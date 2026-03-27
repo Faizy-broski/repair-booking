@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
@@ -36,6 +36,18 @@ function buildSubdomainOrigin(subdomain: string): string {
 }
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="w-full max-w-md mx-auto">
+        <div className="h-48 animate-pulse rounded-lg bg-gray-100" />
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
+  )
+}
+
+function LoginForm() {
   const searchParams = useSearchParams()
   const prefilledEmail = searchParams.get('email') ?? ''
   const redirectTo = searchParams.get('redirectTo') || '/dashboard'
