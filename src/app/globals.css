@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /* ── TSN Brand colours ─────────────────────────────── */
+  --brand-yellow: #F8C301;
+  --brand-teal:   #3BB3C3;
+
+  /* Tonal scale derived from brand colours */
+  --brand-yellow-light: color-mix(in srgb, #F8C301 15%, white);
+  --brand-yellow-dark:  color-mix(in srgb, #F8C301 85%, black);
+  --brand-teal-light:   color-mix(in srgb, #3BB3C3 15%, white);
+  --brand-teal-dark:    color-mix(in srgb, #3BB3C3 80%, black);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* Expose brand colours as Tailwind utilities */
+  --color-brand-yellow:       var(--brand-yellow);
+  --color-brand-yellow-light: var(--brand-yellow-light);
+  --color-brand-yellow-dark:  var(--brand-yellow-dark);
+  --color-brand-teal:         var(--brand-teal);
+  --color-brand-teal-light:   var(--brand-teal-light);
+  --color-brand-teal-dark:    var(--brand-teal-dark);
+}
+
+body {
+  background: #ffffff;
+  color: #171717;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Force light-mode colours on form elements regardless of OS dark-mode preference */
+input, textarea, select {
+  color: #171717;
+  background-color: #ffffff;
+}
