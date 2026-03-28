@@ -5,6 +5,12 @@ const PUBLIC_PATHS = ['/api/auth/', '/api/webhooks/', '/api/public/', '/book/', 
 const SUPERADMIN_SUBDOMAIN = 'admin'
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'repairbooking.co.uk'
 
+// In production, scope auth cookies to the root domain so they are shared
+// across all tenant subdomains (techfix.repairpos.tech, admin.repairpos.tech, etc.)
+const COOKIE_OPTIONS = process.env.NODE_ENV === 'production'
+  ? { domain: `.${ROOT_DOMAIN}`, path: '/', sameSite: 'lax' as const, secure: true }
+  : undefined
+
 // App routes that require tenant context — protected on root domain
 const TENANT_ROUTES = [
   '/dashboard', '/repairs', '/pos', '/customers', '/inventory',
@@ -49,13 +55,17 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: COOKIE_OPTIONS,
       cookies: {
         getAll: () => request.cookies.getAll(),
         setAll: (cookiesToSet) => {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, {
+              ...options,
+              ...(COOKIE_OPTIONS ?? {}),
+            })
           )
         },
       },
@@ -101,7 +111,10 @@ export async function middleware(request: NextRequest) {
     const tenantSupabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { cookies: { getAll: () => request.cookies.getAll(), setAll: () => {} } }
+      {
+        cookieOptions: COOKIE_OPTIONS,
+        cookies: { getAll: () => request.cookies.getAll(), setAll: () => {} },
+      }
     )
 
     const { data: business } = await tenantSupabase
