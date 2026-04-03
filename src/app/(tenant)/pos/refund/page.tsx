@@ -1,5 +1,5 @@
 ﻿'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { Search, CheckCircle2, ChevronLeft, RotateCcw, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,7 +33,7 @@ interface Sale {
   customers: { first_name: string; last_name: string | null } | null
 }
 
-export default function RefundPage() {
+function RefundPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { activeBranch, profile } = useAuthStore()
@@ -474,5 +474,13 @@ export default function RefundPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function RefundPage() {
+  return (
+    <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-gray-400">Loading...</div>}>
+      <RefundPageInner />
+    </Suspense>
   )
 }
