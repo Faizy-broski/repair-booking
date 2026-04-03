@@ -1,0 +1,31 @@
+/**
+ * GET /api/portal/invoices?token=xxx
+ * Returns all invoices for the authenticated portal customer.
+ */
+import { NextRequest, NextResponse } from 'next/server'
+import { adminSupabase } from '@/backend/config/supabase'
+
+export async function GET(req: NextRequest) {
+  const token = req.nextUrl.searchParams.get('token')
+  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { data: session } = await adminSupabase
+    .from('customer_portal_sessions')
+    .select('customer_id, business_id, expires_at')
+    .eq('token', token)
+    .single()
+
+  if (!session || new Date(session.expires_at) < new Date()) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { data: invoices, error } = await adminSupabase
+    .from('invoices')
+    .select('id, invoice_number, status, total, amount_paid, balance_due, due_date, created_at, branches(name)')
+    .eq('customer_id', session.customer_id)
+    .order('created_at', { ascending: false })
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json({ data: invoices ?? [] })
+}

@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat d:/thesocialnexus/POS/repair-booking/src/app/api/messages/[id]/route.ts)",
+      "Bash(node -e \"const z=require\\(''zod''\\);console.log\\(z.NEVER?.description||require\\(''./node_modules/zod/package.json''\\).version\\)\")",
+      "Bash(ls -la \"d:\\\\thesocialnexus\\\\POS\\\\repair-booking/src/app/\\(tenant\\)/\")",
+      "Bash(ls -la \"d:\\\\thesocialnexus\\\\POS\\\\repair-booking/src/app/\\(tenant\\)/repairs/\")",
+      "Bash(ls -la \"d:\\\\thesocialnexus\\\\POS\\\\repair-booking/src/app/\\(tenant\\)/inventory/\")",
+      "Bash(find \"d:\\\\thesocialnexus\\\\POS\\\\repair-booking/src/app/\\(tenant\\)/inventory/\" -name \"*.tsx\")",
+      "Bash(ls -la \"d:\\\\thesocialnexus\\\\POS\\\\repair-booking\\\\src\\\\app\\\\\\(tenant\\)\\\\reports\"\" 2>/dev/null || echo \"Directory check \")",
+      "Bash(ls -la d:/thesocialnexus/POS/repair-booking/src/app/\\\\\\(tenant\\\\\\)/reports/)",
+      "Bash(ls /d/thesocialnexus/POS/repair-booking/src/app/\\\\\\(tenant\\\\\\)/settings/)",
+      "Bash(tail -20 \"d:/thesocialnexus/POS/repair-booking/src/app/\\(tenant\\)/pos/page.tsx\")",
+      "Bash(ls /d/thesocialnexus/POS/repair-booking/src/app/\\\\\\(tenant\\\\\\)/inventory/purchase-orders/)",
+      "Bash(ls /d/thesocialnexus/POS/repair-booking/src/app/\\\\\\(tenant\\\\\\)/inventory/stock-count/)",
+      "Bash(head -5 grep -n \"activeProfile\" \"d:/thesocialnexus/POS/repair-booking/src/app/\\(tenant\\)/inventory/stock-count/page.tsx\")",
+      "Bash(head -5 grep -n \"activeProfile\" \"d:/thesocialnexus/POS/repair-booking/src/app/\\(tenant\\)/inventory/trade-ins/page.tsx\")",
+      "Bash(\"d:/thesocialnexus/POS/repair-booking/src/types/database.ts\":*)",
+      "Bash(mkdir -p \"d:/thesocialnexus/POS/repair-booking/src/app/api/product-attributes/[id]/values\")",
+      "Bash(mkdir -p \"d:/thesocialnexus/POS/repair-booking/src/app/api/product-attributes/values/[valueId]\")",
+      "Bash(ls -la \"d:\\\\thesocialnexus\\\\POS\\\\repair-booking\\\\src\\\\app\\\\\\(tenant\\)\\\\inventory\\\\new\"\" 2>&1 || echo \"Directory does not exist or cannot be accessed \")",
+      "Bash(find \"d:/thesocialnexus/POS/repair-booking/src/app/\\(tenant\\)/inventory\" -type d -name \"new\")",
+      "Bash(ls -la \"d:/thesocialnexus/POS/repair-booking/src/app/\\(tenant\\)/inventory/\")",
+      "Bash(test -d \"d:/thesocialnexus/POS/repair-booking/src/app/\\(tenant\\)/inventory/new\")",
+      "Bash(wc -l \"d:/thesocialnexus/POS/repair-booking/src/app/\\(tenant\\)/settings/page.tsx\")",
+      "Bash(powershell -Command \":*)",
+      "Bash(grep -n \"process_sale\" supabase/migrations/*.sql)"
+    ]
+  }
+}

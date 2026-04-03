@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p src)",
+      "Bash(mv app:*)",
+      "Bash(mv components:*)",
+      "Bash(mv store:*)",
+      "Bash(mv lib:*)",
+      "Bash(mv hooks:*)",
+      "Bash(mv types:*)",
+      "Bash(mv backend:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node -e \"const p = require\\(''./package.json''\\); console.log\\(''zod:'', p.dependencies.zod, ''\\\\n@hookform/resolvers:'', p.dependencies[''@hookform/resolvers'']\\)\")",
+      "Bash(grep -rl \"from ''''@hookform/resolvers/zod''''\" --include=\"*.tsx\" --include=\"*.ts\")",
+      "Bash(xargs sed:*)",
+      "Bash(xargs grep:*)",
+      "Read(//c/Users/HP/.claude/plans/**)",
+      "Bash(cat d:/thesocialnexus/POS/repair-booking/src/app/api/settings/branches/[id]/route.ts)",
+      "Bash(cat d:/thesocialnexus/POS/repair-booking/src/app/api/gift-cards/[id]/route.ts)",
+      "Bash(cat d:/thesocialnexus/POS/repair-booking/src/app/api/repairs/[id]/status/route.ts)"
+    ]
+  }
+}
