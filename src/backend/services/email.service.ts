@@ -86,6 +86,75 @@ export const EmailService = {
     })
   },
 
+  async sendWelcome(payload: {
+    to: string; fullName: string; businessName: string
+    subdomain: string; password: string; planName: string
+  }) {
+    const loginUrl = `https://${payload.subdomain}.repairbooking.co.uk/login`
+    const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://repairbooking.co.uk'
+
+    await getTransporter().sendMail({
+      from: `"RepairBooking" <${process.env.SMTP_FROM ?? process.env.SMTP_USER}>`,
+      to: payload.to,
+      subject: `Welcome to RepairBooking — Your account is ready`,
+      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8f9fa;font-family:Arial,sans-serif;">
+        <div style="max-width:600px;margin:40px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+          <div style="background:#3BB3C3;padding:32px 40px;text-align:center;">
+            <h1 style="color:#fff;margin:0;font-size:24px;font-weight:800;">RepairBooking</h1>
+            <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;">Your shop is ready to go live</p>
+          </div>
+          <div style="padding:40px;">
+            <p style="color:#374151;font-size:16px;margin:0 0 8px;">Hi ${payload.fullName},</p>
+            <p style="color:#6B7280;font-size:14px;line-height:1.6;margin:0 0 24px;">
+              Your <strong>${payload.planName}</strong> account for <strong>${payload.businessName}</strong> has been activated. Here are your login credentials — keep them safe.
+            </p>
+            <div style="background:#f3fffe;border:1px solid #3BB3C3;border-radius:8px;padding:20px 24px;margin-bottom:24px;">
+              <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#3BB3C3;text-transform:uppercase;letter-spacing:0.05em;">Your Login Details</p>
+              <table style="width:100%;font-size:14px;color:#374151;border-collapse:collapse;">
+                <tr><td style="padding:4px 0;color:#6B7280;width:120px;">Dashboard URL</td><td><a href="${loginUrl}" style="color:#3BB3C3;font-weight:600;">${loginUrl}</a></td></tr>
+                <tr><td style="padding:4px 0;color:#6B7280;">Email</td><td><strong>${payload.to}</strong></td></tr>
+                <tr><td style="padding:4px 0;color:#6B7280;">Password</td><td><strong>${payload.password}</strong></td></tr>
+              </table>
+            </div>
+            <p style="color:#6B7280;font-size:13px;margin:0 0 24px;">We recommend changing your password after your first login via <strong>Settings → Account</strong>.</p>
+            <div style="text-align:center;margin-bottom:32px;">
+              <a href="${loginUrl}" style="display:inline-block;background:#3BB3C3;color:#fff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">Open Your Dashboard →</a>
+            </div>
+            <div style="border-top:1px solid #F3F4F6;padding-top:24px;">
+              <p style="font-size:13px;font-weight:700;color:#374151;margin:0 0 12px;">What to do next:</p>
+              <ol style="color:#6B7280;font-size:13px;line-height:1.8;padding-left:20px;margin:0;">
+                <li>Log in and complete your business profile</li>
+                <li>Add your staff and assign roles</li>
+                <li>Set up your repair categories and services</li>
+                <li>Add your inventory / products</li>
+                <li>Start taking bookings and sales!</li>
+              </ol>
+            </div>
+          </div>
+          <div style="background:#F9FAFB;border-top:1px solid #F3F4F6;padding:20px 40px;text-align:center;">
+            <p style="color:#9CA3AF;font-size:12px;margin:0;">© ${new Date().getFullYear()} The Social Nexus Ltd · <a href="${APP_URL}" style="color:#9CA3AF;">repairbooking.co.uk</a></p>
+          </div>
+        </div>
+      </body></html>`,
+    })
+  },
+
+  async sendEnterpriseEnquiry(payload: { businessName: string; email: string; fullName: string; phone?: string }) {
+    const t = getTransporter()
+    await t.sendMail({
+      from: `"RepairBooking" <${process.env.SMTP_FROM ?? process.env.SMTP_USER}>`,
+      to: process.env.SALES_EMAIL ?? 'sales@repairbooking.co.uk',
+      subject: `New Enterprise enquiry — ${payload.businessName}`,
+      html: `<p>New enterprise enquiry:</p><ul><li><b>Business:</b> ${payload.businessName}</li><li><b>Contact:</b> ${payload.fullName}</li><li><b>Email:</b> ${payload.email}</li><li><b>Phone:</b> ${payload.phone ?? '—'}</li></ul>`,
+    })
+    await t.sendMail({
+      from: `"RepairBooking" <${process.env.SMTP_FROM ?? process.env.SMTP_USER}>`,
+      to: payload.email,
+      subject: `We've received your Enterprise enquiry — RepairBooking`,
+      html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:40px auto;color:#374151;"><h2 style="color:#3BB3C3;">Thanks, ${payload.fullName}!</h2><p>We've received your Enterprise enquiry for <strong>${payload.businessName}</strong>.</p><p>One of our team will be in touch within <strong>1 business day</strong> to discuss your requirements.</p><p style="color:#6B7280;font-size:13px;">— The RepairBooking Team</p></div>`,
+    })
+  },
+
   /**
    * Verify SMTP connection is working (used for test notifications).
    */

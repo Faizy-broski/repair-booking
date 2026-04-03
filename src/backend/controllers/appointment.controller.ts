@@ -58,7 +58,7 @@ const bookingSettingsSchema = z.object({
 export const AppointmentController = {
   async list(request: NextRequest, ctx: RequestContext) {
     const { searchParams } = request.nextUrl
-    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     try {
       const data = await AppointmentService.list(branchId, {
         from: searchParams.get('from') ?? undefined,
@@ -72,7 +72,7 @@ export const AppointmentController = {
   },
 
   async getById(request: NextRequest, ctx: RequestContext, id: string) {
-    const branchId = ctx.auth.branchId ?? ''
+    const branchId = ctx.auth.branchId ?? null
     try {
       const appt = await AppointmentService.getById(id, branchId)
       if (!appt) return notFound('Appointment not found')
@@ -122,7 +122,7 @@ export const AppointmentController = {
   async update(request: NextRequest, ctx: RequestContext, id: string) {
     const { data, error } = await validateBody(request, updateSchema)
     if (error) return error
-    const branchId = ctx.auth.branchId ?? ''
+    const branchId = ctx.auth.branchId ?? null
     try {
       const appt = await AppointmentService.update(id, branchId, data)
       return ok(appt)
@@ -132,7 +132,7 @@ export const AppointmentController = {
   },
 
   async delete(request: NextRequest, ctx: RequestContext, id: string) {
-    const branchId = ctx.auth.branchId ?? ''
+    const branchId = ctx.auth.branchId ?? null
     try {
       await AppointmentService.delete(id, branchId)
       return ok({ deleted: true })
@@ -144,7 +144,7 @@ export const AppointmentController = {
   // ── Business Hours ────────────────────────────────────────────────────────
 
   async getBusinessHours(request: NextRequest, ctx: RequestContext) {
-    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     try {
       const data = await BusinessHoursService.list(branchId)
       return ok(data)
@@ -154,7 +154,7 @@ export const AppointmentController = {
   },
 
   async updateBusinessHours(request: NextRequest, ctx: RequestContext) {
-    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     const { data, error } = await validateBody(request, z.object({ hours: businessHoursSchema }))
     if (error) return error
     try {
@@ -168,7 +168,7 @@ export const AppointmentController = {
   // ── Booking Settings ──────────────────────────────────────────────────────
 
   async getBookingSettings(request: NextRequest, ctx: RequestContext) {
-    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     try {
       const data = await BookingSettingsService.get(branchId)
       return ok(data)
@@ -178,7 +178,7 @@ export const AppointmentController = {
   },
 
   async updateBookingSettings(request: NextRequest, ctx: RequestContext) {
-    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     const { data, error } = await validateBody(request, bookingSettingsSchema)
     if (error) return error
     try {
@@ -192,7 +192,7 @@ export const AppointmentController = {
   // ── Blocked Dates ─────────────────────────────────────────────────────────
 
   async getBlockedDates(request: NextRequest, ctx: RequestContext) {
-    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     try {
       const data = await BlockedDatesService.list(branchId)
       return ok(data)
@@ -202,7 +202,7 @@ export const AppointmentController = {
   },
 
   async addBlockedDate(request: NextRequest, ctx: RequestContext) {
-    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     const { data, error } = await validateBody(request, z.object({
       blocked_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
       reason: z.string().max(200).optional(),
@@ -217,7 +217,7 @@ export const AppointmentController = {
   },
 
   async removeBlockedDate(request: NextRequest, ctx: RequestContext, id: string) {
-    const branchId = ctx.auth.branchId ?? ''
+    const branchId = ctx.auth.branchId ?? null
     try {
       await BlockedDatesService.remove(id, branchId)
       return ok({ deleted: true })
@@ -230,7 +230,7 @@ export const AppointmentController = {
 
   async getAvailability(request: NextRequest, ctx: RequestContext) {
     const { searchParams } = request.nextUrl
-    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     const date = searchParams.get('date')
     if (!date) return badRequest('date parameter is required')
 

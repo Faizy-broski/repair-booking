@@ -2,7 +2,8 @@ import { adminSupabase } from '@/backend/config/supabase'
 import type { InsertTables, UpdateTables } from '@/types/database'
 
 export const EmployeeService = {
-  async list(branchId: string) {
+  async list(branchId: string | null) {
+    if (!branchId) return []
     const { data, error } = await adminSupabase
       .from('employees')
       .select('*')

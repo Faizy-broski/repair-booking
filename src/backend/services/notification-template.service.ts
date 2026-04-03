@@ -222,4 +222,101 @@ export const InvoiceReminderService = {
     if (error) throw error
     return data as InvoiceReminderSettings
   },
+
+  /**
+   * Process all businesses with invoice reminders enabled.
+   * Called by the /api/cron/invoice-reminders route (scheduled daily).
+   * Returns a summary of how many reminders were queued.
+   */
+  async processAll(): Promise<{ processed: number; errors: string[] }> {
+    const { NotificationEngine } = await import('./notification-engine.service')
+
+    // Load all enabled reminder configs
+    const { data: configs, error } = await db('invoice_reminder_settings')
+      .select('*, businesses(id, name, currency, subdomain)')
+      .eq('enabled', true)
+    if (error) throw error
+
+    let processed = 0
+    const errors: string[] = []
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    for (const config of (configs ?? [])) {
+      try {
+        const businessId: string = config.business_id
+        const daysBeforeDue: number = config.days_before_due ?? 3
+        const daysAfterOverdue: number[] = config.days_after_overdue ?? [1, 7, 14]
+        const currency: string = config.businesses?.currency ?? 'GBP'
+        const storeName: string = config.businesses?.name ?? ''
+
+        // --- Reminders before due date ---
+        const beforeDate = new Date(today)
+        beforeDate.setDate(beforeDate.getDate() + daysBeforeDue)
+        const beforeDateStr = beforeDate.toISOString().split('T')[0]
+
+        const { data: upcomingInvoices } = await db('invoices')
+          .select('id, invoice_number, total, balance_due, due_date, customers(first_name, last_name, email, phone)')
+          .eq('business_id', businessId)
+          .in('status', ['unpaid', 'partial'])
+          .eq('due_date', beforeDateStr)
+
+        for (const inv of (upcomingInvoices ?? [])) {
+          const customer = inv.customers
+          if (!customer) continue
+          await NotificationEngine.fire('invoice_overdue', {
+            businessId,
+            relatedId: inv.id,
+            relatedType: 'invoice',
+            recipient: { email: customer.email, phone: customer.phone },
+            variables: {
+              customer_name: `${customer.first_name} ${customer.last_name ?? ''}`.trim(),
+              invoice_number: inv.invoice_number,
+              amount_due: new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(inv.balance_due ?? inv.total),
+              due_date: new Date(inv.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+              store_name: storeName,
+            },
+          })
+          processed++
+        }
+
+        // --- Reminders after overdue ---
+        for (const daysOver of daysAfterOverdue) {
+          const overdueDate = new Date(today)
+          overdueDate.setDate(overdueDate.getDate() - daysOver)
+          const overdueDateStr = overdueDate.toISOString().split('T')[0]
+
+          const { data: overdueInvoices } = await db('invoices')
+            .select('id, invoice_number, total, balance_due, due_date, customers(first_name, last_name, email, phone)')
+            .eq('business_id', businessId)
+            .in('status', ['unpaid', 'partial'])
+            .eq('due_date', overdueDateStr)
+
+          for (const inv of (overdueInvoices ?? [])) {
+            const customer = inv.customers
+            if (!customer) continue
+            await NotificationEngine.fire('invoice_overdue', {
+              businessId,
+              relatedId: inv.id,
+              relatedType: 'invoice',
+              recipient: { email: customer.email, phone: customer.phone },
+              variables: {
+                customer_name: `${customer.first_name} ${customer.last_name ?? ''}`.trim(),
+                invoice_number: inv.invoice_number,
+                amount_due: new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(inv.balance_due ?? inv.total),
+                due_date: new Date(inv.due_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+                store_name: storeName,
+                days_overdue: String(daysOver),
+              },
+            })
+            processed++
+          }
+        }
+      } catch (err) {
+        errors.push(`Business ${config.business_id}: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    }
+
+    return { processed, errors }
+  },
 }

@@ -55,7 +55,7 @@ export const PosController = {
 
   async listSales(request: NextRequest, ctx: RequestContext) {
     const { searchParams } = request.nextUrl
-    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     const { page, limit } = getPagination(searchParams)
     try {
       const { data, count } = await PosService.getSales(branchId, {
@@ -71,7 +71,7 @@ export const PosController = {
   },
 
   async getSaleById(request: NextRequest, ctx: RequestContext, id: string) {
-    const branchId = ctx.auth.branchId ?? ''
+    const branchId = ctx.auth.branchId ?? null
     try {
       const sale = await PosService.getSaleById(id, branchId)
       return ok(sale)

@@ -6,7 +6,7 @@ import { ok, serverError } from '@/backend/utils/api-response'
 export const DashboardController = {
   async get(request: NextRequest, ctx: RequestContext) {
     const { searchParams } = request.nextUrl
-    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     const isOwner = ['business_owner', 'super_admin'].includes(ctx.auth.role)
 
     try {

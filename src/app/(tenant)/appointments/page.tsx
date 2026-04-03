@@ -23,7 +23,7 @@ interface AppointmentRow {
 }
 
 interface CustomerOption { id: string; first_name: string; last_name: string | null }
-interface EmployeeOption { id: string; first_name: string; last_name: string | null }
+interface EmployeeOption { id: string; first_name: string; last_name: string | null; role: string | null }
 
 const STATUS_VARIANTS: Record<string, 'default' | 'success' | 'warning' | 'destructive'> = {
   scheduled: 'default',
@@ -44,7 +44,7 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>
 
-const HOURS = Array.from({ length: 13 }, (_, i) => i + 8) // 8am - 8pm
+const DEFAULT_HOURS = Array.from({ length: 15 }, (_, i) => i + 7) // 7am - 9pm
 
 export default function AppointmentsPage() {
   const { activeBranch } = useAuthStore()
@@ -58,8 +58,8 @@ export default function AppointmentsPage() {
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      start_time: format(new Date(), "yyyy-MM-dd'T'HH:00"),
-      end_time: format(addDays(new Date(), 0), "yyyy-MM-dd'T'HH:30").replace(/T\d\d:/, `T${new Date().getHours().toString().padStart(2, '0')}:`),
+      start_time: format(new Date(), "yyyy-MM-dd") + 'T09:00',
+      end_time: format(new Date(), "yyyy-MM-dd") + 'T09:30',
     },
   })
 
@@ -71,7 +71,7 @@ export default function AppointmentsPage() {
     const [apptRes, custRes, empRes] = await Promise.all([
       fetch(`/api/appointments?branch_id=${activeBranch.id}&from=${from}&to=${to}`),
       fetch(`/api/customers?branch_id=${activeBranch.id}&limit=100`),
-      fetch(`/api/employees?branch_id=${activeBranch.id}`),
+      fetch(`/api/employees?branch_id=${activeBranch.id}&limit=200`),
     ])
     const [apptJson, custJson, empJson] = await Promise.all([apptRes.json(), custRes.json(), empRes.json()])
     setAppointments(apptJson.data ?? [])
@@ -100,10 +100,22 @@ export default function AppointmentsPage() {
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
 
+  // Build dynamic hour range: include default business hours plus any hours that have appointments
+  const hours = (() => {
+    const apptHours = appointments.map((a) => parseInt(a.start_time.slice(11, 13), 10))
+    const minHour = Math.min(DEFAULT_HOURS[0], ...apptHours)
+    const maxHour = Math.max(DEFAULT_HOURS[DEFAULT_HOURS.length - 1], ...apptHours)
+    return Array.from({ length: maxHour - minHour + 1 }, (_, i) => i + minHour)
+  })()
+
+  // Parse date/hour directly from ISO string to avoid timezone conversion issues.
+  // datetime-local sends local wall-clock time; Supabase stores it with +00:00
+  // offset, so we extract the literal date/hour to match what the user entered.
   const getAppointmentsForDayHour = (day: Date, hour: number) =>
     appointments.filter((a) => {
-      const start = parseISO(a.start_time)
-      return isSameDay(start, day) && start.getHours() === hour
+      const datePart = a.start_time.slice(0, 10)   // "2026-04-01"
+      const hourPart = parseInt(a.start_time.slice(11, 13), 10) // 9
+      return datePart === format(day, 'yyyy-MM-dd') && hourPart === hour
     })
 
   return (
@@ -153,7 +165,7 @@ export default function AppointmentsPage() {
           {loading ? (
             <div className="flex h-64 items-center justify-center text-sm text-gray-400">Loading...</div>
           ) : (
-            HOURS.map((hour) => (
+            hours.map((hour) => (
               <div
                 key={hour}
                 className="grid border-b border-gray-100 last:border-b-0"

@@ -29,7 +29,11 @@ export function rateLimitMiddleware(
   request: NextRequest,
   options: RateLimitOptions = {}
 ): NextResponse | null {
-  const { limit = 60, windowMs = 60 * 1000 } = options
+  // No rate limiting in development — all requests share one IP bucket
+  // ('unknown') which causes false 429s during normal navigation.
+  if (process.env.NODE_ENV !== 'production') return null
+
+  const { limit = 300, windowMs = 60 * 1000 } = options
 
   const ip =
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||

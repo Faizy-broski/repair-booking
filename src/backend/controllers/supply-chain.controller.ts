@@ -76,7 +76,7 @@ const statusSchema = z.object({ status: z.enum(['draft','pending','in_progress',
 export const PurchaseOrderController = {
   async list(req: NextRequest, ctx: RequestContext) {
     const { searchParams } = req.nextUrl
-    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     const { page, limit } = getPagination(searchParams)
     try {
       const { data, count } = await PurchaseOrderService.list(ctx.businessId, branchId, {
@@ -101,7 +101,7 @@ export const PurchaseOrderController = {
   async create(req: NextRequest, ctx: RequestContext) {
     const { data, error } = await validateBody(req, createPoSchema)
     if (error) return error
-    const branchId = req.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = req.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     try {
       const po = await PurchaseOrderService.create(ctx.businessId, branchId, {
         ...data, created_by: ctx.auth.userId,
@@ -131,7 +131,7 @@ export const PurchaseOrderController = {
   },
 
   async clone(req: NextRequest, ctx: RequestContext, id: string) {
-    const branchId = req.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = req.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     try {
       const po = await PurchaseOrderService.clone(id, ctx.businessId, branchId, ctx.auth.userId)
       return created(po)
@@ -150,7 +150,7 @@ export const PurchaseOrderController = {
     })
     const { data, error } = await validateBody(req, schema)
     if (error) return error
-    const branchId = req.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = req.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     try {
       const po = await PurchaseOrderService.createFromLowStock(
         ctx.businessId, branchId, data.supplier_id, data.items, ctx.auth.userId
@@ -177,7 +177,7 @@ export const GrnController = {
   async create(req: NextRequest, ctx: RequestContext, poId: string) {
     const { data, error } = await validateBody(req, grnSchema)
     if (error) return error
-    const branchId = req.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = req.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     try {
       const grn = await GrnService.create(ctx.businessId, branchId, poId, ctx.auth.userId ?? '', data.items, data.notes)
       return created(grn)
@@ -210,7 +210,7 @@ export const SpecialOrderController = {
   async create(req: NextRequest, ctx: RequestContext) {
     const { data, error } = await validateBody(req, specialOrderSchema)
     if (error) return error
-    const branchId = ctx.auth.branchId ?? ''
+    const branchId = ctx.auth.branchId ?? null
     try {
       return created(await SpecialOrderService.create({
         ...data, business_id: ctx.businessId, branch_id: branchId,

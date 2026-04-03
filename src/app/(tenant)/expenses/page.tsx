@@ -21,11 +21,13 @@ interface SalaryRow {
   id: string; amount: number; pay_date: string; pay_period: string | null
   employees?: { first_name: string; last_name: string | null } | null
 }
+interface CategoryOption { id: string; name: string }
 
 const expenseSchema = z.object({
   title: z.string().min(1),
   amount: z.coerce.number().positive(),
   expense_date: z.string(),
+  category_id: z.string().uuid().optional().or(z.literal('')),
   notes: z.string().optional(),
 })
 
@@ -35,6 +37,7 @@ export default function ExpensesPage() {
   const { activeBranch } = useAuthStore()
   const [expenses, setExpenses] = useState<ExpenseRow[]>([])
   const [salaries, setSalaries] = useState<SalaryRow[]>([])
+  const [categories, setCategories] = useState<CategoryOption[]>([])
   const [totalExp, setTotalExp] = useState(0)
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -63,14 +66,21 @@ export default function ExpensesPage() {
     setSalaries(json.data ?? [])
   }, [activeBranch])
 
-  useEffect(() => { fetchExpenses(); fetchSalaries() }, [fetchExpenses, fetchSalaries])
+  const fetchCategories = useCallback(async () => {
+    if (!activeBranch) return
+    const res = await fetch(`/api/expenses/categories?business_id=${activeBranch.business_id}`)
+    const json = await res.json()
+    setCategories(json.data ?? [])
+  }, [activeBranch])
+
+  useEffect(() => { fetchExpenses(); fetchSalaries(); fetchCategories() }, [fetchExpenses, fetchSalaries, fetchCategories])
 
   async function onCreateExpense(data: ExpenseFormData) {
     if (!activeBranch) return
     const res = await fetch('/api/expenses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, branch_id: activeBranch.id }),
+      body: JSON.stringify({ ...data, branch_id: activeBranch.id, category_id: data.category_id || null }),
     })
     if (res.ok) { reset(); setSheetOpen(false); fetchExpenses() }
   }
@@ -146,6 +156,18 @@ export default function ExpensesPage() {
       <InlineFormSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Add Expense">
         <form onSubmit={handleSubmit(onCreateExpense)} className="space-y-4">
           <Input label="Title" placeholder="Internet Bill" required error={errors.title?.message} {...register('title')} />
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Category</label>
+            <select
+              {...register('category_id')}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            >
+              <option value="">No category</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
           <Input label="Amount (£)" type="number" step="0.01" required error={errors.amount?.message} {...register('amount')} />
           <Input label="Date" type="date" required {...register('expense_date')} />
           <div>

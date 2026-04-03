@@ -5,8 +5,8 @@ const db = (t: string): any => (adminSupabase as any).from(t)
 const rpc = (fn: string, args?: Record<string, unknown>): any => (adminSupabase as any).rpc(fn, args)
 
 export const InvoiceService = {
-  async list(branchId: string, params: { page?: number; limit?: number; status?: string }) {
-    const { page = 1, limit = 20, status } = params
+  async list(branchId: string, params: { page?: number; limit?: number; status?: string; customer_id?: string }) {
+    const { page = 1, limit = 20, status, customer_id } = params
     let q = adminSupabase
       .from('invoices')
       .select('*, customers(first_name,last_name)', { count: 'exact' })
@@ -15,6 +15,7 @@ export const InvoiceService = {
       .range((page - 1) * limit, page * limit - 1)
 
     if (status) q = q.eq('status', status)
+    if (customer_id) q = q.eq('customer_id', customer_id)
 
     const { data, error, count } = await q
     if (error) throw error

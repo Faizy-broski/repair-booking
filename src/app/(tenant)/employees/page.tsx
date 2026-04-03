@@ -43,6 +43,7 @@ const schema = z.object({
   phone: z.string().optional(),
   role: z.string().optional(),
   hourly_rate: z.coerce.number().optional(),
+  access_pin: z.string().regex(/^\d{4,6}$/, 'PIN must be 4–6 digits').optional().or(z.literal('')),
 })
 type FormData = z.infer<typeof schema>
 
@@ -347,6 +348,12 @@ export default function EmployeesPage() {
           <Input label="Phone" type="tel" {...register('phone')} />
           <Input label="Role/Position" placeholder="Technician, Cashier..." {...register('role')} />
           <Input label="Hourly Rate (£)" type="number" step="0.01" {...register('hourly_rate')} />
+          <div>
+            <Input label="Access PIN (4–6 digits)" type="password" inputMode="numeric"
+              placeholder="Leave blank to skip" error={errors.access_pin?.message}
+              {...register('access_pin')} />
+            <p className="mt-1 text-xs text-gray-400">Used for PIN-gated actions (discounts, refunds, etc.)</p>
+          </div>
           <Button type="submit" className="w-full" loading={isSubmitting}>Add Employee</Button>
         </form>
       </InlineFormSheet>

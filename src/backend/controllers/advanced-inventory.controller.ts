@@ -7,15 +7,13 @@ import { getPagination } from '@/backend/utils/pagination'
 import {
   SerialService,
   CountService,
-  BundleService,
-  TradeInService,
 } from '@/backend/services/advanced-inventory.service'
 
 // ── Serialized Units ────────────────────────────────────────
 
 export const SerialController = {
   async list(req: NextRequest, ctx: RequestContext, id: string) {
-    const branchId = ctx.auth.branchId ?? req.nextUrl.searchParams.get('branch_id') ?? ''
+    const branchId = ctx.auth.branchId ?? req.nextUrl.searchParams.get('branch_id') ?? null
     try { return ok(await SerialService.list(id, branchId)) }
     catch (err) { return serverError('Failed to fetch serials', err) }
   },
@@ -74,7 +72,7 @@ export const SerialController = {
 
 export const CountController = {
   async list(req: NextRequest, ctx: RequestContext) {
-    const branchId = ctx.auth.branchId ?? req.nextUrl.searchParams.get('branch_id') ?? ''
+    const branchId = ctx.auth.branchId ?? req.nextUrl.searchParams.get('branch_id') ?? null
     try { return ok(await CountService.list(branchId)) }
     catch (err) { return serverError('Failed to fetch counts', err) }
   },
@@ -121,90 +119,5 @@ export const CountController = {
   async cancel(_req: NextRequest, _ctx: RequestContext, id: string) {
     try { await CountService.cancel(id); return ok({ success: true }) }
     catch (err) { return serverError('Failed to cancel count', err) }
-  },
-}
-
-// ── Bundles ─────────────────────────────────────────────────
-
-export const BundleController = {
-  async list(req: NextRequest, ctx: RequestContext) {
-    const businessId = ctx.businessId ?? req.nextUrl.searchParams.get('business_id') ?? ''
-    try { return ok(await BundleService.list(businessId)) }
-    catch (err) { return serverError('Failed to fetch bundles', err) }
-  },
-
-  async create(req: NextRequest, ctx: RequestContext) {
-    const schema = z.object({
-      business_id:  z.string().uuid(),
-      name:         z.string().min(1),
-      bundle_price: z.number().min(0),
-      description:  z.string().optional(),
-      sku:          z.string().optional(),
-      is_active:    z.boolean().default(true),
-      items: z.array(z.object({
-        product_id: z.string().uuid(),
-        quantity:   z.number().int().min(1),
-      })).min(1),
-    })
-    const { data, error } = await validateBody(req, schema)
-    if (error) return error
-    try { return created(await BundleService.create(data)) }
-    catch (err) { return serverError('Failed to create bundle', err) }
-  },
-
-  async update(req: NextRequest, _ctx: RequestContext, id: string) {
-    const schema = z.object({
-      name:         z.string().min(1).optional(),
-      bundle_price: z.number().min(0).optional(),
-      description:  z.string().optional(),
-      sku:          z.string().optional(),
-      is_active:    z.boolean().optional(),
-      items: z.array(z.object({
-        product_id: z.string().uuid(),
-        quantity:   z.number().int().min(1),
-      })).optional(),
-    })
-    const { data, error } = await validateBody(req, schema)
-    if (error) return error
-    try { return ok(await BundleService.update(id, data)) }
-    catch (err) { return serverError('Failed to update bundle', err) }
-  },
-
-  async remove(_req: NextRequest, _ctx: RequestContext, id: string) {
-    try { await BundleService.remove(id); return ok({ deleted: true }) }
-    catch (err) { return serverError('Failed to delete bundle', err) }
-  },
-}
-
-// ── Trade-In ────────────────────────────────────────────────
-
-export const TradeInController = {
-  async list(req: NextRequest, ctx: RequestContext) {
-    const branchId = ctx.auth.branchId ?? req.nextUrl.searchParams.get('branch_id') ?? ''
-    const { page } = getPagination(req.nextUrl.searchParams)
-    try {
-      const { data, total } = await TradeInService.list(branchId, page)
-      return ok(data, { page, total })
-    }
-    catch (err) { return serverError('Failed to fetch trade-ins', err) }
-  },
-
-  async create(req: NextRequest, ctx: RequestContext) {
-    const schema = z.object({
-      business_id:     z.string().uuid(),
-      branch_id:       z.string().uuid(),
-      product_id:      z.string().uuid(),
-      trade_in_value:  z.number().min(0),
-      condition_grade: z.enum(['A', 'B', 'C', 'D', 'faulty']),
-      customer_id:     z.string().uuid().optional(),
-      variant_id:      z.string().uuid().optional(),
-      serial_number:   z.string().optional(),
-      imei:            z.string().optional(),
-      notes:           z.string().optional(),
-    })
-    const { data, error } = await validateBody(req, schema)
-    if (error) return error
-    try { return created(await TradeInService.create(data)) }
-    catch (err) { return serverError('Failed to create trade-in', err) }
   },
 }

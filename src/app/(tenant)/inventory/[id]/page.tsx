@@ -1,390 +1,490 @@
 'use client'
-import { useState, useEffect, use, useCallback } from 'react'
+import { useState, useEffect, use, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Plus, Trash2, Hash, Settings2 } from 'lucide-react'
+import { ChevronLeft, Save, Trash2, ImagePlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Modal } from '@/components/ui/modal'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
-
-const VALUATION_LABELS: Record<string, string> = {
-  weighted_average: 'Weighted Average',
-  fifo: 'FIFO',
-  lifo: 'LIFO',
-}
+import Link from 'next/link'
 
 interface Product {
   id: string; name: string; sku: string | null; barcode: string | null
-  selling_price: number; cost_price: number; is_service: boolean
-  is_serialized: boolean; valuation_method: string; description: string | null
-  categories?: { name: string } | null
-  brands?: { name: string } | null
-  product_variants?: { id: string; name: string; sku: string | null; selling_price: number }[]
+  selling_price: number; cost_price: number | null; is_service: boolean
+  image_url: string | null; item_type?: string; part_type?: string | null
+  physical_location?: string | null
+  commission_enabled: boolean; commission_type: string; commission_rate: number
+  loyalty_enabled: boolean; low_stock_alert: number | null
+  category_id: string | null; brand_id: string | null; model_id: string | null; supplier_id: string | null
+  categories?: { name: string } | null; brands?: { name: string } | null
+  suppliers?: { name: string; id: string } | null
+  service_devices?: { name: string; id: string } | null
 }
 
-interface Serial {
-  id: string; serial_number: string; imei: string | null; status: string
-  notes: string | null; created_at: string
-}
+interface Category { id: string; name: string }
+interface Brand { id: string; name: string; category_id?: string | null }
+interface Supplier { id: string; name: string }
+interface ServiceDevice { id: string; name: string; brand_id?: string | null }
+interface PartType { id: string; name: string; device_id?: string | null }
 
-const SERIAL_STATUS_VARIANT: Record<string, 'success' | 'warning' | 'default' | 'destructive'> = {
-  in_stock: 'success', sold: 'default', in_repair: 'warning', returned: 'warning', damaged: 'destructive',
-}
-
-type Tab = 'overview' | 'serials'
+type ItemType = 'product' | 'part'
 
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const router  = useRouter()
-  const { activeBranch } = useAuthStore()
+  const { activeBranch, branches } = useAuthStore()
+  const router = useRouter()
 
-  const [product,    setProduct]    = useState<Product | null>(null)
-  const [serials,    setSerials]    = useState<Serial[]>([])
-  const [tab,        setTab]        = useState<Tab>('overview')
-  const [loading,    setLoading]    = useState(true)
-  const [addModal,   setAddModal]   = useState(false)
-  const [bulkModal,  setBulkModal]  = useState(false)
-  const [newSerial,  setNewSerial]  = useState({ serial_number: '', imei: '' })
-  const [bulkText,   setBulkText]   = useState('')
-  const [saving,     setSaving]     = useState(false)
-  const [statusFilter, setStatusFilter] = useState('')
-  const [settingsModal, setSettingsModal] = useState(false)
-  const [settingsForm, setSettingsForm] = useState({ is_serialized: false, valuation_method: 'weighted_average' })
-  const [settingsSaving, setSettingsSaving] = useState(false)
+  const [product, setProduct] = useState<Product | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [deleteModal, setDeleteModal] = useState(false)
 
-  async function fetchProduct() {
+  const [categories, setCategories] = useState<Category[]>([])
+  const [allBrands, setAllBrands] = useState<Brand[]>([])
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [allDevices, setAllDevices] = useState<ServiceDevice[]>([])
+  const [allPartTypes, setAllPartTypes] = useState<PartType[]>([])
+
+  const [addingCategory, setAddingCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [addingBrand, setAddingBrand] = useState(false)
+  const [newBrandName, setNewBrandName] = useState('')
+  const [addingDevice, setAddingDevice] = useState(false)
+  const [newDeviceName, setNewDeviceName] = useState('')
+
+  const [itemType, setItemType] = useState<ItemType>('product')
+  const [name, setName] = useState('')
+  const [categoryId, setCategoryId] = useState('')
+  const [brandId, setBrandId] = useState('')
+  const [modelId, setModelId] = useState('')
+  const [sku, setSku] = useState('')
+  const [barcode, setBarcode] = useState('')
+  const [imageUrl, setImageUrl] = useState('')
+  const [partType, setPartType] = useState('')
+  const [costPrice, setCostPrice] = useState('')
+  const [sellingPrice, setSellingPrice] = useState('')
+  const [supplierId, setSupplierId] = useState('')
+  const [onHand, setOnHand] = useState<number | null>(null)
+  const [lowStockAlert, setLowStockAlert] = useState(5)
+  const [physicalLocation, setPhysicalLocation] = useState('')
+
+  const [commissionEnabled, setCommissionEnabled] = useState(false)
+  const [commissionType, setCommissionType] = useState('percentage')
+  const [commissionRate, setCommissionRate] = useState('')
+  const [loyaltyEnabled, setLoyaltyEnabled] = useState(true)
+
+  const fetchProduct = useCallback(async () => {
     setLoading(true)
-    const res  = await fetch(`/api/products/${id}`)
+    const branchParam = activeBranch ? `?branch_id=${activeBranch.id}` : ''
+    const res = await fetch(`/api/products/${id}${branchParam}`)
     const json = await res.json()
-    setProduct(json.data)
-    setSettingsForm({
-      is_serialized: json.data?.is_serialized ?? false,
-      valuation_method: json.data?.valuation_method ?? 'weighted_average',
-    })
-    setLoading(false)
-  }
+    const p: Product & { on_hand?: number } = json.data ?? json
+    setProduct(p)
+    if (p.on_hand !== undefined) setOnHand(p.on_hand)
 
-  const fetchSerials = useCallback(async () => {
-    if (!activeBranch) return
-    const res  = await fetch(`/api/products/${id}/serials?branch_id=${activeBranch.id}`)
-    const json = await res.json()
-    setSerials(json.data ?? [])
+    setItemType((p.item_type as ItemType) ?? (p.is_service ? 'part' : 'product'))
+    setName(p.name ?? '')
+    setCategoryId(p.category_id ?? '')
+    setBrandId(p.brand_id ?? '')
+    setModelId(p.model_id ?? p.service_devices?.id ?? '')
+    setSku(p.sku ?? '')
+    setBarcode(p.barcode ?? '')
+    setImageUrl(p.image_url ?? '')
+    setPartType(p.part_type ?? '')
+    setCostPrice(String(p.cost_price ?? ''))
+    setSellingPrice(String(p.selling_price ?? ''))
+    setSupplierId(p.supplier_id ?? p.suppliers?.id ?? '')
+    setLowStockAlert(p.low_stock_alert ?? 5)
+    setPhysicalLocation(p.physical_location ?? '')
+    setCommissionEnabled(p.commission_enabled ?? false)
+    setCommissionType(p.commission_type ?? 'percentage')
+    setCommissionRate(String(p.commission_rate ?? ''))
+    setLoyaltyEnabled(p.loyalty_enabled ?? true)
+    setLoading(false)
   }, [id, activeBranch])
 
-  useEffect(() => { fetchProduct() }, [id])
-  useEffect(() => { if (tab === 'serials') fetchSerials() }, [tab, fetchSerials])
+  useEffect(() => { fetchProduct() }, [fetchProduct])
+  useEffect(() => {
+    fetch('/api/categories').then(r => r.json()).then(j => setCategories(j.data ?? [])).catch(() => {})
+    fetch('/api/brands').then(r => r.json()).then(j => setAllBrands(j.data ?? [])).catch(() => {})
+    fetch('/api/suppliers').then(r => r.json()).then(j => setSuppliers(j.data ?? [])).catch(() => {})
+    fetch('/api/services/devices').then(r => r.json()).then(j => setAllDevices(j.data ?? [])).catch(() => {})
+    fetch('/api/part-types').then(r => r.json()).then(j => setAllPartTypes(j.data ?? [])).catch(() => {})
+  }, [])
 
-  async function addSerial() {
-    if (!activeBranch || !newSerial.serial_number) return
-    setSaving(true)
-    await fetch(`/api/products/${id}/serials`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ branch_id: activeBranch.id, ...newSerial, imei: newSerial.imei || undefined }),
+  // Filtered lists based on hierarchy
+  const brands = categoryId ? allBrands.filter(b => b.category_id === categoryId) : allBrands
+  const devices = brandId ? allDevices.filter(d => d.brand_id === brandId) : allDevices
+  const partTypesForModel = modelId ? allPartTypes.filter(p => p.device_id === modelId) : allPartTypes
+
+  async function handleAddCategory() {
+    if (!newCategoryName.trim()) return
+    const res = await fetch('/api/categories', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newCategoryName.trim() }),
     })
-    setAddModal(false)
-    setNewSerial({ serial_number: '', imei: '' })
-    setSaving(false)
-    fetchSerials()
+    if (res.ok) {
+      const json = await res.json()
+      setCategories(prev => [...prev, json.data])
+      setCategoryId(json.data.id)
+      setNewCategoryName(''); setAddingCategory(false)
+    }
   }
 
-  async function addBulkSerials() {
-    if (!activeBranch || !bulkText.trim()) return
-    setSaving(true)
-    const serials = bulkText
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const [serial_number, imei] = line.split(',').map((s) => s.trim())
-        return { serial_number, imei: imei || undefined }
+  async function handleAddBrand() {
+    if (!newBrandName.trim()) return
+    const res = await fetch('/api/brands', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newBrandName.trim(), category_id: categoryId || null }),
+    })
+    if (res.ok) {
+      const json = await res.json()
+      setAllBrands(prev => [...prev, json.data])
+      setBrandId(json.data.id)
+      setNewBrandName(''); setAddingBrand(false)
+    }
+  }
+
+  async function handleAddDevice() {
+    if (!newDeviceName.trim() || !brandId) return
+    const selectedBrand = brands.find(b => b.id === brandId)
+    if (!selectedBrand) return
+    const mfRes = await fetch('/api/services/manufacturers')
+    const mfJson = await mfRes.json()
+    let manufacturer = (mfJson.data ?? []).find((m: { name: string }) => m.name === selectedBrand.name)
+    if (!manufacturer) {
+      const createMfRes = await fetch('/api/services/manufacturers', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: selectedBrand.name }),
       })
-    await fetch(`/api/products/${id}/serials/bulk`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ branch_id: activeBranch.id, serials }),
+      if (!createMfRes.ok) return
+      manufacturer = (await createMfRes.json()).data
+    }
+    const res = await fetch('/api/services/devices', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newDeviceName.trim(), manufacturer_id: manufacturer.id, brand_id: brandId || null }),
     })
-    setBulkModal(false)
-    setBulkText('')
-    setSaving(false)
-    fetchSerials()
+    if (res.ok) {
+      const json = await res.json()
+      setAllDevices(prev => [...prev, json.data])
+      setModelId(json.data.id)
+      setNewDeviceName(''); setAddingDevice(false)
+    }
   }
 
-  async function deleteSerial(serialId: string) {
-    if (!confirm('Delete this serial? This cannot be undone.')) return
-    await fetch(`/api/inventory/serials/${serialId}`, { method: 'DELETE' })
-    fetchSerials()
-  }
-
-  async function saveSettings() {
-    setSettingsSaving(true)
+  async function handleSave() {
+    if (!name.trim()) return
+    setSaving(true)
+    const payload: Record<string, unknown> = {
+      name: name.trim(),
+      item_type: itemType,
+      category_id: categoryId || null,
+      brand_id: brandId || null,
+      model_id: modelId || null,
+      sku: sku || null,
+      barcode: barcode || null,
+      image_url: imageUrl || null,
+      is_service: false,
+      part_type: itemType === 'part' ? (partType || null) : null,
+      cost_price: parseFloat(costPrice) || 0,
+      selling_price: parseFloat(sellingPrice) || 0,
+      supplier_id: itemType === 'part' ? (supplierId || null) : null,
+      low_stock_alert: lowStockAlert,
+      physical_location: physicalLocation || null,
+      branch_id: activeBranch?.id ?? null,
+      commission_enabled: commissionEnabled,
+      commission_type: commissionType,
+      commission_rate: parseFloat(commissionRate) || 0,
+      loyalty_enabled: loyaltyEnabled,
+    }
     await fetch(`/api/products/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settingsForm),
+      body: JSON.stringify(payload),
     })
-    setSettingsModal(false)
-    setSettingsSaving(false)
-    fetchProduct()
+    await fetchProduct()
+    setSaving(false)
   }
 
-  if (loading || !product) {
-    return <div className="space-y-4">{[1,2,3].map((i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-gray-100" />)}</div>
+  async function handleDelete() {
+    await fetch(`/api/products/${id}`, { method: 'DELETE' })
+    router.push('/inventory')
   }
 
-  const filteredSerials = statusFilter ? serials.filter((s) => s.status === statusFilter) : serials
-  const statusCounts = serials.reduce((acc, s) => ({ ...acc, [s.status]: (acc[s.status] ?? 0) + 1 }), {} as Record<string, number>)
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-brand-teal" />
+      </div>
+    )
+  }
+
+  if (!product) {
+    return (
+      <div className="py-16 text-center">
+        <p className="text-gray-500">Product not found.</p>
+        <Link href="/inventory" className="mt-2 inline-block text-sm text-brand-teal hover:underline">Back to Inventory</Link>
+      </div>
+    )
+  }
+
+  const cost = parseFloat(costPrice)
+  const sell = parseFloat(sellingPrice)
+  const hasMargin = !isNaN(cost) && !isNaN(sell) && cost > 0 && sell > 0
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-gray-900">{product.name}</h1>
-            {product.is_service && <Badge variant="purple">Service</Badge>}
-            {product.is_serialized && <Badge variant="secondary">Serialized</Badge>}
-          </div>
-          <p className="text-sm text-gray-500">
-            {product.categories?.name && `${product.categories.name} · `}
-            {product.sku && `SKU: ${product.sku}`}
-          </p>
+    <div className="flex min-h-screen flex-col">
+      <div className="sticky top-0 z-30 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-3">
+        <div className="flex items-center gap-3">
+          <Link href="/inventory" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800">
+            <ChevronLeft className="h-4 w-4" /> Back to Inventory
+          </Link>
+          <span className="text-gray-300">/</span>
+          <span className="text-sm font-medium text-gray-900">{product.name}</span>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setSettingsModal(true)}>
-          <Settings2 className="h-4 w-4" /> Settings
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="text-red-600 hover:bg-red-50" onClick={() => setDeleteModal(true)}>
+            <Trash2 className="h-4 w-4" /> Delete
+          </Button>
+          <Button onClick={handleSave} loading={saving}>
+            <Save className="h-4 w-4" /> Save Changes
+          </Button>
+        </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-200">
-        {(['overview', ...(product.is_serialized ? ['serials'] : [])] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium transition-colors capitalize ${
-              tab === t ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {t}{t === 'serials' ? ` (${serials.length})` : ''}
-          </button>
-        ))}
-      </div>
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl px-6 py-6 space-y-8">
 
-      {/* Overview tab */}
-      {tab === 'overview' && (
+          {/* Type Toggle */}
+          <section>
+            <div className="mb-4 border-b border-gray-200 pb-2">
+              <h2 className="text-base font-semibold text-gray-900">Item Type</h2>
+            </div>
+            <div className="flex rounded-lg border border-gray-200 p-0.5 max-w-xs">
+              <button type="button" onClick={() => setItemType('product')}
+                className={`flex-1 rounded py-2 text-sm font-medium transition-colors ${itemType === 'product' ? 'bg-brand-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                Product
+              </button>
+              <button type="button" onClick={() => setItemType('part')}
+                className={`flex-1 rounded py-2 text-sm font-medium transition-colors ${itemType === 'part' ? 'bg-brand-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                Part
+              </button>
+            </div>
+          </section>
+
+          {/* Item Details */}
+          <section>
+            <div className="mb-4 border-b border-gray-200 pb-2">
+              <h2 className="text-base font-semibold text-gray-900">{itemType === 'part' ? 'Part' : 'Product'} Details</h2>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                {imageUrl ? (
+                  <img src={imageUrl} alt="Item" className="h-20 w-20 rounded-xl border border-gray-200 object-contain" />
+                ) : (
+                  <div className="h-20 w-20 rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400">
+                    <ImagePlus className="h-6 w-6" />
+                    <span className="text-xs mt-1">Image</span>
+                  </div>
+                )}
+                <div className="flex-1">
+                  <Input label="Image URL" placeholder="https://..." value={imageUrl} onChange={e => setImageUrl(e.target.value)} />
+                </div>
+              </div>
+
+              <Input label="Name *" required value={name} onChange={e => setName(e.target.value)} />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700">Device Type</label>
+                    <button type="button" onClick={() => setAddingCategory(true)} className="text-xs text-brand-teal hover:underline">+ Add</button>
+                  </div>
+                  <Select options={[{ value: '', label: 'Select type...' }, ...categories.map(c => ({ value: c.id, label: c.name }))]} value={categoryId} onValueChange={v => { setCategoryId(v); setBrandId(''); setModelId(''); setPartType('') }} />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700">Brand</label>
+                    <button type="button" onClick={() => setAddingBrand(true)} className="text-xs text-brand-teal hover:underline">+ Add</button>
+                  </div>
+                  <Select options={[{ value: '', label: 'Select brand...' }, ...brands.map(b => ({ value: b.id, label: b.name }))]} value={brandId} onValueChange={v => { setBrandId(v); setModelId('') }} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700">Model</label>
+                    <button type="button" onClick={() => setAddingDevice(true)} className="text-xs text-brand-teal hover:underline">+ Add</button>
+                  </div>
+                  <Select options={[{ value: '', label: 'Select model...' }, ...devices.map(d => ({ value: d.id, label: d.name }))]} value={modelId} onValueChange={setModelId} />
+                </div>
+                {itemType === 'part' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Part Type</label>
+                    <Select options={[{ value: '', label: 'Select part type...' }, ...partTypesForModel.map(p => ({ value: p.name, label: p.name }))]} value={partType} onValueChange={setPartType} />
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Input label="SKU" value={sku} onChange={e => setSku(e.target.value)} />
+                <Input label="Barcode / UPC" value={barcode} onChange={e => setBarcode(e.target.value)} />
+              </div>
+            </div>
+          </section>
+
+          {/* Pricing */}
+          <section>
+            <div className="mb-4 border-b border-gray-200 pb-2">
+              <h2 className="text-base font-semibold text-gray-900">Pricing</h2>
+            </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Input label="Cost Price (\u00a3)" type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
+                <Input label="Selling Price (\u00a3) *" type="number" step="0.01" min="0" placeholder="0.00" required value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
+              </div>
+              {hasMargin && (
+                <div className="rounded-lg bg-green-50 border border-green-100 px-4 py-2.5 flex items-center gap-4 text-sm">
+                  <span className="text-gray-600">Margin:</span>
+                  <span className="font-semibold text-green-700">{Math.round(((sell - cost) / sell) * 100)}%</span>
+                  <span className="text-gray-500">({formatCurrency(sell - cost)} profit)</span>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Stock */}
+          <section>
+            <div className="mb-4 border-b border-gray-200 pb-2">
+              <h2 className="text-base font-semibold text-gray-900">Stock</h2>
+            </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                  <p className="text-xs text-gray-500">On Hand</p>
+                  <p className="text-lg font-bold text-gray-900">{onHand ?? 0}</p>
+                </div>
+                <Input label="Low Stock Alert" type="number" min="0" value={lowStockAlert} onChange={e => setLowStockAlert(parseInt(e.target.value) || 0)} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Stock Location</label>
+                <Select
+                  options={[
+                    { value: '', label: 'Select location...' },
+                    { value: 'warehouse', label: 'Warehouse (Main Stock)' },
+                    ...branches.map(b => ({ value: b.name, label: b.name + (b.is_main ? ' (Main Branch)' : '') })),
+                  ]}
+                  value={physicalLocation}
+                  onValueChange={setPhysicalLocation}
+                />
+              </div>
+              {itemType === 'part' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier (optional)</label>
+                  <Select options={[{ value: '', label: 'Select Supplier...' }, ...suppliers.map(s => ({ value: s.id, label: s.name }))]} value={supplierId} onValueChange={setSupplierId} />
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Pricing Options */}
+          <section>
+            <div className="mb-4 border-b border-gray-200 pb-2">
+              <h2 className="text-base font-semibold text-gray-900">Pricing Options</h2>
+            </div>
+            <div className="space-y-4">
+              <div className="rounded-lg border border-gray-200">
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Commission</p>
+                    <p className="text-xs text-gray-500">Enable employee commission for this {itemType}</p>
+                  </div>
+                  <label className="relative inline-flex cursor-pointer items-center">
+                    <input type="checkbox" className="sr-only peer" checked={commissionEnabled} onChange={e => setCommissionEnabled(e.target.checked)} />
+                    <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full" />
+                  </label>
+                </div>
+                {commissionEnabled && (
+                  <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
+                      <Select options={[{ value: 'percentage', label: 'Percentage (%)' }, { value: 'fixed', label: 'Fixed Amount (\u00a3)' }]} value={commissionType} onValueChange={setCommissionType} />
+                    </div>
+                    <Input label={commissionType === 'percentage' ? 'Rate (%)' : 'Amount (\u00a3)'} type="number" step="0.01" min="0" placeholder="0" value={commissionRate} onChange={e => setCommissionRate(e.target.value)} />
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Loyalty Points</p>
+                  <p className="text-xs text-gray-500">Earn / redeem loyalty points on this {itemType}</p>
+                </div>
+                <label className="relative inline-flex cursor-pointer items-center">
+                  <input type="checkbox" className="sr-only peer" checked={loyaltyEnabled} onChange={e => setLoyaltyEnabled(e.target.checked)} />
+                  <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full" />
+                </label>
+              </div>
+            </div>
+          </section>
+
+          {/* Bottom save */}
+          <div className="flex items-center justify-end gap-3 py-6 border-t border-gray-200">
+            <Link href="/inventory"><Button variant="outline">Cancel</Button></Link>
+            <Button onClick={handleSave} loading={saving}>
+              <Save className="h-4 w-4" /> Save Changes
+            </Button>
+          </div>
+        </div>
+      </main>
+
+      {/* Delete Confirm */}
+      <Modal open={deleteModal} onClose={() => setDeleteModal(false)} title="Delete Product" size="sm">
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {[
-              { label: 'Selling Price', value: formatCurrency(product.selling_price) },
-              { label: 'Cost Price',    value: formatCurrency(product.cost_price) },
-              { label: 'Margin',        value: product.cost_price > 0 ? `${Math.round(((product.selling_price - product.cost_price) / product.selling_price) * 100)}%` : '—' },
-              { label: 'Valuation',     value: product.valuation_method.replace('_', ' ') },
-            ].map((card) => (
-              <div key={card.label} className="rounded-lg border border-gray-200 bg-white p-3">
-                <p className="text-xs text-gray-400">{card.label}</p>
-                <p className="font-semibold text-gray-900">{card.value}</p>
-              </div>
-            ))}
+          <p className="text-sm text-gray-600">Are you sure you want to delete <strong>{product.name}</strong>?</p>
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={() => setDeleteModal(false)}>Cancel</Button>
+            <Button variant="destructive" className="flex-1" onClick={handleDelete}>Delete</Button>
           </div>
-
-          {product.description && (
-            <div className="rounded-lg border border-gray-200 bg-white p-4">
-              <p className="text-sm font-medium text-gray-700 mb-1">Description</p>
-              <p className="text-sm text-gray-600">{product.description}</p>
-            </div>
-          )}
-
-          {product.product_variants && product.product_variants.length > 0 && (
-            <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-              <div className="border-b border-gray-200 px-4 py-3">
-                <h3 className="font-semibold text-gray-900 text-sm">Variants</h3>
-              </div>
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs text-gray-500">
-                  <tr>
-                    <th className="px-4 py-2 text-left">Variant</th>
-                    <th className="px-4 py-2 text-left">SKU</th>
-                    <th className="px-4 py-2 text-right">Price</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {product.product_variants.map((v) => (
-                    <tr key={v.id}>
-                      <td className="px-4 py-3 font-medium text-gray-800">{v.name}</td>
-                      <td className="px-4 py-3 text-gray-500">{v.sku ?? '—'}</td>
-                      <td className="px-4 py-3 text-right">{formatCurrency(v.selling_price)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Serials tab */}
-      {tab === 'serials' && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex gap-2 flex-wrap">
-              {['', 'in_stock', 'sold', 'in_repair', 'returned', 'damaged'].map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setStatusFilter(s)}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                    statusFilter === s ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {s ? `${s.replace('_', ' ')} (${statusCounts[s] ?? 0})` : `All (${serials.length})`}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => setBulkModal(true)}>
-                Bulk Add
-              </Button>
-              <Button size="sm" onClick={() => setAddModal(true)}>
-                <Plus className="h-4 w-4" /> Add Serial
-              </Button>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-xs text-gray-500">
-                <tr>
-                  <th className="px-4 py-2 text-left">Serial Number</th>
-                  <th className="px-4 py-2 text-left">IMEI</th>
-                  <th className="px-4 py-2 text-left">Status</th>
-                  <th className="px-4 py-2 text-left">Added</th>
-                  <th className="px-4 py-2" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredSerials.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-12 text-center text-sm text-gray-400">
-                      <Hash className="mx-auto h-8 w-8 text-gray-200 mb-2" />
-                      No serial numbers yet.
-                    </td>
-                  </tr>
-                ) : filteredSerials.map((s) => (
-                  <tr key={s.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-mono font-medium text-gray-800">{s.serial_number}</td>
-                    <td className="px-4 py-3 font-mono text-gray-600">{s.imei ?? '—'}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant={SERIAL_STATUS_VARIANT[s.status] ?? 'default'}>
-                        {s.status.replace('_', ' ')}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">{formatDate(s.created_at)}</td>
-                    <td className="px-4 py-3 text-right">
-                      {s.status === 'in_stock' && (
-                        <Button size="sm" variant="ghost" onClick={() => deleteSerial(s.id)}>
-                          <Trash2 className="h-3.5 w-3.5 text-red-400" />
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Add Single Serial Modal */}
-      <Modal open={addModal} onClose={() => setAddModal(false)} title="Add Serial Number" size="sm">
-        <div className="space-y-3">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Serial Number *</label>
-            <input
-              value={newSerial.serial_number}
-              onChange={(e) => setNewSerial((s) => ({ ...s, serial_number: e.target.value }))}
-              className="h-9 w-full rounded-lg border border-gray-300 px-3 font-mono text-sm"
-              placeholder="SN123456789"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">IMEI</label>
-            <input
-              value={newSerial.imei}
-              onChange={(e) => setNewSerial((s) => ({ ...s, imei: e.target.value }))}
-              className="h-9 w-full rounded-lg border border-gray-300 px-3 font-mono text-sm"
-              placeholder="Optional"
-            />
-          </div>
-          <Button className="w-full" onClick={addSerial} loading={saving} disabled={!newSerial.serial_number}>
-            Add Serial
-          </Button>
         </div>
       </Modal>
 
-      {/* Bulk Add Modal */}
-      <Modal open={bulkModal} onClose={() => setBulkModal(false)} title="Bulk Add Serials" size="sm">
-        <div className="space-y-3">
-          <p className="text-sm text-gray-500">Enter one serial per line. Optionally add IMEI after a comma: <code className="text-xs bg-gray-100 px-1 rounded">SN123,IMEI456</code></p>
-          <textarea
-            rows={8}
-            value={bulkText}
-            onChange={(e) => setBulkText(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm"
-            placeholder={"SN001\nSN002,IMEI001\nSN003"}
-          />
-          <p className="text-xs text-gray-400">{bulkText.split('\n').filter((l) => l.trim()).length} serials to add</p>
-          <Button className="w-full" onClick={addBulkSerials} loading={saving} disabled={!bulkText.trim()}>
-            Add Serials
-          </Button>
+      <Modal open={addingCategory} onClose={() => { setAddingCategory(false); setNewCategoryName('') }} title="Add Device Type" size="sm">
+        <div className="space-y-4">
+          <Input label="Device Type Name" placeholder="e.g. Phones, Laptops" required value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddCategory())} />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => { setAddingCategory(false); setNewCategoryName('') }}>Cancel</Button>
+            <Button onClick={handleAddCategory}>Add</Button>
+          </div>
         </div>
       </Modal>
 
-      {/* Product Settings Modal */}
-      <Modal open={settingsModal} onClose={() => setSettingsModal(false)} title="Product Settings" size="sm">
-        <div className="space-y-5">
-          {/* Serialized toggle */}
-          <div className="flex items-center justify-between rounded-lg border border-gray-200 p-4">
-            <div>
-              <p className="text-sm font-medium text-gray-800">Serialized Inventory</p>
-              <p className="text-xs text-gray-500 mt-0.5">Track each unit by serial number / IMEI</p>
-            </div>
-            <button
-              onClick={() => setSettingsForm((f) => ({ ...f, is_serialized: !f.is_serialized }))}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                settingsForm.is_serialized ? 'bg-blue-600' : 'bg-gray-200'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                  settingsForm.is_serialized ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
-            </button>
+      <Modal open={addingBrand} onClose={() => { setAddingBrand(false); setNewBrandName('') }} title="Add Brand" size="sm">
+        <div className="space-y-4">
+          <Input label="Brand Name" placeholder="e.g. Apple, Samsung" required value={newBrandName} onChange={e => setNewBrandName(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddBrand())} />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => { setAddingBrand(false); setNewBrandName('') }}>Cancel</Button>
+            <Button onClick={handleAddBrand}>Add</Button>
           </div>
+        </div>
+      </Modal>
 
-          {/* Valuation method */}
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Valuation Method</label>
-            <select
-              value={settingsForm.valuation_method}
-              onChange={(e) => setSettingsForm((f) => ({ ...f, valuation_method: e.target.value }))}
-              className="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm"
-            >
-              <option value="weighted_average">Weighted Average</option>
-              <option value="fifo">FIFO (First In, First Out)</option>
-              <option value="lifo">LIFO (Last In, First Out)</option>
-            </select>
-            <p className="mt-1 text-xs text-gray-500">
-              Controls how cost of goods is calculated when stock is sold.
-            </p>
+      <Modal open={addingDevice} onClose={() => { setAddingDevice(false); setNewDeviceName('') }} title="Add Model" size="sm">
+        <div className="space-y-4">
+          {!brandId ? (
+            <p className="text-sm text-amber-600">Please select a brand first.</p>
+          ) : (
+            <>
+              <Input label="Model Name" placeholder="e.g. iPhone 15 Pro, Galaxy S24" required value={newDeviceName} onChange={e => setNewDeviceName(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddDevice())} />
+              <p className="text-xs text-gray-500">This model will be linked to the selected brand.</p>
+            </>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => { setAddingDevice(false); setNewDeviceName('') }}>Cancel</Button>
+            {brandId && <Button onClick={handleAddDevice}>Add</Button>}
           </div>
-
-          <Button className="w-full" onClick={saveSettings} loading={settingsSaving}>
-            Save Settings
-          </Button>
         </div>
       </Modal>
     </div>

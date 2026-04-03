@@ -26,7 +26,7 @@ const setLevelSchema = z.object({
 export const InventoryController = {
   async list(request: NextRequest, ctx: RequestContext) {
     const { searchParams } = request.nextUrl
-    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     const { page, limit } = getPagination(searchParams)
     const lowStock = searchParams.get('low_stock') === 'true'
     try {
@@ -38,7 +38,7 @@ export const InventoryController = {
   },
 
   async getLowStockAlerts(request: NextRequest, ctx: RequestContext) {
-    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     try {
       const data = await InventoryService.getLowStockAlerts(branchId)
       return ok(data)

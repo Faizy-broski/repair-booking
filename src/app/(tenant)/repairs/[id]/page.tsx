@@ -14,12 +14,12 @@ import { RepairEmailPrompt } from '@/components/repairs/email-prompt-modal'
 import { ConditionChecklist } from '@/components/repairs/condition-checklist'
 import { LabelPicker } from '@/components/repairs/label-picker'
 import { EstimatesPanel } from '@/components/repairs/estimates-panel'
+import { CustomFieldRenderer, useCustomFieldDefs } from '@/components/shared/custom-field-renderer'
 
 const STATUS_OPTIONS = REPAIR_STATUSES.map((s) => ({ value: s, label: s.replace('_', ' ') }))
 
 interface Technician {
   id: string
-  profile_id: string | null
   first_name: string
   last_name: string | null
   role: string | null
@@ -82,14 +82,20 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
   const [showCannedPicker, setShowCannedPicker] = useState(false)
   const [technicians, setTechnicians] = useState<Technician[]>([])
   const [assigningTech, setAssigningTech] = useState(false)
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({})
+
+  // Custom fields: load defs scoped to the repair's device_type as category
+  const repairCategory = repair?.device_type ?? undefined
+  const { defs: customFieldDefs } = useCustomFieldDefs('repairs', repairCategory)
 
   useEffect(() => {
     async function fetchRepair() {
+      if (!activeBranch?.id) return
       setLoading(true)
       const [repairRes, cannedRes, staffRes] = await Promise.all([
         fetch(`/api/repairs/${id}`),
         fetch('/api/canned-responses?type=note'),
-        fetch(`/api/employees?branch_id=${activeBranch?.id ?? ''}&limit=100`),
+        fetch(`/api/employees?branch_id=${activeBranch.id}&limit=100`),
       ])
       const [repairJson, cannedJson, staffJson] = await Promise.all([
         repairRes.json(), cannedRes.json(), staffRes.json(),
@@ -98,6 +104,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
       if (repairJson.data) {
         setNewStatus(repairJson.data.status)
         setLabelIds(repairJson.data.label_ids ?? [])
+        setCustomFieldValues((repairJson.data.custom_fields as Record<string, unknown>) ?? {})
       }
       setCannedResponses(cannedJson.data ?? [])
       setTechnicians(staffJson.data ?? [])
@@ -105,6 +112,15 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
     }
     fetchRepair()
   }, [id, activeBranch?.id])
+
+  async function saveCustomFields(values: Record<string, unknown>) {
+    await fetch(`/api/repairs/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ custom_fields: values }),
+    })
+    setCustomFieldValues(values)
+  }
 
   async function assignTechnician(employeeId: string | null) {
     setAssigningTech(true)
@@ -238,6 +254,24 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
           </CardContent>
         </Card>
       </div>
+
+      {/* Custom Fields */}
+      {customFieldDefs.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Additional Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <CustomFieldRenderer
+                values={customFieldValues}
+                definitions={customFieldDefs}
+                onSave={saveCustomFields}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Parts used */}
       {repair.repair_items.length > 0 && (

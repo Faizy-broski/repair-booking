@@ -11,8 +11,8 @@ export const AppointmentService = {
       .eq('branch_id', branchId)
       .order('start_time')
 
-    if (params.from) q = q.gte('start_time', params.from)
-    if (params.to) q = q.lte('start_time', params.to)
+    if (params.from) q = q.gte('start_time', `${params.from}T00:00:00`)
+    if (params.to) q = q.lte('start_time', `${params.to}T23:59:59`)
     if (params.status) q = q.eq('status', params.status)
 
     const { data, error } = await q

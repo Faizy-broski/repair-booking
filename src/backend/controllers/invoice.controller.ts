@@ -26,7 +26,7 @@ const createSchema = z.object({
 })
 
 const updateStatusSchema = z.object({
-  status: z.enum(['draft', 'sent', 'paid', 'overdue', 'cancelled', 'unpaid', 'partial', 'refunded']),
+  status: z.enum(['issued', 'paid', 'void', 'unpaid', 'partial', 'refunded']),
 })
 
 const recordPaymentSchema = z.object({
@@ -36,10 +36,12 @@ const recordPaymentSchema = z.object({
 export const InvoiceController = {
   async list(request: NextRequest, ctx: RequestContext) {
     const { searchParams } = request.nextUrl
-    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
+    if (!branchId) return ok([], { page: 1, limit: 20, total: 0 })
     const { page, limit } = getPagination(searchParams)
+    const customerId = searchParams.get('customer_id') ?? undefined
     try {
-      const { data, count } = await InvoiceService.list(branchId, { page, limit, status: searchParams.get('status') ?? undefined })
+      const { data, count } = await InvoiceService.list(branchId, { page, limit, status: searchParams.get('status') ?? undefined, customer_id: customerId })
       return ok(data, { page, limit, total: count ?? 0 })
     } catch (err) {
       return serverError('Failed to fetch invoices', err)
@@ -47,7 +49,7 @@ export const InvoiceController = {
   },
 
   async getById(request: NextRequest, ctx: RequestContext, id: string) {
-    const branchId = ctx.auth.branchId ?? ''
+    const branchId = ctx.auth.branchId ?? null
     try {
       const invoice = await InvoiceService.getById(id, branchId)
       if (!invoice) return notFound('Invoice not found')
@@ -71,7 +73,7 @@ export const InvoiceController = {
   async updateStatus(request: NextRequest, ctx: RequestContext, id: string) {
     const { data, error } = await validateBody(request, updateStatusSchema)
     if (error) return error
-    const branchId = ctx.auth.branchId ?? ''
+    const branchId = ctx.auth.branchId ?? null
     try {
       const invoice = await InvoiceService.updateStatus(id, branchId, data.status)
       return ok(invoice)
@@ -83,7 +85,7 @@ export const InvoiceController = {
   async recordPayment(request: NextRequest, ctx: RequestContext, id: string) {
     const { data, error } = await validateBody(request, recordPaymentSchema)
     if (error) return error
-    const branchId = ctx.auth.branchId ?? ''
+    const branchId = ctx.auth.branchId ?? null
     try {
       const invoice = await InvoiceService.recordPayment(id, branchId, data.amount)
       return ok(invoice)
@@ -93,7 +95,7 @@ export const InvoiceController = {
   },
 
   async getStatusSummary(request: NextRequest, ctx: RequestContext) {
-    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     try {
       const summary = await InvoiceService.getStatusSummary(branchId)
       return ok(summary)

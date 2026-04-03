@@ -3,7 +3,18 @@ import { generateGiftCardCode } from '@/lib/utils'
 import type { InsertTables } from '@/types/database'
 
 export const GiftCardService = {
+  /** Deactivate any expired gift cards for this branch before returning results */
+  async expireCards(branchId: string) {
+    await adminSupabase
+      .from('gift_cards')
+      .update({ is_active: false })
+      .eq('branch_id', branchId)
+      .eq('is_active', true)
+      .lt('expires_at', new Date().toISOString())
+  },
+
   async list(branchId: string) {
+    await this.expireCards(branchId)
     const { data, error } = await adminSupabase
       .from('gift_cards')
       .select('*, customers(first_name,last_name)')
@@ -13,7 +24,8 @@ export const GiftCardService = {
     return data
   },
 
-  async getByCode(code: string, branchId: string) {
+  async getByCode(code: string, branchId: string, customerId?: string | null) {
+    await this.expireCards(branchId)
     const { data, error } = await adminSupabase
       .from('gift_cards')
       .select('*')
@@ -22,6 +34,11 @@ export const GiftCardService = {
       .eq('is_active', true)
       .single()
     if (error) return null
+    // If card is restricted to specific customers, validate
+    const ids: string[] = data.customer_ids ?? []
+    if (ids.length > 0 && customerId && !ids.includes(customerId)) {
+      return null
+    }
     return data
   },
 

@@ -13,7 +13,7 @@ const settingsSchema = z.object({
 
 export const GoogleReviewController = {
   async list(request: NextRequest, ctx: RequestContext) {
-    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     try {
       const data = await GoogleReviewService.list(branchId)
       return ok(data)
@@ -23,7 +23,7 @@ export const GoogleReviewController = {
   },
 
   async sync(request: NextRequest, ctx: RequestContext) {
-    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     try {
       await GoogleReviewService.sync(branchId)
       return ok({ synced: true })
@@ -33,7 +33,7 @@ export const GoogleReviewController = {
   },
 
   async getSettings(request: NextRequest, ctx: RequestContext) {
-    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     try {
       const settings = await GoogleReviewService.getSettings(branchId)
       return ok(settings)

@@ -303,40 +303,127 @@ export const ReportService = {
 
   // â”€â”€ Register / Z-Report â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  async openSession(businessId: string, branchId: string, cashierId: string, openingFloat: number) {
-    // Allow only one open session per branch
+  async openSession(
+    businessId: string,
+    branchId: string,
+    cashierId: string,
+    openingFloat: number,
+    openingNote?: string,
+    openingDenominations?: Record<string, number>,
+  ) {
     const { data: existing } = await db('register_sessions')
       .select('id, status')
       .eq('branch_id', branchId)
       .eq('status', 'open')
       .maybeSingle()
 
-    if (existing) throw new Error('A register session is already open for this branch')
+    // If a session is already open, return it instead of erroring —
+    // the UI will detect this and show "Join Shift" instead.
+    if (existing) {
+      const { data: full } = await db('register_sessions')
+        .select('*')
+        .eq('id', existing.id)
+        .single()
+      return full ?? existing
+    }
 
     const { data, error } = await db('register_sessions')
-      .insert({ business_id: businessId, branch_id: branchId, cashier_id: cashierId, opening_float: openingFloat, status: 'open' })
+      .insert({
+        business_id: businessId,
+        branch_id: branchId,
+        cashier_id: cashierId,
+        opening_float: openingFloat,
+        opening_note: openingNote ?? null,
+        opening_denominations: openingDenominations ?? {},
+        status: 'open',
+      })
       .select()
       .single()
     if (error) throw error
     return data
   },
 
-  async closeSession(sessionId: string, closingCash: number) {
+  async joinSession(sessionId: string, profileId: string) {
+    const { data: session } = await db('register_sessions')
+      .select('id, status')
+      .eq('id', sessionId)
+      .eq('status', 'open')
+      .single()
+    if (!session) throw new Error('No active session found')
+
+    // Upsert member record
+    const { error } = await (adminSupabase as any)
+      .from('register_session_members')
+      .upsert({ session_id: sessionId, profile_id: profileId }, { onConflict: 'session_id,profile_id' })
+    if (error) throw error
+    return session
+  },
+
+  async closeSession(sessionId: string, closingCash: number, closingNote?: string) {
     const { data, error } = await (adminSupabase as any).rpc('close_register_session', {
       p_session_id: sessionId,
       p_closing_cash: closingCash,
+      p_closing_note: closingNote ?? null,
     })
     if (error) throw error
     return data
   },
 
-  async getCurrentSession(branchId: string) {
-    const { data } = await db('register_sessions')
+  async getCurrentSession(branchId: string | null) {
+    if (!branchId) return null
+
+    // Base query — always works even if migration 034 isn't applied yet
+    const { data: session, error } = await db('register_sessions')
       .select('*, profiles!cashier_id(full_name)')
       .eq('branch_id', branchId)
       .eq('status', 'open')
       .maybeSingle()
-    return data ?? null
+
+    if (error || !session) return null
+
+    // Optionally enrich with members — safe to fail if table doesn't exist yet
+    try {
+      const { data: members } = await (adminSupabase as any)
+        .from('register_session_members')
+        .select('profile_id, joined_at, profiles(full_name)')
+        .eq('session_id', session.id)
+      return { ...session, register_session_members: members ?? [] }
+    } catch {
+      return { ...session, register_session_members: [] }
+    }
+  },
+
+  async addCashMovement(payload: {
+    sessionId: string; branchId: string; businessId: string
+    cashierId: string; type: 'cash_in' | 'cash_out'
+    amount: number; paymentType?: string; notes?: string
+  }) {
+    const { data, error } = await (adminSupabase as any)
+      .from('cash_movements')
+      .insert({
+        session_id: payload.sessionId,
+        branch_id: payload.branchId,
+        business_id: payload.businessId,
+        cashier_id: payload.cashierId,
+        type: payload.type,
+        amount: payload.amount,
+        payment_type: payload.paymentType ?? 'cash',
+        notes: payload.notes ?? null,
+      })
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async listCashMovements(sessionId: string) {
+    const { data, error } = await (adminSupabase as any)
+      .from('cash_movements')
+      .select('*, profiles!cashier_id(full_name)')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data ?? []
   },
 
   async getSession(sessionId: string) {

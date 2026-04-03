@@ -39,31 +39,40 @@ export function Select({
         <RadixSelect.Trigger
           id={id}
           className={cn(
-            'flex h-9 w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm',
-            'focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20',
+            'flex h-9 w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900',
+            'data-[placeholder]:text-gray-400',
+            'focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20',
             'disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500',
-            error && 'border-red-500',
+            error && 'border-red-500 focus:border-red-500 focus:ring-red-500/20',
             className
           )}
         >
-          <RadixSelect.Value placeholder={placeholder} />
-          <ChevronDown className="h-4 w-4 text-gray-400" />
+          <span className="truncate">
+            <RadixSelect.Value placeholder={placeholder} />
+          </span>
+          <RadixSelect.Icon asChild>
+            <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-gray-400" />
+          </RadixSelect.Icon>
         </RadixSelect.Trigger>
 
         <RadixSelect.Portal>
-          <RadixSelect.Content className="z-50 min-w-[8rem] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+          <RadixSelect.Content
+            position="popper"
+            sideOffset={4}
+            className="z-50 max-h-60 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
+          >
             <RadixSelect.Viewport className="p-1">
               {options.filter((o) => o.value !== '').map((option) => (
                 <RadixSelect.Item
                   key={option.value}
                   value={option.value}
                   disabled={option.disabled}
-                  className="relative flex cursor-pointer select-none items-center rounded-md px-8 py-1.5 text-sm text-gray-700 hover:bg-blue-50 focus:bg-blue-50 focus:outline-none data-[disabled]:opacity-50"
+                  className="relative flex cursor-pointer select-none items-center rounded-md py-2 pl-8 pr-3 text-sm text-gray-700 outline-none hover:bg-gray-50 focus:bg-gray-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
                 >
-                  <RadixSelect.ItemText>{option.label}</RadixSelect.ItemText>
                   <RadixSelect.ItemIndicator className="absolute left-2">
-                    <Check className="h-3 w-3 text-blue-600" />
+                    <Check className="h-3.5 w-3.5 text-brand-teal" />
                   </RadixSelect.ItemIndicator>
+                  <RadixSelect.ItemText>{option.label}</RadixSelect.ItemText>
                 </RadixSelect.Item>
               ))}
             </RadixSelect.Viewport>

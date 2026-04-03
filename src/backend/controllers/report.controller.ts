@@ -14,11 +14,22 @@ function defaultRange() {
 const openSessionSchema = z.object({
   opening_float: z.number().min(0),
   branch_id: z.string().uuid().optional(),
+  opening_note: z.string().optional(),
+  opening_denominations: z.record(z.string(), z.number()).optional(),
 })
 
 const closeSessionSchema = z.object({
   session_id: z.string().uuid(),
   closing_cash: z.number().min(0),
+  closing_note: z.string().optional(),
+})
+
+const cashMovementSchema = z.object({
+  session_id: z.string().uuid(),
+  type: z.enum(['cash_in', 'cash_out']),
+  amount: z.number().positive(),
+  payment_type: z.string().optional(),
+  notes: z.string().optional(),
 })
 
 const savedReportSchema = z.object({
@@ -30,7 +41,7 @@ const savedReportSchema = z.object({
 export const ReportController = {
   async get(request: NextRequest, ctx: RequestContext) {
     const { searchParams } = request.nextUrl
-    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     const defaults = defaultRange()
     const from = searchParams.get('from') ?? defaults.from
     const to = searchParams.get('to') ?? defaults.to
@@ -85,7 +96,7 @@ export const ReportController = {
 
   async getEmployeeReports(request: NextRequest, ctx: RequestContext) {
     const { searchParams } = request.nextUrl
-    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     const defaults = defaultRange()
     const from = searchParams.get('from') ?? defaults.from
     const to = searchParams.get('to') ?? defaults.to
@@ -106,7 +117,7 @@ export const ReportController = {
 
   async getInventoryDetailReports(request: NextRequest, ctx: RequestContext) {
     const { searchParams } = request.nextUrl
-    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     const defaults = defaultRange()
     const from = searchParams.get('from') ?? defaults.from
     const to = searchParams.get('to') ?? defaults.to
@@ -142,17 +153,31 @@ export const ReportController = {
     const parsed = openSessionSchema.safeParse(body)
     if (!parsed.success) return badRequest(parsed.error.message)
     try {
-      const branchId = parsed.data.branch_id ?? ctx.auth.branchId ?? ''
+      const branchId = parsed.data.branch_id ?? ctx.auth.branchId ?? null
       if (!branchId) return badRequest('branch_id is required')
       const data = await ReportService.openSession(
         ctx.businessId,
         branchId,
         ctx.auth.userId,
         parsed.data.opening_float,
+        parsed.data.opening_note,
+        parsed.data.opening_denominations,
       )
       return ok(data)
     } catch (err: any) {
       return serverError(err?.message ?? 'Failed to open session', err)
+    }
+  },
+
+  async joinSession(request: NextRequest, ctx: RequestContext) {
+    const body = await request.json()
+    const sessionId = body?.session_id
+    if (!sessionId) return badRequest('session_id is required')
+    try {
+      const data = await ReportService.joinSession(sessionId, ctx.auth.userId)
+      return ok(data)
+    } catch (err: any) {
+      return serverError(err?.message ?? 'Failed to join session', err)
     }
   },
 
@@ -161,16 +186,50 @@ export const ReportController = {
     const parsed = closeSessionSchema.safeParse(body)
     if (!parsed.success) return badRequest(parsed.error.message)
     try {
-      const data = await ReportService.closeSession(parsed.data.session_id, parsed.data.closing_cash)
+      const data = await ReportService.closeSession(parsed.data.session_id, parsed.data.closing_cash, parsed.data.closing_note)
       return ok(data)
     } catch (err: any) {
       return serverError(err?.message ?? 'Failed to close session', err)
     }
   },
 
+  async addCashMovement(request: NextRequest, ctx: RequestContext) {
+    const body = await request.json()
+    const parsed = cashMovementSchema.safeParse(body)
+    if (!parsed.success) return badRequest(parsed.error.message)
+    try {
+      const branchId = ctx.auth.branchId
+      if (!branchId) return badRequest('branch_id required')
+      const data = await ReportService.addCashMovement({
+        sessionId: parsed.data.session_id,
+        branchId,
+        businessId: ctx.businessId,
+        cashierId: ctx.auth.userId,
+        type: parsed.data.type,
+        amount: parsed.data.amount,
+        paymentType: parsed.data.payment_type,
+        notes: parsed.data.notes,
+      })
+      return ok(data)
+    } catch (err: any) {
+      return serverError(err?.message ?? 'Failed to record cash movement', err)
+    }
+  },
+
+  async listCashMovements(request: NextRequest, _ctx: RequestContext) {
+    const sessionId = request.nextUrl.searchParams.get('session_id')
+    if (!sessionId) return badRequest('session_id is required')
+    try {
+      const data = await ReportService.listCashMovements(sessionId)
+      return ok(data)
+    } catch (err) {
+      return serverError('Failed to list cash movements', err)
+    }
+  },
+
   async getCurrentSession(request: NextRequest, ctx: RequestContext) {
     const { searchParams } = request.nextUrl
-    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     try {
       const data = await ReportService.getCurrentSession(branchId)
       return ok(data)

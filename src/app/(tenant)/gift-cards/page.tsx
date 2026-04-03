@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Gift } from 'lucide-react'
+import { Plus, Gift, Printer, X, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -8,9 +8,8 @@ import { DataTable } from '@/components/shared/data-table'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@/lib/zod-resolver'
-import { z } from 'zod'
+import { pdf } from '@react-pdf/renderer'
+import { GiftCardPdf } from '@/components/pdf/gift-card-pdf'
 import type { ColumnDef } from '@tanstack/react-table'
 
 interface GiftCardRow {
@@ -21,18 +20,11 @@ interface GiftCardRow {
   is_active: boolean
   expires_at: string | null
   created_at: string
+  customer_ids: string[] | null
   customers?: { first_name: string; last_name: string | null } | null
 }
 
 interface CustomerOption { id: string; first_name: string; last_name: string | null }
-
-const schema = z.object({
-  initial_value: z.coerce.number().positive('Amount must be positive'),
-  customer_id: z.string().uuid().optional().or(z.literal('')),
-  expires_at: z.string().optional(),
-})
-
-type FormData = z.infer<typeof schema>
 
 export default function GiftCardsPage() {
   const { activeBranch } = useAuthStore()
@@ -42,9 +34,14 @@ export default function GiftCardsPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [qrCard, setQrCard] = useState<GiftCardRow | null>(null)
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
-    resolver: zodResolver(schema),
-  })
+  // Form state
+  const [formValue, setFormValue] = useState('')
+  const [formExpiry, setFormExpiry] = useState('')
+  const [formCustomerIds, setFormCustomerIds] = useState<string[]>([])
+  const [formAllCustomers, setFormAllCustomers] = useState(true)
+  const [formSubmitting, setFormSubmitting] = useState(false)
+  const [custDropdownOpen, setCustDropdownOpen] = useState(false)
+  const [custSearch, setCustSearch] = useState('')
 
   const fetchData = useCallback(async () => {
     if (!activeBranch) return
@@ -61,20 +58,39 @@ export default function GiftCardsPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  async function onCreate(data: FormData) {
-    if (!activeBranch) return
+  async function onCreate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!activeBranch || !formValue) return
+    setFormSubmitting(true)
     const res = await fetch('/api/gift-cards', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        ...data,
         branch_id: activeBranch.id,
-        customer_id: data.customer_id || null,
-        expires_at: data.expires_at || null,
+        initial_value: parseFloat(formValue),
+        customer_id: formAllCustomers ? null : (formCustomerIds[0] ?? null),
+        customer_ids: formAllCustomers ? [] : formCustomerIds,
+        expires_at: formExpiry || null,
       }),
     })
-    if (res.ok) { reset(); setSheetOpen(false); fetchData() }
+    if (res.ok) {
+      setFormValue(''); setFormExpiry(''); setFormCustomerIds([]); setFormAllCustomers(true)
+      setSheetOpen(false); fetchData()
+    }
+    setFormSubmitting(false)
   }
+
+  function toggleCustomer(id: string) {
+    setFormCustomerIds(prev =>
+      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+    )
+  }
+
+  const filteredCustomers = customers.filter(c => {
+    if (!custSearch) return true
+    const name = `${c.first_name} ${c.last_name ?? ''}`.toLowerCase()
+    return name.includes(custSearch.toLowerCase())
+  })
 
   async function deactivate(id: string) {
     await fetch(`/api/gift-cards/${id}`, {
@@ -83,6 +99,25 @@ export default function GiftCardsPage() {
       body: JSON.stringify({ is_active: false }),
     })
     fetchData()
+  }
+
+  async function printGiftCard(card: GiftCardRow) {
+    const customerName = card.customers
+      ? `${card.customers.first_name} ${card.customers.last_name ?? ''}`.trim()
+      : undefined
+    const blob = await pdf(
+      <GiftCardPdf
+        code={card.code}
+        balance={card.balance}
+        initialValue={card.initial_value}
+        customerName={customerName}
+        expiresAt={card.expires_at ? formatDate(card.expires_at) : null}
+        issuedAt={formatDate(card.created_at)}
+        storeName={activeBranch?.name ?? 'RepairBooking'}
+      />
+    ).toBlob()
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
   }
 
   const columns: ColumnDef<GiftCardRow>[] = [
@@ -102,11 +137,15 @@ export default function GiftCardsPage() {
       ),
     },
     {
-      accessorKey: 'customers',
+      accessorKey: 'customer_ids',
       header: 'Customer',
-      cell: ({ getValue }) => {
-        const c = getValue() as GiftCardRow['customers']
-        return c ? `${c.first_name} ${c.last_name ?? ''}` : '—'
+      cell: ({ row }) => {
+        const ids: string[] = row.original.customer_ids ?? []
+        if (ids.length === 0) return <span className="text-xs text-gray-400">All Customers</span>
+        // Legacy single customer fallback
+        const c = row.original.customers
+        if (c && ids.length === 1) return `${c.first_name} ${c.last_name ?? ''}`
+        return <span className="text-xs text-gray-600">{ids.length} customer{ids.length > 1 ? 's' : ''}</span>
       },
     },
     {
@@ -152,11 +191,18 @@ export default function GiftCardsPage() {
     {
       id: 'actions',
       header: '',
-      cell: ({ row }) => row.original.is_active ? (
-        <Button size="sm" variant="ghost" onClick={() => deactivate(row.original.id)} className="text-red-500 hover:text-red-700">
-          Deactivate
-        </Button>
-      ) : null,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <Button size="sm" variant="ghost" onClick={() => printGiftCard(row.original)} className="text-gray-500 hover:text-gray-700">
+            <Printer className="h-3.5 w-3.5" />
+          </Button>
+          {row.original.is_active && (
+            <Button size="sm" variant="ghost" onClick={() => deactivate(row.original.id)} className="text-red-500 hover:text-red-700">
+              Deactivate
+            </Button>
+          )}
+        </div>
+      ),
     },
   ]
 
@@ -199,30 +245,109 @@ export default function GiftCardsPage() {
       )}
 
       <InlineFormSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Issue Gift Card">
-        <form onSubmit={handleSubmit(onCreate)} className="space-y-4">
+        <form onSubmit={onCreate} className="space-y-4">
           <Input
             label="Value (£)"
             type="number"
             step="0.01"
             required
-            error={errors.initial_value?.message}
-            {...register('initial_value')}
+            value={formValue}
+            onChange={e => setFormValue(e.target.value)}
           />
+
+          {/* Customer multi-select */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Customer (optional)</label>
-            <select
-              {...register('customer_id')}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            >
-              <option value="">No customer</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>{c.first_name} {c.last_name ?? ''}</option>
-              ))}
-            </select>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Customers</label>
+            <div className="flex gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => { setFormAllCustomers(true); setFormCustomerIds([]) }}
+                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  formAllCustomers
+                    ? 'border-brand-teal bg-brand-teal/10 text-brand-teal'
+                    : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                All Customers
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormAllCustomers(false)}
+                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  !formAllCustomers
+                    ? 'border-brand-teal bg-brand-teal/10 text-brand-teal'
+                    : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                Specific Customers
+              </button>
+            </div>
+
+            {!formAllCustomers && (
+              <div className="relative">
+                {/* Selected chips */}
+                {formCustomerIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {formCustomerIds.map(id => {
+                      const c = customers.find(cu => cu.id === id)
+                      if (!c) return null
+                      return (
+                        <span key={id} className="inline-flex items-center gap-1 rounded-full bg-brand-teal/10 px-2.5 py-0.5 text-xs font-medium text-brand-teal">
+                          {c.first_name} {c.last_name ?? ''}
+                          <button type="button" onClick={() => toggleCustomer(id)} className="hover:text-red-500">
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Search + dropdown */}
+                <input
+                  type="text"
+                  placeholder="Search customers..."
+                  value={custSearch}
+                  onChange={e => { setCustSearch(e.target.value); setCustDropdownOpen(true) }}
+                  onFocus={() => setCustDropdownOpen(true)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
+                />
+                {custDropdownOpen && (
+                  <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                    {filteredCustomers.length === 0 ? (
+                      <p className="px-3 py-2 text-xs text-gray-400">No customers found</p>
+                    ) : filteredCustomers.map(c => {
+                      const selected = formCustomerIds.includes(c.id)
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => { toggleCustomer(c.id); setCustSearch('') }}
+                          className={`flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 ${selected ? 'bg-brand-teal/5' : ''}`}
+                        >
+                          <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${selected ? 'border-brand-teal bg-brand-teal text-white' : 'border-gray-300'}`}>
+                            {selected && <Check className="h-3 w-3" />}
+                          </span>
+                          <span className="truncate">{c.first_name} {c.last_name ?? ''}</span>
+                        </button>
+                      )
+                    })}
+                    <button
+                      type="button"
+                      onClick={() => setCustDropdownOpen(false)}
+                      className="w-full border-t border-gray-100 px-3 py-1.5 text-xs font-medium text-gray-400 hover:bg-gray-50"
+                    >
+                      Close
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          <Input label="Expiry Date (optional)" type="date" {...register('expires_at')} />
+
+          <Input label="Expiry Date (optional)" type="date" value={formExpiry} onChange={e => setFormExpiry(e.target.value)} />
           <p className="text-xs text-gray-400">A unique code will be auto-generated</p>
-          <Button type="submit" className="w-full" loading={isSubmitting}>Issue Gift Card</Button>
+          <Button type="submit" className="w-full" loading={formSubmitting} disabled={!formValue}>Issue Gift Card</Button>
         </form>
       </InlineFormSheet>
     </div>

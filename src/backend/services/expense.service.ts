@@ -61,4 +61,14 @@ export const ExpenseService = {
     if (error) throw error
     return data
   },
+
+  async getCategories(businessId: string) {
+    const { data, error } = await adminSupabase
+      .from('expense_categories')
+      .select('id, name')
+      .eq('business_id', businessId)
+      .order('name')
+    if (error) throw error
+    return data
+  },
 }

@@ -1,4 +1,4 @@
-import { createAdminClient } from '@/backend/config/supabase'
+﻿import { createAdminClient } from '@/backend/config/supabase'
 import { formatCurrency } from '@/lib/utils'
 import {
   TrendingUp, TrendingDown, Building2, CreditCard,

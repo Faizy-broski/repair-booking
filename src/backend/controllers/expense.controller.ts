@@ -28,7 +28,7 @@ const createSalarySchema = z.object({
 export const ExpenseController = {
   async listExpenses(request: NextRequest, ctx: RequestContext) {
     const { searchParams } = request.nextUrl
-    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     const { page, limit } = getPagination(searchParams)
     try {
       const { data, count } = await ExpenseService.list(branchId, {
@@ -55,7 +55,7 @@ export const ExpenseController = {
   },
 
   async deleteExpense(request: NextRequest, ctx: RequestContext, id: string) {
-    const branchId = ctx.auth.branchId ?? ''
+    const branchId = ctx.auth.branchId ?? null
     try {
       await ExpenseService.delete(id, branchId)
       return ok({ deleted: true })
@@ -65,7 +65,7 @@ export const ExpenseController = {
   },
 
   async listSalaries(request: NextRequest, ctx: RequestContext) {
-    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     try {
       const data = await ExpenseService.getSalaries(branchId)
       return ok(data)
@@ -82,6 +82,17 @@ export const ExpenseController = {
       return created(salary)
     } catch (err) {
       return serverError('Failed to create salary', err)
+    }
+  },
+
+  async listCategories(request: NextRequest, ctx: RequestContext) {
+    const businessId = request.nextUrl.searchParams.get('business_id') ?? ctx.auth.businessId ?? null
+    if (!businessId) return badRequest('business_id is required')
+    try {
+      const data = await ExpenseService.getCategories(businessId)
+      return ok(data)
+    } catch (err) {
+      return serverError('Failed to fetch expense categories', err)
     }
   },
 }

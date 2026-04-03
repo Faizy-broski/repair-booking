@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, GripVertical, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -7,28 +7,36 @@ import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { MODULES, type Module } from '@/backend/config/constants'
 
+type FieldType = 'text' | 'textarea' | 'number' | 'select' | 'date' | 'boolean' | 'checkbox' | 'phone' | 'email'
+
 interface CustomField {
   id?: string
   field_key: string
   label: string
-  field_type: 'text' | 'number' | 'select' | 'date' | 'boolean'
+  field_type: FieldType
   options: string[]
   is_required: boolean
   sort_order: number
+  repair_category: string | null
 }
 
 const FIELD_TYPE_OPTIONS = [
-  { value: 'text', label: 'Text' },
-  { value: 'number', label: 'Number' },
-  { value: 'select', label: 'Dropdown' },
-  { value: 'date', label: 'Date' },
-  { value: 'boolean', label: 'Yes / No' },
+  { value: 'text',     label: 'Text' },
+  { value: 'textarea', label: 'Text Area' },
+  { value: 'number',   label: 'Number' },
+  { value: 'select',   label: 'Dropdown' },
+  { value: 'checkbox', label: 'Checkbox' },
+  { value: 'date',     label: 'Date' },
+  { value: 'phone',    label: 'Phone' },
+  { value: 'email',    label: 'Email' },
 ]
 
-const MODULE_OPTIONS = MODULES.map((m) => ({ value: m, label: m.replace('_', ' ') }))
+const CUSTOM_FIELD_MODULES = ['repairs', 'customers', 'appointments', 'expenses', 'inventory'] as const
+const MODULE_OPTIONS = CUSTOM_FIELD_MODULES.map((m) => ({ value: m, label: m.charAt(0).toUpperCase() + m.slice(1) }))
 
 interface CustomFieldBuilderProps {
-  module?: Module
+  module?: string
+  repairCategory?: string
   onSaved?: () => void
 }
 
@@ -36,8 +44,9 @@ interface CustomFieldBuilderProps {
  * Drag-and-drop custom field definition builder.
  * Fetches existing fields from /api/custom-fields and allows CRUD.
  */
-export function CustomFieldBuilder({ module: initialModule, onSaved }: CustomFieldBuilderProps) {
-  const [module, setModule] = useState<Module>(initialModule ?? 'repairs')
+export function CustomFieldBuilder({ module: initialModule, repairCategory: initialCategory, onSaved }: CustomFieldBuilderProps) {
+  const [module, setModule] = useState<string>(initialModule ?? 'repairs')
+  const [repairCategory, setRepairCategory] = useState<string>(initialCategory ?? '')
   const [fields, setFields] = useState<CustomField[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -45,17 +54,20 @@ export function CustomFieldBuilder({ module: initialModule, onSaved }: CustomFie
 
   async function fetchFields() {
     setLoading(true)
-    const res = await fetch(`/api/custom-fields?module=${module}`)
+    const params = new URLSearchParams({ module })
+    if (repairCategory.trim()) params.set('repair_category', repairCategory.trim())
+    const res = await fetch(`/api/custom-fields?${params}`)
     const json = await res.json()
     const data: CustomField[] = (json.data ?? []).map((f: CustomField & { options: { choices?: string[] } | null }) => ({
       ...f,
       options: f.options && 'choices' in f.options ? (f.options as { choices: string[] }).choices ?? [] : [],
+      repair_category: (f as any).repair_category ?? null,
     }))
     setFields(data)
     setLoading(false)
   }
 
-  useEffect(() => { fetchFields() }, [module]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchFields() }, [module, repairCategory]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function addField() {
     setFields((prev) => [
@@ -67,6 +79,7 @@ export function CustomFieldBuilder({ module: initialModule, onSaved }: CustomFie
         options: [],
         is_required: false,
         sort_order: prev.length,
+        repair_category: repairCategory.trim() || null,
       },
     ])
   }
@@ -95,6 +108,7 @@ export function CustomFieldBuilder({ module: initialModule, onSaved }: CustomFie
           options: field.field_type === 'select' ? field.options : null,
           is_required: field.is_required,
           sort_order: field.sort_order,
+          repair_category: field.repair_category ?? null,
         }
         if (field.id) {
           await fetch(`/api/custom-fields/${field.id}`, {
@@ -134,13 +148,44 @@ export function CustomFieldBuilder({ module: initialModule, onSaved }: CustomFie
   return (
     <div className="space-y-4">
       {!initialModule && (
-        <Select
-          options={MODULE_OPTIONS}
-          value={module}
-          onValueChange={(v) => setModule(v as Module)}
-          placeholder="Select module"
-          className="w-48"
-        />
+        <div className="flex gap-3 flex-wrap items-end">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Module</label>
+            <Select
+              options={MODULE_OPTIONS}
+              value={module}
+              onValueChange={(v) => setModule(v)}
+              placeholder="Select module"
+              className="w-44"
+            />
+          </div>
+          {module === 'repairs' && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">Repair Category (optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. Phone Repair, Computer Repair"
+                value={repairCategory}
+                onChange={e => setRepairCategory(e.target.value)}
+                className="h-9 w-56 rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none"
+              />
+            </div>
+          )}
+        </div>
+      )}
+      {initialModule === 'repairs' && (
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">
+            Repair Category <span className="text-gray-400">(optional — leave blank to apply to all repair types)</span>
+          </label>
+          <input
+            type="text"
+            placeholder="e.g. Phone Repair, Computer Repair, Watch Repair"
+            value={repairCategory}
+            onChange={e => setRepairCategory(e.target.value)}
+            className="h-9 w-72 rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none"
+          />
+        </div>
       )}
 
       {loading ? (
@@ -190,12 +235,19 @@ export function CustomFieldBuilder({ module: initialModule, onSaved }: CustomFie
               </div>
 
               {field.field_type === 'select' && (
-                <div className="w-full col-span-full pl-6">
+                <div className="mt-1.5 w-full">
                   <Input
-                    placeholder="Options (comma-separated)"
+                    placeholder="Dropdown options (comma-separated, e.g. Red, Blue, Green)"
                     value={field.options.join(', ')}
                     onChange={(e) => updateField(index, { options: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })}
                   />
+                </div>
+              )}
+              {field.repair_category && (
+                <div className="mt-1.5">
+                  <span className="inline-flex items-center rounded-full bg-brand-teal-light px-2 py-0.5 text-[11px] font-medium text-brand-teal border border-brand-teal-light">
+                    {field.repair_category}
+                  </span>
                 </div>
               )}
 

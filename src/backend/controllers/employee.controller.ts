@@ -14,6 +14,7 @@ const createSchema = z.object({
   role: z.string().optional().nullable(),
   hourly_rate: z.number().min(0).optional().nullable(),
   hire_date: z.string().optional().nullable(),
+  access_pin: z.string().regex(/^\d{4,6}$/).optional().nullable().or(z.literal('')),
 })
 
 const updateSchema = createSchema.partial().omit({ branch_id: true })
@@ -26,7 +27,8 @@ const clockSchema = z.object({
 
 export const EmployeeController = {
   async list(request: NextRequest, ctx: RequestContext) {
-    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
+    if (!branchId) return ok([])
     try {
       const data = await EmployeeService.list(branchId)
       return ok(data)
@@ -36,7 +38,8 @@ export const EmployeeController = {
   },
 
   async getById(request: NextRequest, ctx: RequestContext, id: string) {
-    const branchId = ctx.auth.branchId ?? ''
+    const branchId = ctx.auth.branchId ?? null
+    if (!branchId) return ok(null)
     try {
       const employee = await EmployeeService.getById(id, branchId)
       if (!employee) return notFound('Employee not found')
@@ -53,6 +56,7 @@ export const EmployeeController = {
       const employee = await EmployeeService.create({
         ...data,
         email: data.email || null,
+        access_pin: data.access_pin || null,
       })
       return created(employee)
     } catch (err) {
@@ -63,11 +67,13 @@ export const EmployeeController = {
   async update(request: NextRequest, ctx: RequestContext, id: string) {
     const { data, error } = await validateBody(request, updateSchema)
     if (error) return error
-    const branchId = ctx.auth.branchId ?? ''
+    const branchId = ctx.auth.branchId
+    if (!branchId) return ok(null)
     try {
       const employee = await EmployeeService.update(id, branchId, {
         ...data,
         email: data.email || null,
+        access_pin: data.access_pin || null,
       })
       return ok(employee)
     } catch (err) {
@@ -94,7 +100,8 @@ export const EmployeeController = {
 
   async getTimeLogs(request: NextRequest, ctx: RequestContext) {
     const { searchParams } = request.nextUrl
-    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId
+    if (!branchId) return ok([])
     const date = searchParams.get('date') ?? undefined
     try {
       const data = await EmployeeService.getTimeLogs(branchId, date)

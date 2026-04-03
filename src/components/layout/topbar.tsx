@@ -1,7 +1,6 @@
 'use client'
 import { Bell, Menu, Search, ChevronDown } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
-import { BranchSwitcher } from './branch-switcher'
 
 interface TopbarProps {
   onMenuClick?: () => void
@@ -32,9 +31,6 @@ export function Topbar({ onMenuClick }: TopbarProps) {
       </div>
 
       <div className="flex items-center gap-1.5 ml-auto">
-        {/* Branch Switcher */}
-        <BranchSwitcher />
-
         {/* Notifications */}
         <button className="relative rounded-xl p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600">
           <Bell className="h-4.5 w-4.5" style={{ width: '1.125rem', height: '1.125rem' }} />

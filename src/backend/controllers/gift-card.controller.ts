@@ -9,6 +9,7 @@ const createSchema = z.object({
   branch_id: z.string().uuid(),
   initial_value: z.number().positive(),
   customer_id: z.string().uuid().optional().nullable(),
+  customer_ids: z.array(z.string().uuid()).optional().nullable(),
   expires_at: z.string().optional().nullable(),
 })
 
@@ -19,7 +20,8 @@ const updateSchema = z.object({
 
 export const GiftCardController = {
   async list(request: NextRequest, ctx: RequestContext) {
-    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId
+    if (!branchId) return notFound('Branch ID is required')
     try {
       const data = await GiftCardService.list(branchId)
       return ok(data)
@@ -31,10 +33,12 @@ export const GiftCardController = {
   async getByCode(request: NextRequest, ctx: RequestContext) {
     const { searchParams } = request.nextUrl
     const code = searchParams.get('code') ?? ''
-    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? ''
+    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId
+    const customerId = searchParams.get('customer_id') ?? null
+    if (!branchId) return notFound('Branch ID is required')
     try {
-      const card = await GiftCardService.getByCode(code, branchId)
-      if (!card) return notFound('Gift card not found or inactive')
+      const card = await GiftCardService.getByCode(code, branchId, customerId)
+      if (!card) return notFound('Gift card not found, inactive, or not valid for this customer')
       return ok(card)
     } catch (err) {
       return serverError('Failed to fetch gift card', err)
@@ -56,9 +60,11 @@ export const GiftCardController = {
   async update(request: NextRequest, ctx: RequestContext, id: string) {
     const { data, error } = await validateBody(request, updateSchema)
     if (error) return error
+    const branchId = ctx.auth.branchId
+    if (!branchId) return notFound('Branch ID is required')
     try {
       if (data.is_active === false) {
-        await GiftCardService.deactivate(id)
+        await GiftCardService.deactivate(id, branchId)
       }
       return ok({ updated: true })
     } catch (err) {

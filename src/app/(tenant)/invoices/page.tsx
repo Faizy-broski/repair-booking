@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Download, CreditCard } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Plus, Download, CreditCard, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -36,10 +37,11 @@ interface StatusSummary {
 }
 
 const STATUS_VARIANTS: Record<string, 'default' | 'success' | 'warning' | 'destructive'> = {
-  draft: 'default', sent: 'warning', paid: 'success',
-  overdue: 'destructive', cancelled: 'destructive',
-  unpaid: 'destructive', partial: 'warning', refunded: 'default',
+  issued: 'warning', unpaid: 'destructive', partial: 'warning',
+  paid: 'success', refunded: 'default', void: 'destructive',
 }
+
+const INVOICE_STATUSES = ['issued', 'unpaid', 'partial', 'paid', 'refunded', 'void'] as const
 
 const lineItemSchema = z.object({
   description: z.string().min(1),
@@ -57,6 +59,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 export default function InvoicesPage() {
+  const router = useRouter()
   const { activeBranch } = useAuthStore()
   const [invoices, setInvoices] = useState<InvoiceRow[]>([])
   const [customers, setCustomers] = useState<CustomerOption[]>([])
@@ -95,6 +98,15 @@ export default function InvoicesPage() {
   }, [activeBranch, page, statusFilter])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  async function changeStatus(invoiceId: string, newStatus: string) {
+    const res = await fetch(`/api/invoices/${invoiceId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+    })
+    if (res.ok) fetchData()
+  }
 
   function addLineItem() {
     const updated = [...lineItems, { description: '', quantity: 1, unit_price: 0 }]
@@ -184,9 +196,24 @@ export default function InvoicesPage() {
     {
       accessorKey: 'status',
       header: 'Status',
-      cell: ({ getValue }) => {
-        const s = getValue() as string
-        return <Badge variant={STATUS_VARIANTS[s] ?? 'default'}>{s}</Badge>
+      cell: ({ row }) => {
+        const inv = row.original
+        return (
+          <select
+            value={inv.status}
+            onChange={e => changeStatus(inv.id, e.target.value)}
+            className={`cursor-pointer rounded-full border-0 px-2 py-0.5 text-xs font-medium focus:ring-2 focus:ring-blue-400 ${
+              inv.status === 'paid' ? 'bg-green-100 text-green-800' :
+              inv.status === 'unpaid' || inv.status === 'void' ? 'bg-red-100 text-red-800' :
+              inv.status === 'partial' || inv.status === 'issued' ? 'bg-yellow-100 text-yellow-800' :
+              'bg-gray-100 text-gray-800'
+            }`}
+          >
+            {INVOICE_STATUSES.map(s => (
+              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+            ))}
+          </select>
+        )
       },
     },
     {
@@ -210,6 +237,17 @@ export default function InvoicesPage() {
               >
                 <CreditCard className="h-3.5 w-3.5 mr-1" />
                 Pay
+              </Button>
+            )}
+            {inv.status === 'paid' && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-red-200 text-red-600 hover:bg-red-50"
+                onClick={() => router.push(`/pos/refund?sale_id=${inv.id}`)}
+              >
+                <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                Refund
               </Button>
             )}
             <Button size="sm" variant="ghost" onClick={() => downloadPdf(row.original.id)}>

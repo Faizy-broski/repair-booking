@@ -105,7 +105,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
             onClick={() => setSidebarOpen(false)}
           />
           <div className="relative z-50">
-            <Sidebar />
+            <Sidebar onClose={() => setSidebarOpen(false)} />
           </div>
         </div>
       )}

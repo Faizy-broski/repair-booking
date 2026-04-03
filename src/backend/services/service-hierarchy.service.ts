@@ -92,7 +92,7 @@ export const ServiceManufacturerService = {
 // ── Devices ──────────────────────────────────────────────────────────────────
 
 export const ServiceDeviceService = {
-  async list(businessId: string, manufacturerId?: string) {
+  async list(businessId: string, manufacturerId?: string, brandId?: string) {
     let q = adminSupabase
       .from('service_devices')
       .select('*, service_manufacturers(name)')
@@ -100,6 +100,7 @@ export const ServiceDeviceService = {
       .order('name', { ascending: true })
 
     if (manufacturerId) q = q.eq('manufacturer_id', manufacturerId)
+    if (brandId) q = q.eq('brand_id', brandId)
 
     const { data, error } = await q
     if (error) throw error

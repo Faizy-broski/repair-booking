@@ -103,16 +103,14 @@ export default function MessagesPage() {
   async function onReply() {
     if (!replyBody.trim() || !selected || !activeBranch) return
     setSending(true)
-    const other = selected.from_branch?.name === activeBranch.name
-      ? messages.find((m) => m.id === selected.id)
-      : selected
+    const isFromMe = selected.from_branch_id === activeBranch.id
 
     await fetch('/api/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from_branch_id: activeBranch.id,
-        to_branch_id: other?.from_branch ? messages[0]?.sender_id : activeBranch.id,
+        to_branch_id: isFromMe ? selected.to_branch_id : selected.from_branch_id,
         subject: selected.subject,
         body: replyBody,
         parent_id: selected.parent_id ?? selected.id,

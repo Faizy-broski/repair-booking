@@ -19,10 +19,13 @@ interface PosState {
   customer: Customer | null
   discount: number
   taxRate: number
-  paymentMethod: 'cash' | 'card' | 'gift_card' | 'split'
+  paymentMethod: 'cash' | 'card' | 'gift_card' | 'store_credit' | 'loyalty_points' | 'split'
   paymentSplits: PaymentSplit[]
   giftCardId: string | null
   giftCardAmount: number
+  storeCreditAmount: number
+  loyaltyPointsAmount: number
+  loyaltyPointsUsed: number
 
   addToCart: (product: Product, variant?: ProductVariant | null) => void
   removeFromCart: (productId: string, variantId?: string | null) => void
@@ -34,6 +37,8 @@ interface PosState {
   setPaymentMethod: (method: PosState['paymentMethod']) => void
   setPaymentSplits: (splits: PaymentSplit[]) => void
   setGiftCard: (id: string, amount: number) => void
+  setStoreCredit: (amount: number) => void
+  setLoyaltyPoints: (points: number, amount: number) => void
   clearCart: () => void
 
   // Computed
@@ -52,6 +57,9 @@ export const usePosStore = create<PosState>((set, get) => ({
   paymentSplits: [],
   giftCardId: null,
   giftCardAmount: 0,
+  storeCreditAmount: 0,
+  loyaltyPointsAmount: 0,
+  loyaltyPointsUsed: 0,
 
   addToCart: (product, variant = null) => {
     const { cart } = get()
@@ -99,6 +107,8 @@ export const usePosStore = create<PosState>((set, get) => ({
   setPaymentMethod: (paymentMethod) => set({ paymentMethod }),
   setPaymentSplits: (paymentSplits) => set({ paymentSplits }),
   setGiftCard: (id, amount) => set({ giftCardId: id, giftCardAmount: amount }),
+  setStoreCredit: (amount) => set({ storeCreditAmount: amount }),
+  setLoyaltyPoints: (points, amount) => set({ loyaltyPointsUsed: points, loyaltyPointsAmount: amount }),
 
   clearCart: () =>
     set({
@@ -108,6 +118,9 @@ export const usePosStore = create<PosState>((set, get) => ({
       paymentSplits: [],
       giftCardId: null,
       giftCardAmount: 0,
+      storeCreditAmount: 0,
+      loyaltyPointsAmount: 0,
+      loyaltyPointsUsed: 0,
     }),
 
   subtotal: () =>

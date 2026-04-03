@@ -57,13 +57,13 @@ export const PosService = {
     return { data, count }
   },
 
-  async getSaleById(id: string, branchId: string) {
-    const { data, error } = await adminSupabase
+  async getSaleById(id: string, branchId: string | null) {
+    let q = adminSupabase
       .from('sales')
-      .select('*, sale_items(*), customers(*)')
+      .select('*, sale_items(*), customers(*), profiles!cashier_id(full_name)')
       .eq('id', id)
-      .eq('branch_id', branchId)
-      .single()
+    if (branchId) q = q.eq('branch_id', branchId)
+    const { data, error } = await q.single()
     if (error) throw error
     return data
   },

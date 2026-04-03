@@ -24,6 +24,13 @@ const createSchema = z.object({
   notify_customer: z.boolean().default(true),
   custom_fields: z.record(z.string(), z.unknown()).default({}),
   asset_id: z.string().uuid().optional().nullable(),
+  parts: z.array(z.object({
+    product_id: z.string().uuid(),
+    name: z.string(),
+    quantity: z.number().int().min(1).default(1),
+    unit_cost: z.number().min(0).default(0),
+    unit_price: z.number().min(0).default(0),
+  })).optional().default([]),
 })
 
 const updateSchema = createSchema.partial().omit({ branch_id: true })
@@ -68,7 +75,21 @@ export const RepairController = {
     const { data, error } = await validateBody(request, createSchema)
     if (error) return error
     try {
-      const repair = await RepairService.create(data)
+      const { parts, ...repairPayload } = data
+      const repair = await RepairService.create(repairPayload)
+
+      // Save repair items (parts) if any
+      if (parts && parts.length > 0 && repair) {
+        const items = parts.map(p => ({
+          repair_id: repair.id,
+          product_id: p.product_id,
+          name: p.name,
+          quantity: p.quantity,
+          unit_cost: p.unit_cost,
+          unit_price: p.unit_price,
+        }))
+        await adminSupabase.from('repair_items').insert(items)
+      }
 
       // Fire ticket_created notification if customer is attached and notify_customer is true
       if (data.notify_customer && data.customer_id && repair) {
@@ -130,7 +151,7 @@ export const RepairController = {
 
       // Fire-and-forget commission recording on completion
       if (data.status === 'completed') {
-        const branchId = ctx.auth.branchId ?? ''
+        const branchId = ctx.auth.branchId ?? null
         RepairService.getById(id, branchId).then((repair) => {
           if (repair?.assigned_to) {
             const total = (repair as Record<string, unknown>).total_cost as number ?? 0
@@ -141,7 +162,7 @@ export const RepairController = {
 
       // Non-blocking notification via NotificationEngine (email + SMS based on template)
       if (data.send_email) {
-        const branchId = ctx.auth.branchId ?? ''
+        const branchId = ctx.auth.branchId ?? null
         const repair = await RepairService.getById(id, branchId)
         if (repair?.customers) {
           const { data: business } = await adminSupabase

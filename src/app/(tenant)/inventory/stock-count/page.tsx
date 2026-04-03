@@ -19,7 +19,7 @@ const STATUS_VARIANT: Record<string, 'default' | 'warning' | 'success' | 'destru
 }
 
 export default function StockCountPage() {
-  const { activeBranch, activeProfile } = useAuthStore()
+  const { activeBranch, profile } = useAuthStore()
   const router = useRouter()
   const [counts, setCounts] = useState<CountRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -39,13 +39,13 @@ export default function StockCountPage() {
   useEffect(() => { fetchCounts() }, [fetchCounts])
 
   async function createCount() {
-    if (!activeBranch || !activeProfile) return
+    if (!activeBranch || !profile) return
     setCreating(true)
     const res = await fetch('/api/inventory/counts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        business_id: activeProfile.business_id,
+        business_id: profile.business_id,
         branch_id: activeBranch.id,
         name: newName || `Stock Count ${formatDate(new Date().toISOString())}`,
       }),

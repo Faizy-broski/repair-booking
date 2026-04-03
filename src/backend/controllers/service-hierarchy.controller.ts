@@ -28,7 +28,8 @@ const manufacturerSchema = z.object({
 })
 
 const deviceSchema = z.object({
-  manufacturer_id: z.string().uuid(),
+  manufacturer_id: z.string().uuid().optional(),
+  brand_id: z.string().uuid().nullable().optional(),
   name: z.string().min(1),
   image_url: z.string().url().nullable().optional(),
   colors: z.array(z.string()).default([]),
@@ -150,8 +151,9 @@ export const ServiceManufacturerController = {
 export const ServiceDeviceController = {
   async list(req: NextRequest, ctx: RequestContext) {
     const manufacturerId = req.nextUrl.searchParams.get('manufacturer_id') ?? undefined
+    const brandId = req.nextUrl.searchParams.get('brand_id') ?? undefined
     try {
-      const data = await ServiceDeviceService.list(ctx.businessId, manufacturerId)
+      const data = await ServiceDeviceService.list(ctx.businessId, manufacturerId, brandId)
       return ok(data)
     } catch (err) {
       return serverError('Failed to fetch devices', err)
