@@ -158,6 +158,7 @@ export default function PosPage() {
   const [gcCode, setGcCode] = useState('')
   const [gcLooking, setGcLooking] = useState(false)
   const [gcError, setGcError] = useState('')
+  const [gcModalOpen, setGcModalOpen] = useState(false)
 
   // Products tab view
   type ProductsView = 'by_products' | 'by_parts' | 'custom_item'
@@ -859,7 +860,7 @@ export default function PosPage() {
       setSuccess(true)
       // Auto-print receipt
       try {
-        const saleId = saleJson.data?.id ?? 'unknown'
+        const saleId = saleJson.data?.sale_id ?? 'unknown'
         const blob = await pdf(
           <SaleReceiptPdf
             saleId={saleId}
@@ -918,7 +919,7 @@ export default function PosPage() {
       setSuccess(true)
       // Auto-print receipt
       try {
-        const saleId = saleJson.data?.id ?? 'unknown'
+        const saleId = saleJson.data?.sale_id ?? 'unknown'
         const blob = await pdf(
           <SaleReceiptPdf
             saleId={saleId}
@@ -1362,12 +1363,6 @@ export default function PosPage() {
               <input
                 type="number" min="0" step="0.01" placeholder="0"
                 value={pos.discount || ''}
-                onFocus={async e => {
-                  if (pos.discount === 0) {
-                    const ok = await requestPin('Manager PIN required to apply a discount')
-                    if (!ok) { e.target.blur(); return }
-                  }
-                }}
                 onChange={e => pos.setDiscount(Math.max(0, parseFloat(e.target.value) || 0))}
                 className="h-7 w-20 rounded border border-gray-200 px-1.5 text-right text-sm text-green-700 focus:border-brand-teal focus:outline-none"
               />
@@ -1393,6 +1388,13 @@ export default function PosPage() {
                 className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border-2 border-[#1a3c40] bg-[#1a3c40] py-2.5 text-xs font-bold text-white hover:bg-[#15332e] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <SplitSquareHorizontal className="h-3.5 w-3.5" /><span className="hidden sm:inline">Multiple </span>Pay
+              </button>
+              <button
+                onClick={() => { setGcCode(''); setGcError(''); pos.cart.length > 0 && setGcModalOpen(true) }}
+                disabled={pos.cart.length === 0}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-purple-600 py-2.5 text-xs font-bold text-white hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <Gift className="h-3.5 w-3.5" /> Gift Card
               </button>
               <button
                 onClick={processCashPayment}
@@ -2305,6 +2307,94 @@ export default function PosPage() {
       </Modal>
 
 
+
+      {/* Gift Card Modal */}
+      {gcModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          {success ? (
+            <div className="rounded-2xl bg-white px-16 py-14 text-center shadow-2xl">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                <CheckCircle2 className="h-9 w-9 text-green-600" />
+              </div>
+              <p className="text-xl font-bold text-green-700">Payment Successful!</p>
+              <p className="mt-1 text-sm text-gray-500">Receipt has been processed.</p>
+            </div>
+          ) : (
+            <div className="w-[420px] rounded-2xl bg-white shadow-2xl overflow-hidden">
+              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+                <div className="flex items-center gap-2">
+                  <Gift className="h-5 w-5 text-purple-600" />
+                  <h3 className="font-bold text-gray-900">Gift Card Payment</h3>
+                </div>
+                <button onClick={() => { setGcModalOpen(false); pos.clearGiftCard() }} className="text-gray-400 hover:text-gray-600"><X className="h-4 w-4" /></button>
+              </div>
+              <div className="p-5 space-y-4">
+                {/* Order total */}
+                <div className="rounded-lg bg-gray-50 px-4 py-3 flex justify-between text-sm font-medium text-gray-700">
+                  <span>Total Due</span>
+                  <span className="font-bold text-gray-900">{formatCurrency(totalDue)}</span>
+                </div>
+
+                {/* Gift card code input */}
+                {!pos.giftCardId ? (
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Gift Card Code</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Enter gift card code"
+                        value={gcCode}
+                        onChange={e => { setGcCode(e.target.value); setGcError('') }}
+                        onKeyDown={e => e.key === 'Enter' && lookupGiftCard()}
+                        className="h-10 flex-1 rounded-lg border border-gray-200 px-3 text-sm focus:border-purple-500 focus:outline-none"
+                        autoFocus
+                      />
+                      <button
+                        onClick={lookupGiftCard}
+                        disabled={!gcCode.trim() || gcLooking}
+                        className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-40 transition-colors"
+                      >
+                        {gcLooking ? 'Checking…' : 'Apply'}
+                      </button>
+                    </div>
+                    {gcError && <p className="text-xs text-red-600">{gcError}</p>}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="rounded-lg bg-purple-50 border border-purple-200 px-4 py-3 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-semibold text-purple-700 uppercase tracking-wide">Gift Card Applied</p>
+                        <p className="text-lg font-bold text-purple-800">-{formatCurrency(pos.giftCardAmount)}</p>
+                      </div>
+                      <button
+                        onClick={() => { pos.clearGiftCard(); setGcCode(''); setGcError('') }}
+                        className="text-purple-400 hover:text-purple-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {totalDue - pos.giftCardAmount > 0.005 && (
+                      <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-2 flex justify-between text-sm">
+                        <span className="text-amber-700 font-medium">Remaining to Pay</span>
+                        <span className="font-bold text-amber-800">{formatCurrency(totalDue - pos.giftCardAmount)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Confirm button */}
+                <button
+                  onClick={async () => { await processPayment(); setGcModalOpen(false) }}
+                  disabled={!pos.giftCardId || processing}
+                  className="w-full rounded-lg bg-purple-600 py-3 text-sm font-bold text-white hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {processing ? 'Processing…' : 'Confirm Gift Card Payment'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Cash Payment Success Overlay */}
       {success && !paymentOpen && (

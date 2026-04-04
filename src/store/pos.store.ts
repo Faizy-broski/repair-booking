@@ -37,6 +37,7 @@ interface PosState {
   setPaymentMethod: (method: PosState['paymentMethod']) => void
   setPaymentSplits: (splits: PaymentSplit[]) => void
   setGiftCard: (id: string, amount: number) => void
+  clearGiftCard: () => void
   setStoreCredit: (amount: number) => void
   setLoyaltyPoints: (points: number, amount: number) => void
   clearCart: () => void
@@ -107,6 +108,7 @@ export const usePosStore = create<PosState>((set, get) => ({
   setPaymentMethod: (paymentMethod) => set({ paymentMethod }),
   setPaymentSplits: (paymentSplits) => set({ paymentSplits }),
   setGiftCard: (id, amount) => set({ giftCardId: id, giftCardAmount: amount }),
+  clearGiftCard: () => set({ giftCardId: null, giftCardAmount: 0, paymentMethod: 'cash' }),
   setStoreCredit: (amount) => set({ storeCreditAmount: amount }),
   setLoyaltyPoints: (points, amount) => set({ loyaltyPointsUsed: points, loyaltyPointsAmount: amount }),
 
