@@ -1,16 +1,16 @@
-﻿'use client'
+'use client'
 import { useState, useEffect } from 'react'
-import { Save, Wrench, ChevronRight, ChevronDown, GitBranch, Users, Star, Bell, Calendar, Plus, Code2, Sliders, Pencil, Trash2, Tag, Package, Smartphone, Cpu, Check, X } from 'lucide-react'
+import { Save, Wrench, ChevronRight, ChevronDown, GitBranch, Users, Star, Bell, Calendar, Plus, Code2, Sliders, Pencil, Trash2, Tag, Package, Check, X, Cpu } from 'lucide-react'
 import { CustomFieldBuilder } from '@/components/shared/custom-field-builder'
 import Link from 'next/link'
 import * as Tabs from '@radix-ui/react-tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ImageUpload } from '@/components/ui/image-upload'
 import { useAuthStore } from '@/store/auth.store'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
-
 const businessSchema = z.object({
   name: z.string().min(1),
   email: z.string().email().optional().or(z.literal('')),
@@ -19,34 +19,31 @@ const businessSchema = z.object({
   currency: z.string().default('GBP'),
   timezone: z.string().default('Europe/London'),
 })
-
 type BusinessFormData = z.infer<typeof businessSchema>
-
 interface Branch {
   id: string; name: string; address: string | null; phone: string | null; email: string | null; is_active: boolean
+  logo_url?: string | null
 }
 interface UserRow {
   id: string; full_name: string | null; email: string; role: string; is_active: boolean
   branches?: { name: string } | null
 }
-
 const branchSchema = z.object({
   name: z.string().min(1),
   address: z.string().optional(),
   phone: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
+  logo_url: z.string().url().optional().or(z.literal('')),
 })
-
-const userInviteSchema = z.object({
+const userCreateSchema = z.object({
   email: z.string().email(),
+  password: z.string().min(6),
   full_name: z.string().min(1),
   role: z.enum(['cashier', 'staff', 'branch_manager']),
   branch_id: z.string().uuid(),
 })
-
 type BranchFormData = z.infer<typeof branchSchema>
-type UserInviteFormData = z.infer<typeof userInviteSchema>
-
+type UserCreateFormData = z.infer<typeof userCreateSchema>
 export default function SettingsPage() {
   const { activeBranch, branches, isOwner, setCurrency, setBranches: setStoreBranches } = useAuthStore()
   const [activeTab, setActiveTab] = useState('general')
@@ -55,39 +52,43 @@ export default function SettingsPage() {
   const [savedBusiness, setSavedBusiness] = useState(false)
   const [editBranchId, setEditBranchId] = useState<string | null>(null)
   const [showNewBranchForm, setShowNewBranchForm] = useState(false)
-
   // Catalogue — Device Type → Brand → Model → Part Types
-  interface CatBrand { id: string; name: string; category_id: string | null }
-  interface CatModel { id: string; name: string; brand_id: string | null; manufacturer_id: string | null }
-  interface CatPartType { id: string; name: string; device_id: string | null }
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
+  interface CatBrand    { id: string; name: string; category_id: string | null; image_url?: string | null }
+  interface CatModel    { id: string; name: string; brand_id: string | null; manufacturer_id: string | null; image_url?: string | null }
+  interface CatPartType { id: string; name: string; device_id: string | null; image_url?: string | null }
+  interface CatCategory { id: string; name: string; image_url?: string | null }
+  const [categories, setCategories] = useState<CatCategory[]>([])
   const [brands, setBrands] = useState<CatBrand[]>([])
   const [models, setModels] = useState<CatModel[]>([])
   const [partTypes, setPartTypes] = useState<CatPartType[]>([])
   const [catalogueSaving, setCatalogueSaving] = useState(false)
-
-  // inline add inputs
-  const [newTypeName, setNewTypeName] = useState('')
+  // inline add inputs + images
+  const [newTypeName, setNewTypeName]   = useState('')
+  const [newTypeImage, setNewTypeImage] = useState('')
   const [newBrandName, setNewBrandName] = useState('')
+  const [newBrandImage, setNewBrandImage] = useState('')
   const [newModelName, setNewModelName] = useState('')
-  const [newPartName, setNewPartName] = useState('')
-
+  const [newModelImage, setNewModelImage] = useState('')
+  const [newPartName, setNewPartName]   = useState('')
+  const [newPartImage, setNewPartImage] = useState('')
   // 4-column selection + mobile step
-  const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null)
+  const [selectedTypeId, setSelectedTypeId]   = useState<string | null>(null)
   const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null)
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null)
   const [mobileStep, setMobileStep] = useState<0 | 1 | 2 | 3>(0)
-
   // inline rename
-  const [editingTypeId, setEditingTypeId] = useState<string | null>(null)
-  const [editTypeName, setEditTypeName] = useState('')
+  const [editingTypeId, setEditingTypeId]   = useState<string | null>(null)
+  const [editTypeName, setEditTypeName]     = useState('')
+  const [editTypeImage, setEditTypeImage]   = useState('')
   const [editingBrandId, setEditingBrandId] = useState<string | null>(null)
-  const [editBrandName, setEditBrandName] = useState('')
+  const [editBrandName, setEditBrandName]   = useState('')
+  const [editBrandImage, setEditBrandImage] = useState('')
   const [editingModelId, setEditingModelId] = useState<string | null>(null)
-  const [editModelName, setEditModelName] = useState('')
-  const [editingPartId, setEditingPartId] = useState<string | null>(null)
-  const [editPartName, setEditPartName] = useState('')
-
+  const [editModelName, setEditModelName]   = useState('')
+  const [editModelImage, setEditModelImage] = useState('')
+  const [editingPartId, setEditingPartId]   = useState<string | null>(null)
+  const [editPartName, setEditPartName]     = useState('')
+  const [editPartImage, setEditPartImage]   = useState('')
   async function loadCatalogue() {
     const [cRes, bRes, mRes, pRes] = await Promise.all([
       fetch('/api/categories'), fetch('/api/brands'),
@@ -99,35 +100,30 @@ export default function SettingsPage() {
     setModels(mj.data ?? [])
     setPartTypes(pj.data ?? [])
   }
-
   async function addDeviceType() {
     if (!newTypeName.trim()) return
     setCatalogueSaving(true)
-    await fetch('/api/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newTypeName.trim() }) })
-    setNewTypeName('')
+    await fetch('/api/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newTypeName.trim(), image_url: newTypeImage || null }) })
+    setNewTypeName(''); setNewTypeImage('')
     await loadCatalogue()
     setCatalogueSaving(false)
   }
-
   async function deleteDeviceType(id: string) {
     await fetch(`/api/categories/${id}`, { method: 'DELETE' })
     await loadCatalogue()
   }
-
   async function addBrand(categoryId: string) {
     if (!newBrandName.trim()) return
     setCatalogueSaving(true)
-    await fetch('/api/brands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newBrandName.trim(), category_id: categoryId }) })
-    setNewBrandName('')
+    await fetch('/api/brands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newBrandName.trim(), category_id: categoryId, image_url: newBrandImage || null }) })
+    setNewBrandName(''); setNewBrandImage('')
     await loadCatalogue()
     setCatalogueSaving(false)
   }
-
   async function deleteBrand(id: string) {
     await fetch(`/api/brands/${id}`, { method: 'DELETE' })
     await loadCatalogue()
   }
-
   async function addModel(brandId: string) {
     if (!newModelName.trim()) return
     setCatalogueSaving(true)
@@ -146,65 +142,56 @@ export default function SettingsPage() {
     }
     await fetch('/api/services/devices', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newModelName.trim(), brand_id: brandId, manufacturer_id: manufacturerId }),
+      body: JSON.stringify({ name: newModelName.trim(), brand_id: brandId, manufacturer_id: manufacturerId, image_url: newModelImage || null }),
     })
-    setNewModelName('')
+    setNewModelName(''); setNewModelImage('')
     await loadCatalogue()
     setCatalogueSaving(false)
   }
-
   async function deleteModel(id: string) {
     await fetch(`/api/services/devices/${id}`, { method: 'DELETE' })
     await loadCatalogue()
   }
-
   async function addPartType(deviceId: string) {
     if (!newPartName.trim()) return
     setCatalogueSaving(true)
-    await fetch('/api/part-types', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newPartName.trim(), device_id: deviceId }) })
-    setNewPartName('')
+    await fetch('/api/part-types', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newPartName.trim(), device_id: deviceId, image_url: newPartImage || null }) })
+    setNewPartName(''); setNewPartImage('')
     await loadCatalogue()
     setCatalogueSaving(false)
   }
-
   async function deletePartType(id: string) {
     await fetch(`/api/part-types/${id}`, { method: 'DELETE' })
     await loadCatalogue()
   }
-
   async function renameDeviceType(id: string) {
     if (!editTypeName.trim()) return
-    await fetch(`/api/categories/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editTypeName.trim() }) })
+    await fetch(`/api/categories/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editTypeName.trim(), image_url: editTypeImage || null }) })
     setEditingTypeId(null)
     await loadCatalogue()
   }
-
   async function renameBrand(id: string) {
     if (!editBrandName.trim()) return
-    await fetch(`/api/brands/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editBrandName.trim() }) })
+    await fetch(`/api/brands/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editBrandName.trim(), image_url: editBrandImage || null }) })
     setEditingBrandId(null)
     await loadCatalogue()
   }
-
   async function renameModel(id: string) {
     if (!editModelName.trim()) return
-    await fetch(`/api/services/devices/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editModelName.trim() }) })
+    await fetch(`/api/services/devices/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editModelName.trim(), image_url: editModelImage || null }) })
     setEditingModelId(null)
     await loadCatalogue()
   }
-
   async function renamePartType(id: string) {
     if (!editPartName.trim()) return
-    await fetch(`/api/part-types/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editPartName.trim() }) })
+    await fetch(`/api/part-types/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editPartName.trim(), image_url: editPartImage || null }) })
     setEditingPartId(null)
     await loadCatalogue()
   }
-
   const businessForm = useForm<BusinessFormData>({ resolver: zodResolver(businessSchema) })
   const branchForm = useForm<BranchFormData>({ resolver: zodResolver(branchSchema) })
   const newBranchForm = useForm<BranchFormData>({ resolver: zodResolver(branchSchema) })
-  const userForm = useForm<UserInviteFormData>({ resolver: zodResolver(userInviteSchema) })
-
+  const userForm = useForm<UserCreateFormData>({ resolver: zodResolver(userCreateSchema) })
   useEffect(() => {
     async function fetchBusinessInfo() {
       const res = await fetch('/api/settings/business')
@@ -230,7 +217,6 @@ export default function SettingsPage() {
     loadCatalogue()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
   async function onSaveBusiness(data: BusinessFormData) {
     await fetch('/api/settings/business', {
       method: 'PATCH',
@@ -241,7 +227,6 @@ export default function SettingsPage() {
     setSavedBusiness(true)
     setTimeout(() => setSavedBusiness(false), 2000)
   }
-
   async function refreshBranches() {
     const res = await fetch('/api/settings/branches')
     const json = await res.json()
@@ -249,7 +234,6 @@ export default function SettingsPage() {
     setBranchList(updated)
     setStoreBranches(updated)
   }
-
   async function onSaveBranch(data: BranchFormData) {
     if (!editBranchId) return
     await fetch(`/api/settings/branches/${editBranchId}`, {
@@ -261,7 +245,6 @@ export default function SettingsPage() {
     branchForm.reset()
     refreshBranches()
   }
-
   async function onCreateBranch(data: BranchFormData) {
     const res = await fetch('/api/settings/branches', {
       method: 'POST',
@@ -274,8 +257,7 @@ export default function SettingsPage() {
       refreshBranches()
     }
   }
-
-  async function onInviteUser(data: UserInviteFormData) {
+  async function onCreateUser(data: UserCreateFormData) {
     const res = await fetch('/api/users/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -283,49 +265,41 @@ export default function SettingsPage() {
     })
     if (res.ok) { userForm.reset(); const json = await res.json(); setUsers((u) => [...u, json.data]) }
   }
-
   function startEditBranch(branch: Branch) {
     setEditBranchId(branch.id)
-    branchForm.reset({ name: branch.name, address: branch.address ?? '', phone: branch.phone ?? '', email: branch.email ?? '' })
+    branchForm.reset({ name: branch.name, address: branch.address ?? '', phone: branch.phone ?? '', email: branch.email ?? '', logo_url: branch.logo_url ?? '' })
   }
-
   const ROLE_LABELS: Record<string, string> = {
     cashier: 'Cashier',
     staff: 'Staff',
     branch_manager: 'Branch Manager',
     business_owner: 'Business Owner',
   }
-
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-bold text-gray-900">Settings</h1>
         <p className="text-sm text-gray-500">Manage your business configuration</p>
       </div>
-
       <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
-        <Tabs.List className="flex gap-1 rounded-lg bg-gray-100 p-1 w-fit">
-          <Tabs.Trigger value="general" className="rounded-md px-4 py-1.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">
+        <Tabs.List className="flex gap-2 rounded-xl bg-gray-100/80 p-1.5 border border-gray-200 w-fit">
+          <Tabs.Trigger value="general" className="rounded-lg px-5 py-2 text-sm font-medium text-gray-600 transition-all hover:bg-gray-200/50 hover:text-gray-900 data-[state=active]:bg-brand-teal data-[state=active]:text-white data-[state=active]:shadow-md">
             General
           </Tabs.Trigger>
           {isOwner() && (
             <>
-              <Tabs.Trigger value="branches" className="rounded-md px-4 py-1.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <Tabs.Trigger value="branches" className="rounded-lg px-5 py-2 text-sm font-medium text-gray-600 transition-all hover:bg-gray-200/50 hover:text-gray-900 data-[state=active]:bg-brand-teal data-[state=active]:text-white data-[state=active]:shadow-md">
                 Branches
               </Tabs.Trigger>
-              <Tabs.Trigger value="users" className="rounded-md px-4 py-1.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <Tabs.Trigger value="users" className="rounded-lg px-5 py-2 text-sm font-medium text-gray-600 transition-all hover:bg-gray-200/50 hover:text-gray-900 data-[state=active]:bg-brand-teal data-[state=active]:text-white data-[state=active]:shadow-md">
                 Users
               </Tabs.Trigger>
             </>
           )}
-          <Tabs.Trigger value="custom_fields" className="rounded-md px-4 py-1.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">
+          <Tabs.Trigger value="custom_fields" className="rounded-lg px-5 py-2 text-sm font-medium text-gray-600 transition-all hover:bg-gray-200/50 hover:text-gray-900 data-[state=active]:bg-brand-teal data-[state=active]:text-white data-[state=active]:shadow-md">
             Custom Fields
           </Tabs.Trigger>
-          <Tabs.Trigger value="catalogue" className="rounded-md px-4 py-1.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm">
-            Catalogue
-          </Tabs.Trigger>
         </Tabs.List>
-
         {/* General settings */}
         <Tabs.Content value="general" className="mt-4">
           <div className="rounded-xl border border-gray-200 bg-white p-6">
@@ -363,64 +337,11 @@ export default function SettingsPage() {
               </Button>
             </form>
           </div>
-
           {/* Quick links */}
           <div className="mt-4 rounded-xl border border-gray-200 bg-white divide-y">
             <div className="px-6 py-3">
               <h3 className="font-semibold text-gray-900 text-sm">Configuration</h3>
             </div>
-            <Link
-              href="/settings/services"
-              className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors group"
-            >
-              <div className="flex items-center gap-3">
-                <Wrench className="h-4 w-4 text-blue-600" />
-                <div>
-                  <p className="text-sm font-medium text-gray-800">Service Catalogue</p>
-                  <p className="text-xs text-gray-400">Manage manufacturers, devices, and repair services</p>
-                </div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-gray-600" />
-            </Link>
-            <Link
-              href="/settings/product-attributes"
-              className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors group"
-            >
-              <div className="flex items-center gap-3">
-                <Plus className="h-4 w-4 text-indigo-600" />
-                <div>
-                  <p className="text-sm font-medium text-gray-800">Product Attributes</p>
-                  <p className="text-xs text-gray-400">Define Color, Size, Storage etc. for product variants</p>
-                </div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-gray-600" />
-            </Link>
-            <Link
-              href="/settings/workflows"
-              className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors group"
-            >
-              <div className="flex items-center gap-3">
-                <GitBranch className="h-4 w-4 text-purple-600" />
-                <div>
-                  <p className="text-sm font-medium text-gray-800">Workflows &amp; Responses</p>
-                  <p className="text-xs text-gray-400">Custom workflows, status flags, and canned responses</p>
-                </div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-gray-600" />
-            </Link>
-            <Link
-              href="/settings/customer-groups"
-              className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors group"
-            >
-              <div className="flex items-center gap-3">
-                <Users className="h-4 w-4 text-indigo-600" />
-                <div>
-                  <p className="text-sm font-medium text-gray-800">Customer Groups</p>
-                  <p className="text-xs text-gray-400">Segment customers for pricing, discounts, and billing</p>
-                </div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-gray-600" />
-            </Link>
             <Link
               href="/settings/loyalty"
               className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors group"
@@ -434,48 +355,8 @@ export default function SettingsPage() {
               </div>
               <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-gray-600" />
             </Link>
-            <Link
-              href="/settings/notifications"
-              className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors group"
-            >
-              <div className="flex items-center gap-3">
-                <Bell className="h-4 w-4 text-orange-500" />
-                <div>
-                  <p className="text-sm font-medium text-gray-800">Notifications</p>
-                  <p className="text-xs text-gray-400">Email &amp; SMS templates, gateway config, and invoice reminders</p>
-                </div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-gray-600" />
-            </Link>
-            <Link
-              href="/settings/booking"
-              className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors group"
-            >
-              <div className="flex items-center gap-3">
-                <Calendar className="h-4 w-4 text-brand-teal" />
-                <div>
-                  <p className="text-sm font-medium text-gray-800">Online Booking</p>
-                  <p className="text-xs text-gray-400">Business hours, booking widget, and availability settings</p>
-                </div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-gray-600" />
-            </Link>
-            <Link
-              href="/settings/widgets"
-              className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors group"
-            >
-              <div className="flex items-center gap-3">
-                <Code2 className="h-4 w-4 text-indigo-500" />
-                <div>
-                  <p className="text-sm font-medium text-gray-800">Embeddable Widgets</p>
-                  <p className="text-xs text-gray-400">Repair tracker &amp; price calculator embed code for your website</p>
-                </div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-gray-600" />
-            </Link>
           </div>
         </Tabs.Content>
-
         {/* Branches */}
         <Tabs.Content value="branches" className="mt-4 space-y-3">
           <div className="rounded-xl border border-gray-200 bg-white">
@@ -485,12 +366,12 @@ export default function SettingsPage() {
                 <Plus className="h-4 w-4" /> Add Branch
               </Button>
             </div>
-
             {/* New branch form */}
             {showNewBranchForm && (
               <div className="border-b border-gray-100 bg-blue-50/40 px-4 py-4">
                 <p className="mb-3 text-sm font-semibold text-gray-700">New Branch</p>
                 <form onSubmit={newBranchForm.handleSubmit(onCreateBranch)} className="space-y-3">
+                  <ImageUpload label="Branch Logo" value={newBranchForm.watch('logo_url') || ''} onChange={(url) => newBranchForm.setValue('logo_url', url)} />
                   <div className="grid grid-cols-2 gap-3">
                     <Input label="Branch Name *" required {...newBranchForm.register('name')} />
                     <Input label="Phone" {...newBranchForm.register('phone')} />
@@ -504,12 +385,12 @@ export default function SettingsPage() {
                 </form>
               </div>
             )}
-
             <div className="divide-y divide-gray-100">
               {branchList.map((branch) => (
                 <div key={branch.id} className="px-4 py-4">
                   {editBranchId === branch.id ? (
                     <form onSubmit={branchForm.handleSubmit(onSaveBranch)} className="space-y-3">
+                      <ImageUpload label="Branch Logo" value={branchForm.watch('logo_url') || ''} onChange={(url) => branchForm.setValue('logo_url', url)} />
                       <div className="grid grid-cols-2 gap-3">
                         <Input label="Branch Name" required {...branchForm.register('name')} />
                         <Input label="Phone" {...branchForm.register('phone')} />
@@ -543,7 +424,6 @@ export default function SettingsPage() {
             </div>
           </div>
         </Tabs.Content>
-
         {/* Users */}
         <Tabs.Content value="users" className="mt-4 space-y-4">
           <div className="rounded-xl border border-gray-200 bg-white">
@@ -564,12 +444,12 @@ export default function SettingsPage() {
               ))}
             </div>
           </div>
-
           <div className="rounded-xl border border-gray-200 bg-white p-6">
-            <h3 className="mb-4 font-semibold text-gray-900">Invite Team Member</h3>
-            <form onSubmit={userForm.handleSubmit(onInviteUser)} className="space-y-3 max-w-md">
+            <h3 className="mb-4 font-semibold text-gray-900">Create Team Member Account</h3>
+            <form onSubmit={userForm.handleSubmit(onCreateUser)} className="space-y-3 max-w-md">
               <Input label="Full Name" required {...userForm.register('full_name')} />
               <Input label="Email" type="email" required {...userForm.register('email')} />
+              <Input label="Password" type="password" required {...userForm.register('password')} />
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">Role</label>
@@ -589,7 +469,7 @@ export default function SettingsPage() {
                   </select>
                 </div>
               </div>
-              <Button type="submit" loading={userForm.formState.isSubmitting}>Send Invite</Button>
+              <Button type="submit" loading={userForm.formState.isSubmitting}>Create Account</Button>
             </form>
           </div>
         </Tabs.Content>
@@ -605,7 +485,6 @@ export default function SettingsPage() {
               </div>
               <Sliders className="h-5 w-5 shrink-0 text-brand-teal mt-0.5" />
             </div>
-
             {/* How it works info */}
             <div className="rounded-lg bg-brand-teal-light border border-brand-teal-light px-4 py-3 text-sm text-brand-teal-dark space-y-1">
               <p className="font-medium">Field Types</p>
@@ -617,13 +496,11 @@ export default function SettingsPage() {
                 <li><strong>Number, Date, Phone, Email</strong> — typed inputs with validation</li>
               </ul>
             </div>
-
             <CustomFieldBuilder />
           </div>
         </Tabs.Content>
-
-        {/* Catalogue — Device Type → Brand → Model → Part Types */}
-        <Tabs.Content value="catalogue" className="mt-4">
+        {/* Catalogue moved to /inventory/catalogue */}
+        {false && <Tabs.Content value="catalogue" className="mt-4">
           <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
             {/* Header */}
             <div className="flex items-center gap-3 px-5 py-3.5 border-b border-gray-200">
@@ -633,7 +510,6 @@ export default function SettingsPage() {
                 <p className="text-xs text-gray-400 mt-0.5">Types → Brands → Models → Part Types</p>
               </div>
             </div>
-
             {/* Mobile breadcrumb stepper */}
             <div className="lg:hidden border-b border-gray-100 px-4 py-2 bg-gray-50 flex items-center gap-1 flex-wrap">
               <button onClick={() => setMobileStep(0)} className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${mobileStep === 0 ? 'bg-brand-teal text-white' : 'text-gray-500 hover:text-gray-700'}`}>Types</button>
@@ -654,18 +530,17 @@ export default function SettingsPage() {
                 <button onClick={() => setMobileStep(3)} className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${mobileStep === 3 ? 'bg-brand-teal text-white' : 'text-gray-500 hover:text-gray-700'}`}>Parts</button>
               </>)}
             </div>
-
             {/* 4-column explorer (desktop) / single active column (mobile) */}
             <div className="lg:grid lg:grid-cols-4 lg:divide-x lg:divide-gray-200" style={{ minHeight: 460 }}>
-
               {/* ── Col 1: Device Types ── */}
               <div className={`flex flex-col border-b lg:border-b-0 border-gray-200 ${mobileStep !== 0 ? 'hidden lg:flex' : 'flex'}`}>
                 <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">Device Types</span>
                   <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-1.5">{categories.length}</span>
                 </div>
-                <div className="px-3 py-2 border-b border-gray-100">
-                  <div className="flex gap-1.5">
+                <div className="px-3 py-2 border-b border-gray-100 space-y-1.5">
+                  <div className="flex gap-1.5 items-center">
+                    <ImageUpload compact value={newTypeImage} onChange={setNewTypeImage} />
                     <input type="text" placeholder="e.g. Phones, Laptops…" value={newTypeName}
                       onChange={e => setNewTypeName(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && addDeviceType()}
@@ -685,9 +560,12 @@ export default function SettingsPage() {
                       <div key={dt.id}
                         onClick={() => { if (!isEditing) { setSelectedTypeId(dt.id); setSelectedBrandId(null); setSelectedModelId(null); setMobileStep(1) } }}
                         className={`flex items-center gap-2 px-3 py-2.5 cursor-pointer border-b border-gray-50 last:border-b-0 transition-colors ${isSelected ? 'bg-teal-50 border-l-[3px] border-l-brand-teal' : 'hover:bg-gray-50 border-l-[3px] border-l-transparent'}`}>
-                        <Smartphone className="h-3.5 w-3.5 text-brand-teal shrink-0" />
+                        {dt.image_url
+                          ? <img src={dt.image_url} alt={dt.name} className="h-5 w-5 rounded object-cover shrink-0" />
+                          : <Smartphone className="h-3.5 w-3.5 text-brand-teal shrink-0" />}
                         {isEditing ? (
                           <>
+                            <ImageUpload compact value={editTypeImage} onChange={setEditTypeImage} className="shrink-0" />
                             <input autoFocus value={editTypeName}
                               onChange={e => setEditTypeName(e.target.value)}
                               onKeyDown={e => { if (e.key === 'Enter') renameDeviceType(dt.id); if (e.key === 'Escape') setEditingTypeId(null) }}
@@ -703,7 +581,7 @@ export default function SettingsPage() {
                             <span className="flex-1 text-sm text-gray-800 truncate">{dt.name}</span>
                             <span className="text-[11px] text-gray-400 shrink-0 mr-1">{brands.filter(b => b.category_id === dt.id).length}</span>
                             <div className="flex gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
-                              <button onClick={() => { setEditingTypeId(dt.id); setEditTypeName(dt.name) }} className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"><Pencil className="h-3 w-3" /></button>
+                              <button onClick={() => { setEditingTypeId(dt.id); setEditTypeName(dt.name); setEditTypeImage(dt.image_url ?? '') }} className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"><Pencil className="h-3 w-3" /></button>
                               <button onClick={() => deleteDeviceType(dt.id)} className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"><Trash2 className="h-3 w-3" /></button>
                             </div>
                           </>
@@ -713,7 +591,6 @@ export default function SettingsPage() {
                   })}
                 </div>
               </div>
-
               {/* ── Col 2: Brands ── */}
               <div className={`flex flex-col border-b lg:border-b-0 border-gray-200 ${mobileStep !== 1 ? 'hidden lg:flex' : 'flex'}`}>
                 <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
@@ -728,7 +605,8 @@ export default function SettingsPage() {
                 ) : (
                   <>
                     <div className="px-3 py-2 border-b border-gray-100">
-                      <div className="flex gap-1.5">
+                      <div className="flex gap-1.5 items-center">
+                        <ImageUpload compact value={newBrandImage} onChange={setNewBrandImage} />
                         <input type="text" placeholder="e.g. Apple, Samsung…" value={newBrandName}
                           onChange={e => setNewBrandName(e.target.value)}
                           onKeyDown={e => e.key === 'Enter' && addBrand(selectedTypeId)}
@@ -748,9 +626,12 @@ export default function SettingsPage() {
                           <div key={brand.id}
                             onClick={() => { if (!isEditing) { setSelectedBrandId(brand.id); setSelectedModelId(null); setMobileStep(2) } }}
                             className={`flex items-center gap-2 px-3 py-2.5 cursor-pointer border-b border-gray-50 last:border-b-0 transition-colors ${isSelected ? 'bg-teal-50 border-l-[3px] border-l-brand-teal' : 'hover:bg-gray-50 border-l-[3px] border-l-transparent'}`}>
-                            <Tag className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                            {brand.image_url
+                              ? <img src={brand.image_url} alt={brand.name} className="h-5 w-5 rounded object-contain shrink-0" />
+                              : <Tag className="h-3.5 w-3.5 text-blue-500 shrink-0" />}
                             {isEditing ? (
                               <>
+                                <ImageUpload compact value={editBrandImage} onChange={setEditBrandImage} className="shrink-0" />
                                 <input autoFocus value={editBrandName}
                                   onChange={e => setEditBrandName(e.target.value)}
                                   onKeyDown={e => { if (e.key === 'Enter') renameBrand(brand.id); if (e.key === 'Escape') setEditingBrandId(null) }}
@@ -766,7 +647,7 @@ export default function SettingsPage() {
                                 <span className="flex-1 text-sm text-gray-800 truncate">{brand.name}</span>
                                 <span className="text-[11px] text-gray-400 shrink-0 mr-1">{models.filter(m => m.brand_id === brand.id).length}</span>
                                 <div className="flex gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
-                                  <button onClick={() => { setEditingBrandId(brand.id); setEditBrandName(brand.name) }} className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"><Pencil className="h-3 w-3" /></button>
+                                  <button onClick={() => { setEditingBrandId(brand.id); setEditBrandName(brand.name); setEditBrandImage(brand.image_url ?? '') }} className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"><Pencil className="h-3 w-3" /></button>
                                   <button onClick={() => deleteBrand(brand.id)} className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"><Trash2 className="h-3 w-3" /></button>
                                 </div>
                               </>
@@ -778,7 +659,6 @@ export default function SettingsPage() {
                   </>
                 )}
               </div>
-
               {/* ── Col 3: Models ── */}
               <div className={`flex flex-col border-b lg:border-b-0 border-gray-200 ${mobileStep !== 2 ? 'hidden lg:flex' : 'flex'}`}>
                 <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
@@ -793,7 +673,8 @@ export default function SettingsPage() {
                 ) : (
                   <>
                     <div className="px-3 py-2 border-b border-gray-100">
-                      <div className="flex gap-1.5">
+                      <div className="flex gap-1.5 items-center">
+                        <ImageUpload compact value={newModelImage} onChange={setNewModelImage} />
                         <input type="text" placeholder="e.g. iPhone 15, Galaxy S24…" value={newModelName}
                           onChange={e => setNewModelName(e.target.value)}
                           onKeyDown={e => e.key === 'Enter' && addModel(selectedBrandId)}
@@ -814,9 +695,12 @@ export default function SettingsPage() {
                           <div key={model.id}
                             onClick={() => { if (!isEditing) { setSelectedModelId(model.id); setMobileStep(3) } }}
                             className={`flex items-center gap-2 px-3 py-2.5 cursor-pointer border-b border-gray-50 last:border-b-0 transition-colors ${isSelected ? 'bg-teal-50 border-l-[3px] border-l-brand-teal' : 'hover:bg-gray-50 border-l-[3px] border-l-transparent'}`}>
-                            <Package className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                            {model.image_url
+                              ? <img src={model.image_url} alt={model.name} className="h-5 w-5 rounded object-cover shrink-0" />
+                              : <Package className="h-3.5 w-3.5 text-gray-400 shrink-0" />}
                             {isEditing ? (
                               <>
+                                <ImageUpload compact value={editModelImage} onChange={setEditModelImage} className="shrink-0" />
                                 <input autoFocus value={editModelName}
                                   onChange={e => setEditModelName(e.target.value)}
                                   onKeyDown={e => { if (e.key === 'Enter') renameModel(model.id); if (e.key === 'Escape') setEditingModelId(null) }}
@@ -832,7 +716,7 @@ export default function SettingsPage() {
                                 <span className="flex-1 text-sm text-gray-800 truncate">{model.name}</span>
                                 <span className="text-[11px] text-gray-400 shrink-0 mr-1">{partCount}p</span>
                                 <div className="flex gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
-                                  <button onClick={() => { setEditingModelId(model.id); setEditModelName(model.name) }} className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"><Pencil className="h-3 w-3" /></button>
+                                  <button onClick={() => { setEditingModelId(model.id); setEditModelName(model.name); setEditModelImage(model.image_url ?? '') }} className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"><Pencil className="h-3 w-3" /></button>
                                   <button onClick={() => deleteModel(model.id)} className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"><Trash2 className="h-3 w-3" /></button>
                                 </div>
                               </>
@@ -844,7 +728,6 @@ export default function SettingsPage() {
                   </>
                 )}
               </div>
-
               {/* ── Col 4: Part Types ── */}
               <div className={`flex flex-col ${mobileStep !== 3 ? 'hidden lg:flex' : 'flex'}`}>
                 <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
@@ -862,7 +745,8 @@ export default function SettingsPage() {
                 ) : (
                   <>
                     <div className="px-3 py-2 border-b border-gray-100">
-                      <div className="flex gap-1.5">
+                      <div className="flex gap-1.5 items-center">
+                        <ImageUpload compact value={newPartImage} onChange={setNewPartImage} />
                         <input type="text" placeholder="e.g. Screen, Battery, IC…" value={newPartName}
                           onChange={e => setNewPartName(e.target.value)}
                           onKeyDown={e => e.key === 'Enter' && addPartType(selectedModelId)}
@@ -879,9 +763,12 @@ export default function SettingsPage() {
                         const isEditing = editingPartId === pt.id
                         return (
                           <div key={pt.id} className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-50 last:border-b-0 hover:bg-purple-50/40 transition-colors">
-                            <Cpu className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                            {pt.image_url
+                              ? <img src={pt.image_url} alt={pt.name} className="h-5 w-5 rounded object-cover shrink-0" />
+                              : <Cpu className="h-3.5 w-3.5 text-purple-400 shrink-0" />}
                             {isEditing ? (
                               <>
+                                <ImageUpload compact value={editPartImage} onChange={setEditPartImage} className="shrink-0" />
                                 <input autoFocus value={editPartName}
                                   onChange={e => setEditPartName(e.target.value)}
                                   onKeyDown={e => { if (e.key === 'Enter') renamePartType(pt.id); if (e.key === 'Escape') setEditingPartId(null) }}
@@ -895,7 +782,7 @@ export default function SettingsPage() {
                               <>
                                 <span className="flex-1 text-sm text-gray-800 truncate">{pt.name}</span>
                                 <div className="flex gap-0.5 shrink-0">
-                                  <button onClick={() => { setEditingPartId(pt.id); setEditPartName(pt.name) }} className="p-1 rounded text-gray-400 hover:text-purple-600 hover:bg-purple-50"><Pencil className="h-3 w-3" /></button>
+                                  <button onClick={() => { setEditingPartId(pt.id); setEditPartName(pt.name); setEditPartImage(pt.image_url ?? '') }} className="p-1 rounded text-gray-400 hover:text-purple-600 hover:bg-purple-50"><Pencil className="h-3 w-3" /></button>
                                   <button onClick={() => deletePartType(pt.id)} className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"><Trash2 className="h-3 w-3" /></button>
                                 </div>
                               </>
@@ -914,11 +801,9 @@ export default function SettingsPage() {
                   </>
                 )}
               </div>
-
             </div>
           </div>
-        </Tabs.Content>
-
+        </Tabs.Content>}
       </Tabs.Root>
     </div>
   )

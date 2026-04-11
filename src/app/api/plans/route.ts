@@ -41,5 +41,20 @@ async function createHandler(request: NextRequest, ctx: RequestContext) {
   }
 }
 
-export const GET  = withMiddleware(listHandler,   { requiredRole: 'super_admin', skipTenant: true })
+// GET is public — needed by the registration page to display plan options
+export async function GET() {
+  const supabase = createAdminClient()
+  try {
+    const { data, error } = await supabase
+      .from('plans')
+      .select('id, name, price_monthly, max_branches, max_users, features, stripe_price_id_monthly, plan_type')
+      .eq('is_active', true)
+      .order('price_monthly', { ascending: true })
+    if (error) throw error
+    return ok(data)
+  } catch (err) {
+    return serverError('Failed to fetch plans', err)
+  }
+}
+
 export const POST = withMiddleware(createHandler, { requiredRole: 'super_admin', skipTenant: true })

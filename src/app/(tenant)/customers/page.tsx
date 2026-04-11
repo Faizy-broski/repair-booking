@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DataTable } from '@/components/shared/data-table'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
+import { CustomFieldRenderer, useCustomFieldDefs } from '@/components/shared/custom-field-renderer'
 import { useAuthStore } from '@/store/auth.store'
 import { formatDate } from '@/lib/utils'
 import { useForm } from 'react-hook-form'
@@ -41,6 +42,8 @@ export default function CustomersPage() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [customFields, setCustomFields] = useState<Record<string, unknown>>({})
+  const { defs: customerFieldDefs } = useCustomFieldDefs('customers')
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -69,7 +72,7 @@ export default function CustomersPage() {
     const res = await fetch('/api/customers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, branch_id: activeBranch.id }),
+      body: JSON.stringify({ ...data, branch_id: activeBranch.id, custom_fields: customFields }),
     })
     if (res.ok) { reset(); setSheetOpen(false); fetchCustomers() }
   }
@@ -105,7 +108,7 @@ export default function CustomersPage() {
       id: 'actions',
       header: '',
       cell: ({ row }) => (
-        <Button size="sm" variant="ghost" onClick={() => router.push(`/customers/${row.original.id}`)}>
+        <Button size="sm" variant="ghost" className="bg-brand-teal/10 text-brand-teal hover:bg-brand-teal/20 hover:text-brand-teal" onClick={() => router.push(`/customers/${row.original.id}`)}>
           View
         </Button>
       ),
@@ -162,6 +165,19 @@ export default function CustomersPage() {
               {...register('address')}
             />
           </div>
+          
+          {customerFieldDefs.length > 0 && (
+            <div className="border-t border-gray-100 pt-3 mt-2">
+              <p className="mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Additional Info</p>
+              <CustomFieldRenderer 
+                definitions={customerFieldDefs} 
+                values={customFields} 
+                onSave={async (v) => setCustomFields(v)}
+                readOnly={false}
+                showSave={false} 
+              />
+            </div>
+          )}
           <Button type="submit" className="w-full" loading={isSubmitting}>Add Customer</Button>
         </form>
       </InlineFormSheet>

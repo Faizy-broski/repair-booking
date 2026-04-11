@@ -150,6 +150,7 @@ export const NotificationEngine = {
           subject: subject ?? `Notification from ${businessName}`,
           html: emailBody!,
           fromName: businessName,
+          businessId,
         })
           .then(() => {
             logEntry(businessId, branchId ?? null, template.id, triggerEvent, 'email',

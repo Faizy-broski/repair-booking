@@ -23,6 +23,7 @@ export const PUT = withMiddleware(async (req, ctx, { params }) => {
   try {
     const update: Record<string, unknown> = { name: body.name }
     if (body.device_id !== undefined) update.device_id = body.device_id || null
+    if (body.image_url !== undefined) update.image_url = body.image_url || null
     const { data, error } = await adminSupabase
       .from('part_types')
       .update(update)

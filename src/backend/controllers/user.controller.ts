@@ -5,8 +5,9 @@ import { ok, created, serverError } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 import { z } from 'zod'
 
-const inviteSchema = z.object({
+const createSchema = z.object({
   email: z.string().email(),
+  password: z.string().min(6),
   full_name: z.string().min(1),
   role: z.enum(['branch_manager', 'staff', 'cashier']),
   branch_id: z.string().uuid().optional().nullable(),
@@ -30,17 +31,17 @@ export const UserController = {
     }
   },
 
-  async invite(request: NextRequest, ctx: RequestContext) {
-    const { data, error } = await validateBody(request, inviteSchema)
+  async create(request: NextRequest, ctx: RequestContext) {
+    const { data, error } = await validateBody(request, createSchema)
     if (error) return error
     try {
-      const user = await UserService.invite({
+      const user = await UserService.create({
         ...data,
         business_id: ctx.businessId,
       })
       return created(user)
     } catch (err) {
-      return serverError('Failed to invite user', err)
+      return serverError('Failed to create user', err)
     }
   },
 

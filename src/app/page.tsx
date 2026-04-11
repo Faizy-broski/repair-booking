@@ -169,7 +169,7 @@ export default function HomePage() {
   return (
     <>
       {/* ── Navbar ─────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100">
+      <header className="sticky top-0 z-50 bg-brand-teal border-b border-brand-teal-dark/25">
         <nav className="mx-auto max-w-7xl px-6 lg:px-8 flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center gap-2 flex-shrink-0">
             <Image
@@ -182,28 +182,28 @@ export default function HomePage() {
             />
           </Link>
 
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
-            <Link href="#features" className="hover:text-brand-teal transition-colors">Features</Link>
-            <Link href="#modules" className="hover:text-brand-teal transition-colors">Modules</Link>
-            <Link href="#pricing" className="hover:text-brand-teal transition-colors">Pricing</Link>
-            <Link href="#testimonials" className="hover:text-brand-teal transition-colors">Reviews</Link>
+          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-white/80">
+            <Link href="#features" className="hover:text-white transition-colors">Features</Link>
+            <Link href="#modules" className="hover:text-white transition-colors">Modules</Link>
+            <Link href="#pricing" className="hover:text-white transition-colors">Pricing</Link>
+            <Link href="#testimonials" className="hover:text-white transition-colors">Reviews</Link>
           </div>
 
           <div className="flex items-center gap-3">
             <Link
               href="/login"
-              className="hidden md:inline-flex text-sm font-medium text-gray-700 hover:text-brand-teal transition-colors"
+              className="hidden md:inline-flex text-sm font-medium text-white/90 hover:text-white transition-colors"
             >
               Sign in
             </Link>
             <Link
               href="/register"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-teal hover:bg-brand-teal-dark px-4 py-2 text-sm font-semibold text-white transition-colors shadow-sm"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-brand-teal transition-colors shadow-sm"
             >
               Get started free
               <ChevronRight className="h-3.5 w-3.5" />
             </Link>
-            <button className="md:hidden p-2 rounded-md text-gray-500 hover:text-gray-700" aria-label="Open menu">
+            <button className="md:hidden p-2 rounded-md text-white/80 hover:text-white" aria-label="Open menu">
               <Menu className="h-5 w-5" />
             </button>
           </div>

@@ -61,10 +61,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<ProductStats | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ProductRow | null>(null)
-  const [importModalOpen, setImportModalOpen] = useState(false)
-  const [importing, setImporting] = useState(false)
-  const [importResult, setImportResult] = useState<{ created: number; updated: number; errors: number; error_details?: string[] } | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [deleting, setDeleting] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [brands, setBrands] = useState<Brand[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -94,7 +91,7 @@ export default function InventoryPage() {
   const fetchProducts = useCallback(async () => {
     if (!activeBranch) return
     setLoading(true)
-    const params = new URLSearchParams({ page: String(page + 1), limit: '30', branch_id: activeBranch.id })
+    const params = new URLSearchParams({ page: String(page + 1), limit: '20', branch_id: activeBranch.id })
     if (search) params.set('search', search)
     if (categoryFilter) params.set('category_id', categoryFilter)
     if (brandFilter) params.set('brand_id', brandFilter)
@@ -119,20 +116,6 @@ export default function InventoryPage() {
     fetch('/api/suppliers').then(r => r.json()).then(j => setSuppliers(j.data ?? [])).catch(() => {})
   }, [])
 
-  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setImporting(true)
-    setImportResult(null)
-    const form = new FormData()
-    form.append('file', file)
-    const res = await fetch('/api/products/import', { method: 'POST', body: form })
-    const json = await res.json()
-    setImportResult(json.data ?? json)
-    setImporting(false)
-    if (res.ok) { fetchProducts(); fetchStats() }
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }
 
   async function openVariantDrawer(product: ProductRow) {
     setVariantDrawer(product)
@@ -146,7 +129,9 @@ export default function InventoryPage() {
 
   async function handleDelete() {
     if (!deleteTarget) return
+    setDeleting(true)
     await fetch(`/api/products/${deleteTarget.id}`, { method: 'DELETE' })
+    setDeleting(false)
     setDeleteTarget(null)
     fetchProducts()
     fetchStats()
@@ -211,9 +196,16 @@ export default function InventoryPage() {
       cell: ({ row }) => {
         const t = row.original.item_type ?? (row.original.is_service ? 'part' : 'product')
         return (
-          <Badge variant={t === 'part' ? 'warning' : 'secondary'}>
-            {t === 'part' ? 'Part' : 'Product'}
-          </Badge>
+          <div className="flex flex-col gap-1 items-start">
+            <Badge variant={t === 'part' ? 'warning' : 'secondary'}>
+              {t === 'part' ? 'Part' : 'Product'}
+            </Badge>
+            {row.original.part_type && (
+              <span className="text-[10px] uppercase text-gray-500 font-semibold tracking-wider">
+                {row.original.part_type}
+              </span>
+            )}
+          </div>
         )
       },
     },
@@ -321,7 +313,7 @@ export default function InventoryPage() {
           <Button variant="outline" size="sm" onClick={() => window.open(`/api/products/export`, '_blank')}>
             <Download className="h-4 w-4" /> Export
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setImportModalOpen(true)}>
+          <Button variant="outline" size="sm" onClick={() => router.push('/inventory/bulk-upload')}>
             <Upload className="h-4 w-4" /> Import
           </Button>
           <Button onClick={() => router.push('/inventory/new')}>
@@ -470,60 +462,22 @@ export default function InventoryPage() {
         isLoading={loading}
         totalCount={total}
         pageIndex={page}
-        pageSize={30}
+        pageSize={20}
         onPageChange={setPage}
         emptyMessage="No products yet. Click Add Product to get started!"
       />
 
-      {/* Import Modal */}
-      <Modal open={importModalOpen} onClose={() => { setImportModalOpen(false); setImportResult(null) }} title="Import Products from CSV" size="sm">
-        <div className="space-y-4">
-          {importResult ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 rounded-lg bg-green-50 p-3 text-sm text-green-800">
-                <CheckCircle2 className="h-4 w-4 shrink-0" />
-                Import complete
-              </div>
-              <div className="rounded-lg bg-gray-50 p-3 text-sm space-y-1">
-                <div className="flex justify-between"><span className="text-gray-500">Created</span><span className="font-medium text-green-700">{importResult.created}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Updated</span><span className="font-medium text-blue-700">{importResult.updated}</span></div>
-                {importResult.errors > 0 && (
-                  <div className="flex justify-between"><span className="text-gray-500">Errors</span><span className="font-medium text-red-600">{importResult.errors}</span></div>
-                )}
-              </div>
-              {(importResult.error_details ?? []).length > 0 && (
-                <div className="rounded-lg border border-red-100 bg-red-50 p-3 text-xs text-red-700 space-y-1 max-h-32 overflow-y-auto">
-                  {importResult.error_details!.map((e, i) => <div key={i}>{e}</div>)}
-                </div>
-              )}
-              <Button className="w-full" onClick={() => { setImportModalOpen(false); setImportResult(null) }}>Done</Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
-                <p className="font-medium mb-1">Expected CSV columns:</p>
-                <p className="text-xs font-mono text-blue-600">name, sku, barcode, selling_price, cost_price, description, is_service, is_serialized, valuation_method, category, brand</p>
-                <p className="text-xs text-blue-600 mt-1">Products are upserted by SKU if provided.</p>
-              </div>
-              <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleImport} />
-              <Button className="w-full" loading={importing} onClick={() => fileInputRef.current?.click()}>
-                <Upload className="h-4 w-4" />
-                {importing ? 'Importing...' : 'Choose CSV File'}
-              </Button>
-            </div>
-          )}
-        </div>
-      </Modal>
-
       {/* Delete Confirm Modal */}
-      <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete Product" size="sm">
+      <Modal open={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)} title="Delete Product" size="sm">
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
             Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This will hide it from the POS and inventory. Stock movements history is preserved.
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => setDeleteTarget(null)}>Cancel</Button>
-            <Button variant="destructive" className="flex-1" onClick={handleDelete}>Delete</Button>
+            <Button variant="outline" className="flex-1" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</Button>
+            <Button variant="destructive" className="flex-1" onClick={handleDelete} loading={deleting}>
+              {deleting ? 'Deleting...' : 'Delete'}
+            </Button>
           </div>
         </div>
       </Modal>
@@ -602,7 +556,6 @@ export default function InventoryPage() {
         </div>
       )}
 
-      <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleImport} />
     </div>
   )
 }

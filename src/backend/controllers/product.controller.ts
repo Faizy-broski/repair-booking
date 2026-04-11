@@ -19,7 +19,7 @@ const createSchema = z.object({
   has_variants: z.boolean().default(false),
   is_serialized: z.boolean().optional(),
   valuation_method: z.enum(['weighted_average', 'fifo', 'lifo']).optional(),
-  image_url: z.string().url().optional().nullable(),
+  image_url: z.string().optional().nullable(),
   show_on_pos: z.boolean().optional(),
   tax_class: z.string().optional().nullable(),
   // Item type: product or part
@@ -149,8 +149,10 @@ export const ProductController = {
           .eq('product_id', id)
           .maybeSingle()
         if (existing) {
+          const updatePayload: Record<string, unknown> = { low_stock_alert: low_stock_alert ?? 5 }
+          if (initial_stock !== undefined) updatePayload.quantity = initial_stock
           await adminSupabase.from('inventory')
-            .update({ low_stock_alert: low_stock_alert ?? 5 })
+            .update(updatePayload)
             .eq('branch_id', targetBranch)
             .eq('product_id', id)
         } else {

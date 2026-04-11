@@ -1,11 +1,12 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Save, Plus, ImagePlus } from 'lucide-react'
+import { ChevronLeft, Save, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Modal } from '@/components/ui/modal'
+import { ImageUpload } from '@/components/ui/image-upload'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency } from '@/lib/utils'
 import Link from 'next/link'
@@ -72,6 +73,7 @@ export default function NewProductPage() {
   const brands = categoryId ? allBrands.filter(b => b.category_id === categoryId) : allBrands
   const devices = brandId ? allDevices.filter(d => d.brand_id === brandId) : allDevices
   const partTypesForModel = modelId ? allPartTypes.filter(p => p.device_id === modelId) : allPartTypes
+
 
   async function handleAddCategory() {
     if (!newCategoryName.trim()) return
@@ -237,19 +239,11 @@ export default function NewProductPage() {
               <h2 className="text-base font-semibold text-gray-900">{itemType === 'part' ? 'Part' : 'Product'} Details</h2>
             </div>
             <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                {imageUrl ? (
-                  <img src={imageUrl} alt="Item" className="h-20 w-20 rounded-xl border border-gray-200 object-contain" />
-                ) : (
-                  <div className="h-20 w-20 rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:border-blue-400 hover:text-blue-500 transition-colors">
-                    <ImagePlus className="h-6 w-6" />
-                    <span className="text-xs mt-1">Image</span>
-                  </div>
-                )}
-                <div className="flex-1">
-                  <Input label="Image URL" placeholder="https://..." value={imageUrl} onChange={e => setImageUrl(e.target.value)} />
-                </div>
-              </div>
+              <ImageUpload
+                label={itemType === 'part' ? 'Part image' : 'Product image'}
+                value={imageUrl}
+                onChange={setImageUrl}
+              />
 
               <Input label="Name *" placeholder={itemType === 'part' ? 'e.g. iPhone 13 Screen' : 'e.g. iPhone 13 Pro Max'} required value={name} onChange={e => setName(e.target.value)} />
 

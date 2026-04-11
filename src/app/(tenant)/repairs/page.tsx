@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Search, LayoutGrid, List } from 'lucide-react'
+import { Plus, Search, LayoutGrid, List, Wrench, DollarSign, AlertTriangle, Clock, TrendingUp, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge, REPAIR_STATUS_VARIANTS } from '@/components/ui/badge'
@@ -54,6 +54,7 @@ type CreateFormData = z.infer<typeof createSchema>
 
 interface RepairRow extends Repair {
   customers?: { first_name: string; last_name: string | null; phone: string | null; email: string | null } | null
+  is_rush?: boolean
 }
 
 export default function RepairsPage() {
@@ -70,6 +71,12 @@ export default function RepairsPage() {
   const [emailPrompt, setEmailPrompt] = useState<{ repairId: string; jobNumber: string } | null>(null)
   const [view, setView] = useState<'list' | 'kanban'>('list')
   const [selectedAsset, setSelectedAsset] = useState<{ id: string; name: string; brand: string | null; model: string | null; serial_number: string | null; imei: string | null; color: string | null } | null>(null)
+
+  // Dashboard stats
+  const [repairStats, setRepairStats] = useState<{
+    total_repairs: number; repairs_open: number; repairs_completed: number;
+    repairs_urgent: number; total_sales: number;
+  } | null>(null)
 
   const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<CreateFormData>({
     resolver: zodResolver(createSchema),
@@ -104,6 +111,25 @@ export default function RepairsPage() {
   }
 
   useEffect(() => { fetchRepairs() }, [fetchRepairs])
+
+  // Fetch repair dashboard stats
+  useEffect(() => {
+    if (!activeBranch) return
+    fetch(`/api/dashboard?branch_id=${activeBranch.id}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.data?.stats) {
+          const s = json.data.stats
+          setRepairStats({
+            total_repairs: s.repairs_open + s.repairs_completed,
+            repairs_open: s.repairs_open,
+            repairs_completed: s.repairs_completed,
+            repairs_urgent: s.repairs_urgent,
+            total_sales: s.total_sales,
+          })
+        }
+      })
+  }, [activeBranch])
 
   async function onCreate(data: CreateFormData) {
     if (!activeBranch) return
@@ -143,8 +169,11 @@ export default function RepairsPage() {
   }
 
   const columns: ColumnDef<RepairRow>[] = [
-    { accessorKey: 'job_number', header: 'Job #', cell: ({ getValue }) => (
-      <span className="font-mono text-sm font-semibold text-blue-600">{getValue() as string}</span>
+    { accessorKey: 'job_number', header: 'Job #', cell: ({ row }) => (
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-sm font-semibold text-blue-600">{row.original.job_number}</span>
+        {row.original.is_rush && <span className="flex h-4 items-center rounded bg-orange-100 px-1.5 text-[9px] font-bold text-orange-700 uppercase tracking-widest border border-orange-200" title="Rush Job">Rush</span>}
+      </div>
     )},
     { accessorKey: 'customers', header: 'Customer', cell: ({ getValue }) => {
       const c = getValue() as RepairRow['customers']
@@ -182,7 +211,7 @@ export default function RepairsPage() {
     }},
     { accessorKey: 'created_at', header: 'Created', cell: ({ getValue }) => formatDateTime(getValue() as string) },
     { id: 'actions', header: '', cell: ({ row }) => (
-      <Button size="sm" variant="ghost" onClick={() => router.push(`/repairs/${row.original.id}`)}>
+      <Button size="sm" variant="ghost" className="bg-brand-teal/10 text-brand-teal hover:bg-brand-teal/20 hover:text-brand-teal" onClick={() => router.push(`/repairs/${row.original.id}`)}>
         View
       </Button>
     )},
@@ -190,19 +219,106 @@ export default function RepairsPage() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Repairs</h1>
-          <p className="text-sm text-gray-500">{total} total jobs</p>
+
+      {/* ── Repair Dashboard Stats ── */}
+      <div>
+        <h1 className="text-2xl font-bold text-on-surface">Repair Dashboard</h1>
+        <p className="text-sm text-on-surface-variant">Real-time overview of your workshop performance.</p>
+      </div>
+
+      {repairStats ? (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {/* Total Repairs */}
+          <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-5 px-5 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Total Repairs</p>
+                <p className="mt-2 text-3xl font-bold text-on-surface">{repairStats.total_repairs}</p>
+              </div>
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-container">
+                <Wrench className="h-5 w-5 text-primary" />
+              </div>
+            </div>
+            <p className="mt-3 flex items-center gap-1 text-xs font-medium text-primary">
+              <TrendingUp className="h-3 w-3" />
+              {repairStats.repairs_completed} completed this month
+            </p>
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />
+          </div>
+
+          {/* Revenue */}
+          <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-5 px-5 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Revenue</p>
+                <p className="mt-2 text-3xl font-bold text-on-surface">{formatCurrency(repairStats.total_sales)}</p>
+              </div>
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-tertiary-container/40">
+                <DollarSign className="h-5 w-5 text-tertiary" />
+              </div>
+            </div>
+            <p className="mt-3 flex items-center gap-1 text-xs font-medium text-tertiary">
+              <TrendingUp className="h-3 w-3" />
+              total this month
+            </p>
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-tertiary" />
+          </div>
+
+          {/* Open Jobs */}
+          <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-5 px-5 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Open Jobs</p>
+                <p className="mt-2 text-3xl font-bold text-on-surface">{repairStats.repairs_open}</p>
+              </div>
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-yellow-light">
+                <Wrench className="h-5 w-5 text-[#b45309]" />
+              </div>
+            </div>
+            <p className="mt-3 flex items-center gap-1 text-xs font-medium text-[#b45309]">
+              <Clock className="h-3 w-3" />
+              Avg. 2h turnaround
+            </p>
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-brand-yellow" />
+          </div>
+
+          {/* Urgent Jobs */}
+          <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-5 px-5 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Urgent Jobs</p>
+                <p className="mt-2 text-3xl font-bold text-on-surface">{repairStats.repairs_urgent}</p>
+              </div>
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-error-container/20">
+                <AlertTriangle className="h-5 w-5 text-error" />
+              </div>
+            </div>
+            <p className={`mt-3 flex items-center gap-1 text-xs font-medium ${repairStats.repairs_urgent === 0 ? 'text-primary' : 'text-error'}`}>
+              {repairStats.repairs_urgent === 0
+                ? <><CheckCircle className="h-3 w-3" /> All clear</>
+                : <><AlertTriangle className="h-3 w-3" /> Needs attention</>}
+            </p>
+            <div className={`absolute bottom-0 left-0 right-0 h-1 ${repairStats.repairs_urgent > 0 ? 'bg-error' : 'bg-outline-variant'}`} />
+          </div>
         </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-28 animate-pulse rounded-xl bg-surface-container" />
+          ))}
+        </div>
+      )}
+
+      {/* ── List header ── */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-on-surface-variant">{total} total jobs</p>
         <div className="flex items-center gap-2">
           {/* View toggle */}
-          <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+          <div className="flex rounded-lg border border-outline-variant bg-surface-container-low p-0.5">
             <button
               onClick={() => setView('list')}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                view === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                view === 'list' ? 'bg-surface-container-lowest shadow-sm text-on-surface' : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
               <List className="h-3.5 w-3.5" />
@@ -211,7 +327,7 @@ export default function RepairsPage() {
             <button
               onClick={() => setView('kanban')}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                view === 'kanban' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                view === 'kanban' ? 'bg-surface-container-lowest shadow-sm text-on-surface' : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
               <LayoutGrid className="h-3.5 w-3.5" />
@@ -323,6 +439,7 @@ export default function RepairsPage() {
               if (sel) {
                 // Only auto-fill device fields if no customer asset is linked
                 if (!selectedAsset) {
+                  setValue('device_type', sel.categoryName)
                   setValue('device_brand', sel.manufacturerName)
                   setValue('device_model', sel.deviceName)
                 }

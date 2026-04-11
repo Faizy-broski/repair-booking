@@ -266,6 +266,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           is_main: boolean | null
+          logo_url: string | null
           name: string
           phone: string | null
           updated_at: string | null
@@ -278,6 +279,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_main?: boolean | null
+          logo_url?: string | null
           name: string
           phone?: string | null
           updated_at?: string | null
@@ -290,6 +292,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_main?: boolean | null
+          logo_url?: string | null
           name?: string
           phone?: string | null
           updated_at?: string | null
@@ -3357,6 +3360,8 @@ export type Database = {
           estimated_cost: number | null
           id: string
           issue: string
+          lock_type: string | null
+          passcode: string | null
           job_number: string
           label_ids: string[] | null
           notify_customer: boolean | null
@@ -3383,6 +3388,8 @@ export type Database = {
           estimated_cost?: number | null
           id?: string
           issue: string
+          lock_type: string | null
+          passcode: string | null
           job_number: string
           label_ids?: string[] | null
           notify_customer?: boolean | null

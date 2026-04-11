@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, GripVertical, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -204,16 +204,11 @@ export function CustomFieldBuilder({ module: initialModule, repairCategory: init
             >
               <GripVertical className="mt-2.5 h-4 w-4 shrink-0 cursor-grab text-gray-300" />
 
-              <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-3">
                 <Input
                   placeholder="Label"
                   value={field.label}
                   onChange={(e) => updateField(index, { label: e.target.value })}
-                />
-                <Input
-                  placeholder="field_key"
-                  value={field.field_key}
-                  onChange={(e) => updateField(index, { field_key: e.target.value })}
                 />
                 <Select
                   options={FIELD_TYPE_OPTIONS}

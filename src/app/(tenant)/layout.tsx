@@ -5,12 +5,14 @@ import { Topbar } from '@/components/layout/topbar'
 import { useAuthStore } from '@/store/auth.store'
 import { useModuleConfigStore } from '@/store/module-config.store'
 import { createClient } from '@/lib/supabase/client'
+import { getSubdomain } from '@/lib/utils'
 import type { Profile, Branch } from '@/types/database'
+import type { SubscriptionStatus } from '@/store/auth.store'
 
 export default function TenantLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
-  const { setProfile, setBranches, setActiveBranch, setLoading, setCurrency, clear, profile: cachedProfile, activeBranch: storedActiveBranch } = useAuthStore()
+  const { setProfile, setBranches, setActiveBranch, setLoading, setCurrency, setSubscriptionStatus, clear, profile: cachedProfile, activeBranch: storedActiveBranch } = useAuthStore()
   const { fetchConfigs, invalidate: invalidateConfigs } = useModuleConfigStore()
 
   useEffect(() => {
@@ -35,6 +37,29 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
 
       const profile = profileData as Profile | null
       if (!profile) return
+
+      // ── Cross-tenant guard (defence-in-depth) ────────────────────────
+      // Verify the loaded profile belongs to the current subdomain's
+      // business.  Catches edge cases where middleware was bypassed
+      // (client-side nav, cached pages, etc.).
+      // Uses .maybeSingle() to avoid 406 errors when RLS hides the row.
+      // Only enforces when we *positively* find a mismatched business.
+      const subdomain = getSubdomain(window.location.hostname)
+      if (subdomain && profile.business_id) {
+        const { data: subBiz, error: bizError } = await supabase
+          .from('businesses')
+          .select('id')
+          .eq('subdomain', subdomain)
+          .maybeSingle()
+
+        if (!bizError && subBiz && subBiz.id !== profile.business_id) {
+          await supabase.auth.signOut()
+          clear()
+          invalidateConfigs()
+          window.location.replace('/login?error=wrong_tenant')
+          return
+        }
+      }
 
       setProfile(profile)
 
@@ -83,6 +108,33 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
         }
       }
 
+      // Load subscription status
+      if (profile.business_id) {
+        supabase
+          .from('subscriptions')
+          .select('status, trial_ends_at, current_period_end, plans(name, plan_type)')
+          .eq('business_id', profile.business_id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+          .then(({ data: sub }) => {
+            const plans = sub?.plans as { name?: string; plan_type?: string } | null
+            const planType = (plans?.plan_type ?? null) as SubscriptionStatus['planType']
+            const planName = plans?.name ?? null
+            const trialEndsAt = sub?.trial_ends_at ?? null
+            const freeTrialExpired = planType === 'free' && trialEndsAt && new Date(trialEndsAt) < new Date()
+            const paidSubInactive = planType === 'paid' && sub?.status && !['active', 'trialing'].includes(sub.status)
+            setSubscriptionStatus({
+              status: sub?.status ?? null,
+              planType,
+              planName,
+              trialEndsAt,
+              currentPeriodEnd: (sub as any)?.current_period_end ?? null,
+              hasAccess: !freeTrialExpired && !paidSubInactive,
+            })
+          })
+      }
+
       setLoading(false)
     }
 
@@ -91,7 +143,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
   }, [])
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50">
+    <div className="flex h-screen overflow-hidden bg-surface-container-low">
       {/* Desktop sidebar */}
       <div className="hidden lg:flex">
         <Sidebar collapsed={collapsed} />

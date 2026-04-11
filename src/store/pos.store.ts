@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Product, ProductVariant, Customer } from '@/types/database'
+import type { RegisterSession } from '@/app/(tenant)/pos/_types'
 
 export interface CartItem {
   product: Product
@@ -27,6 +28,14 @@ interface PosState {
   loyaltyPointsAmount: number
   loyaltyPointsUsed: number
 
+  // POS Session Cache
+  session: RegisterSession | null
+  existingSession: RegisterSession | null
+  sessionLoaded: boolean
+  setSession: (session: RegisterSession | null) => void
+  setExistingSession: (session: RegisterSession | null) => void
+  setSessionLoaded: (loaded: boolean) => void
+
   addToCart: (product: Product, variant?: ProductVariant | null) => void
   removeFromCart: (productId: string, variantId?: string | null) => void
   updateQuantity: (productId: string, variantId: string | null, quantity: number) => void
@@ -37,6 +46,7 @@ interface PosState {
   setPaymentMethod: (method: PosState['paymentMethod']) => void
   setPaymentSplits: (splits: PaymentSplit[]) => void
   setGiftCard: (id: string, amount: number) => void
+  clearGiftCard: () => void
   setStoreCredit: (amount: number) => void
   setLoyaltyPoints: (points: number, amount: number) => void
   clearCart: () => void
@@ -60,6 +70,13 @@ export const usePosStore = create<PosState>((set, get) => ({
   storeCreditAmount: 0,
   loyaltyPointsAmount: 0,
   loyaltyPointsUsed: 0,
+
+  session: null,
+  existingSession: null,
+  sessionLoaded: false,
+  setSession: (session) => set({ session }),
+  setExistingSession: (existingSession) => set({ existingSession }),
+  setSessionLoaded: (sessionLoaded) => set({ sessionLoaded }),
 
   addToCart: (product, variant = null) => {
     const { cart } = get()
@@ -107,6 +124,7 @@ export const usePosStore = create<PosState>((set, get) => ({
   setPaymentMethod: (paymentMethod) => set({ paymentMethod }),
   setPaymentSplits: (paymentSplits) => set({ paymentSplits }),
   setGiftCard: (id, amount) => set({ giftCardId: id, giftCardAmount: amount }),
+  clearGiftCard: () => set({ giftCardId: null, giftCardAmount: 0, paymentMethod: 'cash' }),
   setStoreCredit: (amount) => set({ storeCreditAmount: amount }),
   setLoyaltyPoints: (points, amount) => set({ loyaltyPointsUsed: points, loyaltyPointsAmount: amount }),
 

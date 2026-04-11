@@ -44,10 +44,54 @@ export function slugify(str: string): string {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
 
+/**
+ * Extracts the subdomain from a hostname.
+ * Returns null for the root domain, www, localhost (no subdomain), or admin.
+ * Works in both browser and server-side contexts.
+ */
+export function getSubdomain(hostname: string): string | null {
+  const rootDomain = (process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'repairbooking.co.uk').split(':')[0]
+  const cleanHost = hostname.split(':')[0]
+  if (cleanHost === 'localhost' || cleanHost === rootDomain || cleanHost === `www.${rootDomain}`) return null
+  if (cleanHost.endsWith('.localhost')) {
+    const sub = cleanHost.replace('.localhost', '')
+    return sub === 'admin' ? null : sub
+  }
+  if (cleanHost.endsWith(`.${rootDomain}`)) {
+    const sub = cleanHost.replace(`.${rootDomain}`, '')
+    return sub === 'admin' ? null : sub
+  }
+  return null
+}
+
 export function generateGiftCardCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   const segments = Array.from({ length: 4 }, () =>
     Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
   )
   return 'GC-' + segments.join('-')
+}
+
+/**
+ * Client-side cross-tenant guard.
+ * Signs the user out and redirects to /login when the loaded profile
+ * belongs to a different business than the current subdomain.
+ * Call from any client component that detects a tenant mismatch.
+ *
+ * Dynamic imports prevent circular dependencies and keep this
+ * file safe for server-side (middleware) imports.
+ */
+export async function signOutWrongTenant(): Promise<void> {
+  const { createClient } = await import('@/lib/supabase/client')
+  const { useAuthStore } = await import('@/store/auth.store')
+  const { useModuleConfigStore } = await import('@/store/module-config.store')
+
+  const supabase = createClient()
+  await supabase.auth.signOut()
+
+  // Wipe cached Zustand state so no stale tenant data lingers
+  useAuthStore.getState().clear()
+  useModuleConfigStore.getState().invalidate()
+
+  window.location.replace('/login?error=wrong_tenant')
 }

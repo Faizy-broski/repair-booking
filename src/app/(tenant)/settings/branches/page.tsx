@@ -11,6 +11,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
 import type { ColumnDef } from '@tanstack/react-table'
+import { ImageUpload } from '@/components/ui/image-upload'
 
 interface BranchRow {
   id: string
@@ -20,6 +21,7 @@ interface BranchRow {
   email: string | null
   is_main: boolean
   is_active: boolean
+  logo_url: string | null
 }
 
 const schema = z.object({
@@ -27,6 +29,7 @@ const schema = z.object({
   address: z.string().optional(),
   phone: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
+  logo_url: z.string().url().optional().or(z.literal('')),
 })
 type FormData = z.infer<typeof schema>
 
@@ -37,7 +40,7 @@ export default function BranchesSettingsPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editingBranch, setEditingBranch] = useState<BranchRow | null>(null)
 
-  const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
   })
 
@@ -63,6 +66,7 @@ export default function BranchesSettingsPage() {
     setValue('address', branch.address ?? '')
     setValue('phone', branch.phone ?? '')
     setValue('email', branch.email ?? '')
+    setValue('logo_url', branch.logo_url ?? '')
     setSheetOpen(true)
   }
 
@@ -146,6 +150,11 @@ export default function BranchesSettingsPage() {
         description={editingBranch ? `Editing ${editingBranch.name}` : 'Create a new branch location'}
       >
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <ImageUpload
+            label="Branch Logo"
+            value={watch('logo_url') || ''}
+            onChange={(url) => setValue('logo_url', url, { shouldValidate: true })}
+          />
           <Input label="Branch Name" required error={errors.name?.message} {...register('name')} />
           <Input label="Address" {...register('address')} />
           <div className="grid grid-cols-2 gap-3">

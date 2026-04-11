@@ -1,18 +1,86 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* ── Material Design 3 Color Tokens ─────────────────── */
 
-  /* ── TSN Brand colours ─────────────────────────────── */
-  --brand-yellow: #F8C301;
-  --brand-teal:   #3BB3C3;
+  /* Primary – teal */
+  --primary:                    #008080;
+  --primary-dim:                #005959;
+  --primary-fixed:              #8dedec;
+  --primary-fixed-dim:          #7fdede;
+  --primary-container:          #8dedec;
+  --on-primary:                 #bbfffe;
+  --on-primary-container:       #005858;
+  --on-primary-fixed:           #004343;
+  --on-primary-fixed-variant:   #006262;
+  --inverse-primary:            #8dedec;
 
-  /* Tonal scale derived from brand colours */
+  /* Secondary – slate-blue */
+  --secondary:                  #535b71;
+  --secondary-dim:              #484f65;
+  --secondary-fixed:            #dae2fd;
+  --secondary-fixed-dim:        #ccd4ee;
+  --secondary-container:        #dae2fd;
+  --on-secondary:               #f0f2ff;
+  --on-secondary-container:     #4a5167;
+  --on-secondary-fixed:         #373f54;
+  --on-secondary-fixed-variant: #535b71;
+
+  /* Tertiary – blue */
+  --tertiary:                   #006094;
+  --tertiary-dim:               #005482;
+  --tertiary-fixed:             #5bb8ff;
+  --tertiary-fixed-dim:         #37abf9;
+  --tertiary-container:         #5bb8ff;
+  --on-tertiary:                #ebf3ff;
+  --on-tertiary-container:      #003352;
+  --on-tertiary-fixed:          #001a2c;
+  --on-tertiary-fixed-variant:  #003d5f;
+
+  /* Error */
+  --error:                      #b31b25;
+  --error-dim:                  #9f0519;
+  --error-container:            #fb5151;
+  --on-error:                   #ffefee;
+  --on-error-container:         #570008;
+
+  /* Surface */
+  --surface:                    #f5f7f9;
+  --surface-dim:                #d0d5d8;
+  --surface-bright:             #f5f7f9;
+  --surface-tint:               #008080;
+  --surface-variant:            #d9dde0;
+  --surface-container-lowest:   #ffffff;
+  --surface-container-low:      #eef1f3;
+  --surface-container:          #e5e9eb;
+  --surface-container-high:     #dfe3e6;
+  --surface-container-highest:  #d9dde0;
+
+  /* On-surface */
+  --on-surface:                 #2c2f31;
+  --on-surface-variant:         #595c5e;
+  --on-background:              #2c2f31;
+  --inverse-surface:            #0b0f10;
+  --inverse-on-surface:         #9a9d9f;
+
+  /* Outline */
+  --outline:                    #747779;
+  --outline-variant:            #abadaf;
+
+  /* Background */
+  --background:                 #f5f7f9;
+  --foreground:                 #2c2f31;
+
+  /* ── Sidebar ──────────────────────────────────────────────── */
+  --sidebar-bg:         #001F2B;
+
+  /* ── Legacy brand aliases (sidebar / existing components) ── */
+  --brand-yellow:       #F8C301;
+  --brand-teal:         var(--primary);   /* now resolves to #008080 */
+  --brand-teal-light:   var(--primary-container);
+  --brand-teal-dark:    var(--primary-dim);
   --brand-yellow-light: color-mix(in srgb, #F8C301 15%, white);
   --brand-yellow-dark:  color-mix(in srgb, #F8C301 85%, black);
-  --brand-teal-light:   color-mix(in srgb, #3BB3C3 15%, white);
-  --brand-teal-dark:    color-mix(in srgb, #3BB3C3 80%, black);
 }
 
 @theme inline {
@@ -21,7 +89,74 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
-  /* Expose brand colours as Tailwind utilities */
+  /* Primary */
+  --color-primary:                  var(--primary);
+  --color-primary-dim:              var(--primary-dim);
+  --color-primary-fixed:            var(--primary-fixed);
+  --color-primary-fixed-dim:        var(--primary-fixed-dim);
+  --color-primary-container:        var(--primary-container);
+  --color-on-primary:               var(--on-primary);
+  --color-on-primary-container:     var(--on-primary-container);
+  --color-on-primary-fixed:         var(--on-primary-fixed);
+  --color-on-primary-fixed-variant: var(--on-primary-fixed-variant);
+  --color-inverse-primary:          var(--inverse-primary);
+
+  /* Secondary */
+  --color-secondary:                  var(--secondary);
+  --color-secondary-dim:              var(--secondary-dim);
+  --color-secondary-fixed:            var(--secondary-fixed);
+  --color-secondary-fixed-dim:        var(--secondary-fixed-dim);
+  --color-secondary-container:        var(--secondary-container);
+  --color-on-secondary:               var(--on-secondary);
+  --color-on-secondary-container:     var(--on-secondary-container);
+  --color-on-secondary-fixed:         var(--on-secondary-fixed);
+  --color-on-secondary-fixed-variant: var(--on-secondary-fixed-variant);
+
+  /* Tertiary */
+  --color-tertiary:                   var(--tertiary);
+  --color-tertiary-dim:               var(--tertiary-dim);
+  --color-tertiary-fixed:             var(--tertiary-fixed);
+  --color-tertiary-fixed-dim:         var(--tertiary-fixed-dim);
+  --color-tertiary-container:         var(--tertiary-container);
+  --color-on-tertiary:                var(--on-tertiary);
+  --color-on-tertiary-container:      var(--on-tertiary-container);
+  --color-on-tertiary-fixed:          var(--on-tertiary-fixed);
+  --color-on-tertiary-fixed-variant:  var(--on-tertiary-fixed-variant);
+
+  /* Error */
+  --color-error:              var(--error);
+  --color-error-dim:          var(--error-dim);
+  --color-error-container:    var(--error-container);
+  --color-on-error:           var(--on-error);
+  --color-on-error-container: var(--on-error-container);
+
+  /* Surface */
+  --color-surface:                   var(--surface);
+  --color-surface-dim:               var(--surface-dim);
+  --color-surface-bright:            var(--surface-bright);
+  --color-surface-tint:              var(--surface-tint);
+  --color-surface-variant:           var(--surface-variant);
+  --color-surface-container-lowest:  var(--surface-container-lowest);
+  --color-surface-container-low:     var(--surface-container-low);
+  --color-surface-container:         var(--surface-container);
+  --color-surface-container-high:    var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+
+  /* On-surface */
+  --color-on-surface:         var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-on-background:      var(--on-background);
+  --color-inverse-surface:    var(--inverse-surface);
+  --color-inverse-on-surface: var(--inverse-on-surface);
+
+  /* Outline */
+  --color-outline:         var(--outline);
+  --color-outline-variant: var(--outline-variant);
+
+  /* Sidebar */
+  --color-sidebar-bg: var(--sidebar-bg);
+
+  /* Brand aliases */
   --color-brand-yellow:       var(--brand-yellow);
   --color-brand-yellow-light: var(--brand-yellow-light);
   --color-brand-yellow-dark:  var(--brand-yellow-dark);
@@ -31,13 +166,13 @@
 }
 
 body {
-  background: #ffffff;
-  color: #171717;
+  background: var(--background);
+  color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
 
 /* Force light-mode colours on form elements regardless of OS dark-mode preference */
 input, textarea, select {
-  color: #171717;
-  background-color: #ffffff;
+  color: var(--on-surface);
+  background-color: var(--surface-container-lowest);
 }

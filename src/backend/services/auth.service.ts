@@ -9,6 +9,10 @@ interface RegisterPayload {
   fullName: string
   password: string
   mainBranchName: string
+  /** When true (called from free plan signup or Stripe webhook after payment), business is immediately active */
+  activateNow?: boolean
+  /** ISO string — set for free plan so middleware can check expiry quickly */
+  trialEndsAt?: string
 }
 
 export const AuthService = {
@@ -20,6 +24,24 @@ export const AuthService = {
       .eq('subdomain', subdomain.toLowerCase())
       .single()
     return !data
+  },
+
+  async checkEmailAvailable(email: string): Promise<boolean> {
+    const supabase = getAdminSupabase()
+    // Check businesses table (covers active + inactive accounts)
+    const { data: biz } = await supabase
+      .from('businesses')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .maybeSingle()
+    if (biz) return false
+    // Also check pending_registrations (payment started but not yet completed)
+    const { data: pending } = await (supabase as any)
+      .from('pending_registrations')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .maybeSingle()
+    return !pending
   },
 
   async register(payload: RegisterPayload) {
@@ -52,7 +74,8 @@ export const AuthService = {
         subdomain,
         email: payload.email,
         phone: payload.phone ?? null,
-        is_active: false, // activated after subscription payment
+        is_active: payload.activateNow ?? false,
+        ...(payload.trialEndsAt ? { trial_ends_at: payload.trialEndsAt } : {}),
       })
       .select()
       .single()

@@ -10,6 +10,7 @@ const createSchema = z.object({
   address: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),
   email: z.string().email().optional().nullable().or(z.literal('')),
+  logo_url: z.string().url().optional().nullable().or(z.literal('')),
 })
 
 const updateSchema = createSchema.partial()
@@ -31,6 +32,7 @@ export const BranchController = {
       const branch = await BranchService.create({
         ...data,
         email: data.email || null,
+        logo_url: data.logo_url || null,
         business_id: ctx.businessId,
       })
       return created(branch)
@@ -50,6 +52,7 @@ export const BranchController = {
       const branch = await BranchService.update(id, {
         ...data,
         email: data.email || null,
+        logo_url: data.logo_url || null,
       })
       return ok(branch)
     } catch (err) {

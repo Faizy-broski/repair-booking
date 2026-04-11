@@ -12,7 +12,7 @@ export const DashboardController = {
     try {
       const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
 
-      const [salesRes, repairsRes, expensesRes, inventoryRes] = await Promise.all([
+      const [salesRes, repairsRes, expensesRes, inventoryRes, recentRepairsRes, activityRes] = await Promise.all([
         // Total sales this month
         adminSupabase
           .from('sales')
@@ -23,7 +23,7 @@ export const DashboardController = {
         // Open repairs
         adminSupabase
           .from('repairs')
-          .select('id, status')
+          .select('id, status, created_at')
           .eq('branch_id', branchId)
           .not('status', 'in', '("collected","unrepairable")'),
 
@@ -39,22 +39,70 @@ export const DashboardController = {
           .from('inventory')
           .select('id, quantity, low_stock_alert')
           .eq('branch_id', branchId),
+
+        // Recent repair tickets (last 20)
+        adminSupabase
+          .from('repairs')
+          .select('id, job_number, device_brand, device_model, issue, status, created_at, customers(full_name)')
+          .eq('branch_id', branchId)
+          .order('created_at', { ascending: false })
+          .limit(20),
+
+        // Recent repair status activity (last 20)
+        adminSupabase
+          .from('repair_status_history')
+          .select('id, new_status, note, created_at, repairs!inner(id, job_number, device_brand, device_model), profiles!changed_by(full_name)')
+          .eq('repairs.branch_id', branchId)
+          .order('created_at', { ascending: false })
+          .limit(20),
       ])
 
       const sales = salesRes.data ?? []
       const repairs = repairsRes.data ?? []
       const expenses = expensesRes.data ?? []
       const inventory = inventoryRes.data ?? []
+      const recentRepairs = (recentRepairsRes.data ?? []).map((r) => ({
+        id: r.id,
+        job_number: r.job_number,
+        device: [r.device_brand, r.device_model].filter(Boolean).join(' ') || 'Unknown Device',
+        issue: r.issue,
+        status: r.status,
+        created_at: r.created_at,
+        customer_name: (r.customers as { full_name: string } | null)?.full_name ?? 'Walk-in',
+      }))
+
+      const recentActivity = (activityRes.data ?? []).map((a) => {
+        const r = a.repairs as { id: string; job_number: string; device_brand: string; device_model: string } | null
+        const p = a.profiles as { full_name: string } | null
+        return {
+          id: a.id,
+          status: a.new_status as string,
+          note: a.note as string | null,
+          created_at: a.created_at as string | null,
+          repair_id: r?.id ?? null,
+          job_number: r?.job_number ?? null,
+          device: [r?.device_brand, r?.device_model].filter(Boolean).join(' ') || 'Unknown Device',
+          changed_by: p?.full_name ?? null,
+        }
+      })
 
       const lowStockCount = inventory.filter(
         (i) => i.quantity <= (i.low_stock_alert ?? 5)
       ).length
 
+      // Urgent = active repairs sitting for more than 3 days
+      const urgentCutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+      const repairsUrgent = repairs.filter(
+        (r) => !['repaired', 'collected', 'unrepairable'].includes(r.status) &&
+          (r.created_at ?? '') < urgentCutoff
+      ).length
+
       const stats = {
         total_sales: sales.reduce((s, r) => s + (r.total ?? 0), 0),
         sales_count: sales.length,
-        repairs_open: repairs.filter((r) => r.status !== 'collected').length,
+        repairs_open: repairs.filter((r) => !['repaired', 'collected', 'unrepairable'].includes(r.status)).length,
         repairs_completed: repairs.filter((r) => r.status === 'repaired').length,
+        repairs_urgent: repairsUrgent,
         total_expenses: expenses.reduce((s, r) => s + (r.amount ?? 0), 0),
         low_stock_count: lowStockCount,
       }
@@ -87,7 +135,7 @@ export const DashboardController = {
         }
       }
 
-      return ok({ stats, branchRevenue })
+      return ok({ stats, branchRevenue, recentRepairs, recentActivity })
     } catch (err) {
       return serverError('Failed to load dashboard', err)
     }

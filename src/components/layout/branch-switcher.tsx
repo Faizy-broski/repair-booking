@@ -27,15 +27,20 @@ export function BranchSwitcher({ collapsed = false }: { collapsed?: boolean }) {
         {collapsed ? (
           <Building2 className="h-4 w-4 text-emerald-400" />
         ) : (
-          <>
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
-              <p className="truncate text-xs font-semibold text-white/90">{activeBranch.name}</p>
+          <div className="flex items-center gap-3">
+            {activeBranch.logo_url ? (
+              <img src={activeBranch.logo_url} alt="Branch Logo" className="h-10 w-12 rounded-md object-cover bg-white shadow-sm shrink-0" />
+            ) : null}
+            <div className="min-w-0 flex flex-col items-start justify-center">
+              <div className="flex items-center gap-1.5 w-full">
+                <p className="truncate text-base font-bold text-white/90">{activeBranch.name}</p>
+                <div className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
+              </div>
+              <p className="text-[11px] text-white/40 capitalize tracking-wide">
+                {profile?.role?.replace(/_/g, ' ')}
+              </p>
             </div>
-            <p className="mt-0.5 text-[10px] text-white/40 capitalize pl-4">
-              {profile?.role?.replace(/_/g, ' ')}
-            </p>
-          </>
+          </div>
         )}
       </div>
     )
@@ -52,14 +57,19 @@ export function BranchSwitcher({ collapsed = false }: { collapsed?: boolean }) {
           <Building2 className="h-4 w-4 text-emerald-400" />
         ) : (
           <>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
-                <p className="truncate text-xs font-semibold text-white/90">{activeBranch?.name ?? 'Select Branch'}</p>
+            <div className="min-w-0 flex-1 flex items-center gap-3">
+              {activeBranch?.logo_url ? (
+                <img src={activeBranch.logo_url} alt="Branch Logo" className="h-10 w-12 rounded-md object-cover bg-white shrink-0 shadow-sm" />
+              ) : null}
+              <div className="min-w-0 flex flex-col items-start justify-center">
+                <div className="flex items-center gap-1.5 w-full">
+                  <p className="truncate text-base font-bold text-white/90">{activeBranch?.name ?? 'Select Branch'}</p>
+                  <div className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
+                </div>
+                <p className="text-[11px] text-white/40 capitalize tracking-wide">
+                  {profile?.role?.replace(/_/g, ' ')}
+                </p>
               </div>
-              <p className="mt-0.5 text-[10px] text-white/40 capitalize pl-4">
-                {profile?.role?.replace(/_/g, ' ')}
-              </p>
             </div>
             <ChevronDown className="h-3.5 w-3.5 shrink-0 text-white/40" />
           </>

@@ -22,6 +22,9 @@ const createSchema = z.object({
   estimated_cost: z.number().min(0).optional().nullable(),
   deposit_paid: z.number().min(0).default(0),
   notify_customer: z.boolean().default(true),
+  is_rush: z.boolean().default(false),
+  lock_type: z.string().optional().nullable(),
+  passcode: z.string().optional().nullable(),
   custom_fields: z.record(z.string(), z.unknown()).default({}),
   asset_id: z.string().uuid().optional().nullable(),
   parts: z.array(z.object({

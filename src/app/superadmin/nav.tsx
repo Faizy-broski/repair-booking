@@ -17,7 +17,7 @@ export function SuperAdminNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="flex-1 space-y-0.5 p-2">
+    <nav className="flex-1 space-y-0.5 overflow-y-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {NAV.map((item) => {
         const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
         return (
@@ -27,8 +27,8 @@ export function SuperAdminNav() {
             className={cn(
               'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors',
               isActive
-                ? 'bg-purple-50 font-medium text-purple-700'
-                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                ? 'bg-white/15 font-semibold text-white'
+                : 'text-white/60 hover:bg-white/10 hover:text-white'
             )}
           >
             <item.icon className="h-4 w-4 shrink-0" />

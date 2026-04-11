@@ -47,8 +47,13 @@ function RepairCard({ repair, isDragOverlay = false }: { repair: RepairRow; isDr
         isDragging && !isDragOverlay ? 'opacity-40' : ''
       }`}
     >
-      <div className="flex items-start justify-between gap-1 mb-1">
-        <span className="font-mono text-xs font-semibold text-blue-600">{repair.job_number}</span>
+      <div className="flex items-start justify-between gap-1 mb-1 relative">
+        <div className="flex items-center gap-1.5">
+          <span className="font-mono text-xs font-semibold text-blue-600">{repair.job_number}</span>
+          {(repair as any).is_rush && (
+            <span className="flex h-3.5 items-center rounded-sm bg-orange-100 px-1 text-[8px] font-bold text-orange-700 uppercase tracking-widest border border-orange-200">Rush</span>
+          )}
+        </div>
         {repair.estimated_cost && (
           <span className="text-xs text-gray-500">{formatCurrency(repair.estimated_cost)}</span>
         )}

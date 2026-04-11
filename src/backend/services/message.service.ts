@@ -6,7 +6,7 @@ export const MessageService = {
     const { branchId, page = 1, limit = 30 } = params
     let q = adminSupabase
       .from('messages')
-      .select('*, profiles!sender_id(full_name,avatar_url)', { count: 'exact' })
+      .select('*, profiles!sender_id(full_name,avatar_url), from_branch:branches!from_branch_id(name), to_branch:branches!to_branch_id(name)', { count: 'exact' })
       .eq('business_id', businessId)
       .is('parent_id', null) // Only top-level threads
       .order('created_at', { ascending: false })
@@ -24,7 +24,7 @@ export const MessageService = {
   async getThread(parentId: string) {
     const { data, error } = await adminSupabase
       .from('messages')
-      .select('*, profiles!sender_id(full_name,avatar_url)')
+      .select('*, profiles!sender_id(full_name,avatar_url), from_branch:branches!from_branch_id(name), to_branch:branches!to_branch_id(name)')
       .eq('parent_id', parentId)
       .order('created_at')
     if (error) throw error

@@ -22,6 +22,8 @@ interface MessageRow {
   parent_id: string | null
   from_branch_id: string | null
   to_branch_id: string | null
+  from_branch?: { name: string } | null
+  to_branch?: { name: string } | null
   profiles?: { full_name: string | null } | null
 }
 
@@ -35,8 +37,14 @@ type FormData = z.infer<typeof schema>
 
 export default function MessagesPage() {
   const { activeBranch, branches, profile } = useAuthStore()
-  const branchName = (id: string | null | undefined) =>
-    branches.find((b) => b.id === id)?.name ?? 'Unknown'
+  const getBranchName = (msg: MessageRow | null | undefined, type: 'from' | 'to') => {
+    if (!msg) return 'Unknown'
+    const loaded = type === 'from' ? msg.from_branch?.name : msg.to_branch?.name
+    if (loaded) return loaded
+    const id = type === 'from' ? msg.from_branch_id : msg.to_branch_id
+    if (!id && type === 'from') return 'Main Branch'
+    return branches.find((b) => b.id === id)?.name ?? 'Unknown'
+  }
   const [messages, setMessages] = useState<MessageRow[]>([])
   const [selected, setSelected] = useState<MessageRow | null>(null)
   const [thread, setThread] = useState<MessageRow[]>([])
@@ -168,7 +176,7 @@ export default function MessagesPage() {
                   {!msg.is_read && <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" />}
                 </div>
                 <p className="mt-0.5 truncate text-xs text-gray-400">
-                  {branchName(msg.from_branch_id)} → {branchName(msg.to_branch_id)}
+                  {getBranchName(msg, 'from')} → {getBranchName(msg, 'to')}
                 </p>
                 <p className="mt-0.5 text-xs text-gray-400">{formatDateTime(msg.created_at)}</p>
               </button>
@@ -184,7 +192,7 @@ export default function MessagesPage() {
             <div className="border-b border-gray-200 px-6 py-3">
               <h2 className="font-semibold text-gray-900">{selected.subject || '(no subject)'}</h2>
               <p className="text-xs text-gray-400">
-                {branchName(selected.from_branch_id)} → {branchName(selected.to_branch_id)}
+                {getBranchName(selected, 'from')} → {getBranchName(selected, 'to')}
               </p>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
@@ -203,21 +211,23 @@ export default function MessagesPage() {
                   </div>
                 )
               })}
-              <div ref={bottomRef} />
-            </div>
-            <div className="border-t border-gray-200 px-4 py-3">
-              <div className="flex gap-2">
-                <input
-                  value={replyBody}
-                  onChange={(e) => setReplyBody(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onReply() } }}
-                  placeholder="Type a reply..."
-                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                />
-                <Button size="sm" onClick={onReply} loading={sending} disabled={!replyBody.trim()}>
-                  <Send className="h-4 w-4" />
-                </Button>
+              {/* Reply Box at the end of the thread */}
+              <div className="mt-6 flex flex-col gap-2 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <label className="text-xs font-semibold text-gray-600">Reply to thread</label>
+                <div className="flex gap-2">
+                  <input
+                    value={replyBody}
+                    onChange={(e) => setReplyBody(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onReply() } }}
+                    placeholder="Type a reply..."
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none bg-white"
+                  />
+                  <Button size="sm" onClick={onReply} loading={sending} disabled={!replyBody.trim()}>
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
+              <div ref={bottomRef} className="h-4" />
             </div>
           </>
         ) : (

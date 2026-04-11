@@ -15,7 +15,7 @@ const COOKIE_OPTIONS = process.env.NODE_ENV === 'production'
 const TENANT_ROUTES = [
   '/dashboard', '/repairs', '/pos', '/customers', '/inventory',
   '/employees', '/reports', '/invoices', '/appointments', '/messages',
-  '/expenses', '/gift-cards', '/settings', '/phone', '/google-reviews',
+  '/expenses', '/gift-cards', '/settings', '/phone', '/google-reviews', '/account',
 ]
 
 function getSubdomain(host: string): string | null {
@@ -139,13 +139,80 @@ export async function middleware(request: NextRequest) {
       )
     }
 
-    // Auth pages — pass through so login/register work on the subdomain
+    // Auth pages — pass through so login/register work on the subdomain,
+    // but first destroy any session that belongs to a DIFFERENT business.
+    // This prevents stale cross-tenant cookies from causing redirect loops.
     if (pathname.startsWith('/login') || pathname.startsWith('/register')) {
+      if (user) {
+        const { data: loginProfile } = await supabase
+          .from('profiles')
+          .select('business_id')
+          .eq('id', user.id)
+          .maybeSingle()
+
+        if (loginProfile && loginProfile.business_id !== business.id) {
+          await supabase.auth.signOut()
+        }
+      }
       return forwardAuthCookies(supabaseResponse, NextResponse.next({ request }))
     }
 
     // All other routes require authentication
     if (!user) return redirectToLogin('/login')
+
+    // ── Tenant isolation: verify this user belongs to THIS business ──────────
+    // Prevents a user from business A accessing business B's subdomain.
+    // Uses the main `supabase` client (which has proper cookie setters) so that
+    // calling signOut() actually clears the session cookies in the response.
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('business_id')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (!userProfile || userProfile.business_id !== business.id) {
+      // Sign the user OUT so the stale cross-tenant session is destroyed.
+      // forwardAuthCookies will carry the cleared session cookies to the browser.
+      await supabase.auth.signOut()
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('error', 'wrong_tenant')
+      return forwardAuthCookies(supabaseResponse, NextResponse.redirect(loginUrl))
+    }
+
+    // ── Trial / subscription enforcement ─────────────────────────────────
+    // Skip enforcement on account page, its API, stripe routes, and upgrade page
+    const isExemptPath =
+      pathname.startsWith('/account') ||
+      pathname.startsWith('/api/account/') ||
+      pathname.startsWith('/api/stripe/') ||
+      pathname.startsWith('/upgrade')
+
+    if (!isExemptPath) {
+      const { data: sub } = await tenantSupabase
+        .from('subscriptions')
+        .select('status, trial_ends_at, plans(plan_type)')
+        .eq('business_id', business.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      const planType = (sub?.plans as { plan_type?: string } | null)?.plan_type
+
+      const freeTrialExpired =
+        planType === 'free' &&
+        sub?.trial_ends_at &&
+        new Date(sub.trial_ends_at) < new Date()
+
+      const paidSubInactive =
+        planType === 'paid' &&
+        sub?.status &&
+        !['active', 'trialing'].includes(sub.status)
+
+      if (freeTrialExpired || paidSubInactive) {
+        const accountUrl = new URL('/account', request.url)
+        return forwardAuthCookies(supabaseResponse, NextResponse.redirect(accountUrl))
+      }
+    }
 
     // Inject tenant context into request headers.
     // Read by tenantMiddleware via request.headers.get('x-business-id').

@@ -12,8 +12,9 @@ export const UserService = {
     return data
   },
 
-  async invite(payload: {
+  async create(payload: {
     email: string
+    password?: string
     full_name: string
     role: string
     branch_id?: string | null
@@ -21,19 +22,19 @@ export const UserService = {
   }) {
     const supabase = createAdminClient()
 
-    // Invite via Supabase Auth admin API (sends invite email)
-    const { data: authData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
-      payload.email,
-      {
-        data: {
-          full_name: payload.full_name,
-          role: payload.role,
-          business_id: payload.business_id,
-          branch_id: payload.branch_id ?? null,
-        },
-      }
-    )
-    if (inviteError) throw inviteError
+    // Create user via Supabase Auth admin API (no invite email)
+    const { data: authData, error: createError } = await supabase.auth.admin.createUser({
+      email: payload.email,
+      password: payload.password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: payload.full_name,
+        role: payload.role,
+        business_id: payload.business_id,
+        branch_id: payload.branch_id ?? null,
+      },
+    })
+    if (createError) throw createError
 
     // Create profile row (the auth trigger may also do this, but be explicit)
     const { data: profile, error: profileError } = await adminSupabase

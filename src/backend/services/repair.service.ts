@@ -10,6 +10,7 @@ export const RepairService = {
     let q = adminSupabase
       .from('repairs')
       .select('*, customers(first_name,last_name,phone,email), employees!assigned_to(id,first_name,last_name)', { count: 'exact' })
+      .order('is_rush', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1)
 

@@ -2,18 +2,29 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Profile, Branch } from '@/types/database'
 
+export interface SubscriptionStatus {
+  status: string | null
+  planType: 'free' | 'paid' | 'enterprise' | null
+  planName: string | null
+  trialEndsAt: string | null
+  currentPeriodEnd: string | null
+  hasAccess: boolean
+}
+
 interface AuthState {
   profile: Profile | null
   activeBranch: Branch | null
   branches: Branch[]
   isLoading: boolean
   currency: string
+  subscriptionStatus: SubscriptionStatus | null
 
   setProfile: (profile: Profile | null) => void
   setActiveBranch: (branch: Branch) => void
   setBranches: (branches: Branch[]) => void
   setLoading: (loading: boolean) => void
   setCurrency: (currency: string) => void
+  setSubscriptionStatus: (status: SubscriptionStatus | null) => void
   clear: () => void
 
   // Computed helpers
@@ -30,13 +41,15 @@ export const useAuthStore = create<AuthState>()(
       branches: [],
       isLoading: true,
       currency: 'GBP',
+      subscriptionStatus: null,
 
       setProfile: (profile) => set({ profile }),
       setActiveBranch: (branch) => set({ activeBranch: branch }),
       setBranches: (branches) => set({ branches }),
       setLoading: (isLoading) => set({ isLoading }),
       setCurrency: (currency) => set({ currency }),
-      clear: () => set({ profile: null, activeBranch: null, branches: [], currency: 'GBP' }),
+      setSubscriptionStatus: (subscriptionStatus) => set({ subscriptionStatus }),
+      clear: () => set({ profile: null, activeBranch: null, branches: [], currency: 'GBP', subscriptionStatus: null }),
 
       isOwner: () => {
         const role = get().profile?.role

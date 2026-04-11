@@ -26,7 +26,7 @@ export const POST = withMiddleware(async (req, ctx) => {
     const body = await req.json()
     const { data, error } = await adminSupabase
       .from('part_types')
-      .insert({ name: body.name, device_id: body.device_id || null, business_id: ctx.businessId })
+      .insert({ name: body.name, device_id: body.device_id || null, image_url: body.image_url || null, business_id: ctx.businessId })
       .select()
       .single()
     if (error) throw error

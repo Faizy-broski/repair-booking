@@ -12,48 +12,50 @@ interface StatsCardProps {
 }
 
 const COLOR_CLASSES = {
-  blue:   { bg: 'bg-blue-50',   icon: 'text-blue-600',   iconBg: 'bg-blue-100' },
-  green:  { bg: 'bg-green-50',  icon: 'text-green-600',  iconBg: 'bg-green-100' },
-  yellow: { bg: 'bg-yellow-50', icon: 'text-yellow-600', iconBg: 'bg-yellow-100' },
-  red:    { bg: 'bg-red-50',    icon: 'text-red-600',    iconBg: 'bg-red-100' },
-  purple: { bg: 'bg-purple-50', icon: 'text-purple-600', iconBg: 'bg-purple-100' },
+  blue:   { icon: 'text-tertiary',      iconBg: 'bg-tertiary-container',      accent: 'bg-tertiary',      sub: 'text-tertiary' },
+  green:  { icon: 'text-primary-dim',   iconBg: 'bg-primary-container',       accent: 'bg-primary',       sub: 'text-primary-dim' },
+  yellow: { icon: 'text-secondary',     iconBg: 'bg-secondary-container',     accent: 'bg-secondary',     sub: 'text-secondary' },
+  red:    { icon: 'text-error',         iconBg: 'bg-error-container/30',      accent: 'bg-error',         sub: 'text-error' },
+  purple: { icon: 'text-secondary-dim', iconBg: 'bg-secondary-fixed-dim',     accent: 'bg-secondary-dim', sub: 'text-secondary-dim' },
 }
 
 export function StatsCard({ title, value, subtitle, icon, trend, color = 'blue', className }: StatsCardProps) {
   const colors = COLOR_CLASSES[color]
 
   return (
-    <div className={cn('rounded-xl border border-gray-200 bg-white p-5', className)}>
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <p className="text-sm text-gray-500">{title}</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">{value}</p>
+    <div className={cn('relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-5 px-5 shadow-sm', className)}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="min-h-[2rem] text-[11px] font-semibold uppercase leading-tight tracking-wider text-on-surface-variant">{title}</p>
+          <p className="text-3xl font-bold text-on-surface">{value}</p>
           {subtitle && (
-            <p className="mt-1 flex items-center gap-1 text-xs">
-              {trend !== undefined && (
+            <p className={cn('mt-3 flex items-center gap-1 text-xs font-medium', colors.sub)}>
+              {trend !== undefined ? (
                 <>
                   {trend > 0 ? (
-                    <TrendingUp className="h-3 w-3 text-green-500" />
+                    <TrendingUp className="h-3 w-3" />
                   ) : trend < 0 ? (
-                    <TrendingDown className="h-3 w-3 text-red-500" />
+                    <TrendingDown className="h-3 w-3" />
                   ) : (
-                    <Minus className="h-3 w-3 text-gray-400" />
+                    <Minus className="h-3 w-3" />
                   )}
-                  <span className={trend > 0 ? 'text-green-600' : trend < 0 ? 'text-red-600' : 'text-gray-400'}>
-                    {Math.abs(trend)}%
-                  </span>
+                  <span>{Math.abs(trend)}%</span>
                 </>
+              ) : (
+                <TrendingUp className="h-3 w-3" />
               )}
-              <span className="text-gray-400">{subtitle}</span>
+              <span>{subtitle}</span>
             </p>
           )}
         </div>
         {icon && (
-          <div className={cn('flex h-10 w-10 items-center justify-center rounded-lg', colors.iconBg)}>
+          <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', colors.iconBg)}>
             <span className={colors.icon}>{icon}</span>
           </div>
         )}
       </div>
+      {/* Coloured bottom accent stripe */}
+      <div className={cn('absolute bottom-0 left-0 right-0 h-1', colors.accent)} />
     </div>
   )
 }

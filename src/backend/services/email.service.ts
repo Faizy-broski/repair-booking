@@ -1,11 +1,35 @@
 /**
  * Email service — sends templated and ad-hoc emails.
- * Uses nodemailer with SMTP by default.
- * In production, configure a transactional provider (Resend/SES) via business settings.
+ * Uses nodemailer with SMTP.
+ *
+ * Priority:
+ *   1. Per-business SMTP config (smtp_enabled = true) — stored in businesses table
+ *   2. Global platform SMTP (env vars SMTP_HOST / SMTP_USER / SMTP_PASS)
  */
 import nodemailer from 'nodemailer'
 
-function getTransporter() {
+// ── Transporter helpers ────────────────────────────────────────────────────────
+
+interface SmtpConfig {
+  host: string
+  port: number
+  secure: boolean
+  user: string
+  pass: string
+  from: string
+}
+
+function buildTransporter(cfg: SmtpConfig) {
+  return nodemailer.createTransport({
+    host:   cfg.host,
+    port:   cfg.port,
+    secure: cfg.secure,
+    auth:   { user: cfg.user, pass: cfg.pass },
+  })
+}
+
+/** Global platform transporter — used when no per-business SMTP is configured. */
+function getGlobalTransporter() {
   return nodemailer.createTransport({
     host:   process.env.SMTP_HOST ?? 'smtp.ethereal.email',
     port:   parseInt(process.env.SMTP_PORT ?? '587'),
@@ -16,6 +40,51 @@ function getTransporter() {
     },
   })
 }
+
+function globalFromAddress(displayName?: string): string {
+  const addr = process.env.SMTP_FROM ?? process.env.SMTP_USER ?? ''
+  return displayName ? `"${displayName}" <${addr}>` : addr
+}
+
+/**
+ * Fetch per-business SMTP config from the database (lazy import to avoid circular deps
+ * and to keep this service usable in edge/non-Supabase contexts).
+ * Returns null if not enabled or not configured.
+ */
+async function getBusinessSmtpConfig(businessId: string): Promise<SmtpConfig | null> {
+  try {
+    // Dynamic import so this service can still be imported without Supabase env vars
+    const { adminSupabase } = await import('@/backend/config/supabase')
+    const { data } = await (adminSupabase as any)
+      .from('businesses')
+      .select('smtp_enabled, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from')
+      .eq('id', businessId)
+      .single()
+
+    if (
+      !data ||
+      !data.smtp_enabled ||
+      !data.smtp_host ||
+      !data.smtp_user ||
+      !data.smtp_pass
+    ) {
+      return null
+    }
+
+    return {
+      host:   data.smtp_host,
+      port:   data.smtp_port ?? 587,
+      secure: data.smtp_secure ?? false,
+      user:   data.smtp_user,
+      pass:   data.smtp_pass,
+      from:   data.smtp_from ?? data.smtp_user,
+    }
+  } catch {
+    return null
+  }
+}
+
+// ── Public types ───────────────────────────────────────────────────────────────
 
 export interface RepairStatusEmailPayload {
   customerEmail: string
@@ -32,6 +101,8 @@ export interface TemplatedEmailPayload {
   subject: string
   html: string
   fromName?: string
+  /** When provided, the per-business SMTP config is used if enabled. */
+  businessId?: string
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -43,21 +114,39 @@ const STATUS_LABELS: Record<string, string> = {
   collected:      'Collected',
 }
 
+// ── EmailService ───────────────────────────────────────────────────────────────
+
 export const EmailService = {
   /**
    * Send an email with pre-rendered subject and HTML body (used by NotificationEngine).
+   * If `businessId` is supplied and that business has SMTP enabled, uses their credentials.
    */
   async sendTemplated(payload: TemplatedEmailPayload) {
-    const from = payload.fromName
-      ? `"${payload.fromName}" <${process.env.SMTP_FROM ?? process.env.SMTP_USER}>`
-      : process.env.SMTP_FROM ?? process.env.SMTP_USER
+    const bizCfg = payload.businessId
+      ? await getBusinessSmtpConfig(payload.businessId)
+      : null
 
-    await getTransporter().sendMail({
-      from,
-      to:      payload.to,
-      subject: payload.subject,
-      html:    payload.html,
-    })
+    if (bizCfg) {
+      const from = payload.fromName
+        ? `"${payload.fromName}" <${bizCfg.from}>`
+        : bizCfg.from
+      await buildTransporter(bizCfg).sendMail({
+        from,
+        to:      payload.to,
+        subject: payload.subject,
+        html:    payload.html,
+      })
+    } else {
+      const from = payload.fromName
+        ? `"${payload.fromName}" <${process.env.SMTP_FROM ?? process.env.SMTP_USER}>`
+        : (process.env.SMTP_FROM ?? process.env.SMTP_USER)
+      await getGlobalTransporter().sendMail({
+        from,
+        to:      payload.to,
+        subject: payload.subject,
+        html:    payload.html,
+      })
+    }
   },
 
   /**
@@ -67,7 +156,7 @@ export const EmailService = {
   async sendRepairStatusUpdate(payload: RepairStatusEmailPayload) {
     const statusLabel = STATUS_LABELS[payload.newStatus] ?? payload.newStatus
 
-    await getTransporter().sendMail({
+    await getGlobalTransporter().sendMail({
       from:    `"${payload.businessName}" <${process.env.SMTP_FROM ?? process.env.SMTP_USER}>`,
       to:      payload.customerEmail,
       subject: `Repair Update: ${payload.jobNumber} — ${statusLabel}`,
@@ -93,7 +182,7 @@ export const EmailService = {
     const loginUrl = `https://${payload.subdomain}.repairbooking.co.uk/login`
     const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://repairbooking.co.uk'
 
-    await getTransporter().sendMail({
+    await getGlobalTransporter().sendMail({
       from: `"RepairBooking" <${process.env.SMTP_FROM ?? process.env.SMTP_USER}>`,
       to: payload.to,
       subject: `Welcome to RepairBooking — Your account is ready`,
@@ -140,7 +229,7 @@ export const EmailService = {
   },
 
   async sendEnterpriseEnquiry(payload: { businessName: string; email: string; fullName: string; phone?: string }) {
-    const t = getTransporter()
+    const t = getGlobalTransporter()
     await t.sendMail({
       from: `"RepairBooking" <${process.env.SMTP_FROM ?? process.env.SMTP_USER}>`,
       to: process.env.SALES_EMAIL ?? 'sales@repairbooking.co.uk',
@@ -156,14 +245,67 @@ export const EmailService = {
   },
 
   /**
-   * Verify SMTP connection is working (used for test notifications).
+   * Verify SMTP connection — checks global platform config.
+   * For per-business config, use verifyBusinessConnection().
    */
   async verifyConnection(): Promise<boolean> {
     try {
-      await getTransporter().verify()
+      await getGlobalTransporter().verify()
       return true
     } catch {
       return false
+    }
+  },
+
+  /**
+   * Verify a per-business SMTP config by building a transporter from the supplied values.
+   * Used by the "Test Connection" feature in settings.
+   */
+  async verifyBusinessConnection(cfg: {
+    host: string
+    port: number
+    secure: boolean
+    user: string
+    pass: string
+  }): Promise<{ success: boolean; error?: string }> {
+    try {
+      const transport = nodemailer.createTransport({
+        host:   cfg.host,
+        port:   cfg.port,
+        secure: cfg.secure,
+        auth:   { user: cfg.user, pass: cfg.pass },
+      })
+      await transport.verify()
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : 'Connection failed' }
+    }
+  },
+
+  /**
+   * Send a test email using per-business SMTP credentials.
+   * Credentials are passed directly (not yet saved) so the owner can test before saving.
+   */
+  async sendTestEmail(cfg: {
+    host: string; port: number; secure: boolean
+    user: string; pass: string; from: string
+  }, to: string, businessName: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const transport = buildTransporter({ ...cfg })
+      await transport.sendMail({
+        from:    `"${businessName}" <${cfg.from}>`,
+        to,
+        subject: `✅ SMTP test from ${businessName} — RepairBooking`,
+        html: `<div style="font-family:Arial,sans-serif;max-width:480px;margin:40px auto;color:#374151;">
+          <h2 style="color:#008080;">Connection successful!</h2>
+          <p>Your SMTP configuration for <strong>${businessName}</strong> is working correctly.</p>
+          <p>Emails will now be sent to your customers from <strong>${cfg.from}</strong>.</p>
+          <p style="color:#6B7280;font-size:13px;margin-top:24px;">— RepairBooking Platform</p>
+        </div>`,
+      })
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : 'Failed to send test email' }
     }
   },
 }

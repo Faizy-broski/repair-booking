@@ -116,12 +116,28 @@ export const ProductService = {
   },
 
   async delete(id: string, businessId: string) {
-    const { error } = await adminSupabase
+    // Attempt to hard delete first (ideal for cleaning up accidental imports)
+    const { error: hardDeleteError } = await adminSupabase
       .from('products')
-      .update({ is_active: false })
+      .delete()
       .eq('id', id)
       .eq('business_id', businessId)
-    if (error) throw error
+
+    // If there is a foreign key constraint violation (e.g. product was sold or used in orders),
+    // gracefully fall back to a soft delete.
+    if (hardDeleteError) {
+      if (hardDeleteError.code === '23503') {
+        const { error: softDeleteError } = await adminSupabase
+          .from('products')
+          .update({ is_active: false })
+          .eq('id', id)
+          .eq('business_id', businessId)
+        
+        if (softDeleteError) throw softDeleteError
+      } else {
+        throw hardDeleteError
+      }
+    }
   },
 
   // ── History ──────────────────────────────────────────────────────────────

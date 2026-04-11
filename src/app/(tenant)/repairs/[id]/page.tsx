@@ -15,6 +15,7 @@ import { ConditionChecklist } from '@/components/repairs/condition-checklist'
 import { LabelPicker } from '@/components/repairs/label-picker'
 import { EstimatesPanel } from '@/components/repairs/estimates-panel'
 import { CustomFieldRenderer, useCustomFieldDefs } from '@/components/shared/custom-field-renderer'
+import { PatternLock } from '@/components/ui/pattern-lock'
 
 const STATUS_OPTIONS = REPAIR_STATUSES.map((s) => ({ value: s, label: s.replace('_', ' ') }))
 
@@ -37,6 +38,8 @@ interface RepairDetail {
   serial_number: string | null
   issue: string
   diagnosis: string | null
+  lock_type: string | null
+  passcode: string | null
   estimated_cost: number | null
   actual_cost: number | null
   deposit_paid: number
@@ -214,6 +217,15 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
             <InfoRow label="Serial" value={repair.serial_number} />
             <InfoRow label="Issue" value={repair.issue} />
             {repair.diagnosis && <InfoRow label="Diagnosis" value={repair.diagnosis} />}
+            {repair.lock_type === 'passcode' && <InfoRow label="Passcode" value={repair.passcode} />}
+            {repair.lock_type === 'pattern' && repair.passcode && (
+              <div className="flex gap-2">
+                <span className="w-28 shrink-0 text-gray-400">Pattern</span>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 overflow-hidden pointer-events-none w-fit">
+                  <PatternLock value={repair.passcode} size={150} readOnly />
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

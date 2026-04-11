@@ -148,6 +148,12 @@ export default function SalesPage() {
         refundReason={sale.refund_reason}
         paymentSplits={sale.payment_splits}
         notes={sale.notes}
+        branchName={activeBranch?.name}
+        branchAddress={activeBranch?.address ?? undefined}
+        branchPhone={activeBranch?.phone ?? undefined}
+        branchEmail={activeBranch?.email ?? undefined}
+        logoUrl={activeBranch?.logo_url ?? undefined}
+        currency="£"
       />
     ).toBlob()
     const url = URL.createObjectURL(blob)

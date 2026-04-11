@@ -36,6 +36,26 @@ const templateUpdateSchema = z.object({
   is_active:  z.boolean().optional(),
 })
 
+const smtpConfigSchema = z.object({
+  smtp_host:    z.string().min(1),
+  smtp_port:    z.number().int().min(1).max(65535).default(587),
+  smtp_user:    z.string().min(1),
+  smtp_pass:    z.string().optional(),
+  smtp_from:    z.string().email().or(z.string().min(1)),
+  smtp_secure:  z.boolean().default(false),
+  smtp_enabled: z.boolean().default(true),
+})
+
+const smtpTestSchema = z.object({
+  host:    z.string().min(1),
+  port:    z.number().int().min(1).max(65535),
+  user:    z.string().min(1),
+  pass:    z.string().min(1),
+  from:    z.string().min(1),
+  secure:  z.boolean(),
+  test_to: z.string().email(),
+})
+
 const smsConfigSchema = z.object({
   sms_gateway:    z.enum(['twilio', 'textlocal', 'smsglobal']),
   sms_api_key:    z.string().min(1),
@@ -305,6 +325,78 @@ export const NotificationController = {
       return ok(settings)
     } catch (err) {
       return serverError('Failed to update invoice reminder settings', err)
+    }
+  },
+
+  // ── Email (SMTP) Config ───────────────────────────────────────────────
+
+  async getEmailConfig(request: NextRequest, ctx: RequestContext) {
+    try {
+      const { data } = await db('businesses')
+        .select('smtp_enabled, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from, smtp_secure')
+        .eq('id', ctx.businessId)
+        .single()
+
+      if (!data) return ok(null)
+
+      return ok({
+        smtp_enabled:    data.smtp_enabled ?? false,
+        smtp_host:       data.smtp_host ?? '',
+        smtp_port:       data.smtp_port ?? 587,
+        smtp_user:       data.smtp_user ?? '',
+        // Mask password — only indicate whether it is set
+        smtp_pass:       data.smtp_pass ? '••••••••' : '',
+        smtp_from:       data.smtp_from ?? '',
+        smtp_secure:     data.smtp_secure ?? false,
+        is_configured:   !!(data.smtp_host && data.smtp_user && data.smtp_pass),
+      })
+    } catch (err) {
+      return serverError('Failed to fetch email config', err)
+    }
+  },
+
+  async updateEmailConfig(request: NextRequest, ctx: RequestContext) {
+    const { data, error } = await validateBody(request, smtpConfigSchema)
+    if (error) return error
+    try {
+      const updatePayload: Record<string, unknown> = {
+        smtp_enabled: data.smtp_enabled,
+        smtp_host:    data.smtp_host,
+        smtp_port:    data.smtp_port,
+        smtp_user:    data.smtp_user,
+        smtp_from:    data.smtp_from,
+        smtp_secure:  data.smtp_secure,
+        updated_at:   new Date().toISOString(),
+      }
+      // Only overwrite password if a new one was provided (not the masked placeholder)
+      if (data.smtp_pass && data.smtp_pass !== '••••••••') {
+        updatePayload.smtp_pass = data.smtp_pass
+      }
+
+      await db('businesses').update(updatePayload).eq('id', ctx.businessId)
+      return ok({ updated: true })
+    } catch (err) {
+      return serverError('Failed to update email config', err)
+    }
+  },
+
+  async testEmailConfig(request: NextRequest, ctx: RequestContext) {
+    const { data, error } = await validateBody(request, smtpTestSchema)
+    if (error) return error
+    try {
+      const { data: biz } = await db('businesses').select('name').eq('id', ctx.businessId).single()
+      const businessName = biz?.name ?? 'RepairBooking'
+
+      const result = await EmailService.sendTestEmail(
+        { host: data.host, port: data.port, secure: data.secure, user: data.user, pass: data.pass, from: data.from },
+        data.test_to,
+        businessName,
+      )
+
+      if (result.success) return ok({ success: true })
+      return badRequest(result.error ?? 'Connection test failed')
+    } catch (err) {
+      return serverError('Failed to test email config', err)
     }
   },
 

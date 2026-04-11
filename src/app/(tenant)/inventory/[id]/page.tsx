@@ -1,11 +1,12 @@
 'use client'
 import { useState, useEffect, use, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Save, Trash2, ImagePlus } from 'lucide-react'
+import { ChevronLeft, Save, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Modal } from '@/components/ui/modal'
+import { ImageUpload } from '@/components/ui/image-upload'
 import { formatCurrency } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import Link from 'next/link'
@@ -192,6 +193,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       selling_price: parseFloat(sellingPrice) || 0,
       supplier_id: itemType === 'part' ? (supplierId || null) : null,
       low_stock_alert: lowStockAlert,
+      initial_stock: onHand ?? 0,
       physical_location: physicalLocation || null,
       branch_id: activeBranch?.id ?? null,
       commission_enabled: commissionEnabled,
@@ -280,19 +282,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <h2 className="text-base font-semibold text-gray-900">{itemType === 'part' ? 'Part' : 'Product'} Details</h2>
             </div>
             <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                {imageUrl ? (
-                  <img src={imageUrl} alt="Item" className="h-20 w-20 rounded-xl border border-gray-200 object-contain" />
-                ) : (
-                  <div className="h-20 w-20 rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400">
-                    <ImagePlus className="h-6 w-6" />
-                    <span className="text-xs mt-1">Image</span>
-                  </div>
-                )}
-                <div className="flex-1">
-                  <Input label="Image URL" placeholder="https://..." value={imageUrl} onChange={e => setImageUrl(e.target.value)} />
-                </div>
-              </div>
+              <ImageUpload
+                label={itemType === 'part' ? 'Part image' : 'Product image'}
+                value={imageUrl}
+                onChange={setImageUrl}
+              />
 
               <Input label="Name *" required value={name} onChange={e => setName(e.target.value)} />
 
@@ -343,8 +337,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Cost Price (\u00a3)" type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
-                <Input label="Selling Price (\u00a3) *" type="number" step="0.01" min="0" placeholder="0.00" required value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
+                <Input label="Cost Price (£)" type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
+                <Input label="Selling Price (£)" type="number" step="0.01" min="0" placeholder="0.00" required value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
               </div>
               {hasMargin && (
                 <div className="rounded-lg bg-green-50 border border-green-100 px-4 py-2.5 flex items-center gap-4 text-sm">
@@ -363,10 +357,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-                  <p className="text-xs text-gray-500">On Hand</p>
-                  <p className="text-lg font-bold text-gray-900">{onHand ?? 0}</p>
-                </div>
+                <Input label="Quantity" type="number" min="0" value={onHand ?? 0} onChange={e => setOnHand(parseInt(e.target.value) || 0)} />
                 <Input label="Low Stock Alert" type="number" min="0" value={lowStockAlert} onChange={e => setLowStockAlert(parseInt(e.target.value) || 0)} />
               </div>
               <div>

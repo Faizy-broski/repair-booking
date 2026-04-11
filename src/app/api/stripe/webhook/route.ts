@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { getAdminSupabase } from '@/backend/config/supabase'
+import { AuthService } from '@/backend/services/auth.service'
 import { EmailService } from '@/backend/services/email.service'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', { apiVersion: '2025-03-31.basil' })
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', { apiVersion: '2026-02-25.clover' })
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET ?? ''
-
-const PLAN_NAMES: Record<string, string> = {
-  starter:    'Starter (£29/mo)',
-  growth:     'Growth (£79/mo)',
-  enterprise: 'Enterprise',
-}
 
 export async function POST(request: NextRequest) {
   const body = await request.text()
@@ -26,61 +21,152 @@ export async function POST(request: NextRequest) {
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session
-    const businessId = session.metadata?.businessId
-    const planId     = session.metadata?.planId ?? 'starter'
-
-    if (!businessId) {
-      return NextResponse.json({ error: 'Missing businessId in metadata' }, { status: 400 })
-    }
+    const pendingId  = session.metadata?.pendingId
+    let businessId   = session.metadata?.businessId   // present on upgrade flow
+    const planId     = session.metadata?.planId
 
     const supabase = getAdminSupabase()
 
-    // 1. Activate business + store Stripe subscription ID + plan
+    // ── Upgrade path (existing business) ─────────────────────────────────────
+    if (businessId && !pendingId) {
+      const subscriptionId = typeof session.subscription === 'string'
+        ? session.subscription
+        : (session.subscription as Stripe.Subscription)?.id ?? null
+
+      // Activate business + update Stripe IDs
+      await (supabase as any)
+        .from('businesses')
+        .update({
+          is_active:              true,
+          stripe_customer_id:     session.customer ?? null,
+          stripe_subscription_id: subscriptionId,
+          trial_ends_at:          null, // clear trial on upgrade
+        })
+        .eq('id', businessId)
+
+      // Upsert subscription row to active
+      if (planId) {
+        await (supabase as any)
+          .from('subscriptions')
+          .upsert(
+            {
+              business_id:        businessId,
+              plan_id:            planId,
+              stripe_sub_id:      subscriptionId,
+              stripe_customer_id: session.customer ?? null,
+              status:             'active',
+              billing_cycle:      'monthly',
+              trial_ends_at:      null,
+            },
+            { onConflict: 'business_id' }
+          )
+      }
+
+      return NextResponse.json({ received: true })
+    }
+
+    // ── New registration path (pending_registrations) ─────────────────────────
+    if (!pendingId) {
+      console.error('[webhook] Missing pendingId in session metadata')
+      return NextResponse.json({ error: 'Missing pendingId in metadata' }, { status: 400 })
+    }
+
+    // 1. Look up the pending registration
+    const { data: pending, error: pendingErr } = await (supabase as any)
+      .from('pending_registrations')
+      .select('*')
+      .eq('id', pendingId)
+      .single()
+
+    if (pendingErr || !pending) {
+      console.error('[webhook] Pending registration not found:', pendingId)
+      // Return 200 to prevent Stripe retrying — registration may have already been processed
+      return NextResponse.json({ received: true })
+    }
+
     const subscriptionId = typeof session.subscription === 'string'
       ? session.subscription
-      : session.subscription?.id ?? null
+      : (session.subscription as Stripe.Subscription)?.id ?? null
 
-    const { data: business, error: bizError } = await (supabase as any)
-      .from('businesses')
-      .update({
-        is_active:       true,
-        plan:            planId,
-        stripe_customer_id:     session.customer ?? null,
-        stripe_subscription_id: subscriptionId,
-      })
-      .eq('id', businessId)
-      .select('name, subdomain, email')
-      .single()
+    businessId = null
 
-    if (bizError || !business) {
-      console.error('[webhook] Failed to activate business:', bizError)
-      return NextResponse.json({ error: 'Failed to activate business' }, { status: 500 })
-    }
-
-    // 2. Fetch the owner profile to get name + stored password hint
-    const { data: profile } = await (supabase as any)
-      .from('profiles')
-      .select('full_name')
-      .eq('business_id', businessId)
-      .eq('role', 'business_owner')
-      .single()
-
-    // 3. Send welcome email with credentials
-    // Note: we can't retrieve the password from Supabase (hashed), so we ask
-    // them to use the password they set during registration.
     try {
-      await EmailService.sendWelcome({
-        to:           business.email,
-        fullName:     profile?.full_name ?? 'there',
-        businessName: business.name,
-        subdomain:    business.subdomain,
-        password:     '(the password you set during registration)',
-        planName:     PLAN_NAMES[planId] ?? planId,
+      // 2. Create the account (user + business [is_active:true] + branch + profile)
+      const { business } = await AuthService.register({
+        businessName:   pending.business_name,
+        subdomain:      pending.subdomain,
+        email:          pending.email,
+        phone:          pending.phone ?? undefined,
+        fullName:       pending.full_name,
+        password:       pending.password_temp,
+        mainBranchName: pending.main_branch_name,
+        activateNow:    true,
       })
-    } catch (emailErr) {
-      // Don't fail the webhook if email fails — business is already activated
-      console.error('[webhook] Welcome email failed:', emailErr)
+      businessId = business.id
+    } catch (regErr) {
+      const msg = regErr instanceof Error ? regErr.message : 'Registration failed'
+
+      // Account already created by check-registration polling (race condition is expected).
+      // Look up the existing business so we can still update Stripe IDs.
+      if (msg.includes('already taken') || msg.includes('already been registered') || msg.includes('already exists')) {
+        const { data: existingBiz } = await (supabase as any)
+          .from('businesses')
+          .select('id')
+          .eq('email', pending.email)
+          .maybeSingle()
+        businessId = existingBiz?.id ?? null
+        console.log('[webhook] Account already exists, updating Stripe IDs for:', pending.email)
+      } else {
+        console.error('[webhook] Account creation failed:', msg)
+        // Return 200 so Stripe doesn't retry infinitely — admin must resolve manually
+        return NextResponse.json({ received: true })
+      }
     }
+
+    if (businessId) {
+      // 3. Store the Stripe subscription + customer on the business
+      await (supabase as any)
+        .from('businesses')
+        .update({
+          stripe_customer_id:     session.customer ?? null,
+          stripe_subscription_id: subscriptionId,
+        })
+        .eq('id', businessId)
+
+      // 4. Upsert subscription record (safe to re-run if check-registration already inserted)
+      if (pending.plan_id) {
+        await (supabase as any)
+          .from('subscriptions')
+          .upsert(
+            {
+              business_id:        businessId,
+              plan_id:            pending.plan_id,
+              stripe_sub_id:      subscriptionId,
+              stripe_customer_id: session.customer ?? null,
+              status:             'trialing',
+              billing_cycle:      'monthly',
+              trial_ends_at:      new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+            },
+            { onConflict: 'business_id' }
+          )
+      }
+    }
+
+    // 5. Send welcome email (non-blocking, best-effort — check-registration may have sent it already)
+    EmailService.sendWelcome({
+      to:           pending.email,
+      fullName:     pending.full_name,
+      businessName: pending.business_name,
+      subdomain:    pending.subdomain,
+      password:     '(the password you set during registration)',
+      planName:     'your plan',
+    }).catch((emailErr: unknown) => console.error('[webhook] Welcome email failed:', emailErr))
+
+    // 6. Delete the pending registration (cleanup sensitive data)
+    await (supabase as any)
+      .from('pending_registrations')
+      .delete()
+      .eq('id', pendingId)
   }
 
   if (event.type === 'customer.subscription.deleted') {
