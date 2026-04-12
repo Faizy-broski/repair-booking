@@ -26,19 +26,6 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
   } = useAuthStore()
   const { fetchConfigs, invalidate: invalidateConfigs } = useModuleConfigStore()
 
-  // Detect post-upgrade redirect (?upgraded=1) and force-clear the module
-  // config cache so new plan modules appear immediately without waiting for TTL.
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('upgraded') === '1') {
-      invalidateConfigs()
-      // Remove the query param cleanly
-      const clean = window.location.pathname
-      window.history.replaceState({}, '', clean)
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
   useEffect(() => {
     async function loadSession() {
       const supabase = createClient()
@@ -67,6 +54,28 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
       // All remaining DB queries run in the background and update stores
       // reactively — no additional loading states are imposed.
       setSessionVerified(true)
+
+      // ── Post-upgrade: verify Stripe session and update subscription ──────
+      // When Stripe redirects back with ?upgraded=1&session_id=cs_xxx, call
+      // the verify endpoint BEFORE fetching subscription/module configs so
+      // the DB is updated first and we get the fresh plan data immediately.
+      const urlParams = new URLSearchParams(window.location.search)
+      if (urlParams.get('upgraded') === '1') {
+        const sessionId = urlParams.get('session_id')
+        // Clean URL immediately regardless of outcome
+        window.history.replaceState({}, '', window.location.pathname)
+        if (sessionId) {
+          try {
+            await fetch('/api/stripe/verify-upgrade', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sessionId }),
+            })
+          } catch { /* non-fatal — subscription data will just come from webhook later */ }
+        }
+        // Always bust the module config cache so new modules show immediately
+        invalidateConfigs()
+      }
 
       // ── Step 2: Load profile (background) ───────────────────────────────
       if (cachedProfile && cachedProfile.id !== user.id) {
@@ -130,13 +139,22 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
           let resolvedBranch: Branch | null = null
           if (profile.branch_id) {
             resolvedBranch = branches.find((b) => b.id === profile.branch_id) ?? null
-            if (resolvedBranch) setActiveBranch(resolvedBranch)
           } else {
-            const preferred = storedActiveBranch
+            resolvedBranch = storedActiveBranch
               ? branches.find((b) => b.id === storedActiveBranch.id) ?? branches[0]
               : branches[0]
-            resolvedBranch = preferred
-            setActiveBranch(resolvedBranch)
+          }
+
+          if (resolvedBranch) {
+            // Only call setActiveBranch when the branch ID actually changes.
+            // The layout fetches fresh Branch objects from the DB on every load,
+            // so the reference always differs from the persisted one even when
+            // the ID is identical. Without this guard, every page load triggers
+            // a second round of inventory/stats fetches with the same branch_id,
+            // creating a race where the slower request overwrites the faster one.
+            if (resolvedBranch.id !== storedActiveBranch?.id) {
+              setActiveBranch(resolvedBranch)
+            }
           }
 
           // fetchConfigs uses TTL-based cache: if the same branch's data is

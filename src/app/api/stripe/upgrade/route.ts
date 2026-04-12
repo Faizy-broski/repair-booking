@@ -98,9 +98,12 @@ export async function POST(request: NextRequest) {
 
     const subdomain = business?.subdomain ?? ''
     const appUrlObj = new URL(APP_URL)
+    // {CHECKOUT_SESSION_ID} is a Stripe template variable — it gets replaced with
+    // the real session ID at redirect time, so we can verify the payment server-side
+    // without relying on the webhook.
     const successUrl = subdomain
-      ? `${appUrlObj.protocol}//${subdomain}.${appUrlObj.host}/dashboard?upgraded=1`
-      : `${APP_URL}/dashboard?upgraded=1`
+      ? `${appUrlObj.protocol}//${subdomain}.${appUrlObj.host}/dashboard?upgraded=1&session_id={CHECKOUT_SESSION_ID}`
+      : `${APP_URL}/dashboard?upgraded=1&session_id={CHECKOUT_SESSION_ID}`
 
     // Create Stripe Checkout session for upgrade
     const session = await stripe.checkout.sessions.create({

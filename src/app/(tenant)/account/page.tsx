@@ -272,8 +272,15 @@ export default function AccountPage() {
                           : '—'
                     } />
                     {isTrialing && <InfoRow label="Trial ends"  value={formatDate(sub.trial_ends_at)} />}
-                    {isActive    && <InfoRow label="Renews on"   value={formatDate(sub.current_period_end)} />}
-                    {isCanceled  && <InfoRow label="Expired on"  value={formatDate(sub.current_period_end)} />}
+                    {isActive && (
+                      <InfoRow
+                        label="Renews on"
+                        value={sub.current_period_end ? formatDate(sub.current_period_end) : 'Manual / no expiry'}
+                      />
+                    )}
+                    {isCanceled && sub.current_period_end && (
+                      <InfoRow label="Expired on" value={formatDate(sub.current_period_end)} />
+                    )}
                     {plan?.max_branches != null && <InfoRow label="Branches"  value={String(plan.max_branches)} />}
                     {plan?.max_users    != null && <InfoRow label="Staff"     value={String(plan.max_users)}    />}
                   </div>

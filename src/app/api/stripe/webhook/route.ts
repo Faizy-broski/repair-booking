@@ -3,9 +3,19 @@ import Stripe from 'stripe'
 import { getAdminSupabase } from '@/backend/config/supabase'
 import { AuthService } from '@/backend/services/auth.service'
 import { EmailService } from '@/backend/services/email.service'
+import { SubscriptionSyncService } from '@/backend/services/subscription-sync.service'
+import { invalidateBusinessCache } from '@/backend/services/module-config.service'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', { apiVersion: '2026-02-25.clover' })
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET ?? ''
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function ts(unix: number | null | undefined): string | null {
+  return unix ? new Date(unix * 1000).toISOString() : null
+}
+
+// ── Webhook handler ───────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
   const body = await request.text()
@@ -16,62 +26,75 @@ export async function POST(request: NextRequest) {
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Webhook signature verification failed'
+    console.error('[webhook] Signature error:', msg)
     return NextResponse.json({ error: msg }, { status: 400 })
   }
 
+  console.log(`[webhook] ${event.type}`)
+
+  // ── checkout.session.completed ──────────────────────────────────────────────
+  // Fires for both new registrations (pendingId in metadata) and plan upgrades
+  // (businessId in metadata). For upgrades this is the primary event that
+  // updates the subscription row.
   if (event.type === 'checkout.session.completed') {
-    const session = event.data.object as Stripe.Checkout.Session
-    const pendingId  = session.metadata?.pendingId
-    let businessId   = session.metadata?.businessId   // present on upgrade flow
+    const session   = event.data.object as Stripe.Checkout.Session
+    const pendingId = session.metadata?.pendingId
+    const businessId = session.metadata?.businessId
     const planId     = session.metadata?.planId
 
     const supabase = getAdminSupabase()
 
-    // ── Upgrade path (existing business) ─────────────────────────────────────
-    if (businessId && !pendingId) {
-      const subscriptionId = typeof session.subscription === 'string'
+    // ── Upgrade path ─────────────────────────────────────────────────────────
+    if (businessId && planId && !pendingId) {
+      const stripeSubId = typeof session.subscription === 'string'
         ? session.subscription
-        : (session.subscription as Stripe.Subscription)?.id ?? null
+        : (session.subscription as Stripe.Subscription | null)?.id ?? null
 
-      // Activate business + update Stripe IDs
+      // Activate business + clear trial
       await (supabase as any)
         .from('businesses')
         .update({
           is_active:              true,
           stripe_customer_id:     session.customer ?? null,
-          stripe_subscription_id: subscriptionId,
-          trial_ends_at:          null, // clear trial on upgrade
+          stripe_subscription_id: stripeSubId,
+          trial_ends_at:          null,
         })
         .eq('id', businessId)
 
-      // Upsert subscription row to active
-      if (planId) {
-        await (supabase as any)
-          .from('subscriptions')
-          .upsert(
-            {
-              business_id:        businessId,
-              plan_id:            planId,
-              stripe_sub_id:      subscriptionId,
-              stripe_customer_id: session.customer ?? null,
-              status:             'active',
-              billing_cycle:      'monthly',
-              trial_ends_at:      null,
-            },
-            { onConflict: 'business_id' }
-          )
+      // Resolve period dates from the Stripe subscription if available
+      let periodStart: string | null = null
+      let periodEnd: string | null = null
+      if (stripeSubId) {
+        try {
+          const stripeSub = await stripe.subscriptions.retrieve(stripeSubId)
+          periodStart = ts(stripeSub.current_period_start)
+          periodEnd   = ts(stripeSub.current_period_end)
+        } catch { /* non-fatal */ }
       }
+
+      await SubscriptionSyncService.upsert({
+        businessId,
+        planId,
+        stripeSubId,
+        stripeCustomerId: typeof session.customer === 'string' ? session.customer : null,
+        status: 'active',
+        trialEndsAt: null,
+        currentPeriodStart: periodStart,
+        currentPeriodEnd:   periodEnd,
+      })
+
+      // Bust Next.js data cache so module configs reflect the new plan immediately
+      await invalidateBusinessCache(businessId)
 
       return NextResponse.json({ received: true })
     }
 
-    // ── New registration path (pending_registrations) ─────────────────────────
+    // ── New registration path ─────────────────────────────────────────────────
     if (!pendingId) {
-      console.error('[webhook] Missing pendingId in session metadata')
-      return NextResponse.json({ error: 'Missing pendingId in metadata' }, { status: 400 })
+      console.error('[webhook] Missing pendingId and businessId in session metadata')
+      return NextResponse.json({ received: true }) // 200 so Stripe stops retrying
     }
 
-    // 1. Look up the pending registration
     const { data: pending, error: pendingErr } = await (supabase as any)
       .from('pending_registrations')
       .select('*')
@@ -79,19 +102,16 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (pendingErr || !pending) {
-      console.error('[webhook] Pending registration not found:', pendingId)
-      // Return 200 to prevent Stripe retrying — registration may have already been processed
+      console.warn('[webhook] Pending registration not found (may be already processed):', pendingId)
       return NextResponse.json({ received: true })
     }
 
-    const subscriptionId = typeof session.subscription === 'string'
+    const stripeSubId = typeof session.subscription === 'string'
       ? session.subscription
-      : (session.subscription as Stripe.Subscription)?.id ?? null
+      : (session.subscription as Stripe.Subscription | null)?.id ?? null
 
-    businessId = null
-
+    let newBusinessId: string | null = null
     try {
-      // 2. Create the account (user + business [is_active:true] + branch + profile)
       const { business } = await AuthService.register({
         businessName:   pending.business_name,
         subdomain:      pending.subdomain,
@@ -102,84 +122,141 @@ export async function POST(request: NextRequest) {
         mainBranchName: pending.main_branch_name,
         activateNow:    true,
       })
-      businessId = business.id
+      newBusinessId = business.id
     } catch (regErr) {
       const msg = regErr instanceof Error ? regErr.message : 'Registration failed'
-
-      // Account already created by check-registration polling (race condition is expected).
-      // Look up the existing business so we can still update Stripe IDs.
       if (msg.includes('already taken') || msg.includes('already been registered') || msg.includes('already exists')) {
         const { data: existingBiz } = await (supabase as any)
-          .from('businesses')
-          .select('id')
-          .eq('email', pending.email)
-          .maybeSingle()
-        businessId = existingBiz?.id ?? null
-        console.log('[webhook] Account already exists, updating Stripe IDs for:', pending.email)
+          .from('businesses').select('id').eq('email', pending.email).maybeSingle()
+        newBusinessId = existingBiz?.id ?? null
+        console.log('[webhook] Account already exists:', pending.email)
       } else {
         console.error('[webhook] Account creation failed:', msg)
-        // Return 200 so Stripe doesn't retry infinitely — admin must resolve manually
         return NextResponse.json({ received: true })
       }
     }
 
-    if (businessId) {
-      // 3. Store the Stripe subscription + customer on the business
+    if (newBusinessId) {
       await (supabase as any)
         .from('businesses')
-        .update({
-          stripe_customer_id:     session.customer ?? null,
-          stripe_subscription_id: subscriptionId,
-        })
-        .eq('id', businessId)
+        .update({ stripe_customer_id: session.customer ?? null, stripe_subscription_id: stripeSubId })
+        .eq('id', newBusinessId)
 
-      // 4. Upsert subscription record (safe to re-run if check-registration already inserted)
       if (pending.plan_id) {
-        await (supabase as any)
-          .from('subscriptions')
-          .upsert(
-            {
-              business_id:        businessId,
-              plan_id:            pending.plan_id,
-              stripe_sub_id:      subscriptionId,
-              stripe_customer_id: session.customer ?? null,
-              status:             'trialing',
-              billing_cycle:      'monthly',
-              trial_ends_at:      new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-            },
-            { onConflict: 'business_id' }
-          )
+        await SubscriptionSyncService.upsert({
+          businessId:       newBusinessId,
+          planId:           pending.plan_id,
+          stripeSubId,
+          stripeCustomerId: typeof session.customer === 'string' ? session.customer : null,
+          status:           'trialing',
+          trialEndsAt:      new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        })
       }
     }
 
-    // 5. Send welcome email (non-blocking, best-effort — check-registration may have sent it already)
     EmailService.sendWelcome({
-      to:           pending.email,
-      fullName:     pending.full_name,
-      businessName: pending.business_name,
-      subdomain:    pending.subdomain,
-      password:     '(the password you set during registration)',
-      planName:     'your plan',
-    }).catch((emailErr: unknown) => console.error('[webhook] Welcome email failed:', emailErr))
+      to: pending.email, fullName: pending.full_name, businessName: pending.business_name,
+      subdomain: pending.subdomain, password: '(the password you set during registration)', planName: 'your plan',
+    }).catch((e: unknown) => console.error('[webhook] Welcome email failed:', e))
 
-    // 6. Delete the pending registration (cleanup sensitive data)
-    await (supabase as any)
-      .from('pending_registrations')
-      .delete()
-      .eq('id', pendingId)
+    await (supabase as any).from('pending_registrations').delete().eq('id', pendingId)
+    return NextResponse.json({ received: true })
   }
 
-  if (event.type === 'customer.subscription.deleted') {
-    // Deactivate business when subscription is cancelled
-    const subscription = event.data.object as Stripe.Subscription
-    const businessId = subscription.metadata?.businessId
-    if (businessId) {
-      await (getAdminSupabase() as any)
-        .from('businesses')
-        .update({ is_active: false })
-        .eq('id', businessId)
+  // ── customer.subscription.updated ──────────────────────────────────────────
+  // Fires when a subscription's plan, status, or billing dates change —
+  // including plan upgrades made via Stripe Customer Portal.
+  if (event.type === 'customer.subscription.updated') {
+    const stripeSub  = event.data.object as Stripe.Subscription
+    const businessId = stripeSub.metadata?.businessId
+      ?? await SubscriptionSyncService.businessIdFromStripeSubId(stripeSub.id)
+
+    if (!businessId) {
+      console.warn('[webhook] subscription.updated: no businessId for', stripeSub.id)
+      return NextResponse.json({ received: true })
     }
+
+    // Resolve our internal planId from the Stripe price on the subscription
+    const priceId = stripeSub.items.data[0]?.price?.id ?? null
+    const planId  = priceId
+      ? await SubscriptionSyncService.planIdFromStripePrice(priceId)
+      : null
+
+    // If we don't recognise the price, keep the existing planId
+    const supabase = getAdminSupabase() as any
+    const { data: existing } = await supabase
+      .from('subscriptions').select('plan_id').eq('business_id', businessId).maybeSingle()
+
+    const resolvedPlanId = planId ?? existing?.plan_id
+    if (!resolvedPlanId) {
+      console.warn('[webhook] subscription.updated: unknown price, no fallback planId', priceId)
+      return NextResponse.json({ received: true })
+    }
+
+    const stripeStatus = stripeSub.status as 'active' | 'trialing' | 'past_due' | 'canceled'
+    const dbStatus: SubscriptionPayload['status'] =
+      ['active', 'trialing', 'past_due', 'canceled'].includes(stripeStatus) ? stripeStatus : 'active'
+
+    // Update business.is_active based on status
+    await supabase
+      .from('businesses')
+      .update({ is_active: !['canceled', 'past_due'].includes(dbStatus) })
+      .eq('id', businessId)
+
+    await SubscriptionSyncService.upsert({
+      businessId,
+      planId:           resolvedPlanId,
+      stripeSubId:      stripeSub.id,
+      stripeCustomerId: typeof stripeSub.customer === 'string' ? stripeSub.customer : null,
+      status:           dbStatus,
+      trialEndsAt:      stripeSub.trial_end ? new Date(stripeSub.trial_end * 1000).toISOString() : null,
+      currentPeriodStart: ts(stripeSub.current_period_start),
+      currentPeriodEnd:   ts(stripeSub.current_period_end),
+    })
+
+    await invalidateBusinessCache(businessId)
+
+    return NextResponse.json({ received: true })
+  }
+
+  // ── invoice.payment_succeeded ───────────────────────────────────────────────
+  // Fires on every successful charge (initial + renewals).
+  // Updates current_period_end so the "Renews on" date in Account page is correct.
+  if (event.type === 'invoice.payment_succeeded') {
+    const invoice = event.data.object as Stripe.Invoice
+    const stripeSubId = typeof invoice.subscription === 'string'
+      ? invoice.subscription
+      : (invoice.subscription as Stripe.Subscription | null)?.id ?? null
+
+    if (stripeSubId) {
+      const lines = (invoice as any).lines?.data?.[0]
+      await SubscriptionSyncService.updatePeriod({
+        stripeSubId,
+        status: 'active',
+        currentPeriodStart: ts(lines?.period?.start),
+        currentPeriodEnd:   ts(lines?.period?.end),
+      })
+    }
+
+    return NextResponse.json({ received: true })
+  }
+
+  // ── customer.subscription.deleted ──────────────────────────────────────────
+  if (event.type === 'customer.subscription.deleted') {
+    const stripeSub  = event.data.object as Stripe.Subscription
+    const businessId = stripeSub.metadata?.businessId
+      ?? await SubscriptionSyncService.businessIdFromStripeSubId(stripeSub.id)
+
+    if (businessId) {
+      await SubscriptionSyncService.deactivate(businessId)
+      await invalidateBusinessCache(businessId)
+    }
+
+    return NextResponse.json({ received: true })
   }
 
   return NextResponse.json({ received: true })
 }
+
+// Required type — used inside the subscription.updated handler
+type SubscriptionPayload = Parameters<typeof SubscriptionSyncService.upsert>[0]

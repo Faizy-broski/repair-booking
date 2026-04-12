@@ -129,6 +129,43 @@ export async function GET() {
       }
     }
 
+    // ── If DB row has no period dates, sync them from Stripe now ─────────────
+    // This happens when verify-upgrade ran but the Stripe subscription retrieval
+    // failed silently, or when the row was written before period dates were tracked.
+    // Use stripe_sub_id from the sub row first, fall back to businesses table.
+    const fallbackStripeSubId =
+      (sub?.stripe_sub_id as string | null) ??
+      (business?.stripe_subscription_id as string | null) ?? null
+
+    if (sub && !sub.current_period_end && fallbackStripeSubId) {
+      try {
+        const stripeSub = await stripe.subscriptions.retrieve(fallbackStripeSubId)
+        const patchedStart = stripeSub.current_period_start
+          ? new Date(stripeSub.current_period_start * 1000).toISOString() : null
+        const patchedEnd = stripeSub.current_period_end
+          ? new Date(stripeSub.current_period_end * 1000).toISOString() : null
+
+        if (patchedEnd) {
+          await (supabase as any)
+            .from('subscriptions')
+            .update({
+              current_period_start: patchedStart,
+              current_period_end:   patchedEnd,
+              status:               stripeSub.status,
+              stripe_sub_id:        fallbackStripeSubId,
+            })
+            .eq('business_id', profile.business_id)
+
+          sub.current_period_start = patchedStart
+          sub.current_period_end   = patchedEnd
+          sub.status               = stripeSub.status
+          sub.stripe_sub_id        = fallbackStripeSubId
+        }
+      } catch (patchErr) {
+        console.error('[account/subscription] period-date patch failed:', patchErr)
+      }
+    }
+
     // Resolve plan — FK join on plans may come back as an array in some PostgREST versions
     const rawPlans = sub?.plans
     let planData = Array.isArray(rawPlans) ? (rawPlans[0] ?? null) : (rawPlans ?? null)

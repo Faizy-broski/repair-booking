@@ -53,6 +53,9 @@ interface ProductStats {
 
 export default function InventoryPage() {
   const { activeBranch } = useAuthStore()
+  // Use the branch ID as a stable primitive — avoids re-running effects when
+  // the layout refreshes the activeBranch object reference but the ID is the same.
+  const branchId = activeBranch?.id ?? null
   const router = useRouter()
   const pathname = usePathname()
   const [products, setProducts] = useState<ProductRow[]>([])
@@ -82,16 +85,16 @@ export default function InventoryPage() {
   const [drawerLoading, setDrawerLoading] = useState(false)
 
   const fetchStats = useCallback(async () => {
-    if (!activeBranch) return
-    const res = await fetch(`/api/products/stats?branch_id=${activeBranch.id}`)
+    if (!branchId) return
+    const res = await fetch(`/api/products/stats?branch_id=${branchId}`)
     const json = await res.json()
     if (res.ok) setStats(json.data ?? json)
-  }, [activeBranch])
+  }, [branchId])
 
-  const fetchProducts = useCallback(async () => {
-    if (!activeBranch) return
+  const fetchProducts = useCallback(async (signal?: AbortSignal) => {
+    if (!branchId) return
     setLoading(true)
-    const params = new URLSearchParams({ page: String(page + 1), limit: '20', branch_id: activeBranch.id })
+    const params = new URLSearchParams({ page: String(page + 1), limit: '20', branch_id: branchId })
     if (search) params.set('search', search)
     if (categoryFilter) params.set('category_id', categoryFilter)
     if (brandFilter) params.set('brand_id', brandFilter)
@@ -100,14 +103,24 @@ export default function InventoryPage() {
     if (hideOutOfStock) params.set('hide_out_of_stock', 'true')
     if (typeFilter === 'product') params.set('item_type', 'product')
     else if (typeFilter === 'part') params.set('item_type', 'part')
-    const res = await fetch(`/api/products?${params}`)
-    const json = await res.json()
-    setProducts(json.data ?? [])
-    setTotal(json.meta?.total ?? 0)
-    setLoading(false)
-  }, [page, search, activeBranch, typeFilter, categoryFilter, brandFilter, supplierFilter, valuationFilter, hideOutOfStock])
+    try {
+      const res = await fetch(`/api/products?${params}`, { signal })
+      if (signal?.aborted) return
+      const json = await res.json()
+      setProducts(json.data ?? [])
+      setTotal(json.meta?.total ?? 0)
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return // ignore aborted requests
+    } finally {
+      if (!signal?.aborted) setLoading(false)
+    }
+  }, [page, search, branchId, typeFilter, categoryFilter, brandFilter, supplierFilter, valuationFilter, hideOutOfStock])
 
-  useEffect(() => { fetchProducts() }, [fetchProducts])
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchProducts(controller.signal)
+    return () => controller.abort()
+  }, [fetchProducts])
   useEffect(() => { fetchStats() }, [fetchStats])
 
   useEffect(() => {

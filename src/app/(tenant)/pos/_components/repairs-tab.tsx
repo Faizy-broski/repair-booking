@@ -231,10 +231,10 @@ export function RepairsTab() {
               {repairDetailsMenuOpen && (
                 <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-gray-200 bg-white shadow-lg">
                   <button
-                    onClick={() => { setRepairDetailsMenuOpen(false); router.push('/settings/services') }}
+                    onClick={() => { setRepairDetailsMenuOpen(false); router.push('/repairs/service-catalogue') }}
                     className="flex w-full items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
                   >
-                    <ClipboardList className="h-3.5 w-3.5" /> Manage Custom Fields
+                    <ClipboardList className="h-3.5 w-3.5" /> Manage Service Catalogue
                   </button>
                 </div>
               )}
@@ -268,7 +268,7 @@ export function RepairsTab() {
             ) : (
               <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
                 <button
-                  onClick={() => router.push('/settings/services')}
+                  onClick={() => router.push('/repairs/service-catalogue')}
                   className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-brand-teal-light bg-brand-teal p-4 text-white hover:bg-brand-teal-dark transition-colors min-h-[100px]"
                 >
                   <Plus className="h-7 w-7" />
@@ -321,11 +321,11 @@ export function RepairsTab() {
             ) : (
               <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
                 <button
-                  onClick={() => router.push('/settings/services')}
+                  onClick={() => router.push('/repairs/service-catalogue')}
                   className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-brand-teal-light bg-brand-teal p-4 text-white hover:bg-brand-teal-dark transition-colors min-h-[130px]"
                 >
                   <Plus className="h-7 w-7" />
-                  <span className="text-sm font-medium">Add Device Issue</span>
+                  <span className="text-sm font-medium">Add Service</span>
                 </button>
                 {filteredRepairItems.map((prob: ServiceProblem) => {
                   const isSelected = selectedProblems.some(p => p.id === prob.id)
