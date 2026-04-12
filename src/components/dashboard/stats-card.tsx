@@ -12,25 +12,25 @@ interface StatsCardProps {
 }
 
 const COLOR_CLASSES = {
-  blue:   { icon: 'text-tertiary',      iconBg: 'bg-tertiary-container',      accent: 'bg-tertiary',      sub: 'text-tertiary' },
-  green:  { icon: 'text-primary-dim',   iconBg: 'bg-primary-container',       accent: 'bg-primary',       sub: 'text-primary-dim' },
-  yellow: { icon: 'text-secondary',     iconBg: 'bg-secondary-container',     accent: 'bg-secondary',     sub: 'text-secondary' },
-  red:    { icon: 'text-error',         iconBg: 'bg-error-container/30',      accent: 'bg-error',         sub: 'text-error' },
-  purple: { icon: 'text-secondary-dim', iconBg: 'bg-secondary-fixed-dim',     accent: 'bg-secondary-dim', sub: 'text-secondary-dim' },
+  blue:   { icon: 'text-[#1a5b99]', iconBg: 'bg-[#55b2ff]', accent: 'bg-[#155a94]', sub: 'text-[#1a5b99]' },
+  green:  { icon: 'text-[#16605a]', iconBg: 'bg-[#82ebd9]', accent: 'bg-[#0f7d73]', sub: 'text-[#0f7d73]' },
+  yellow: { icon: 'text-amber-800', iconBg: 'bg-amber-200',   accent: 'bg-amber-600', sub: 'text-amber-700' },
+  purple: { icon: 'text-[#595a6f]', iconBg: 'bg-[#dfe0fa]', accent: 'bg-[#474a62]', sub: 'text-[#474a62]' },
+  red:    { icon: 'text-[#ab1c1c]', iconBg: 'bg-[#fad1d2]', accent: 'bg-[#bd1818]', sub: 'text-[#bd1818]' },
 }
 
 export function StatsCard({ title, value, subtitle, icon, trend, color = 'blue', className }: StatsCardProps) {
   const colors = COLOR_CLASSES[color]
 
   return (
-    <div className={cn('relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-5 px-5 shadow-sm', className)}>
+    <div className={cn('relative flex h-full flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-5 px-5 shadow-sm', className)}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="min-h-[2rem] text-[11px] font-semibold uppercase leading-tight tracking-wider text-on-surface-variant">{title}</p>
-          <p className="text-3xl font-bold text-on-surface">{value}</p>
+          <p className="min-h-[1.5rem] text-[10px] font-bold uppercase leading-tight tracking-[0.05em] text-gray-700">{title}</p>
+          <p className="mt-1 text-[28px] font-bold tracking-tight text-gray-900 leading-none">{value}</p>
           {subtitle && (
             <p className={cn('mt-3 flex items-center gap-1 text-xs font-medium', colors.sub)}>
-              {trend !== undefined ? (
+              {trend !== undefined && (
                 <>
                   {trend > 0 ? (
                     <TrendingUp className="h-3 w-3" />
@@ -41,8 +41,6 @@ export function StatsCard({ title, value, subtitle, icon, trend, color = 'blue',
                   )}
                   <span>{Math.abs(trend)}%</span>
                 </>
-              ) : (
-                <TrendingUp className="h-3 w-3" />
               )}
               <span>{subtitle}</span>
             </p>
@@ -55,7 +53,7 @@ export function StatsCard({ title, value, subtitle, icon, trend, color = 'blue',
         )}
       </div>
       {/* Coloured bottom accent stripe */}
-      <div className={cn('absolute bottom-0 left-0 right-0 h-1', colors.accent)} />
+      <div className={cn('absolute bottom-0 left-0 right-0 h-2', colors.accent)} />
     </div>
   )
 }

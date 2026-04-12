@@ -10,6 +10,7 @@ interface BulkRow {
   selling_price?: string | number
   cost_price?: string | number
   description?: string
+  image_url?: string      // direct image URL (JPG/PNG/WebP)
   category?: string       // products: category name
   device_type?: string    // parts: device type (maps to category_id)
   brand?: string
@@ -64,17 +65,21 @@ async function bulkImport(req: NextRequest, ctx: RequestContext) {
   }
 
   // ── Prefetch all lookup tables in parallel ──────────────────────────────
-  const [catRes, brandRes, supplierRes, deviceRes] = await Promise.all([
+  // All queries scoped to this business — no cross-tenant data leakage.
+  const [catRes, brandRes, supplierRes, deviceRes, mfrRes] = await Promise.all([
     adminSupabase.from('categories').select('id, name').eq('business_id', ctx.businessId),
     adminSupabase.from('brands').select('id, name').eq('business_id', ctx.businessId),
     adminSupabase.from('suppliers').select('id, name').eq('business_id', ctx.businessId),
-    adminSupabase.from('service_devices').select('id, name'),
+    adminSupabase.from('service_devices').select('id, name').eq('business_id', ctx.businessId),
+    adminSupabase.from('service_manufacturers').select('id, name').eq('business_id', ctx.businessId),
   ])
 
   const catMap      = new Map((catRes.data ?? []).map((r) => [r.name.toLowerCase(), r.id]))
   const brandMap    = new Map((brandRes.data ?? []).map((r) => [r.name.toLowerCase(), r.id]))
   const supplierMap = new Map((supplierRes.data ?? []).map((r) => [r.name.toLowerCase(), r.id]))
   const deviceMap   = new Map((deviceRes.data ?? []).map((r) => [r.name.toLowerCase(), r.id]))
+  // Manufacturer map: used by model auto-create (service_devices requires manufacturer_id NOT NULL)
+  const mfrMap      = new Map((mfrRes.data ?? []).map((r) => [r.name.toLowerCase(), r.id]))
 
   // ── Auto-create Missing References ──────────────────────────────────────
   for (const r of rows) {
@@ -110,28 +115,66 @@ async function bulkImport(req: NextRequest, ctx: RequestContext) {
     }
 
     // 3. Model (service_devices)
+    // service_devices.manufacturer_id is NOT NULL, so we must ensure a manufacturer
+    // exists before inserting a device. We use a lookup-or-create pattern for both
+    // the manufacturer and the device to avoid UNIQUE constraint failures.
     const modelName = r.model?.trim()
     let modelId = modelName ? deviceMap.get(modelName.toLowerCase()) : null
 
-    if (isPart && modelName && !modelId) {
-      const { data, error } = await adminSupabase.from('service_devices')
-        .insert({ business_id: ctx.businessId, name: modelName, brand_id: brandId || null })
-        .select('id').single()
-      if (data) {
-        modelId = data.id
-        deviceMap.set(modelName.toLowerCase(), data.id)
-      } else if (error && error.code === '23502') { 
-        // Fallback if 'manufacturer_id' is NOT NULL constraint
-        const { data: mfg } = await adminSupabase.from('service_manufacturers')
-          .insert({ business_id: ctx.businessId, name: brandName || 'Unknown Manufacturer' })
-          .select('id').single()
-        if (mfg) {
-          const { data: retryData } = await adminSupabase.from('service_devices')
-            .insert({ business_id: ctx.businessId, name: modelName, brand_id: brandId || null, manufacturer_id: mfg.id })
-            .select('id').single()
-          if (retryData) {
-            modelId = retryData.id
-            deviceMap.set(modelName.toLowerCase(), retryData.id)
+    // Model applies to both products and parts — products like screen assemblies
+    // and cases are often linked to a specific device model.
+    if (modelName && !modelId) {
+      // Step A: Resolve manufacturer (maps to brand in the catalogue hierarchy)
+      const mfrName = brandName || 'Unknown'
+      let mfrId: string | null = mfrMap.get(mfrName.toLowerCase()) ?? null
+
+      if (!mfrId) {
+        // Not in cache — insert and cache
+        const { data: newMfr } = await adminSupabase
+          .from('service_manufacturers')
+          .insert({ business_id: ctx.businessId, name: mfrName })
+          .select('id')
+          .single()
+        if (newMfr) {
+          mfrId = newMfr.id
+          mfrMap.set(mfrName.toLowerCase(), newMfr.id)
+        } else {
+          // Race or UNIQUE conflict — fetch the existing row
+          const { data: existingMfr } = await adminSupabase
+            .from('service_manufacturers')
+            .select('id')
+            .eq('business_id', ctx.businessId)
+            .eq('name', mfrName)
+            .maybeSingle()
+          if (existingMfr) {
+            mfrId = existingMfr.id
+            mfrMap.set(mfrName.toLowerCase(), existingMfr.id)
+          }
+        }
+      }
+
+      // Step B: Resolve device (requires mfrId)
+      if (mfrId) {
+        const { data: newDevice } = await adminSupabase
+          .from('service_devices')
+          .insert({ business_id: ctx.businessId, name: modelName, manufacturer_id: mfrId, brand_id: brandId || null })
+          .select('id')
+          .single()
+        if (newDevice) {
+          modelId = newDevice.id
+          deviceMap.set(modelName.toLowerCase(), newDevice.id)
+        } else {
+          // Race or UNIQUE conflict — fetch the existing row
+          const { data: existingDevice } = await adminSupabase
+            .from('service_devices')
+            .select('id')
+            .eq('business_id', ctx.businessId)
+            .eq('manufacturer_id', mfrId)
+            .eq('name', modelName)
+            .maybeSingle()
+          if (existingDevice) {
+            modelId = existingDevice.id
+            deviceMap.set(modelName.toLowerCase(), existingDevice.id)
           }
         }
       }
@@ -173,6 +216,13 @@ async function bulkImport(req: NextRequest, ctx: RequestContext) {
       continue
     }
 
+    // Validate image_url if provided — accept only http/https URLs
+    const rawImageUrl = r.image_url?.trim() || null
+    if (rawImageUrl && !/^https?:\/\/.+/i.test(rawImageUrl)) {
+      errors.push({ row: rowNum, message: `image_url must be a valid http/https URL (got: ${rawImageUrl})` })
+      continue
+    }
+
     const record: Record<string, unknown> = {
       business_id:     ctx.businessId,
       name,
@@ -181,6 +231,7 @@ async function bulkImport(req: NextRequest, ctx: RequestContext) {
       selling_price:   sellingPrice,
       cost_price:      parseNum(r.cost_price) ?? 0,
       description:     r.description?.trim() || null,
+      image_url:       rawImageUrl,
       item_type,
       is_service:      false,
       track_inventory: true,
@@ -202,14 +253,14 @@ async function bulkImport(req: NextRequest, ctx: RequestContext) {
       record.supplier_id = supplierMap.get(r.supplier.trim().toLowerCase()) ?? null
     }
 
-    // Parts-specific
-    if (item_type === 'part') {
-      if (r.model?.trim()) {
-        record.model_id = deviceMap.get(r.model.trim().toLowerCase()) ?? null
-      }
-      if (r.part_type?.trim()) {
-        record.part_type = r.part_type.trim()
-      }
+    // Model applies to both products and parts
+    if (r.model?.trim()) {
+      record.model_id = deviceMap.get(r.model.trim().toLowerCase()) ?? null
+    }
+
+    // Part type is parts-only
+    if (item_type === 'part' && r.part_type?.trim()) {
+      record.part_type = r.part_type.trim()
     }
 
     const quantity      = parseNum(r.quantity) ?? 0

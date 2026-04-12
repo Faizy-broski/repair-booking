@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { ProductService } from '@/backend/services/product.service'
-import { ok, created, notFound, serverError } from '@/backend/utils/api-response'
+import { ok, created, notFound, forbidden, serverError } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
+import { PlanLimitService } from '@/backend/services/plan-limit.service'
 import { z } from 'zod'
 
 const createSchema = z.object({
@@ -103,6 +104,14 @@ export const ProductController = {
     const { data, error } = await validateBody(request, createSchema)
     if (error) return error
     try {
+      // Check plan limit: services count against max_services, products against max_products
+      const limitKey = data.is_service ? 'max_services' : 'max_products'
+      const limitCheck = await PlanLimitService.checkLimit(ctx.businessId, limitKey)
+      if (!limitCheck.allowed) {
+        const label = data.is_service ? 'service' : 'product'
+        return forbidden(`${label.charAt(0).toUpperCase() + label.slice(1)} limit reached. Your plan allows ${limitCheck.limit} ${label}s.`)
+      }
+
       const { initial_stock, low_stock_alert, branch_id, ...productData } = data
       const product = await ProductService.create({ ...productData, business_id: ctx.businessId } as any)
 

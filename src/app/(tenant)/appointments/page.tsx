@@ -54,6 +54,7 @@ export default function AppointmentsPage() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }))
   const [loading, setLoading] = useState(true)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -96,6 +97,10 @@ export default function AppointmentsPage() {
       body: JSON.stringify(payload),
     })
     if (res.ok) { reset(); setSheetOpen(false); fetchData() }
+    else {
+      const json = await res.json().catch(() => null)
+      setCreateError(json?.error?.message ?? 'Failed to create appointment.')
+    }
   }
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
@@ -203,8 +208,11 @@ export default function AppointmentsPage() {
         </div>
       </div>
 
-      <InlineFormSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Add Appointment">
+      <InlineFormSheet open={sheetOpen} onClose={() => { setSheetOpen(false); setCreateError(null) }} title="Add Appointment">
         <form onSubmit={handleSubmit(onCreate)} className="space-y-4">
+          {createError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{createError}</div>
+          )}
           <Input label="Title" placeholder="Repair Consultation" required error={errors.title?.message} {...register('title')} />
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Customer (optional)</label>

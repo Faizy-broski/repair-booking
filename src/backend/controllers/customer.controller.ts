@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { CustomerService } from '@/backend/services/customer.service'
-import { ok, created, notFound, serverError } from '@/backend/utils/api-response'
+import { ok, created, notFound, forbidden, serverError } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
+import { PlanLimitService } from '@/backend/services/plan-limit.service'
 import { z } from 'zod'
 
 const createSchema = z.object({
@@ -55,6 +56,11 @@ export const CustomerController = {
     const { data, error } = await validateBody(request, createSchema)
     if (error) return error
     try {
+      const limitCheck = await PlanLimitService.checkLimit(ctx.businessId, 'max_customers')
+      if (!limitCheck.allowed) {
+        return forbidden(`Customer limit reached. Your plan allows ${limitCheck.limit} customers.`)
+      }
+
       const customer = await CustomerService.create({
         ...data,
         business_id: ctx.businessId,

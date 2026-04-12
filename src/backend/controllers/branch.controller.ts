@@ -3,6 +3,7 @@ import { type RequestContext } from '@/backend/middleware'
 import { BranchService } from '@/backend/services/branch.service'
 import { ok, created, notFound, forbidden, serverError } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
+import { PlanLimitService } from '@/backend/services/plan-limit.service'
 import { z } from 'zod'
 
 const createSchema = z.object({
@@ -29,6 +30,11 @@ export const BranchController = {
     const { data, error } = await validateBody(request, createSchema)
     if (error) return error
     try {
+      const limitCheck = await PlanLimitService.checkLimit(ctx.businessId, 'max_branches')
+      if (!limitCheck.allowed) {
+        return forbidden(`Branch limit reached. Your plan allows ${limitCheck.limit} branch${limitCheck.limit === 1 ? '' : 'es'}.`)
+      }
+
       const branch = await BranchService.create({
         ...data,
         email: data.email || null,

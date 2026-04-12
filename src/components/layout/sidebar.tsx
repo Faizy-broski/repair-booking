@@ -60,12 +60,12 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Messages',         href: '/messages',                                icon: MessageSquare, requiredRole: 'cashier',        module: 'messages' },
   { label: 'Phone',            href: '/phone',                                   icon: Phone,         requiredRole: 'cashier',        module: 'phone' },
   { label: 'Google Reviews',   href: '/google-reviews',                          icon: Star,          requiredRole: 'branch_manager', module: 'google_reviews' },
-  { label: 'Notifications',    href: '/settings/notifications',                  icon: Bell,          requiredRole: 'branch_manager' },
-  { label: 'Templates',        href: '/settings/notifications',                  icon: Mail,          requiredRole: 'branch_manager', subItem: true },
-  { label: 'Email (SMTP)',     href: '/settings/notifications/email',            icon: Server,        requiredRole: 'branch_manager', subItem: true },
-  { label: 'SMS Gateway',      href: '/settings/notifications/sms',              icon: MessageSquare, requiredRole: 'branch_manager', subItem: true },
-  { label: 'Invoice Reminders',href: '/settings/notifications/reminders',        icon: Clock,         requiredRole: 'branch_manager', subItem: true },
-  { label: 'Delivery Logs',    href: '/settings/notifications/delivery-logs',    icon: Activity,      requiredRole: 'branch_manager', subItem: true },
+  { label: 'Notifications',    href: '/settings/notifications',                  icon: Bell,          requiredRole: 'branch_manager', module: 'notifications' },
+  { label: 'Templates',        href: '/settings/notifications',                  icon: Mail,          requiredRole: 'branch_manager', module: 'notifications', subItem: true },
+  { label: 'Email (SMTP)',     href: '/settings/notifications/email',            icon: Server,        requiredRole: 'branch_manager', module: 'notifications', subItem: true },
+  { label: 'SMS Gateway',      href: '/settings/notifications/sms',              icon: MessageSquare, requiredRole: 'branch_manager', module: 'notifications', subItem: true },
+  { label: 'Invoice Reminders',href: '/settings/notifications/reminders',        icon: Clock,         requiredRole: 'branch_manager', module: 'notifications', subItem: true },
+  { label: 'Delivery Logs',    href: '/settings/notifications/delivery-logs',    icon: Activity,      requiredRole: 'branch_manager', module: 'notifications', subItem: true },
   { label: 'Settings',         href: '/settings',                                icon: Settings,      requiredRole: 'branch_manager' },
   { label: 'Account',          href: '/account',                                 icon: CreditCard,    requiredRole: 'cashier' },
 ]
@@ -106,9 +106,11 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
     const supabase = createClient()
     await supabase.auth.signOut()
     clear()
-    invalidateConfigs()
-    router.push('/login')
-    router.refresh()
+    // Do NOT invalidateConfigs() here — clearing the persisted config cache causes
+    // sidebar skeletons on the very next login. Instead, keep the stale cache in
+    // localStorage; the next session's fetchConfigs() will detect the TTL has
+    // expired (or branchId changed) and silently refresh without showing skeletons.
+    window.location.replace('/login')
   }
 
   function toggleSection(href: string, e: React.MouseEvent) {
@@ -121,7 +123,10 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
     })
   }
 
-  const configsReady = configs !== null && !isLoading
+  // configsReady = we have data to show (may be slightly stale — that's fine,
+  // the store revalidates in background). Only false on the very first ever load
+  // when localStorage has no data at all (isLoading=true AND configs=null).
+  const configsReady = configs !== null
 
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (!hasAccess(profile?.role ?? 'cashier', item.requiredRole)) return false
@@ -185,8 +190,10 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-2 px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {/* Loading skeletons */}
-        {!configsReady && (
+        {/* Loading skeletons — only shown on the very first load when there is
+            no cached data in localStorage. On subsequent page loads the persisted
+            store supplies configs instantly and this block never renders. */}
+        {!configsReady && isLoading && (
           <div className="space-y-1 px-1">
             {Array.from({ length: 6 }).map((_, i) => (
               <div

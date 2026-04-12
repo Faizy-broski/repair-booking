@@ -29,6 +29,10 @@ export default function PhonePage() {
   const remoteAudioRef = useRef<HTMLAudioElement>(null)
   const channelRef = useRef<any>(null)
   const callTimerRef = useRef<NodeJS.Timeout | null>(null)
+  // Stores the SDP offer received from the caller so acceptCall() can feed it
+  // to the callee peer via peer.signal(). Without this the callee peer cannot
+  // generate an answer and the call hangs indefinitely.
+  const incomingOfferRef = useRef<any>(null)
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -56,6 +60,7 @@ export default function PhonePage() {
         if (payload.to !== activeBranch.id) return
 
         if (payload.type === 'offer') {
+          incomingOfferRef.current = payload.data   // must be fed to the callee peer in acceptCall()
           setCallerInfo({ branchId: payload.from, branchName: payload.fromName })
           setCallStatus('incoming')
         }
@@ -165,6 +170,14 @@ export default function PhonePage() {
 
       peer.on('error', () => endCall(true))
       peerRef.current = peer
+
+      // Feed the stored SDP offer to this peer so it can generate an answer.
+      // This MUST happen after peerRef.current is set so that any ICE candidates
+      // emitted synchronously during signal() are captured by the 'signal' handler above.
+      if (incomingOfferRef.current) {
+        peer.signal(incomingOfferRef.current)
+        incomingOfferRef.current = null
+      }
     } catch {
       rejectCall()
     }
@@ -192,6 +205,7 @@ export default function PhonePage() {
       })
     }
     if (peerRef.current) { peerRef.current.destroy(); peerRef.current = null }
+    incomingOfferRef.current = null
     if (localStreamRef.current) { localStreamRef.current.getTracks().forEach((t) => t.stop()); localStreamRef.current = null }
     if (callTimerRef.current) { clearInterval(callTimerRef.current); callTimerRef.current = null }
     setCallStatus('idle')

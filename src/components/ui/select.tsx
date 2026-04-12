@@ -22,10 +22,16 @@ interface SelectProps {
   required?: boolean
 }
 
+const EMPTY_OPTION_VALUE = '__select_empty_value__'
+
 export function Select({
   options, value, onValueChange, placeholder = 'Select...', label, error, disabled, className, required,
 }: SelectProps) {
   const id = label?.toLowerCase().replace(/\s+/g, '-')
+  const mappedOptions = options.map((option) => ({
+    ...option,
+    itemValue: option.value === '' ? EMPTY_OPTION_VALUE : option.value,
+  }))
 
   return (
     <div className="w-full">
@@ -35,7 +41,14 @@ export function Select({
           {required && <span className="ml-1 text-red-500">*</span>}
         </label>
       )}
-      <RadixSelect.Root value={value} onValueChange={onValueChange} disabled={disabled}>
+      <RadixSelect.Root
+        value={value || undefined}
+        onValueChange={(val) => {
+          if (!onValueChange) return
+          onValueChange(val === EMPTY_OPTION_VALUE ? '' : val)
+        }}
+        disabled={disabled}
+      >
         <RadixSelect.Trigger
           id={id}
           className={cn(
@@ -62,10 +75,10 @@ export function Select({
             className="z-50 max-h-60 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
           >
             <RadixSelect.Viewport className="p-1">
-              {options.filter((o) => o.value !== '').map((option) => (
+              {mappedOptions.map((option) => (
                 <RadixSelect.Item
-                  key={option.value}
-                  value={option.value}
+                  key={option.value || option.itemValue}
+                  value={option.itemValue}
                   disabled={option.disabled}
                   className="relative flex cursor-pointer select-none items-center rounded-md py-2 pl-8 pr-3 text-sm text-gray-700 outline-none hover:bg-gray-50 focus:bg-gray-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
                 >

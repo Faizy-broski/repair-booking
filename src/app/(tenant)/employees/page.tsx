@@ -70,6 +70,7 @@ export default function EmployeesPage() {
   const [commissions, setCommissions] = useState<CommissionRow[]>([])
   const [loading, setLoading] = useState(true)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
   const [shiftSheetOpen, setShiftSheetOpen] = useState(false)
   const [payrollSheetOpen, setPayrollSheetOpen] = useState(false)
   const [clockingEmployee, setClockinEmployee] = useState<string | null>(null)
@@ -108,12 +109,14 @@ export default function EmployeesPage() {
 
   async function onCreate(data: FormData) {
     if (!activeBranch) return
+    setCreateError(null)
     const res = await fetch('/api/employees', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, branch_id: activeBranch.id }),
     })
     if (res.ok) { reset(); setSheetOpen(false); fetchData() }
+    else { const j = await res.json(); setCreateError(j?.error?.message ?? 'Failed to create employee.') }
   }
 
   async function handleClock(employeeId: string, action: 'in' | 'out') {
@@ -338,8 +341,11 @@ export default function EmployeesPage() {
       </Tabs.Root>
 
       {/* ── Add Employee Sheet ── */}
-      <InlineFormSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Add Employee">
+      <InlineFormSheet open={sheetOpen} onClose={() => { setSheetOpen(false); setCreateError(null) }} title="Add Employee">
         <form onSubmit={handleSubmit(onCreate)} className="space-y-4">
+          {createError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{createError}</div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <Input label="First Name" required error={errors.first_name?.message} {...register('first_name')} />
             <Input label="Last Name" {...register('last_name')} />

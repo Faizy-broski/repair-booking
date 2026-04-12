@@ -11,7 +11,8 @@ const schema = z.object({
   price_yearly: z.coerce.number().min(0).optional(),
   max_branches: z.coerce.number().int().positive().optional(),
   max_users: z.coerce.number().int().positive().optional(),
-  features: z.record(z.string(), z.boolean()).optional(),
+  // DB column is JSONB array e.g. ["pos","repairs"]
+  features: z.array(z.string()).optional(),
   limits: z.record(z.string(), z.union([z.number(), z.boolean(), z.null()])).optional(),
   is_active: z.boolean().optional(),
   stripe_price_id_monthly: z.string().transform((v) => v || null).nullable().optional(),

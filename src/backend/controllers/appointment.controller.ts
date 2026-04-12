@@ -9,8 +9,9 @@ import {
 } from '@/backend/services/booking.service'
 import { NotificationEngine } from '@/backend/services/notification-engine.service'
 import { adminSupabase } from '@/backend/config/supabase'
-import { ok, created, notFound, serverError, badRequest } from '@/backend/utils/api-response'
+import { ok, created, notFound, serverError, badRequest, forbidden } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
+import { PlanLimitService } from '@/backend/services/plan-limit.service'
 import { z } from 'zod'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -86,6 +87,10 @@ export const AppointmentController = {
     const { data, error } = await validateBody(request, createSchema)
     if (error) return error
     try {
+      const limitCheck = await PlanLimitService.checkLimit(ctx.businessId, 'max_appointments_per_month')
+      if (!limitCheck.allowed) {
+        return forbidden(`Appointment limit reached. Your plan allows ${limitCheck.limit} appointments per month.`)
+      }
       const appt = await AppointmentService.create(data)
 
       // Fire notification if customer email is available

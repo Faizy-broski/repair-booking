@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { EmployeeService } from '@/backend/services/employee.service'
-import { ok, created, notFound, badRequest, serverError } from '@/backend/utils/api-response'
+import { ok, created, notFound, badRequest, serverError, forbidden } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
+import { PlanLimitService } from '@/backend/services/plan-limit.service'
 import { z } from 'zod'
 
 const createSchema = z.object({
@@ -53,6 +54,10 @@ export const EmployeeController = {
     const { data, error } = await validateBody(request, createSchema)
     if (error) return error
     try {
+      const limitCheck = await PlanLimitService.checkLimit(ctx.businessId, 'max_employees')
+      if (!limitCheck.allowed) {
+        return forbidden(`Employee limit reached. Your plan allows ${limitCheck.limit} employee${limitCheck.limit === 1 ? '' : 's'}.`)
+      }
       const employee = await EmployeeService.create({
         ...data,
         email: data.email || null,

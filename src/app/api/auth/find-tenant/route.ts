@@ -45,12 +45,18 @@ export async function POST(req: NextRequest) {
 
     const { data: business } = await adminSupabase
       .from('businesses')
-      .select('subdomain, is_suspended')
+      .select('subdomain, is_active, is_suspended')
       .eq('id', profile.business_id)
-      .single() as { data: { subdomain: string | null; is_suspended: boolean } | null; error: unknown }
+      .single() as { data: { subdomain: string | null; is_active: boolean; is_suspended: boolean } | null; error: unknown }
 
-    if (!business?.subdomain || business.is_suspended) {
+    if (!business?.subdomain) {
       return NextResponse.json({ subdomain: null })
+    }
+
+    // Return a dedicated flag so the login page can show a meaningful error
+    // rather than the generic "no account found" message.
+    if (!business.is_active || business.is_suspended) {
+      return NextResponse.json({ subdomain: null, suspended: true })
     }
 
     return NextResponse.json({ subdomain: business.subdomain })

@@ -1,11 +1,29 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { Search, ShieldAlert, ShieldCheck, ExternalLink } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/data-table'
+import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
 import { formatDate } from '@/lib/utils'
 import type { ColumnDef } from '@tanstack/react-table'
+import { MODULES } from '@/backend/config/constants'
+
+const MODULE_LABELS: Record<string, string> = {
+  pos:            'POS',
+  inventory:      'Inventory',
+  repairs:        'Repairs',
+  customers:      'Customers',
+  appointments:   'Appointments',
+  expenses:       'Expenses',
+  employees:      'Employees',
+  reports:        'Reports',
+  messages:       'Messages',
+  invoices:       'Invoices',
+  gift_cards:     'Gift Cards',
+  google_reviews: 'Google Reviews',
+  phone:          'Phone',
+}
 
 interface BusinessRow {
   id: string
@@ -14,8 +32,200 @@ interface BusinessRow {
   email: string | null
   is_active: boolean
   created_at: string
-  subscriptions?: Array<{ status: string; plans?: { name: string } | null }> | null
+  subscriptions?: Array<{ status: string; plans?: { name: string; features: string[] } | null }> | null
 }
+
+/** Shape returned by GET /api/admin/businesses/[id]/modules */
+interface ModuleSummaryRow {
+  module: string
+  is_enabled: boolean   // resolved (plan + overrides)
+  access: {
+    is_enabled: boolean
+    plan_override: boolean | null  // null = respect plan, true = force-grant, false = force-deny
+    template_name: string | null
+  } | null
+  has_override: boolean
+}
+
+// ── Override badge helpers ────────────────────────────────────────────────────
+
+function OverrideLabel({ override }: { override: boolean | null }) {
+  if (override === true)  return <span className="text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded">Force ON</span>
+  if (override === false) return <span className="text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded">Force OFF</span>
+  return <span className="text-[10px] text-gray-400">Plan default</span>
+}
+
+// ── Per-business module management sheet ─────────────────────────────────────
+
+function ModuleSheet({
+  business,
+  open,
+  onClose,
+}: {
+  business: BusinessRow | null
+  open: boolean
+  onClose: () => void
+}) {
+  const [rows, setRows] = useState<ModuleSummaryRow[]>([])
+  const [loadingModules, setLoadingModules] = useState(false)
+  const [saving, setSaving] = useState<string | null>(null)
+
+  const planFeatures: string[] = business?.subscriptions?.[0]?.plans?.features ?? []
+
+  const fetchModules = useCallback(async () => {
+    if (!business) return
+    setLoadingModules(true)
+    try {
+      const res = await fetch(`/api/admin/businesses/${business.id}/modules`)
+      const json = await res.json()
+      setRows(json.data ?? [])
+    } finally {
+      setLoadingModules(false)
+    }
+  }, [business])
+
+  useEffect(() => {
+    if (open && business) fetchModules()
+  }, [open, business, fetchModules])
+
+  async function setPlanOverride(module: string, value: boolean | null) {
+    if (!business) return
+    setSaving(module)
+    try {
+      await fetch(`/api/admin/businesses/${business.id}/modules/${module}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan_override: value }),
+      })
+      // Refresh
+      await fetchModules()
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  const planName = business?.subscriptions?.[0]?.plans?.name ?? 'No plan'
+  const subStatus = business?.subscriptions?.[0]?.status ?? null
+
+  return (
+    <InlineFormSheet
+      open={open}
+      onClose={onClose}
+      title={`Module Access — ${business?.name ?? ''}`}
+    >
+      <div className="space-y-4">
+        {/* Plan info header */}
+        <div className="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-800">{planName}</p>
+            <p className="text-xs text-gray-500">
+              {planFeatures.length} modules included in plan
+            </p>
+          </div>
+          {subStatus && (
+            <Badge variant={
+              subStatus === 'active' ? 'success' :
+              subStatus === 'trialing' ? 'warning' : 'destructive'
+            }>
+              {subStatus}
+            </Badge>
+          )}
+        </div>
+
+        <p className="text-xs text-gray-500 leading-relaxed">
+          <strong>Plan default</strong> respects the plan's module list.{' '}
+          <strong>Force ON</strong> grants a module even if not in the plan.{' '}
+          <strong>Force OFF</strong> blocks a module even if the plan includes it.
+        </p>
+
+        {loadingModules ? (
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-14 animate-pulse rounded-lg bg-gray-100" />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {[...MODULES].map((mod) => {
+              const row = rows.find((r) => r.module === mod)
+              const inPlan = planFeatures.includes(mod)
+              const override = row?.access?.plan_override ?? null
+              const resolvedEnabled = row?.is_enabled ?? false
+              const isSaving = saving === mod
+
+              return (
+                <div
+                  key={mod}
+                  className="flex items-center gap-3 rounded-lg border border-gray-100 bg-white px-4 py-3"
+                >
+                  {/* Status icon */}
+                  {resolvedEnabled
+                    ? <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />
+                    : <XCircle className="h-4 w-4 shrink-0 text-gray-300" />
+                  }
+
+                  {/* Module name + plan membership */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800">{MODULE_LABELS[mod] ?? mod}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      {inPlan
+                        ? <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">In plan</span>
+                        : <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">Not in plan</span>
+                      }
+                      <OverrideLabel override={override} />
+                    </div>
+                  </div>
+
+                  {/* Override controls */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      title="Force ON — grant regardless of plan"
+                      disabled={isSaving}
+                      onClick={() => setPlanOverride(mod, override === true ? null : true)}
+                      className={`flex h-7 w-7 items-center justify-center rounded-md border text-xs transition-colors disabled:opacity-50 ${
+                        override === true
+                          ? 'border-green-500 bg-green-500 text-white'
+                          : 'border-gray-200 bg-white text-gray-400 hover:border-green-400 hover:text-green-600'
+                      }`}
+                    >
+                      ✓
+                    </button>
+                    <button
+                      title="Plan default"
+                      disabled={isSaving}
+                      onClick={() => setPlanOverride(mod, null)}
+                      className={`flex h-7 w-7 items-center justify-center rounded-md border text-xs transition-colors disabled:opacity-50 ${
+                        override === null
+                          ? 'border-gray-400 bg-gray-100 text-gray-600'
+                          : 'border-gray-200 bg-white text-gray-300 hover:border-gray-400 hover:text-gray-500'
+                      }`}
+                    >
+                      <Minus className="h-3 w-3" />
+                    </button>
+                    <button
+                      title="Force OFF — deny regardless of plan"
+                      disabled={isSaving}
+                      onClick={() => setPlanOverride(mod, override === false ? null : false)}
+                      className={`flex h-7 w-7 items-center justify-center rounded-md border text-xs transition-colors disabled:opacity-50 ${
+                        override === false
+                          ? 'border-red-500 bg-red-500 text-white'
+                          : 'border-gray-200 bg-white text-gray-400 hover:border-red-400 hover:text-red-600'
+                      }`}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </InlineFormSheet>
+  )
+}
+
+// ── Main businesses page ──────────────────────────────────────────────────────
 
 export default function BusinessesPage() {
   const [businesses, setBusinesses] = useState<BusinessRow[]>([])
@@ -23,6 +233,7 @@ export default function BusinessesPage() {
   const [page, setPage] = useState(0)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [modulesBusiness, setModulesBusiness] = useState<BusinessRow | null>(null)
 
   useEffect(() => {
     async function fetch_() {
@@ -39,12 +250,23 @@ export default function BusinessesPage() {
   }, [page, search])
 
   async function toggleSuspend(biz: BusinessRow) {
+    const suspending = biz.is_active
+    // Always update BOTH fields atomically so middleware checks stay consistent:
+    //   is_active=false + is_suspended=true  → blocked
+    //   is_active=true  + is_suspended=false → allowed
     await fetch(`/api/businesses/${biz.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_active: !biz.is_active }),
+      body: JSON.stringify({
+        is_active:    !suspending,
+        is_suspended:  suspending,
+      }),
     })
-    setBusinesses((b) => b.map((x) => x.id === biz.id ? { ...x, is_active: !biz.is_active } : x))
+    setBusinesses((b) =>
+      b.map((x) =>
+        x.id === biz.id ? { ...x, is_active: !suspending } : x
+      )
+    )
   }
 
   const columns: ColumnDef<BusinessRow>[] = [
@@ -72,11 +294,17 @@ export default function BusinessesPage() {
         return sub ? (
           <div>
             <p className="text-sm text-gray-700">{sub.plans?.name ?? '—'}</p>
-            <Badge variant={sub.status === 'active' ? 'success' : sub.status === 'trialing' ? 'warning' : 'destructive'} className="text-[10px]">
+            <Badge
+              variant={
+                sub.status === 'active' ? 'success' :
+                sub.status === 'trialing' ? 'warning' : 'destructive'
+              }
+              className="text-[10px]"
+            >
               {sub.status}
             </Badge>
           </div>
-        ) : '—'
+        ) : <span className="text-gray-400 text-sm">—</span>
       },
     },
     {
@@ -98,6 +326,14 @@ export default function BusinessesPage() {
       header: '',
       cell: ({ row }) => (
         <div className="flex gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setModulesBusiness(row.original)}
+            title="Manage module access"
+          >
+            <Settings2 className="h-3.5 w-3.5 mr-1" /> Modules
+          </Button>
           <Button
             size="sm"
             variant="ghost"
@@ -144,6 +380,13 @@ export default function BusinessesPage() {
         pageSize={20}
         onPageChange={setPage}
         emptyMessage="No businesses found."
+      />
+
+      {/* Per-business module management sheet */}
+      <ModuleSheet
+        business={modulesBusiness}
+        open={modulesBusiness !== null}
+        onClose={() => setModulesBusiness(null)}
       />
     </div>
   )

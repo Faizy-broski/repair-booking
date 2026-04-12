@@ -7,7 +7,7 @@ import { Modal } from '@/components/ui/modal'
 import { DataTable } from '@/components/shared/data-table'
 import { Select } from '@/components/ui/select'
 import { useAuthStore } from '@/store/auth.store'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
 import type { ColumnDef } from '@tanstack/react-table'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
@@ -287,7 +287,7 @@ export default function InventoryPage() {
           { label: 'Purchase Orders', href: '/inventory/purchase-orders' },
           { label: 'Suppliers',       href: '/inventory/suppliers' },
           { label: 'Stock Count',     href: '/inventory/stock-count' },
-          { label: 'Special Orders',  href: '/inventory/special-orders' },
+          // { label: 'Special Orders',  href: '/inventory/special-orders' },
         ].map(({ label, href }) => (
           <Link
             key={href}
@@ -327,13 +327,13 @@ export default function InventoryPage() {
         {[
           {
             label: 'Stock Retail Value',
-            value: stats ? formatCurrency(stats.stockRetailValue) : '…',
+            value: stats ? formatCurrencyCompact(stats.stockRetailValue) : '…',
             icon: <Boxes className="h-4 w-4 text-blue-600" />,
             color: 'bg-blue-50',
           },
           {
             label: 'Stock Cost Value',
-            value: stats ? formatCurrency(stats.stockCostValue) : '…',
+            value: stats ? formatCurrencyCompact(stats.stockCostValue) : '…',
             icon: <Package className="h-4 w-4 text-indigo-600" />,
             color: 'bg-indigo-50',
           },

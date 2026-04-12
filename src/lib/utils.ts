@@ -20,7 +20,20 @@ function getBusinessCurrency(): string {
 
 export function formatCurrency(amount: number, currency?: string): string {
   const c = currency ?? getBusinessCurrency()
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: c }).format(amount)
+  const locale = c === 'USD' ? 'en-US' : 'en-GB'
+  return new Intl.NumberFormat(locale, { style: 'currency', currency: c }).format(amount)
+}
+
+export function formatCurrencyCompact(amount: number, currency?: string): string {
+  const c = currency ?? getBusinessCurrency()
+  const locale = c === 'USD' ? 'en-US' : 'en-GB'
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: c,
+    notation: 'compact',
+    compactDisplay: 'short',
+    maximumFractionDigits: Math.abs(amount) < 1000 ? 2 : 1,
+  }).format(amount)
 }
 
 export function formatDate(date: string | Date): string {

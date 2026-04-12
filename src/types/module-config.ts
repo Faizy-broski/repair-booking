@@ -109,6 +109,16 @@ export interface PhoneSettings {
   voicemail_greeting?: string
 }
 
+export interface NotificationsSettings {
+  email_enabled?: boolean
+  sms_enabled?: boolean
+  push_enabled?: boolean
+  notify_on_new_repair?: boolean
+  notify_on_status_change?: boolean
+  notify_on_payment?: boolean
+  notify_on_low_stock?: boolean
+}
+
 // ── Map: module name → settings type ─────────────────────────────────────────
 
 export interface ModuleSettingsMap {
@@ -125,6 +135,7 @@ export interface ModuleSettingsMap {
   gift_cards: GiftCardsSettings
   google_reviews: GoogleReviewsSettings
   phone: PhoneSettings
+  notifications: NotificationsSettings
 }
 
 // ── Resolved config (what the frontend receives from the API) ─────────────────

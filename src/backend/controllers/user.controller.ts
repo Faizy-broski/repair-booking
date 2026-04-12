@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { UserService } from '@/backend/services/user.service'
-import { ok, created, serverError } from '@/backend/utils/api-response'
+import { ok, created, forbidden, serverError } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
+import { PlanLimitService } from '@/backend/services/plan-limit.service'
 import { z } from 'zod'
 
 const createSchema = z.object({
@@ -35,6 +36,11 @@ export const UserController = {
     const { data, error } = await validateBody(request, createSchema)
     if (error) return error
     try {
+      const limitCheck = await PlanLimitService.checkLimit(ctx.businessId, 'max_users')
+      if (!limitCheck.allowed) {
+        return forbidden(`User limit reached. Your plan allows ${limitCheck.limit} user${limitCheck.limit === 1 ? '' : 's'}.`)
+      }
+
       const user = await UserService.create({
         ...data,
         business_id: ctx.businessId,

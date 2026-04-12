@@ -103,12 +103,17 @@ function LoginForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: data.email }),
       })
-      const json = await res.json() as { subdomain: string | null; isSuperAdmin?: boolean }
+      const json = await res.json() as { subdomain: string | null; isSuperAdmin?: boolean; suspended?: boolean }
 
       if (json.isSuperAdmin) {
         // Super admins authenticate on the admin subdomain via the shared /login page
         const params = new URLSearchParams({ redirectTo: '/superadmin/dashboard', email: data.email })
         window.location.href = `${buildSubdomainOrigin('admin')}/login?${params}`
+        return
+      }
+
+      if (json.suspended) {
+        setServerError('This business account has been suspended. Please contact support@repairbooking.co.uk.')
         return
       }
 
@@ -218,6 +223,20 @@ function LoginForm() {
           <p className="mb-5 text-sm text-on-surface-variant">Sign in to your account.</p>
         )}
 
+        {/* Account suspended */}
+        {errorParam === 'suspended' && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <p className="font-semibold">Account suspended</p>
+            <p className="mt-0.5 text-red-700">
+              This business account has been suspended. Please contact{' '}
+              <a href="mailto:support@repairbooking.co.uk" className="underline">
+                support@repairbooking.co.uk
+              </a>{' '}
+              to resolve this.
+            </p>
+          </div>
+        )}
+
         {/* Show cross-tenant error from middleware redirect */}
         {errorParam === 'wrong_tenant' && (
           <div className="rounded-lg border border-error-container/40 bg-error-container/15 px-4 py-3 text-sm text-on-error-container">
@@ -259,7 +278,12 @@ function LoginForm() {
             </div>
           )}
 
-          <Button type="submit" className="w-full" loading={isSubmitting}>
+          <Button
+            type="submit"
+            className="w-full"
+            loading={isSubmitting}
+            disabled={errorParam === 'suspended'}
+          >
             {onRoot ? 'Continue →' : 'Sign in'}
           </Button>
         </form>

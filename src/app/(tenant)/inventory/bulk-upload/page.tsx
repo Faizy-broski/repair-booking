@@ -30,8 +30,10 @@ const PRODUCT_COLUMNS = [
   { key: 'selling_price',  label: 'Selling Price',   required: true,  note: 'Must be ≥ 0' },
   { key: 'cost_price',     label: 'Cost Price',      required: false, note: 'Defaults to 0' },
   { key: 'description',    label: 'Description',     required: false, note: '' },
-  { key: 'category',       label: 'Category',        required: false, note: 'Must match existing device type name' },
-  { key: 'brand',          label: 'Brand',           required: false, note: 'Must match existing brand name' },
+  { key: 'image_url',      label: 'Image URL',       required: false, note: 'Public http/https URL to product image (JPG, PNG, WebP)' },
+  { key: 'category',       label: 'Category',        required: false, note: 'Device type — e.g. iPhone, Laptops. Auto-created if missing.' },
+  { key: 'brand',          label: 'Brand',           required: false, note: 'e.g. Apple, Samsung. Auto-created if missing.' },
+  { key: 'model',          label: 'Model',           required: false, note: 'e.g. iPhone 15 Pro. Auto-created if missing. Leave blank for generic products.' },
   { key: 'supplier',       label: 'Supplier',        required: false, note: 'Must match existing supplier name' },
   { key: 'quantity',       label: 'Quantity',        required: false, note: 'Starting stock (default: 0)' },
   { key: 'low_stock_alert',label: 'Low Stock Alert', required: false, note: 'Alert threshold (default: 5)' },
@@ -44,6 +46,7 @@ const PART_COLUMNS = [
   { key: 'selling_price',  label: 'Selling Price',   required: true,  note: 'Must be ≥ 0' },
   { key: 'cost_price',     label: 'Cost Price',      required: false, note: 'Defaults to 0' },
   { key: 'description',    label: 'Description',     required: false, note: '' },
+  { key: 'image_url',      label: 'Image URL',       required: false, note: 'Public http/https URL to part image (JPG, PNG, WebP)' },
   { key: 'device_type',    label: 'Device Type',     required: false, note: 'e.g. iPhone, Samsung — must match existing device type' },
   { key: 'brand',          label: 'Brand',           required: false, note: 'e.g. Apple, Samsung — must match existing brand' },
   { key: 'model',          label: 'Model',           required: false, note: 'e.g. iPhone 15 Pro — must match existing model' },
@@ -103,16 +106,88 @@ function parseCSV(text: string): { headers: string[]; rows: ParsedRow[] } {
 
 // ── Template Download ─────────────────────────────────────────────────────────
 
+const PRODUCT_SAMPLE_ROWS = [
+  // name, sku, barcode, selling_price, cost_price, description, image_url, category, brand, model, supplier, quantity, low_stock_alert
+  [
+    'iPhone 15 Pro Screen Assembly', 'SKU-PRD-001', '8901234567890', '89.99', '42.00',
+    'Original OLED screen assembly with frame for iPhone 15 Pro',
+    'https://images.pexels.com/photos/699122/pexels-photo-699122.jpeg',
+    'Phones', 'Apple', 'iPhone 15 Pro', 'TechParts Ltd', '15', '3',
+  ],
+  [
+    'Samsung Galaxy S24 Screen', 'SKU-PRD-002', '8901234567891', '79.99', '35.00',
+    'Genuine AMOLED display replacement for Samsung S24',
+    'https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg',
+    'Phones', 'Samsung', 'Galaxy S24', 'TechParts Ltd', '10', '2',
+  ],
+  [
+    'Universal USB-C Charging Cable 2m', 'SKU-PRD-003', '8901234567892', '14.99', '4.50',
+    '2m braided USB-C to USB-C fast charging cable 65W',
+    'https://images.pexels.com/photos/4195342/pexels-photo-4195342.jpeg',
+    'Accessories', 'Generic', '', 'Accessories Hub', '50', '10',
+  ],
+  [
+    '9H Tempered Glass Screen Protector', 'SKU-PRD-004', '8901234567893', '9.99', '2.00',
+    'Anti-scratch 9H hardness tempered glass screen protector universal fit',
+    'https://images.pexels.com/photos/1092671/pexels-photo-1092671.jpeg',
+    'Accessories', 'Generic', '', 'Accessories Hub', '100', '20',
+  ],
+  [
+    'iPhone 14 Silicone Case', 'SKU-PRD-005', '8901234567894', '19.99', '6.00',
+    'Official Apple silicone case for iPhone 14 — Midnight colour',
+    'https://images.pexels.com/photos/3825586/pexels-photo-3825586.jpeg',
+    'Cases', 'Apple', 'iPhone 14', 'Cases & More', '30', '5',
+  ],
+]
+
+const PART_SAMPLE_ROWS = [
+  // name, sku, barcode, selling_price, cost_price, description, image_url, device_type, brand, model, part_type, supplier, quantity, low_stock_alert
+  [
+    'iPhone 15 Pro OLED Screen', 'SKU-PRT-001', '', '45.00', '20.00',
+    'OEM OLED LCD panel with digitizer for iPhone 15 Pro',
+    'https://images.pexels.com/photos/699122/pexels-photo-699122.jpeg',
+    'iPhone', 'Apple', 'iPhone 15 Pro', 'Screen', 'Parts Supplier', '8', '2',
+  ],
+  [
+    'Samsung S24 Battery 4000mAh', 'SKU-PRT-002', '', '22.00', '9.00',
+    'Original capacity 4000mAh Li-ion replacement battery for Galaxy S24',
+    'https://images.pexels.com/photos/1092671/pexels-photo-1092671.jpeg',
+    'Samsung', 'Samsung', 'Galaxy S24', 'Battery', 'Parts Supplier', '12', '3',
+  ],
+  [
+    'MacBook Pro 14 Keyboard UK', 'SKU-PRT-003', '', '89.00', '38.00',
+    'UK layout backlit replacement keyboard for MacBook Pro 14-inch M3',
+    'https://images.pexels.com/photos/3825586/pexels-photo-3825586.jpeg',
+    'Laptops', 'Apple', 'MacBook Pro 14', 'Keyboard', 'Laptop Parts Co', '5', '1',
+  ],
+  [
+    'iPad Pro 12.9 Touch Digitizer', 'SKU-PRT-004', '', '65.00', '28.00',
+    'Front glass touch digitizer panel for iPad Pro 12.9 inch 6th Gen',
+    'https://images.pexels.com/photos/4195342/pexels-photo-4195342.jpeg',
+    'Tablets', 'Apple', 'iPad Pro 12.9', 'Digitizer', 'Parts Supplier', '6', '2',
+  ],
+  [
+    'iPhone 15 USB-C Charging Port', 'SKU-PRT-005', '', '18.00', '7.50',
+    'USB-C charging port flex cable assembly for iPhone 15 and 15 Plus',
+    'https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg',
+    'iPhone', 'Apple', 'iPhone 15', 'Charging Port', 'Parts Supplier', '20', '5',
+  ],
+]
+
+function csvRow(cells: string[]): string {
+  return cells.map((c) => (c.includes(',') || c.includes('"') ? `"${c.replace(/"/g, '""')}"` : c)).join(',')
+}
+
 function downloadTemplate(itemType: ItemType) {
-  const cols  = itemType === 'product' ? PRODUCT_COLUMNS : PART_COLUMNS
-  const header = cols.map((c) => c.key).join(',')
+  const cols    = itemType === 'product' ? PRODUCT_COLUMNS : PART_COLUMNS
+  const samples = itemType === 'product' ? PRODUCT_SAMPLE_ROWS : PART_SAMPLE_ROWS
 
-  const sampleProduct = itemType === 'product'
-    ? 'Sample iPhone Screen,SKU-001,,49.99,22.00,Genuine OEM screen,iPhone,Apple,Main Supplier,10,3'
-    : 'Screen LCD,SKU-P001,,45.00,20.00,OEM LCD panel,iPhone,Apple,iPhone 15 Pro,Screen,Parts Supplier,5,2'
+  const lines = [
+    cols.map((c) => c.key).join(','),
+    ...samples.map(csvRow),
+  ]
 
-  const csv  = [header, sampleProduct].join('\n')
-  const blob = new Blob([csv], { type: 'text/csv' })
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' })
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
   a.href     = url

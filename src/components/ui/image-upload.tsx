@@ -68,6 +68,9 @@ export function ImageUpload({ value, onChange, label, compact = false, className
       if (!/^https?:\/\//i.test(trimmed) && !trimmed.startsWith('/') && !trimmed.startsWith('data:') && !trimmed.startsWith('blob:')) {
         trimmed = 'https://' + trimmed
       }
+      if (trimmed.toLowerCase().startsWith('http://')) {
+        trimmed = trimmed.replace(/^http:\/\//i, 'https://')
+      }
       onChange(trimmed)
       setError(null)
     }
@@ -102,11 +105,11 @@ export function ImageUpload({ value, onChange, label, compact = false, className
           {uploading ? (
             <Loader2 className="absolute inset-0 m-auto h-4 w-4 animate-spin text-brand-teal" />
           ) : value ? (
-            <img 
-              src={value} 
-              alt="Preview" 
-              referrerPolicy="no-referrer"
-              className="h-full w-full object-cover" 
+            <img
+              key={value}
+              src={value}
+              alt="Preview"
+              className="h-full w-full object-cover"
               onError={() => setError('Image URL could not be loaded')}
               onLoad={() => setError(null)}
             />
@@ -159,9 +162,9 @@ export function ImageUpload({ value, onChange, label, compact = false, className
           {value ? (
             <>
               <img
+                key={value}
                 src={value}
                 alt="Preview"
-                referrerPolicy="no-referrer"
                 className="h-20 w-20 rounded-lg border border-gray-200 object-contain bg-white"
                 onError={() => setError('Image URL could not be loaded')}
                 onLoad={() => setError(null)}

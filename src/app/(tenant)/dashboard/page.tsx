@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { DollarSign, Wrench, ShoppingCart, TrendingUp, AlertTriangle, Clock, Package } from 'lucide-react'
 import { StatsCard } from '@/components/dashboard/stats-card'
 import { useAuthStore } from '@/store/auth.store'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
@@ -126,18 +126,18 @@ export default function DashboardPage() {
 
       {/* ── Stats Grid (6 cards) ── */}
       {loading && (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-24 animate-pulse rounded-xl bg-surface-container" />
+            <div key={i} className="h-32 animate-pulse rounded-xl bg-surface-container" />
           ))}
         </div>
       )}
 
       {stats && (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
           <StatsCard
             title="Total Sales"
-            value={formatCurrency(stats.total_sales)}
+            value={formatCurrencyCompact(stats.total_sales)}
             subtitle="this month"
             icon={<DollarSign className="h-5 w-5" />}
             color="green"
@@ -164,7 +164,7 @@ export default function DashboardPage() {
           />
           <StatsCard
             title="Total Expenses"
-            value={formatCurrency(stats.total_expenses)}
+            value={formatCurrencyCompact(stats.total_expenses)}
             subtitle="this month"
             icon={<TrendingUp className="h-5 w-5" />}
             color="red"

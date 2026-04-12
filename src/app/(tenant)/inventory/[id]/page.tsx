@@ -115,10 +115,25 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     fetch('/api/part-types').then(r => r.json()).then(j => setAllPartTypes(j.data ?? [])).catch(() => {})
   }, [])
 
-  // Filtered lists based on hierarchy
-  const brands = categoryId ? allBrands.filter(b => b.category_id === categoryId) : allBrands
-  const devices = brandId ? allDevices.filter(d => d.brand_id === brandId) : allDevices
-  const partTypesForModel = modelId ? allPartTypes.filter(p => p.device_id === modelId) : allPartTypes
+  // Filtered lists based on hierarchy.
+  // Always include the currently-selected item even if it doesn't pass the filter —
+  // brands/devices may have been created without a category/brand link (category_id=null),
+  // and the part_types table may not have a row for the free-text value stored on the product.
+  const brands = categoryId
+    ? allBrands.filter(b => b.id === brandId || b.category_id === categoryId || !b.category_id)
+    : allBrands
+
+  const devices = brandId
+    ? allDevices.filter(d => d.id === modelId || d.brand_id === brandId || !d.brand_id)
+    : allDevices
+
+  // part_types rows filtered by model; if the saved text isn't in the table yet,
+  // inject it as a synthetic option so the Select shows the correct value.
+  const dbPartTypes = modelId ? allPartTypes.filter(p => p.device_id === modelId) : allPartTypes
+  const partTypeOptions = [...dbPartTypes.map(p => ({ value: p.name, label: p.name }))]
+  if (partType && !partTypeOptions.find(o => o.value === partType)) {
+    partTypeOptions.unshift({ value: partType, label: partType })
+  }
 
   async function handleAddCategory() {
     if (!newCategoryName.trim()) return
@@ -318,7 +333,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 {itemType === 'part' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Part Type</label>
-                    <Select options={[{ value: '', label: 'Select part type...' }, ...partTypesForModel.map(p => ({ value: p.name, label: p.name }))]} value={partType} onValueChange={setPartType} />
+                    <Select options={[{ value: '', label: 'Select part type...' }, ...partTypeOptions]} value={partType} onValueChange={setPartType} />
                   </div>
                 )}
               </div>

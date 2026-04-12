@@ -8,7 +8,7 @@ import { DataTable } from '@/components/shared/data-table'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
 import { KanbanBoard } from '@/components/repairs/kanban-board'
 import { useAuthStore } from '@/store/auth.store'
-import { formatCurrency, formatDateTime } from '@/lib/utils'
+import { formatCurrency, formatCurrencyCompact, formatDateTime } from '@/lib/utils'
 import { Select } from '@/components/ui/select'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
@@ -251,7 +251,7 @@ export default function RepairsPage() {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Revenue</p>
-                <p className="mt-2 text-3xl font-bold text-on-surface">{formatCurrency(repairStats.total_sales)}</p>
+                <p className="mt-2 text-3xl font-bold text-on-surface">{formatCurrencyCompact(repairStats.total_sales)}</p>
               </div>
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-tertiary-container/40">
                 <DollarSign className="h-5 w-5 text-tertiary" />

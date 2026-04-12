@@ -35,6 +35,7 @@ export const MODULES = [
   'gift_cards',
   'google_reviews',
   'phone',
+  'notifications',
 ] as const
 
 export type Module = (typeof MODULES)[number]

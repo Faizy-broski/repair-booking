@@ -23,7 +23,7 @@ export const DashboardController = {
         // Open repairs
         adminSupabase
           .from('repairs')
-          .select('id, status, created_at')
+          .select('id, status, created_at, is_rush')
           .eq('branch_id', branchId)
           .not('status', 'in', '("collected","unrepairable")'),
 
@@ -43,7 +43,7 @@ export const DashboardController = {
         // Recent repair tickets (last 20)
         adminSupabase
           .from('repairs')
-          .select('id, job_number, device_brand, device_model, issue, status, created_at, customers(full_name)')
+          .select('id, job_number, device_brand, device_model, issue, status, created_at, is_rush, customers(first_name,last_name)')
           .eq('branch_id', branchId)
           .order('created_at', { ascending: false })
           .limit(20),
@@ -61,15 +61,19 @@ export const DashboardController = {
       const repairs = repairsRes.data ?? []
       const expenses = expensesRes.data ?? []
       const inventory = inventoryRes.data ?? []
-      const recentRepairs = (recentRepairsRes.data ?? []).map((r) => ({
-        id: r.id,
-        job_number: r.job_number,
-        device: [r.device_brand, r.device_model].filter(Boolean).join(' ') || 'Unknown Device',
-        issue: r.issue,
-        status: r.status,
-        created_at: r.created_at,
-        customer_name: (r.customers as { full_name: string } | null)?.full_name ?? 'Walk-in',
-      }))
+      const recentRepairs = (recentRepairsRes.data ?? []).map((r) => {
+        const customer = r.customers as { first_name: string; last_name?: string } | null
+        const customerName = customer ? [customer.first_name, customer.last_name].filter(Boolean).join(' ') : null
+        return {
+          id: r.id,
+          job_number: r.job_number,
+          device: [r.device_brand, r.device_model].filter(Boolean).join(' ') || 'Unknown Device',
+          issue: r.issue,
+          status: r.status,
+          created_at: r.created_at,
+          customer_name: customerName ?? 'Walk-in',
+        }
+      })
 
       const recentActivity = (activityRes.data ?? []).map((a) => {
         const r = a.repairs as { id: string; job_number: string; device_brand: string; device_model: string } | null
@@ -90,11 +94,11 @@ export const DashboardController = {
         (i) => i.quantity <= (i.low_stock_alert ?? 5)
       ).length
 
-      // Urgent = active repairs sitting for more than 3 days
+      // Urgent = active rush jobs OR active repairs sitting for more than 3 days
       const urgentCutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
       const repairsUrgent = repairs.filter(
         (r) => !['repaired', 'collected', 'unrepairable'].includes(r.status) &&
-          (r.created_at ?? '') < urgentCutoff
+          ((r as any).is_rush || (r.created_at ?? '') < urgentCutoff)
       ).length
 
       const stats = {

@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { CustomFieldService } from '@/backend/services/custom-field.service'
-import { ok, created, serverError } from '@/backend/utils/api-response'
+import { ok, created, serverError, forbidden } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
+import { PlanLimitService } from '@/backend/services/plan-limit.service'
 import { MODULES } from '@/backend/config/constants'
 import { z } from 'zod'
 
@@ -39,6 +40,10 @@ export const CustomFieldController = {
     const { data, error } = await validateBody(request, createSchema)
     if (error) return error
     try {
+      const limitCheck = await PlanLimitService.checkLimit(ctx.businessId, 'max_custom_fields')
+      if (!limitCheck.allowed) {
+        return forbidden(`Custom field limit reached. Your plan allows ${limitCheck.limit} custom field${limitCheck.limit === 1 ? '' : 's'}.`)
+      }
       const field = await CustomFieldService.create({
         ...data,
         business_id: ctx.businessId,

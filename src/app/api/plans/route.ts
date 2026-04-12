@@ -11,7 +11,8 @@ const schema = z.object({
   price_yearly: z.coerce.number().min(0).optional().default(0),
   max_branches: z.coerce.number().int().positive(),
   max_users: z.coerce.number().int().positive(),
-  features: z.record(z.string(), z.boolean()).default({}),
+  // DB column is JSONB array e.g. ["pos","repairs"] — the DB function uses @> operator to check membership
+  features: z.array(z.string()).default([]),
   limits: z.record(z.string(), z.union([z.number(), z.boolean(), z.null()])).default({}),
   stripe_price_id_monthly: z.string().transform((v) => v || null).nullable().optional(),
   stripe_price_id_yearly:  z.string().transform((v) => v || null).nullable().optional(),
@@ -42,14 +43,20 @@ async function createHandler(request: NextRequest, ctx: RequestContext) {
 }
 
 // GET is public — needed by the registration page to display plan options
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = createAdminClient()
   try {
-    const { data, error } = await supabase
+    const isAdminRequest = request.nextUrl.searchParams.get('all') === 'true'
+    const query = supabase
       .from('plans')
-      .select('id, name, price_monthly, max_branches, max_users, features, stripe_price_id_monthly, plan_type')
-      .eq('is_active', true)
+      .select('id, name, price_monthly, price_yearly, max_branches, max_users, features, limits, is_active, stripe_price_id_monthly, plan_type')
       .order('price_monthly', { ascending: true })
+
+    if (!isAdminRequest) {
+      query.eq('is_active', true)
+    }
+
+    const { data, error } = await query
     if (error) throw error
     return ok(data)
   } catch (err) {

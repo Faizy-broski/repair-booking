@@ -52,6 +52,7 @@ export default function SettingsPage() {
   const [savedBusiness, setSavedBusiness] = useState(false)
   const [editBranchId, setEditBranchId] = useState<string | null>(null)
   const [showNewBranchForm, setShowNewBranchForm] = useState(false)
+  const [branchCreateError, setBranchCreateError] = useState<string | null>(null)
   // Catalogue — Device Type → Brand → Model → Part Types
   interface CatBrand    { id: string; name: string; category_id: string | null; image_url?: string | null }
   interface CatModel    { id: string; name: string; brand_id: string | null; manufacturer_id: string | null; image_url?: string | null }
@@ -246,6 +247,7 @@ export default function SettingsPage() {
     refreshBranches()
   }
   async function onCreateBranch(data: BranchFormData) {
+    setBranchCreateError(null)
     const res = await fetch('/api/settings/branches', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -255,15 +257,21 @@ export default function SettingsPage() {
       newBranchForm.reset()
       setShowNewBranchForm(false)
       refreshBranches()
+    } else {
+      const json = await res.json()
+      setBranchCreateError(json?.error?.message ?? 'Failed to create branch.')
     }
   }
+  const [userCreateError, setUserCreateError] = useState<string | null>(null)
   async function onCreateUser(data: UserCreateFormData) {
+    setUserCreateError(null)
     const res = await fetch('/api/users/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
     if (res.ok) { userForm.reset(); const json = await res.json(); setUsers((u) => [...u, json.data]) }
+    else { const j = await res.json(); setUserCreateError(j?.error?.message ?? 'Failed to create user.') }
   }
   function startEditBranch(branch: Branch) {
     setEditBranchId(branch.id)
@@ -362,7 +370,7 @@ export default function SettingsPage() {
           <div className="rounded-xl border border-gray-200 bg-white">
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
               <h3 className="font-semibold text-gray-900">Branches</h3>
-              <Button size="sm" onClick={() => { setShowNewBranchForm(true); newBranchForm.reset() }}>
+              <Button size="sm" onClick={() => { setShowNewBranchForm(true); setBranchCreateError(null); newBranchForm.reset() }}>
                 <Plus className="h-4 w-4" /> Add Branch
               </Button>
             </div>
@@ -370,6 +378,11 @@ export default function SettingsPage() {
             {showNewBranchForm && (
               <div className="border-b border-gray-100 bg-blue-50/40 px-4 py-4">
                 <p className="mb-3 text-sm font-semibold text-gray-700">New Branch</p>
+                {branchCreateError && (
+                  <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {branchCreateError}
+                  </div>
+                )}
                 <form onSubmit={newBranchForm.handleSubmit(onCreateBranch)} className="space-y-3">
                   <ImageUpload label="Branch Logo" value={newBranchForm.watch('logo_url') || ''} onChange={(url) => newBranchForm.setValue('logo_url', url)} />
                   <div className="grid grid-cols-2 gap-3">
@@ -380,7 +393,7 @@ export default function SettingsPage() {
                   <Input label="Email" type="email" {...newBranchForm.register('email')} />
                   <div className="flex gap-2">
                     <Button type="submit" size="sm" loading={newBranchForm.formState.isSubmitting}>Create Branch</Button>
-                    <Button type="button" size="sm" variant="outline" onClick={() => setShowNewBranchForm(false)}>Cancel</Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => { setShowNewBranchForm(false); setBranchCreateError(null) }}>Cancel</Button>
                   </div>
                 </form>
               </div>
@@ -446,6 +459,9 @@ export default function SettingsPage() {
           </div>
           <div className="rounded-xl border border-gray-200 bg-white p-6">
             <h3 className="mb-4 font-semibold text-gray-900">Create Team Member Account</h3>
+            {userCreateError && (
+              <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{userCreateError}</div>
+            )}
             <form onSubmit={userForm.handleSubmit(onCreateUser)} className="space-y-3 max-w-md">
               <Input label="Full Name" required {...userForm.register('full_name')} />
               <Input label="Email" type="email" required {...userForm.register('email')} />

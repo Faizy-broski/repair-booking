@@ -12,23 +12,56 @@ import type { SubscriptionStatus } from '@/store/auth.store'
 export default function TenantLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
-  const { setProfile, setBranches, setActiveBranch, setLoading, setCurrency, setSubscriptionStatus, clear, profile: cachedProfile, activeBranch: storedActiveBranch } = useAuthStore()
-  const { fetchConfigs, invalidate: invalidateConfigs } = useModuleConfigStore()
+
+  // Gates the protected layout render.
+  // Set to true as soon as Supabase confirms a live session (~100ms JWT check).
+  // Everything else (profile, branches, configs, subscription) loads in background
+  // and populates the persisted stores — sidebar and pages update automatically.
+  const [sessionVerified, setSessionVerified] = useState(false)
+
+  const {
+    setProfile, setBranches, setActiveBranch, setLoading,
+    setCurrency, setSubscriptionStatus, clear,
+    profile: cachedProfile, activeBranch: storedActiveBranch,
+  } = useAuthStore()
+  const { fetchConfigs } = useModuleConfigStore()
 
   useEffect(() => {
     async function loadSession() {
       const supabase = createClient()
 
+      // ── Step 1: Verify live session ──────────────────────────────────────
+      // getUser() validates the JWT against Supabase Auth.
+      // For valid, non-expired tokens this is a local decode (~0ms).
+      // For expired tokens it refreshes via the network (~200ms).
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
 
-      // If cached profile belongs to a different user, wipe stale data immediately
-      if (cachedProfile && cachedProfile.id !== user.id) {
+      if (!user) {
+        // No session — wipe auth store data and redirect.
+        // This is the Back-after-logout guard: cached page renders → useEffect
+        // fires → getUser() returns null → immediate redirect to login.
+        // We intentionally do NOT call invalidateConfigs() here so that the
+        // persisted module config cache survives for the next login — avoiding
+        // sidebar skeletons when the same user (or any user) logs in again.
         clear()
-        invalidateConfigs()
+        window.location.replace('/login')
+        return
       }
 
-      // Load profile
+      // ── Session confirmed ────────────────────────────────────────────────
+      // Unlock the layout immediately so the user sees the UI with whatever
+      // is already in the persisted stores (profile, branches, configs).
+      // All remaining DB queries run in the background and update stores
+      // reactively — no additional loading states are imposed.
+      setSessionVerified(true)
+
+      // ── Step 2: Load profile (background) ───────────────────────────────
+      if (cachedProfile && cachedProfile.id !== user.id) {
+        // Different user logged in on same device — wipe auth store but keep
+        // the config cache (TTL + branchId check in fetchConfigs will refresh it)
+        clear()
+      }
+
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
@@ -38,12 +71,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
       const profile = profileData as Profile | null
       if (!profile) return
 
-      // ── Cross-tenant guard (defence-in-depth) ────────────────────────
-      // Verify the loaded profile belongs to the current subdomain's
-      // business.  Catches edge cases where middleware was bypassed
-      // (client-side nav, cached pages, etc.).
-      // Uses .maybeSingle() to avoid 406 errors when RLS hides the row.
-      // Only enforces when we *positively* find a mismatched business.
+      // ── Step 3: Cross-tenant guard (defence-in-depth) ───────────────────
       const subdomain = getSubdomain(window.location.hostname)
       if (subdomain && profile.business_id) {
         const { data: subBiz, error: bizError } = await supabase
@@ -55,7 +83,6 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
         if (!bizError && subBiz && subBiz.id !== profile.business_id) {
           await supabase.auth.signOut()
           clear()
-          invalidateConfigs()
           window.location.replace('/login?error=wrong_tenant')
           return
         }
@@ -63,7 +90,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
 
       setProfile(profile)
 
-      // Load business currency
+      // ── Step 4: Business currency (fire-and-forget) ──────────────────────
       if (profile.business_id) {
         supabase
           .from('businesses')
@@ -73,7 +100,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
           .then(({ data }) => { if (data?.currency) setCurrency(data.currency) })
       }
 
-      // Load branches for this business
+      // ── Step 5: Branches ─────────────────────────────────────────────────
       if (profile.business_id) {
         const { data: branchData } = await supabase
           .from('branches')
@@ -84,16 +111,14 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
 
         const branches = branchData as Branch[] | null
 
-        if (branches && branchData) {
+        if (branches?.length) {
           setBranches(branches)
 
-          // If staff, set their specific branch; if owner, default to main branch
           let resolvedBranch: Branch | null = null
           if (profile.branch_id) {
             resolvedBranch = branches.find((b) => b.id === profile.branch_id) ?? null
             if (resolvedBranch) setActiveBranch(resolvedBranch)
-          } else if (branches.length > 0) {
-            // Owner: keep their previously selected branch if still valid, else default to main
+          } else {
             const preferred = storedActiveBranch
               ? branches.find((b) => b.id === storedActiveBranch.id) ?? branches[0]
               : branches[0]
@@ -101,14 +126,15 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
             setActiveBranch(resolvedBranch)
           }
 
-          // Refresh module configs in background (won't flash if already cached)
+          // fetchConfigs uses TTL-based cache: if the same branch's data is
+          // fresh (< 5 min) it returns immediately without hitting the network.
           if (resolvedBranch) {
             fetchConfigs(resolvedBranch.id)
           }
         }
       }
 
-      // Load subscription status
+      // ── Step 6: Subscription status (fire-and-forget) ────────────────────
       if (profile.business_id) {
         supabase
           .from('subscriptions')
@@ -141,6 +167,18 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
     loadSession()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // ── Session gate ─────────────────────────────────────────────────────────────
+  // A minimal spinner shown only for the duration of the JWT check (~100ms for
+  // valid sessions, ~200ms if token needs refreshing). It prevents the Back-
+  // after-logout exploit while keeping the delay imperceptible for normal use.
+  if (!sessionVerified) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-surface-container-low">
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-brand-teal border-t-transparent" />
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface-container-low">

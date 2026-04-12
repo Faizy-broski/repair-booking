@@ -24,6 +24,7 @@ export default function NewProductPage() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [saveAndNew, setSaveAndNew] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const [categories, setCategories] = useState<Category[]>([])
   const [allBrands, setAllBrands] = useState<Brand[]>([])
@@ -37,6 +38,8 @@ export default function NewProductPage() {
   const [newBrandName, setNewBrandName] = useState('')
   const [addingDevice, setAddingDevice] = useState(false)
   const [newDeviceName, setNewDeviceName] = useState('')
+  const [addingSupplier, setAddingSupplier] = useState(false)
+  const [newSupplierName, setNewSupplierName] = useState('')
 
   const [itemType, setItemType] = useState<ItemType>('product')
   const [name, setName] = useState('')
@@ -137,10 +140,27 @@ export default function NewProductPage() {
     }
   }
 
+  async function handleAddSupplier() {
+    if (!newSupplierName.trim()) return
+    const res = await fetch('/api/suppliers', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newSupplierName.trim() }),
+    })
+    if (res.ok) {
+      const json = await res.json()
+      const created = json.data
+      setSuppliers(prev => [...prev, created])
+      setSupplierId(created.id)
+      setNewSupplierName('')
+      setAddingSupplier(false)
+    }
+  }
+
   async function handleSave(andNew = false) {
     if (!name.trim() || !sellingPrice) return
     setSaving(true)
     setSaveAndNew(andNew)
+    setSaveError(null)
 
     const payload: Record<string, unknown> = {
       name: name.trim(),
@@ -155,7 +175,7 @@ export default function NewProductPage() {
       part_type: itemType === 'part' ? (partType || null) : null,
       cost_price: parseFloat(costPrice) || 0,
       selling_price: parseFloat(sellingPrice) || 0,
-      supplier_id: itemType === 'part' ? (supplierId || null) : null,
+      supplier_id: supplierId || null,
       track_inventory: true,
       low_stock_alert: lowStockAlert,
       initial_stock: initialStock,
@@ -185,6 +205,9 @@ export default function NewProductPage() {
       } else {
         router.push(`/inventory/${productId}`)
       }
+    } else {
+      const j = await res.json()
+      setSaveError(j?.error?.message ?? 'Failed to save.')
     }
     setSaving(false)
   }
@@ -212,6 +235,9 @@ export default function NewProductPage() {
           </Button>
         </div>
       </div>
+      {saveError && (
+        <div className="mx-6 mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{saveError}</div>
+      )}
 
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-3xl px-6 py-6 space-y-8">
@@ -329,12 +355,13 @@ export default function NewProductPage() {
                   onValueChange={setPhysicalLocation}
                 />
               </div>
-              {itemType === 'part' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier (optional)</label>
-                  <Select options={[{ value: '', label: 'Select Supplier...' }, ...suppliers.map(s => ({ value: s.id, label: s.name }))]} value={supplierId} onValueChange={setSupplierId} />
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-gray-700">Supplier (optional)</label>
+                  <button type="button" onClick={() => setAddingSupplier(true)} className="text-xs text-brand-teal hover:underline">+ Add</button>
                 </div>
-              )}
+                <Select options={[{ value: '', label: 'Select Supplier...' }, ...suppliers.map(s => ({ value: s.id, label: s.name }))]} value={supplierId} onValueChange={setSupplierId} />
+              </div>
             </div>
           </section>
 
@@ -407,6 +434,16 @@ export default function NewProductPage() {
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => { setAddingBrand(false); setNewBrandName('') }}>Cancel</Button>
             <Button onClick={handleAddBrand}>Add</Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={addingSupplier} onClose={() => { setAddingSupplier(false); setNewSupplierName('') }} title="Add Supplier" size="sm">
+        <div className="space-y-4">
+          <Input label="Supplier Name" placeholder="e.g. Tech Parts Ltd" required value={newSupplierName} onChange={e => setNewSupplierName(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddSupplier())} />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => { setAddingSupplier(false); setNewSupplierName('') }}>Cancel</Button>
+            <Button onClick={handleAddSupplier}>Add</Button>
           </div>
         </div>
       </Modal>

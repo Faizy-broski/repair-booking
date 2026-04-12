@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/backend/config/supabase'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrencyCompact } from '@/lib/utils'
 import { Building2, Users, CreditCard, TrendingUp } from 'lucide-react'
 import { StatsCard } from '@/components/dashboard/stats-card'
 
@@ -44,7 +44,7 @@ export default async function SuperAdminDashboard() {
     { label: 'Total Businesses',  value: stats.totalBusinesses ?? 0,   icon: <Building2 className="h-5 w-5" />, color: 'blue'   as const, subtitle: 'registered' },
     { label: 'Active Businesses', value: stats.activeBusinesses ?? 0,  icon: <TrendingUp className="h-5 w-5" />, color: 'green'  as const, subtitle: 'currently active' },
     { label: 'Total Users',       value: stats.totalUsers ?? 0,        icon: <Users className="h-5 w-5" />,     color: 'purple' as const, subtitle: 'across all tenants' },
-    { label: 'MRR',               value: formatCurrency(stats.mrr),    icon: <CreditCard className="h-5 w-5" />, color: 'yellow' as const, subtitle: 'monthly recurring' },
+    { label: 'MRR',               value: formatCurrencyCompact(stats.mrr, 'USD'), icon: <CreditCard className="h-5 w-5" />, color: 'yellow' as const, subtitle: 'monthly recurring' },
   ]
 
   return (

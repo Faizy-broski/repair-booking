@@ -39,6 +39,19 @@ function forwardAuthCookies(from: NextResponse, to: NextResponse): NextResponse 
   return to
 }
 
+/**
+ * Stamp Cache-Control: no-store on any response that serves a protected page.
+ * This prevents the browser from serving a cached version when the user presses
+ * the Back button after logout — without it, the cached dashboard HTML renders
+ * briefly before client-side auth checks kick in.
+ */
+function noStore(res: NextResponse): NextResponse {
+  res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+  res.headers.set('Pragma', 'no-cache')
+  res.headers.set('Expires', '0')
+  return res
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const host = request.headers.get('host') || ''
@@ -130,13 +143,26 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(marketingUrl)
     }
 
-    if (business.is_suspended) {
-      return forwardAuthCookies(
-        supabaseResponse,
-        NextResponse.rewrite(new URL('/suspended', request.url), {
-          request: { headers: new Headers(request.headers) },
-        })
-      )
+    // ── Suspension / deactivation gate ───────────────────────────────────────
+    // A business is blocked when is_active = false OR is_suspended = true.
+    // The check runs before login so that suspended tenants cannot authenticate.
+    // We redirect to /login?error=suspended rather than a separate page so the
+    // user always has a visible, styled error without requiring an extra route.
+    const isBusinessBlocked = !business.is_active || business.is_suspended
+    if (isBusinessBlocked) {
+      // Allow the login page itself through (otherwise we create a redirect loop)
+      // but strip any redirectTo so they can't bounce to a protected page after.
+      if (pathname.startsWith('/login')) {
+        return forwardAuthCookies(supabaseResponse, NextResponse.next({ request }))
+      }
+      // Sign the user out if they have an active session, so the stale session
+      // doesn't let them access the tenant API routes.
+      if (user) {
+        await supabase.auth.signOut()
+      }
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('error', 'suspended')
+      return forwardAuthCookies(supabaseResponse, NextResponse.redirect(loginUrl))
     }
 
     // Auth pages — pass through so login/register work on the subdomain,
@@ -223,9 +249,13 @@ export async function middleware(request: NextRequest) {
     // ── NO REWRITE — pages are now at (tenant)/dashboard etc. ──────────────
     // The (tenant) route group serves /dashboard, /repairs, etc. directly.
     // We only need to forward the enriched headers.
-    return forwardAuthCookies(
-      supabaseResponse,
-      NextResponse.next({ request: { headers: requestHeaders } })
+    // noStore() prevents the browser from caching this response so pressing
+    // Back after logout never shows a stale authenticated page.
+    return noStore(
+      forwardAuthCookies(
+        supabaseResponse,
+        NextResponse.next({ request: { headers: requestHeaders } })
+      )
     )
   }
 

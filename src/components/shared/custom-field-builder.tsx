@@ -51,6 +51,7 @@ export function CustomFieldBuilder({ module: initialModule, repairCategory: init
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   async function fetchFields() {
     setLoading(true)
@@ -98,6 +99,7 @@ export function CustomFieldBuilder({ module: initialModule, repairCategory: init
 
   async function saveAll() {
     setSaving(true)
+    setSaveError(null)
     try {
       for (const field of fields) {
         const body = {
@@ -117,11 +119,16 @@ export function CustomFieldBuilder({ module: initialModule, repairCategory: init
             body: JSON.stringify(body),
           })
         } else {
-          await fetch('/api/custom-fields', {
+          const res = await fetch('/api/custom-fields', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
           })
+          if (!res.ok) {
+            const json = await res.json().catch(() => null)
+            setSaveError(json?.error?.message ?? 'Failed to save custom field.')
+            return
+          }
         }
       }
       await fetchFields()
@@ -258,6 +265,9 @@ export function CustomFieldBuilder({ module: initialModule, repairCategory: init
         </div>
       )}
 
+      {saveError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{saveError}</div>
+      )}
       <div className="flex gap-2">
         <Button variant="outline" size="sm" onClick={addField}>
           <Plus className="h-4 w-4" />

@@ -66,6 +66,7 @@ export const PlanLimitService = {
         result = await db('products')
           .select('*', { count: 'exact', head: true })
           .eq('business_id', businessId)
+          .eq('is_service', false)
         break
       }
       case 'max_employees': {
@@ -79,6 +80,36 @@ export const PlanLimitService = {
         result = await db('customers')
           .select('*', { count: 'exact', head: true })
           .eq('business_id', businessId)
+        break
+      }
+      case 'max_services': {
+        result = await db('products')
+          .select('*', { count: 'exact', head: true })
+          .eq('business_id', businessId)
+          .eq('is_service', true)
+        break
+      }
+      case 'max_custom_fields': {
+        result = await db('custom_field_definitions')
+          .select('*', { count: 'exact', head: true })
+          .eq('business_id', businessId)
+        break
+      }
+      case 'max_appointments_per_month': {
+        // appointments link to business via branch, count all this calendar month
+        const { data: branches } = await db('branches')
+          .select('id')
+          .eq('business_id', businessId)
+        const branchIds: string[] = (branches ?? []).map((b: { id: string }) => b.id)
+        if (branchIds.length === 0) return 0
+        const now = new Date()
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
+        result = await db('appointments')
+          .select('*', { count: 'exact', head: true })
+          .in('branch_id', branchIds)
+          .gte('start_time', monthStart)
+          .lt('start_time', monthEnd)
         break
       }
       default:

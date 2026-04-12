@@ -42,6 +42,7 @@ export default function CustomersPage() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
   const [customFields, setCustomFields] = useState<Record<string, unknown>>({})
   const { defs: customerFieldDefs } = useCustomFieldDefs('customers')
 
@@ -69,12 +70,14 @@ export default function CustomersPage() {
 
   async function onCreate(data: FormData) {
     if (!activeBranch) return
+    setCreateError(null)
     const res = await fetch('/api/customers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, branch_id: activeBranch.id, custom_fields: customFields }),
     })
     if (res.ok) { reset(); setSheetOpen(false); fetchCustomers() }
+    else { const j = await res.json(); setCreateError(j?.error?.message ?? 'Failed to create customer.') }
   }
 
   const columns: ColumnDef<CustomerRow>[] = [
@@ -149,8 +152,11 @@ export default function CustomersPage() {
         emptyMessage="No customers yet."
       />
 
-      <InlineFormSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Add Customer">
+      <InlineFormSheet open={sheetOpen} onClose={() => { setSheetOpen(false); setCreateError(null) }} title="Add Customer">
         <form onSubmit={handleSubmit(onCreate)} className="space-y-4">
+          {createError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{createError}</div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <Input label="First Name" required error={errors.first_name?.message} {...register('first_name')} />
             <Input label="Last Name" {...register('last_name')} />

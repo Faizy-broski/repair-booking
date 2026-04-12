@@ -249,53 +249,50 @@ export function CartPanel({ mobileView }: Props) {
   }
 
   return (
-    <div className={`flex-col border-r border-gray-200 bg-white overflow-hidden lg:flex lg:w-[480px] lg:shrink-0 ${mobileView === 'cart' ? 'flex w-full' : 'hidden'}`}>
+    <div className={`flex-col border-r border-gray-200 bg-white overflow-hidden lg:flex lg:w-[35%] lg:min-w-[300px] lg:max-w-[460px] lg:shrink-0 ${mobileView === 'cart' ? 'flex w-full' : 'hidden'}`}>
 
       {/* Re-open ticket shortcut */}
-      <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-2.5">
+      <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-1.5">
         <button
           onClick={() => router.push('/repairs')}
-          className="shrink-0 rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 whitespace-nowrap"
+          className="shrink-0 rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-200 whitespace-nowrap"
         >
           Re-open in POS
         </button>
       </div>
 
       {/* Customer section */}
-      <div className="border-b border-gray-100 px-4 py-3" ref={customerRef}>
+      <div className="border-b border-gray-100 px-3 py-2" ref={customerRef}>
         {pos.customer ? (
           <div>
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-teal text-base font-bold text-white">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-teal text-xs font-bold text-white">
                   {pos.customer.first_name?.[0]?.toUpperCase()}{pos.customer.last_name?.[0]?.toUpperCase() ?? ''}
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate font-bold text-gray-900 text-lg">{pos.customer.first_name} {pos.customer.last_name ?? ''}</p>
+                  <p className="truncate font-semibold text-gray-900 text-sm">{pos.customer.first_name} {pos.customer.last_name ?? ''}</p>
                   {outstandingBalance > 0 && (
-                    <span className="inline-flex items-center gap-1 text-sm font-medium text-amber-600">
-                      <AlertTriangle className="h-3.5 w-3.5" /> Outstanding {formatCurrency(outstandingBalance)}
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600">
+                      <AlertTriangle className="h-3 w-3" /> Outstanding {formatCurrency(outstandingBalance)}
                     </span>
                   )}
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1 ml-2">
+              <div className="flex shrink-0 items-center gap-0.5 ml-1">
                 <button onClick={() => router.push(`/customers/${pos.customer!.id}`)} className="rounded p-1 text-gray-400 hover:text-brand-teal">
-                  <ExternalLink className="h-3.5 w-3.5" />
+                  <ExternalLink className="h-3 w-3" />
                 </button>
                 <button onClick={() => pos.setCustomer(null)} className="rounded p-1 text-gray-400 hover:text-red-500">
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-3 w-3" />
                 </button>
               </div>
             </div>
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-gray-500">
-              {pos.customer.phone && <span className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{pos.customer.phone}</span>}
-              {pos.customer.email && <span className="flex items-center gap-1 min-w-0"><Mail className="h-3.5 w-3.5" /><span className="truncate">{pos.customer.email}</span></span>}
-            </div>
-            <div className="mt-1.5 flex items-center gap-3 text-sm">
-              <button onClick={() => router.push(`/customers/${pos.customer!.id}`)} className="text-blue-500 hover:underline">View More</button>
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500">
+              {pos.customer.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{pos.customer.phone}</span>}
+              {pos.customer.email && <span className="flex items-center gap-1 min-w-0"><Mail className="h-3 w-3" /><span className="truncate">{pos.customer.email}</span></span>}
               <button onClick={() => router.push(`/invoices?customer_id=${pos.customer!.id}`)} className="flex items-center gap-0.5 text-blue-500 hover:underline">
-                Purchase History <ExternalLink className="h-3 w-3" />
+                History <ExternalLink className="h-2.5 w-2.5" />
               </button>
             </div>
           </div>
@@ -303,20 +300,20 @@ export function CartPanel({ mobileView }: Props) {
           <div className="relative">
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text" placeholder="Search customer by name, phone, email..."
                   value={customerSearch} onChange={e => setCustomerSearch(e.target.value)}
                   onFocus={() => customerResults.length > 0 && setCustomerDropdownOpen(true)}
-                  className="h-10 w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-2 text-base focus:border-brand-teal focus:bg-white focus:outline-none"
+                  className="h-9 w-full rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-2 text-sm focus:border-brand-teal focus:bg-white focus:outline-none"
                 />
               </div>
               <button
                 onClick={() => { setNewCustomerForm(f => ({ ...f, first_name: customerSearch })); setNewCustomerOpen(true) }}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-teal text-white hover:bg-brand-teal-dark"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-teal text-white hover:bg-brand-teal-dark"
                 title="Add new customer"
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-3.5 w-3.5" />
               </button>
             </div>
             {customerDropdownOpen && (

@@ -272,28 +272,37 @@ export function ProductsTab() {
   // ── Product card renderer ──────────────────────────────────────────────────
   function ProductCard({ product, size = 'md' }: { product: ProductWithStock; size?: 'sm' | 'md' }) {
     const hasVariants = product.has_variants || (product.variant_count ?? 0) > 0
-    const h = size === 'sm' ? 'h-12' : 'h-10'
     return (
       <button
         onClick={() => hasVariants ? openVariantSelect(product) : pos.addToCart(product as unknown as Product)}
-        className="relative flex flex-col items-start rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-brand-teal hover:shadow-sm transition-all"
+        className="relative flex w-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-brand-teal hover:shadow-sm transition-all"
       >
         {product.image_url ? (
-          <img src={product.image_url} alt={product.name} className={`mb-2 ${h} w-full object-contain`} />
+          <div className="mb-3 w-full overflow-hidden rounded-xl bg-gray-50 aspect-[4/3]">
+            <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
+          </div>
         ) : (
-          <div className={`mb-2 flex ${h} w-full items-center justify-center rounded bg-gray-100`}>
-            {(product as any).item_type === 'part' ? <Package className="h-4 w-4 text-gray-300" /> : <ShoppingBag className="h-4 w-4 text-gray-300" />}
+          <div className="mb-3 flex w-full items-center justify-center rounded-xl bg-gray-100 aspect-[4/3]">
+            {(product as any).item_type === 'part' ? <Package className="h-8 w-8 text-gray-300" /> : <ShoppingBag className="h-8 w-8 text-gray-300" />}
           </div>
         )}
-        <span className="text-sm font-semibold text-gray-900 line-clamp-2 leading-tight">{product.name}</span>
-        {product.sku && <span className="mt-0.5 text-xs text-gray-400 font-mono truncate w-full">{product.sku}</span>}
-        <span className="mt-1 text-sm font-bold text-brand-teal">{formatCurrency(product.selling_price)}</span>
-        {product.on_hand !== undefined && !product.is_service && (
-          <span className={`mt-0.5 text-xs font-medium ${(product.on_hand ?? 0) > 0 ? 'text-gray-400' : 'text-red-500'}`}>
-            {product.on_hand ?? 0} on hand
-          </span>
-        )}
-        {hasVariants && <span className="mt-0.5 text-xs text-indigo-500 font-medium">Select variant</span>}
+
+        <div className="flex flex-1 flex-col justify-between gap-2">
+          <div>
+            <span className="block text-sm font-semibold text-gray-900 line-clamp-2 leading-tight">{product.name}</span>
+            {product.sku && <span className="mt-1 block text-xs text-gray-400 font-mono truncate">{product.sku}</span>}
+          </div>
+
+          <div className="space-y-1">
+            <span className="text-sm font-bold text-brand-teal">{formatCurrency(product.selling_price)}</span>
+            {product.on_hand !== undefined && !product.is_service && (
+              <span className={`block text-xs font-medium ${(product.on_hand ?? 0) > 0 ? 'text-gray-400' : 'text-red-500'}`}>
+                {product.on_hand ?? 0} on hand
+              </span>
+            )}
+            {hasVariants && <span className="block text-xs text-indigo-500 font-medium">Select variant</span>}
+          </div>
+        </div>
       </button>
     )
   }
@@ -416,7 +425,7 @@ export function ProductsTab() {
                   {catItems.map(item => (
                     <button key={item.id} onClick={() => selectCatItem(item)} className="flex flex-col w-full overflow-hidden rounded-xl border border-gray-200 bg-white hover:border-brand-teal hover:shadow-sm transition-all text-center min-h-[140px]">
                       {item.image_url ? (
-                        <img src={item.image_url} alt={item.name} className="w-full h-24 object-cover border-b border-gray-100 bg-gray-50" />
+                        <img src={item.image_url} alt={item.name} className="w-full h-24 object-contain border-b border-gray-100 bg-white" />
                       ) : (
                         <div className="flex w-full h-24 items-center justify-center bg-gray-50 border-b border-gray-100">
                           {catLevel === 'device_types' && <Layers className="h-8 w-8 text-gray-400" />}
@@ -481,15 +490,17 @@ export function ProductsTab() {
                   {partProducts.map(product => {
                     const hasVariants = product.has_variants || (product as any).variant_count > 0
                     return (
-                      <button key={product.id} onClick={() => hasVariants ? openVariantSelect(product) : pos.addToCart(product as unknown as Product)} className="flex flex-col items-center gap-1.5 rounded-xl border border-gray-200 bg-white p-3 text-center hover:border-brand-teal hover:shadow-sm transition-all cursor-pointer">
+                      <button key={product.id} onClick={() => hasVariants ? openVariantSelect(product) : pos.addToCart(product as unknown as Product)} className="flex flex-col items-center rounded-xl border border-gray-200 bg-white p-3 text-center hover:border-brand-teal hover:shadow-sm transition-all cursor-pointer w-full overflow-hidden">
                         {product.image_url ? (
-                          <img src={product.image_url} alt={product.name} className="h-14 w-14 rounded-lg object-contain border border-gray-100 bg-white" />
+                          <div className="mb-2 w-full h-28 flex items-center justify-center rounded-lg bg-gray-50">
+                            <img src={product.image_url} alt={product.name} className="h-full w-full object-contain rounded-lg" />
+                          </div>
                         ) : (
-                          <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-gray-100"><Package className="h-6 w-6 text-gray-300" /></div>
+                          <div className="mb-2 flex h-28 w-full items-center justify-center rounded-lg bg-gray-100"><Package className="h-8 w-8 text-gray-300" /></div>
                         )}
-                        <span className="text-xs font-medium text-gray-800 line-clamp-2 leading-tight">{product.name}</span>
-                        <span className="text-xs font-bold text-brand-teal">{formatCurrency(Number(product.selling_price))}</span>
-                        {typeof product.on_hand === 'number' && <span className="text-[10px] text-gray-400">On Hand: {product.on_hand}</span>}
+                        <span className="text-sm font-semibold text-gray-800 line-clamp-2 leading-tight w-full">{product.name}</span>
+                        <span className="text-sm font-bold text-brand-teal mt-1">{formatCurrency(Number(product.selling_price))}</span>
+                        {typeof product.on_hand === 'number' && <span className="text-xs text-gray-400 mt-0.5">{product.on_hand} on hand</span>}
                       </button>
                     )
                   })}
@@ -502,7 +513,7 @@ export function ProductsTab() {
                 {partItems.map(item => (
                   <button key={item.id} onClick={() => selectPartItem(item)} className="flex flex-col w-full overflow-hidden rounded-xl border border-gray-200 bg-white hover:border-brand-teal hover:shadow-sm transition-all cursor-pointer text-center min-h-[140px]">
                     {item.image_url ? (
-                      <img src={item.image_url} alt={item.name} className="w-full h-24 object-cover border-b border-gray-100 bg-gray-50" />
+                      <img src={item.image_url} alt={item.name} className="w-full h-24 object-contain border-b border-gray-100 bg-white" />
                     ) : (
                       <div className="flex w-full h-24 items-center justify-center bg-gray-50 border-b border-gray-100">
                         {partLevel === 'device_types' && <Layers className="h-8 w-8 text-gray-400" />}

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, Check, X, Shield, Gauge } from 'lucide-react'
+import { Plus, Edit2, Shield, Gauge } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -10,6 +10,27 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
 import { PLAN_LIMIT_KEYS, type PlanLimits } from '@/types/module-config'
+import { MODULES } from '@/backend/config/constants'
+
+// Canonical module names — must match DB enum in resolve_module_config
+const ALL_MODULES = [...MODULES] as string[]
+
+const MODULE_LABELS: Record<string, string> = {
+  pos:            'POS',
+  inventory:      'Inventory',
+  repairs:        'Repairs',
+  customers:      'Customers',
+  appointments:   'Appointments',
+  expenses:       'Expenses',
+  employees:      'Employees',
+  reports:        'Reports',
+  messages:       'Messages',
+  invoices:       'Invoices',
+  gift_cards:     'Gift Cards',
+  google_reviews: 'Google Reviews',
+  phone:          'Phone',
+  notifications:  'Notifications',
+}
 
 interface PlanRow {
   id: string
@@ -19,7 +40,8 @@ interface PlanRow {
   max_branches: number
   max_users: number
   is_active: boolean
-  features: Record<string, boolean>
+  // DB stores as JSON array of enabled module names e.g. ["pos","repairs"]
+  features: string[]
   limits: PlanLimits
 }
 
@@ -28,25 +50,30 @@ const schema = z.object({
   price_monthly: z.coerce.number().min(0),
   price_yearly: z.coerce.number().min(0),
   max_branches: z.coerce.number().int().positive(),
-  max_users: z.coerce.number().int().positive(),
-  stripe_price_id_monthly: z.string().optional(),
+  max_users: z.coerce.number().int().positive(),  is_active: z.coerce.boolean().optional().default(true),  stripe_price_id_monthly: z.string().optional(),
   stripe_price_id_yearly: z.string().optional(),
 })
 
 type FormData = z.infer<typeof schema>
 
-const ALL_FEATURES = [
-  'pos', 'inventory', 'repairs', 'customers', 'appointments', 'expenses',
-  'employees', 'reports', 'messages', 'invoices', 'gift_cards', 'google_reviews', 'phone',
-]
+/** Convert DB string[] to checkbox state Record */
+function arrayToRecord(arr: string[]): Record<string, boolean> {
+  return Object.fromEntries(ALL_MODULES.map((m) => [m, arr.includes(m)]))
+}
+
+/** Convert checkbox state Record to string[] for the API */
+function recordToArray(rec: Record<string, boolean>): string[] {
+  return Object.entries(rec).filter(([, v]) => v).map(([k]) => k)
+}
 
 export default function PlansPage() {
   const [plans, setPlans] = useState<PlanRow[]>([])
   const [loading, setLoading] = useState(true)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editPlan, setEditPlan] = useState<PlanRow | null>(null)
+  // Internal UI state — checkboxes keyed by module name
   const [features, setFeatures] = useState<Record<string, boolean>>(
-    Object.fromEntries(ALL_FEATURES.map((f) => [f, true]))
+    Object.fromEntries(ALL_MODULES.map((m) => [m, true]))
   )
   const [limits, setLimits] = useState<PlanLimits>({})
   const [tab, setTab] = useState<'general' | 'features' | 'limits'>('general')
@@ -58,9 +85,14 @@ export default function PlansPage() {
   useEffect(() => {
     async function fetchPlans() {
       setLoading(true)
-      const res = await fetch('/api/plans')
+      const res = await fetch('/api/plans?all=true')
       const json = await res.json()
-      setPlans(json.data ?? [])
+      // Normalise: ensure features is always a string[]
+      const rows = (json.data ?? []).map((p: any) => ({
+        ...p,
+        features: Array.isArray(p.features) ? p.features : [],
+      }))
+      setPlans(rows)
       setLoading(false)
     }
     fetchPlans()
@@ -68,8 +100,9 @@ export default function PlansPage() {
 
   function openCreate() {
     setEditPlan(null)
-    reset()
-    setFeatures(Object.fromEntries(ALL_FEATURES.map((f) => [f, true])))
+    reset({ price_yearly: 0, max_branches: 1, max_users: 5, is_active: true })
+    // Default: all modules enabled for new plans
+    setFeatures(Object.fromEntries(ALL_MODULES.map((m) => [m, true])))
     setLimits({})
     setTab('general')
     setSheetOpen(true)
@@ -83,15 +116,18 @@ export default function PlansPage() {
       price_yearly: plan.price_yearly,
       max_branches: plan.max_branches,
       max_users: plan.max_users,
+      is_active: plan.is_active,
     })
-    setFeatures(plan.features ?? {})
+    // Convert DB array → checkbox state
+    setFeatures(arrayToRecord(plan.features ?? []))
     setLimits(plan.limits ?? {})
     setTab('general')
     setSheetOpen(true)
   }
 
   async function onSubmit(data: FormData) {
-    const payload = { ...data, features, limits }
+    // Convert checkbox state → string[] for the API (DB expects JSON array)
+    const payload = { ...data, features: recordToArray(features), limits }
     const res = editPlan
       ? await fetch(`/api/plans/${editPlan.id}`, {
           method: 'PATCH',
@@ -106,10 +142,14 @@ export default function PlansPage() {
 
     if (res.ok) {
       const json = await res.json()
+      const saved: PlanRow = {
+        ...json.data,
+        features: Array.isArray(json.data.features) ? json.data.features : [],
+      }
       if (editPlan) {
-        setPlans((p) => p.map((x) => x.id === editPlan.id ? json.data : x))
+        setPlans((p) => p.map((x) => x.id === editPlan.id ? saved : x))
       } else {
-        setPlans((p) => [...p, json.data])
+        setPlans((p) => [...p, saved])
       }
       setSheetOpen(false)
       reset()
@@ -121,7 +161,7 @@ export default function PlansPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Plans</h1>
-          <p className="text-sm text-gray-500">Manage subscription tiers</p>
+          <p className="text-sm text-gray-500">Manage subscription tiers and their module access</p>
         </div>
         <Button onClick={openCreate}>
           <Plus className="h-4 w-4" /> Add Plan
@@ -136,49 +176,62 @@ export default function PlansPage() {
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-4">
-          {plans.map((plan) => (
-            <div key={plan.id} className="rounded-xl border border-gray-200 bg-white p-5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-semibold text-gray-900">{plan.name}</h3>
-                  <p className="text-2xl font-bold text-blue-600 mt-1">
-                    {formatCurrency(plan.price_monthly)}<span className="text-sm font-normal text-gray-400">/mo</span>
-                  </p>
-                  <p className="text-sm text-gray-400">{formatCurrency(plan.price_yearly)}/yr</p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <Badge variant={plan.is_active ? 'success' : 'destructive'}>
-                    {plan.is_active ? 'Active' : 'Inactive'}
-                  </Badge>
-                  <Button size="sm" variant="ghost" onClick={() => openEdit(plan)}>
-                    <Edit2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-              <div className="mt-3 space-y-1 text-sm text-gray-500">
-                <p>Up to {plan.max_branches} branches</p>
-                <p>Up to {plan.max_users} users</p>
-                {Object.entries(plan.limits ?? {}).filter(([, v]) => typeof v === 'boolean' && v).length > 0 && (
-                  <div className="flex items-center gap-1 mt-1">
-                    <Shield className="h-3 w-3 text-green-500" />
-                    <span className="text-xs text-green-600">
-                      {Object.entries(plan.limits ?? {}).filter(([, v]) => v === true).length} premium features
-                    </span>
+          {plans.map((plan) => {
+            const enabledModules = plan.features ?? []
+            return (
+              <div key={plan.id} className="rounded-xl border border-gray-200 bg-white p-5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-900">{plan.name}</h3>
+                    <p className="text-2xl font-bold text-blue-600 mt-1">
+                      {formatCurrency(plan.price_monthly)}
+                      <span className="text-sm font-normal text-gray-400">/mo</span>
+                    </p>
+                    <p className="text-sm text-gray-400">{formatCurrency(plan.price_yearly)}/yr</p>
                   </div>
-                )}
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge variant={plan.is_active ? 'success' : 'destructive'}>
+                      {plan.is_active ? 'Active' : 'Inactive'}
+                    </Badge>
+                    <Button size="sm" variant="ghost" onClick={() => openEdit(plan)}>
+                      <Edit2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="mt-3 space-y-1 text-sm text-gray-500">
+                  <p>Up to {plan.max_branches} {plan.max_branches === 1 ? 'branch' : 'branches'}</p>
+                  <p>Up to {plan.max_users} users</p>
+                  {Object.values(plan.limits ?? {}).some((v) => v === true) && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <Shield className="h-3 w-3 text-green-500" />
+                      <span className="text-xs text-green-600">
+                        {Object.values(plan.limits ?? {}).filter((v) => v === true).length} premium features
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Module badges — sourced from the array */}
+                <div className="mt-3 flex flex-wrap gap-1">
+                  {enabledModules.slice(0, 6).map((mod) => (
+                    <span
+                      key={mod}
+                      className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600"
+                    >
+                      {MODULE_LABELS[mod] ?? mod}
+                    </span>
+                  ))}
+                  {enabledModules.length > 6 && (
+                    <span className="text-[10px] text-gray-400">+{enabledModules.length - 6} more</span>
+                  )}
+                  {enabledModules.length === 0 && (
+                    <span className="text-[10px] text-gray-400 italic">No modules</span>
+                  )}
+                </div>
               </div>
-              <div className="mt-3 flex flex-wrap gap-1">
-                {Object.entries(plan.features ?? {}).filter(([, v]) => v).slice(0, 5).map(([k]) => (
-                  <span key={k} className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 capitalize">
-                    {k.replace('_', ' ')}
-                  </span>
-                ))}
-                {Object.values(plan.features ?? {}).filter(Boolean).length > 5 && (
-                  <span className="text-[10px] text-gray-400">+{Object.values(plan.features ?? {}).filter(Boolean).length - 5} more</span>
-                )}
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -199,7 +252,7 @@ export default function PlansPage() {
                   tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                {t === 'general' ? 'General' : t === 'features' ? 'Features' : 'Limits'}
+                {t === 'general' ? 'General' : t === 'features' ? `Modules (${recordToArray(features).length})` : 'Limits'}
               </button>
             ))}
           </div>
@@ -209,30 +262,63 @@ export default function PlansPage() {
               <Input label="Plan Name" required error={errors.name?.message} {...register('name')} />
               <div className="grid grid-cols-2 gap-3">
                 <Input label="Monthly Price (£)" type="number" step="0.01" required error={errors.price_monthly?.message} {...register('price_monthly')} />
-                <Input label="Yearly Price (£)" type="number" step="0.01" required {...register('price_yearly')} />
+                <Input label="Yearly Price (£)" type="number" step="0.01" {...register('price_yearly')} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Input label="Max Branches" type="number" required {...register('max_branches')} />
                 <Input label="Max Users" type="number" required {...register('max_users')} />
               </div>
-              <Input label="Stripe Monthly Price ID" placeholder="price_..." {...register('stripe_price_id_monthly')} />
-              <Input label="Stripe Yearly Price ID" placeholder="price_..." {...register('stripe_price_id_yearly')} />
+              <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <input
+                  type="checkbox"
+                  id="plan-active"
+                  {...register('is_active')}
+                  className="h-4 w-4 rounded border-gray-300 text-brand-teal focus:ring-brand-teal"
+                />
+                <label htmlFor="plan-active" className="text-sm font-medium text-gray-700">
+                  Active plan
+                </label>
+              </div>
+              <Input label="Stripe Monthly Price ID (optional)" placeholder="price_..." {...register('stripe_price_id_monthly')} />
+              <Input label="Stripe Yearly Price ID (optional)" placeholder="price_..." {...register('stripe_price_id_yearly')} />
             </div>
           )}
 
           {tab === 'features' && (
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">Enabled Modules</label>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-gray-700">Enabled Modules</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="text-xs text-blue-600 hover:underline"
+                    onClick={() => setFeatures(Object.fromEntries(ALL_MODULES.map((m) => [m, true])))}
+                  >
+                    All
+                  </button>
+                  <span className="text-gray-300">|</span>
+                  <button
+                    type="button"
+                    className="text-xs text-gray-500 hover:underline"
+                    onClick={() => setFeatures(Object.fromEntries(ALL_MODULES.map((m) => [m, false])))}
+                  >
+                    None
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-gray-400">
+                Checked modules are accessible to businesses on this plan. The DB function enforces this at query time.
+              </p>
               <div className="grid grid-cols-2 gap-1.5">
-                {ALL_FEATURES.map((feat) => (
-                  <label key={feat} className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                {ALL_MODULES.map((mod) => (
+                  <label key={mod} className="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2 text-sm text-gray-700 cursor-pointer hover:bg-gray-50">
                     <input
                       type="checkbox"
-                      checked={features[feat] ?? false}
-                      onChange={(e) => setFeatures((f) => ({ ...f, [feat]: e.target.checked }))}
-                      className="rounded"
+                      checked={features[mod] ?? false}
+                      onChange={(e) => setFeatures((f) => ({ ...f, [mod]: e.target.checked }))}
+                      className="rounded accent-blue-600"
                     />
-                    <span className="capitalize">{feat.replace('_', ' ')}</span>
+                    <span>{MODULE_LABELS[mod] ?? mod}</span>
                   </label>
                 ))}
               </div>
@@ -245,40 +331,46 @@ export default function PlansPage() {
                 Set resource limits and premium feature flags for this plan. Leave blank for unlimited.
               </p>
               <div className="space-y-3">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">Resource Limits</h4>
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1">
+                  <Gauge className="h-3 w-3" /> Resource Limits
+                </h4>
                 {PLAN_LIMIT_KEYS.filter((l) => l.type === 'number').map((lk) => (
                   <Input
                     key={lk.key}
                     label={lk.label}
                     type="number"
+                    min="0"
                     value={(limits[lk.key] as number) ?? ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                       const val = e.target.value
+                      const num = Number(val)
                       setLimits((l) => ({
                         ...l,
-                        [lk.key]: val === '' ? undefined : Number(val),
+                        [lk.key]: val === '' ? undefined : num < 0 ? 0 : num,
                       }))
                     }}
                     placeholder="Unlimited"
                   />
                 ))}
               </div>
-              <div className="space-y-3">
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400">Premium Features</h4>
+              {/* <div className="space-y-3">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-1">
+                  <Shield className="h-3 w-3" /> Premium Features
+                </h4>
                 <div className="grid grid-cols-2 gap-1.5">
                   {PLAN_LIMIT_KEYS.filter((l) => l.type === 'boolean').map((lk) => (
-                    <label key={lk.key} className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                    <label key={lk.key} className="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2 text-sm text-gray-600 cursor-pointer hover:bg-gray-50">
                       <input
                         type="checkbox"
                         checked={(limits[lk.key] as boolean) ?? false}
                         onChange={(e) => setLimits((l) => ({ ...l, [lk.key]: e.target.checked }))}
-                        className="rounded"
+                        className="rounded accent-blue-600"
                       />
                       <span>{lk.label}</span>
                     </label>
                   ))}
                 </div>
-              </div>
+              </div> */}
             </div>
           )}
 
