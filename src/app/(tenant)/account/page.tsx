@@ -293,7 +293,7 @@ export default function AccountPage() {
               </div>
 
               {/* Resubscribe / upgrade section */}
-              {(isExpired || isTrialing || !isActive) && plans.length > 0 && (
+              {plans.length > 0 && (
                 <div className="rounded-2xl border border-brand-teal/30 bg-brand-teal/5 p-6">
                   <div className="flex items-center gap-2 mb-1">
                     <Zap className="h-5 w-5 text-brand-teal" />

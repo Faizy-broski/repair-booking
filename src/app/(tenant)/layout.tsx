@@ -24,7 +24,20 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
     setCurrency, setSubscriptionStatus, clear,
     profile: cachedProfile, activeBranch: storedActiveBranch,
   } = useAuthStore()
-  const { fetchConfigs } = useModuleConfigStore()
+  const { fetchConfigs, invalidate: invalidateConfigs } = useModuleConfigStore()
+
+  // Detect post-upgrade redirect (?upgraded=1) and force-clear the module
+  // config cache so new plan modules appear immediately without waiting for TTL.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('upgraded') === '1') {
+      invalidateConfigs()
+      // Remove the query param cleanly
+      const clean = window.location.pathname
+      window.history.replaceState({}, '', clean)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     async function loadSession() {
