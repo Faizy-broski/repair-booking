@@ -15,7 +15,7 @@ export const ProductService = {
             brandId, supplierId, valuation, hideOutOfStock, itemType, modelId, partType } = params
 
     const inventorySelect = branchId
-      ? `*, categories(name), brands(name), inventory!left(quantity, low_stock_alert, branch_id), product_variants(id), suppliers(name), service_devices(name)`
+      ? `*, categories(name), brands(name), inventory!left(quantity, low_stock_alert, branch_id, variant_id), product_variants(id), suppliers(name), service_devices(name)`
       : `*, categories(name), brands(name), product_variants(id), suppliers(name), service_devices(name)`
 
     let q = db
@@ -43,8 +43,8 @@ export const ProductService = {
       if (!branchId || !Array.isArray(p.inventory)) {
         return { ...p, variant_count: variantCount, product_variants: undefined }
       }
-      const branchInv = (p.inventory as Array<{ branch_id: string; quantity: number; low_stock_alert: number | null }>)
-        .find((i) => i.branch_id === branchId)
+      const branchInv = (p.inventory as Array<{ branch_id: string; quantity: number; low_stock_alert: number | null; variant_id: string | null }>)
+        .find((i) => i.branch_id === branchId && i.variant_id === null)
       const on_hand = branchInv?.quantity ?? 0
       return { ...p, on_hand, low_stock_alert: branchInv?.low_stock_alert ?? null, inventory: undefined, variant_count: variantCount, product_variants: undefined }
     })
@@ -179,10 +179,13 @@ export const ProductService = {
     let lowStockCount    = 0
 
     if (branchId) {
+      // Only count base-product rows (variant_id IS NULL) to avoid double-counting
+      // stock when a product has variant-level inventory rows alongside a base row.
       const { data: inv } = await adminSupabase
         .from('inventory')
         .select('quantity, low_stock_alert, product_id, products!inner(selling_price, cost_price, is_service, is_active)')
         .eq('branch_id', branchId)
+        .is('variant_id', null)
 
       ;(inv ?? []).forEach((row: any) => {
         const p = row.products
@@ -191,12 +194,9 @@ export const ProductService = {
         stockCostValue   += (p.cost_price   ?? 0) * row.quantity
         if (row.low_stock_alert != null && row.quantity > 0 && row.quantity <= row.low_stock_alert) lowStockCount++
       })
-    } else {
-      ;(products ?? []).forEach((p: any) => {
-        stockRetailValue += p.selling_price ?? 0
-        stockCostValue   += p.cost_price    ?? 0
-      })
     }
+    // When no branchId, return zeros — summing raw prices without quantities
+    // would produce a meaningless number that looks like real stock value.
 
     // In Purchase Order count
     const { count: inPoCount } = await adminSupabase

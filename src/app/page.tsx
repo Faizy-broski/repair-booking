@@ -170,19 +170,19 @@ export default function HomePage() {
     <>
       {/* ── Navbar ─────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-50 bg-brand-teal border-b border-brand-teal-dark/25">
-        <nav className="mx-auto max-w-7xl px-6 lg:px-8 flex h-16 items-center justify-between">
+        <nav className="mx-auto max-w-7xl px-6 lg:px-8 flex h-18 items-center justify-between">
           <Link href="/" className="flex items-center gap-2 flex-shrink-0">
             <Image
               src="/images/tsn_logo.png"
               alt="The Social Nexus — RepairBooking"
-              width={160}
-              height={40}
-              className="h-9 w-auto"
+              width={200}
+              height={52}
+              className="h-12 w-auto"
               priority
             />
           </Link>
 
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-white/80">
+          <div className="hidden md:flex items-center gap-8 text-base font-medium text-white/80">
             <Link href="#features" className="hover:text-white transition-colors">Features</Link>
             <Link href="#modules" className="hover:text-white transition-colors">Modules</Link>
             <Link href="#pricing" className="hover:text-white transition-colors">Pricing</Link>
@@ -192,7 +192,7 @@ export default function HomePage() {
           <div className="flex items-center gap-3">
             <Link
               href="/login"
-              className="hidden md:inline-flex text-sm font-medium text-white/90 hover:text-white transition-colors"
+              className="hidden md:inline-flex items-center rounded-lg border border-white/40 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
             >
               Sign in
             </Link>
@@ -240,13 +240,13 @@ export default function HomePage() {
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-[1.1] tracking-tight">
-              The all-in-one POS for{' '}
+              The All-in-One POS for{' '}
               <span className="text-brand-teal">repair shops</span>{' '}
               &amp; retail
             </h1>
 
             <p className="mt-6 max-w-2xl mx-auto text-lg text-slate-400 leading-relaxed">
-              Book repairs, ring up sales, manage inventory, staff and customers — all from
+              Book repairs, ring up sales, manage inventory, staff and customers all from
               one cloud platform built for multi-branch businesses.
             </p>
 

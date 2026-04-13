@@ -115,22 +115,39 @@ export const ProductController = {
       const { initial_stock, low_stock_alert, branch_id, ...productData } = data
       const product = await ProductService.create({ ...productData, business_id: ctx.businessId } as any)
 
-      // Seed initial inventory row if stock provided
-      const targetBranch = branch_id ?? ctx.auth.branchId
+      // Seed inventory rows across ALL active branches so every branch has a
+      // tracked stock level (0 by default). The branch that was active at
+      // creation time gets the specified initial_stock quantity.
       const needsStock = productData.item_type === 'part' || !productData.is_service
-      if (targetBranch && needsStock && (initial_stock ?? 0) > 0) {
+      if (needsStock) {
         const { adminSupabase } = await import('@/backend/config/supabase')
-        await adminSupabase.from('inventory').upsert(
-          { branch_id: targetBranch, product_id: product.id, quantity: initial_stock ?? 0, low_stock_alert: low_stock_alert ?? 5 },
-          { onConflict: 'branch_id,product_id' }
-        )
-      } else if (targetBranch && needsStock) {
-        // Always create an inventory row so stock can be tracked
-        const { adminSupabase } = await import('@/backend/config/supabase')
-        await adminSupabase.from('inventory').upsert(
-          { branch_id: targetBranch, product_id: product.id, quantity: 0, low_stock_alert: low_stock_alert ?? 5 },
-          { onConflict: 'branch_id,product_id' }
-        )
+        const targetBranch = branch_id ?? ctx.auth.branchId
+
+        const { data: allBranches } = await adminSupabase
+          .from('branches')
+          .select('id')
+          .eq('business_id', ctx.businessId)
+          .eq('is_active', true)
+
+        const branches = allBranches ?? []
+
+        if (branches.length > 0) {
+          const inventoryRows = branches.map((b: { id: string }) => ({
+            branch_id: b.id,
+            product_id: product.id,
+            quantity: b.id === targetBranch ? (initial_stock ?? 0) : 0,
+            low_stock_alert: low_stock_alert ?? 5,
+          }))
+          await adminSupabase
+            .from('inventory')
+            .upsert(inventoryRows, { onConflict: 'branch_id,product_id' })
+        } else if (targetBranch) {
+          // Fallback: no branches found — at least seed the active branch
+          await adminSupabase.from('inventory').upsert(
+            { branch_id: targetBranch, product_id: product.id, quantity: initial_stock ?? 0, low_stock_alert: low_stock_alert ?? 5 },
+            { onConflict: 'branch_id,product_id' }
+          )
+        }
       }
 
       return created(product)

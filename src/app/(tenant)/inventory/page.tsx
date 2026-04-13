@@ -56,11 +56,15 @@ export default function InventoryPage() {
   // Use the branch ID as a stable primitive — avoids re-running effects when
   // the layout refreshes the activeBranch object reference but the ID is the same.
   const branchId = activeBranch?.id ?? null
+  const prevBranchIdRef = useRef<string | null>(null)
   const router = useRouter()
   const pathname = usePathname()
   const [products, setProducts] = useState<ProductRow[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
+  // Start in loading state — stays true until branchId is known and first
+  // fetch completes. Prevents the DataTable from briefly rendering products
+  // with on_hand=0 before the branch-aware fetch returns.
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<ProductStats | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ProductRow | null>(null)
@@ -84,6 +88,33 @@ export default function InventoryPage() {
   const [drawerVariants, setDrawerVariants] = useState<ProductVariant[]>([])
   const [drawerLoading, setDrawerLoading] = useState(false)
 
+  // When branch changes, immediately flush stale product rows and reset page
+  // so the DataTable never shows the previous branch's on_hand values.
+  useEffect(() => {
+    if (prevBranchIdRef.current !== null && prevBranchIdRef.current !== branchId) {
+      setProducts([])
+      setTotal(0)
+      setStats(null)
+      setPage(0)
+    }
+    prevBranchIdRef.current = branchId
+  }, [branchId])
+
+  // Stats fetch — direct branchId dependency with cancellation flag to
+  // prevent stale responses overwriting fresh ones on rapid branch switching.
+  useEffect(() => {
+    if (!branchId) return
+    let cancelled = false
+    fetch(`/api/products/stats?branch_id=${branchId}`)
+      .then(async res => {
+        const json = await res.json()
+        if (!cancelled && res.ok) setStats(json.data ?? json)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [branchId]) // eslint-disable-line
+
+  // Keep a callable version for manual refresh (e.g. after delete)
   const fetchStats = useCallback(async () => {
     if (!branchId) return
     const res = await fetch(`/api/products/stats?branch_id=${branchId}`)
@@ -121,7 +152,6 @@ export default function InventoryPage() {
     fetchProducts(controller.signal)
     return () => controller.abort()
   }, [fetchProducts])
-  useEffect(() => { fetchStats() }, [fetchStats])
 
   useEffect(() => {
     fetch('/api/categories').then(r => r.json()).then(j => setCategories(j.data ?? [])).catch(() => {})

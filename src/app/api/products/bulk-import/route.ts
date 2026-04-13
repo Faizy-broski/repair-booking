@@ -64,15 +64,22 @@ async function bulkImport(req: NextRequest, ctx: RequestContext) {
     return NextResponse.json({ error: 'branch_id is required' }, { status: 400 })
   }
 
-  // ── Prefetch all lookup tables in parallel ──────────────────────────────
+  // ── Prefetch all lookup tables + branches in parallel ──────────────────
   // All queries scoped to this business — no cross-tenant data leakage.
-  const [catRes, brandRes, supplierRes, deviceRes, mfrRes] = await Promise.all([
+  // Branches are fetched so new products get zero-quantity inventory rows
+  // seeded for every active branch, not just the one being imported into.
+  const [catRes, brandRes, supplierRes, deviceRes, mfrRes, branchRes] = await Promise.all([
     adminSupabase.from('categories').select('id, name').eq('business_id', ctx.businessId),
     adminSupabase.from('brands').select('id, name').eq('business_id', ctx.businessId),
     adminSupabase.from('suppliers').select('id, name').eq('business_id', ctx.businessId),
     adminSupabase.from('service_devices').select('id, name').eq('business_id', ctx.businessId),
     adminSupabase.from('service_manufacturers').select('id, name').eq('business_id', ctx.businessId),
+    adminSupabase.from('branches').select('id').eq('business_id', ctx.businessId).eq('is_active', true),
   ])
+
+  // All active branch IDs for this business — used to seed inventory rows
+  // for every branch when new products are inserted.
+  const allBranchIds: string[] = (branchRes.data ?? []).map((b: { id: string }) => b.id)
 
   const catMap      = new Map((catRes.data ?? []).map((r) => [r.name.toLowerCase(), r.id]))
   const brandMap    = new Map((brandRes.data ?? []).map((r) => [r.name.toLowerCase(), r.id]))
@@ -353,15 +360,18 @@ async function bulkImport(req: NextRequest, ctx: RequestContext) {
 
       if (insertedWithSku && insertedWithSku.length > 0) {
         const skuToMeta = new Map(toInsertWithSku.map((x) => [x.record.sku as string, x]))
-        const inventoryRows = insertedWithSku.map((p) => {
+        // Seed a zero-quantity row for every active branch; the import branch
+        // gets the actual quantity from the CSV row.
+        const inventoryRows = insertedWithSku.flatMap((p) => {
           const meta = skuToMeta.get(p.sku ?? '') ?? toInsertWithSku[0]
-          return {
-            branch_id,
+          const branchesToSeed = allBranchIds.length > 0 ? allBranchIds : [branch_id]
+          return branchesToSeed.map((bid) => ({
+            branch_id:       bid,
             product_id:      p.id,
             variant_id:      null,
-            quantity:        meta.quantity,
+            quantity:        bid === branch_id ? meta.quantity : 0,
             low_stock_alert: meta.lowStockAlert ?? 5,
-          }
+          }))
         })
         await adminSupabase.from('inventory').insert(inventoryRows)
       }
@@ -379,20 +389,18 @@ async function bulkImport(req: NextRequest, ctx: RequestContext) {
     imported = data?.length ?? 0
 
     if (data && data.length > 0) {
-      const inventoryRows = data.map((p, idx) => ({
-        branch_id,
-        product_id:      p.id,
-        variant_id:      null,
-        quantity:        toInsert[idx].quantity,
-        low_stock_alert: toInsert[idx].lowStockAlert ?? 5,
-      }))
-      await adminSupabase
-        .from('inventory')
-        .delete()
-        .eq('branch_id', branch_id)
-        .in('product_id', data.map((p) => p.id))
-        .is('variant_id', null)
-
+      // Seed a zero-quantity inventory row for every active branch; the
+      // import branch gets the actual quantity specified in the CSV row.
+      const branchesToSeed = allBranchIds.length > 0 ? allBranchIds : [branch_id]
+      const inventoryRows = data.flatMap((p, idx) =>
+        branchesToSeed.map((bid) => ({
+          branch_id:       bid,
+          product_id:      p.id,
+          variant_id:      null,
+          quantity:        bid === branch_id ? toInsert[idx].quantity : 0,
+          low_stock_alert: toInsert[idx].lowStockAlert ?? 5,
+        }))
+      )
       await adminSupabase
         .from('inventory')
         .insert(inventoryRows)

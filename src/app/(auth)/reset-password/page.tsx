@@ -51,8 +51,11 @@ function ResetPasswordForm() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSessionReady(!!session)
+    // getUser() validates the token against the Supabase Auth server — unlike
+    // getSession() which can return a stale/expired local session from cookies
+    // or localStorage, giving a false-positive "session found" on this page.
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setSessionReady(!!user)
     })
   }, [])
 

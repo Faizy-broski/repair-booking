@@ -27,10 +27,21 @@ export default function ForgotPasswordPage() {
     setServerError('')
     const supabase = createClient()
 
+    // Clear any existing session so a stale auth state on this device cannot
+    // cause getUser()/getSession() on the reset page to return a false positive.
+    await supabase.auth.signOut().catch(() => {})
+
     // redirectTo: the callback URL on this exact origin (subdomain).
     // Supabase will append ?code=... so exchangeCodeForSession works.
     // next=/reset-password tells the callback where to send the user after
     // the code exchange succeeds.
+    //
+    // IMPORTANT — Supabase Dashboard configuration required:
+    //   Authentication → URL Configuration
+    //   • Site URL      → https://yourdomain.co.uk  (your production root domain)
+    //   • Redirect URLs → https://*.yourdomain.co.uk/**
+    // Without the wildcard redirect rule, Supabase ignores the redirectTo below
+    // and falls back to the Site URL (which causes the localhost redirect bug).
     const redirectTo =
       `${window.location.origin}/api/auth/callback?next=/reset-password`
 

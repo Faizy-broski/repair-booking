@@ -22,7 +22,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
   const {
     setProfile, setBranches, setActiveBranch, setLoading,
     setCurrency, setSubscriptionStatus, clear,
-    profile: cachedProfile, activeBranch: storedActiveBranch,
+    profile: cachedProfile,
   } = useAuthStore()
   const { fetchConfigs, invalidate: invalidateConfigs } = useModuleConfigStore()
 
@@ -136,23 +136,27 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
         if (branches?.length) {
           setBranches(branches)
 
+          // Read activeBranch from the live store state here (NOT from the
+          // useEffect closure). The closure is created during React's SSR
+          // hydration reconciliation pass where localStorage hasn't applied yet,
+          // so the closed-over value would be null and always fall back to
+          // branches[0] (the main branch), silently reverting the user's
+          // branch selection on every reload.
+          // Reading via getState() happens AFTER Zustand's synchronous
+          // localStorage hydration, so it correctly reflects the persisted choice.
+          const persistedActiveBranch = useAuthStore.getState().activeBranch
+
           let resolvedBranch: Branch | null = null
           if (profile.branch_id) {
             resolvedBranch = branches.find((b) => b.id === profile.branch_id) ?? null
           } else {
-            resolvedBranch = storedActiveBranch
-              ? branches.find((b) => b.id === storedActiveBranch.id) ?? branches[0]
+            resolvedBranch = persistedActiveBranch
+              ? branches.find((b) => b.id === persistedActiveBranch.id) ?? branches[0]
               : branches[0]
           }
 
           if (resolvedBranch) {
-            // Only call setActiveBranch when the branch ID actually changes.
-            // The layout fetches fresh Branch objects from the DB on every load,
-            // so the reference always differs from the persisted one even when
-            // the ID is identical. Without this guard, every page load triggers
-            // a second round of inventory/stats fetches with the same branch_id,
-            // creating a race where the slower request overwrites the faster one.
-            if (resolvedBranch.id !== storedActiveBranch?.id) {
+            if (resolvedBranch.id !== persistedActiveBranch?.id) {
               setActiveBranch(resolvedBranch)
             }
           }

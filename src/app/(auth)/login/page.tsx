@@ -147,17 +147,21 @@ function LoginForm() {
     }
 
     const supabase = createClient()
-    const { error: signInError } = await supabase.auth.signInWithPassword({
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
       email: data.email,
       password: data.password,
     })
 
     if (signInError) {
-      setServerError(signInError.message)
+      // Surface the real reason: invalid credentials, email not confirmed, etc.
+      setServerError(signInError.message || 'Authentication failed. Please try again.')
       return
     }
 
-    const { data: { user } } = await supabase.auth.getUser()
+    // Use the user returned directly from signInWithPassword — avoids a separate
+    // getUser() network round-trip that can return null in a timing window where
+    // the session cookie hasn't propagated yet (race condition with @supabase/ssr).
+    const user = signInData?.user
     if (!user) {
       setServerError('Authentication failed. Please try again.')
       return

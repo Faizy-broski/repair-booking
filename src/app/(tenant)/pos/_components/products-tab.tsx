@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Search, Plus, X, Package, ShoppingBag, Tag, Phone,
   Layers, ChevronRight, Check, ShieldCheck, ExternalLink, ArrowLeft,
@@ -21,6 +21,19 @@ export function ProductsTab() {
   const router = useRouter()
   const { activeBranch } = useAuthStore()
   const pos = usePosStore()
+  const prevBranchIdRef = useRef<string | null>(null)
+
+  // ── Clear stale product lists immediately on branch switch ─────────────────
+  useEffect(() => {
+    const newId = activeBranch?.id ?? null
+    if (prevBranchIdRef.current !== null && prevBranchIdRef.current !== newId) {
+      setAllProductsList([])
+      setCategoryProducts([])
+      setPartProducts([])
+      setAdvSearchResults([])
+    }
+    prevBranchIdRef.current = newId
+  }, [activeBranch?.id]) // eslint-disable-line
 
   // ── View state ─────────────────────────────────────────────────────────────
   const [productsView, setProductsView] = useState<ProductsView>('all_products')
