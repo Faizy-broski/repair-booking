@@ -6,17 +6,22 @@ export async function validateBody<T>(
   request: Request,
   schema: ZodSchema<T>
 ): Promise<{ data: T; error: null } | { data: null; error: NextResponse }> {
+  let body: unknown
   try {
-    const body = await request.json()
-    const result = schema.safeParse(body)
-    if (!result.success) {
-      const message = result.error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')
-      return { data: null, error: badRequest(message, 'VALIDATION_ERROR') }
-    }
-    return { data: result.data, error: null }
+    body = await request.json()
   } catch {
-    return { data: null, error: badRequest('Invalid JSON body') }
+    return { data: null, error: badRequest('Request body must be valid JSON') }
   }
+  const result = schema.safeParse(body)
+  if (!result.success) {
+    // Zod v4 uses .issues; v3 used .errors — support both for safety
+    const issues = result.error.issues ?? (result.error as any).errors ?? []
+    const message = issues.map((e: { path: (string | number)[]; message: string }) =>
+      e.path.length ? `${e.path.join('.')}: ${e.message}` : e.message
+    ).join(', ')
+    return { data: null, error: badRequest(message || 'Validation failed', 'VALIDATION_ERROR') }
+  }
+  return { data: result.data, error: null }
 }
 
 // Common reusable schemas

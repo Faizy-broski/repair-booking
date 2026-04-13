@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Save, Wrench, ChevronRight, ChevronDown, GitBranch, Users, Star, Bell, Calendar, Plus, Code2, Sliders, Pencil, Trash2, Tag, Package, Check, X, Cpu } from 'lucide-react'
+import { Save, Wrench, ChevronRight, ChevronDown, GitBranch, Users, Star, Bell, Calendar, Plus, Code2, Sliders, Pencil, Trash2, Tag, Package, Check, X, Cpu, KeyRound } from 'lucide-react'
 import { CustomFieldBuilder } from '@/components/shared/custom-field-builder'
 import Link from 'next/link'
 import * as Tabs from '@radix-ui/react-tabs'
@@ -11,6 +11,11 @@ import { useAuthStore } from '@/store/auth.store'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
+const resetPwSchema = z.object({
+  password: z.string().min(6, 'Min. 6 characters'),
+  confirmPassword: z.string(),
+}).refine((d) => d.password === d.confirmPassword, { message: 'Passwords do not match', path: ['confirmPassword'] })
+type ResetPwForm = z.infer<typeof resetPwSchema>
 const businessSchema = z.object({
   name: z.string().min(1),
   email: z.string().email().optional().or(z.literal('')),
@@ -263,6 +268,27 @@ export default function SettingsPage() {
     }
   }
   const [userCreateError, setUserCreateError] = useState<string | null>(null)
+  const [resetTarget, setResetTarget] = useState<UserRow | null>(null)
+  const [resetError, setResetError] = useState<string | null>(null)
+  const [resetSuccess, setResetSuccess] = useState(false)
+  const resetPwForm = useForm<ResetPwForm>({ resolver: zodResolver(resetPwSchema) })
+  async function onResetPassword(data: ResetPwForm) {
+    if (!resetTarget) return
+    setResetError(null)
+    const res = await fetch(`/api/users/${resetTarget.id}/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: data.password }),
+    })
+    const json = await res.json() as { error?: { message?: string } | string }
+    if (!res.ok) {
+      const msg = typeof json.error === 'string' ? json.error : json.error?.message ?? 'Failed to update password'
+      setResetError(msg)
+      return
+    }
+    setResetSuccess(true)
+    resetPwForm.reset()
+  }
   async function onCreateUser(data: UserCreateFormData) {
     setUserCreateError(null)
     const res = await fetch('/api/users/invite', {
@@ -450,9 +476,21 @@ export default function SettingsPage() {
                     <p className="font-medium text-gray-900">{user.full_name ?? user.email}</p>
                     <p className="text-xs text-gray-400">{user.email} · {ROLE_LABELS[user.role] ?? user.role}</p>
                   </div>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${user.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                    {user.is_active ? 'Active' : 'Inactive'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {isOwner() && user.role !== 'business_owner' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        title="Set password"
+                        onClick={() => { setResetTarget(user); setResetError(null); setResetSuccess(false); resetPwForm.reset() }}
+                      >
+                        <KeyRound className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${user.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {user.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -821,6 +859,62 @@ export default function SettingsPage() {
           </div>
         </Tabs.Content>}
       </Tabs.Root>
+
+      {/* ── Set Password overlay (business_owner only) ──────────────────────── */}
+      {resetTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+              <div>
+                <h2 className="font-semibold text-gray-900">Set password</h2>
+                <p className="mt-0.5 text-xs text-gray-500">{resetTarget.full_name ?? resetTarget.email}</p>
+              </div>
+              <button
+                onClick={() => { setResetTarget(null); setResetError(null); setResetSuccess(false) }}
+                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-5">
+              {resetSuccess ? (
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                    <p className="font-semibold">Password updated</p>
+                    <p className="mt-0.5 text-xs">They can now sign in with the new password.</p>
+                  </div>
+                  <Button className="w-full" variant="outline" onClick={() => { setResetTarget(null); setResetSuccess(false) }}>Done</Button>
+                </div>
+              ) : (
+                <form onSubmit={resetPwForm.handleSubmit(onResetPassword)} className="space-y-4">
+                  {resetError && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{resetError}</div>
+                  )}
+                  <Input
+                    label="New password"
+                    type="password"
+                    placeholder="Min. 6 characters"
+                    autoComplete="new-password"
+                    error={resetPwForm.formState.errors.password?.message}
+                    {...resetPwForm.register('password')}
+                  />
+                  <Input
+                    label="Confirm new password"
+                    type="password"
+                    placeholder="Repeat password"
+                    autoComplete="new-password"
+                    error={resetPwForm.formState.errors.confirmPassword?.message}
+                    {...resetPwForm.register('confirmPassword')}
+                  />
+                  <Button type="submit" className="w-full" loading={resetPwForm.formState.isSubmitting}>
+                    Set password
+                  </Button>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -30,7 +30,10 @@ function checkIsRootDomain(): boolean {
 function buildSubdomainOrigin(subdomain: string): string {
   const { protocol, hostname, port } = window.location
   const rootDomain = (process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'repairbooking.co.uk').split(':')[0]
-  const baseHost = hostname === 'localhost'
+  // In development every tenant runs as *.localhost — use localhost as the base
+  // so redirects land on the correct local port rather than the production domain.
+  const isLocalhost = hostname === 'localhost' || hostname.endsWith('.localhost')
+  const baseHost = isLocalhost
     ? (port ? `localhost:${port}` : 'localhost')
     : rootDomain
   return `${protocol}//${subdomain}.${baseHost}`
@@ -53,8 +56,10 @@ function LoginForm() {
   const prefilledEmail = searchParams.get('email') ?? ''
   const redirectTo = searchParams.get('redirectTo') || '/dashboard'
   const errorParam = searchParams.get('error')
+  const messageParam = searchParams.get('message')
 
   const [onRoot, setOnRoot] = useState<boolean | null>(null)  // null = not yet determined
+  const [isAdminSubdomain, setIsAdminSubdomain] = useState(false)
   const [serverError, setServerError] = useState('')
   const [pwError, setPwError] = useState('')
   const [subdomainBusinessId, setSubdomainBusinessId] = useState<string | null>(null)
@@ -64,6 +69,12 @@ function LoginForm() {
   useEffect(() => {
     const isRoot = checkIsRootDomain()
     setOnRoot(isRoot)
+    // Detect admin subdomain (admin.localhost in dev, admin.domain in prod)
+    const adminHostname = window.location.hostname
+    const adminCheck =
+      adminHostname === 'admin.localhost' ||
+      adminHostname.startsWith('admin.')
+    setIsAdminSubdomain(adminCheck)
     // When landing on the admin subdomain, eagerly wipe any stale tenant store
     // data from localStorage (shared origin with tenant subdomains on localhost).
     if (!isRoot && window.location.hostname.startsWith('admin.')) {
@@ -158,30 +169,49 @@ function LoginForm() {
       .eq('id', user.id)
       .single()
 
-    if (profile && (profile as { role: string }).role === 'super_admin') {
-      // Clear any lingering tenant store data before entering the admin portal.
-      clearAuthStore()
-      invalidateModuleConfig()
-      // Super admin lives on the admin subdomain
-      if (window.location.hostname.startsWith('admin.')) {
+    const isSuperAdmin = profile && (profile as { role: string }).role === 'super_admin'
+
+    // ── Admin subdomain: only super_admins may proceed ────────────────────
+    if (isAdminSubdomain) {
+      if (isSuperAdmin) {
+        clearAuthStore()
+        invalidateModuleConfig()
         window.location.replace('/superadmin/dashboard')
       } else {
-        window.location.href = `${buildSubdomainOrigin('admin')}/superadmin/dashboard`
+        // Fire-and-forget signOut so the error shows immediately without
+        // waiting for the network round-trip.
+        supabase.auth.signOut().catch(() => {})
+        clearAuthStore()
+        invalidateModuleConfig()
+        setServerError(
+          'This portal is for super administrators only. Please sign in at your business subdomain.'
+        )
       }
       return
     }
 
-    // ── Cross-tenant guard (subdomain mode) ───────────────────────────
+    // ── Business subdomain: super_admins are not allowed here ─────────────
+    // Do NOT hint that the credentials belong to a super_admin — that leaks
+    // information about valid accounts (credential enumeration). Show a generic
+    // invalid-credentials message. Fire-and-forget the signOut so the error
+    // appears instantly without awaiting the network round-trip.
+    if (isSuperAdmin) {
+      supabase.auth.signOut().catch(() => {})
+      clearAuthStore()
+      invalidateModuleConfig()
+      setServerError('Invalid credentials. Please check your email and password.')
+      return
+    }
+
+    // ── Cross-tenant guard (subdomain mode) ───────────────────────────────
     // Compare the profile's business_id with the pre-fetched subdomain
     // business ID — this is a synchronous check, no DB query needed.
     if (subdomainBusinessId && profile) {
       if ((profile as { business_id: string }).business_id !== subdomainBusinessId) {
-        await supabase.auth.signOut()
+        supabase.auth.signOut().catch(() => {})
         clearAuthStore()
         invalidateModuleConfig()
-        setServerError(
-          'Invalid credentials. Please sign in using your business credientials.'
-        )
+        setServerError('Invalid credentials. Please check your email and password.')
         return
       }
     }
@@ -219,8 +249,22 @@ function LoginForm() {
           <p className="mb-5 text-sm text-on-surface-variant">
             Enter your email to be redirected to your business login page.
           </p>
+        ) : isAdminSubdomain ? (
+          <p className="mb-5 text-sm text-on-surface-variant">
+            Super administrator portal — authorised personnel only.
+          </p>
         ) : (
           <p className="mb-5 text-sm text-on-surface-variant">Sign in to your account.</p>
+        )}
+
+        {/* Password reset success */}
+        {messageParam === 'password_reset' && (
+          <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+            <p className="font-semibold">Password updated</p>
+            <p className="mt-0.5 text-green-700">
+              Your password has been changed successfully. Sign in with your new password.
+            </p>
+          </div>
         )}
 
         {/* Account suspended */}
@@ -242,6 +286,17 @@ function LoginForm() {
           <div className="rounded-lg border border-error-container/40 bg-error-container/15 px-4 py-3 text-sm text-on-error-container">
             You were signed out because your account does not belong to this business.
             Please sign in with the correct credentials.
+          </div>
+        )}
+
+        {/* Admin portal access denied — shown when a tenant user tries to log in on admin subdomain */}
+        {errorParam === 'not_superadmin' && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            <p className="font-semibold">Access denied</p>
+            <p className="mt-0.5 text-red-700">
+              This portal is for super administrators only. Please sign in at your
+              business subdomain.
+            </p>
           </div>
         )}
 
@@ -288,12 +343,14 @@ function LoginForm() {
           </Button>
         </form>
 
-        <p className="mt-4 text-center text-sm text-on-surface-variant">
-          Don&apos;t have an account?{' '}
-          <Link href="/register" className="font-medium text-primary hover:underline">
-            Start free trial
-          </Link>
-        </p>
+        {!isAdminSubdomain && (
+          <p className="mt-4 text-center text-sm text-on-surface-variant">
+            Don&apos;t have an account?{' '}
+            <Link href="/register" className="font-medium text-primary hover:underline">
+              Start free trial
+            </Link>
+          </p>
+        )}
       </CardContent>
     </Card>
     </div>

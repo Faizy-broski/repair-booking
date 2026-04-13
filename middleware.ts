@@ -98,10 +98,39 @@ export async function middleware(request: NextRequest) {
 
   // ── SuperAdmin portal (admin.domain) ─────────────────────────────────────
   if (subdomain === SUPERADMIN_SUBDOMAIN) {
-    if (pathname.startsWith('/login')) {
+    // Auth pages that must be accessible without a session
+    if (
+      pathname.startsWith('/login') ||
+      pathname.startsWith('/forgot-password') ||
+      pathname.startsWith('/reset-password')
+    ) {
       return forwardAuthCookies(supabaseResponse, NextResponse.next({ request }))
     }
     if (!user) return redirectToLogin('/login')
+
+    // ── Role enforcement: admin subdomain is exclusively for super_admins ────
+    // Hard server-side gate: tenant users must not access this portal even if
+    // their auth cookie is valid on this origin (shared localhost in dev or
+    // shared root domain in prod). Sign them out immediately and send them back
+    // to the login page with a clear error so they can use the correct subdomain.
+    const { data: adminProfile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (!adminProfile || adminProfile.role !== 'super_admin') {
+      await supabase.auth.signOut()
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('error', 'not_superadmin')
+      return forwardAuthCookies(supabaseResponse, NextResponse.redirect(loginUrl))
+    }
+
+    // API routes must pass through as-is — redirecting them to /superadmin/api/...
+    // would 404 because there are no routes under that path.
+    if (pathname.startsWith('/api/')) {
+      return forwardAuthCookies(supabaseResponse, NextResponse.next({ request }))
+    }
 
     // If already on /superadmin/* — pass through normally (no rewrite needed).
     if (pathname.startsWith('/superadmin')) {
@@ -150,9 +179,12 @@ export async function middleware(request: NextRequest) {
     // user always has a visible, styled error without requiring an extra route.
     const isBusinessBlocked = !business.is_active || business.is_suspended
     if (isBusinessBlocked) {
-      // Allow the login page itself through (otherwise we create a redirect loop)
-      // but strip any redirectTo so they can't bounce to a protected page after.
-      if (pathname.startsWith('/login')) {
+      // Allow login and password-reset pages through (otherwise we create redirect loops)
+      if (
+        pathname.startsWith('/login') ||
+        pathname.startsWith('/forgot-password') ||
+        pathname.startsWith('/reset-password')
+      ) {
         return forwardAuthCookies(supabaseResponse, NextResponse.next({ request }))
       }
       // Sign the user out if they have an active session, so the stale session
@@ -165,16 +197,35 @@ export async function middleware(request: NextRequest) {
       return forwardAuthCookies(supabaseResponse, NextResponse.redirect(loginUrl))
     }
 
-    // Auth pages — pass through so login/register work on the subdomain,
-    // but first destroy any session that belongs to a DIFFERENT business.
-    // This prevents stale cross-tenant cookies from causing redirect loops.
-    if (pathname.startsWith('/login') || pathname.startsWith('/register')) {
+    // Auth + password-reset pages — pass through without requiring an existing session.
+    // /forgot-password and /reset-password must be accessible unauthenticated so users
+    // can initiate and complete a password reset from any device.
+    if (
+      pathname.startsWith('/login') ||
+      pathname.startsWith('/register') ||
+      pathname.startsWith('/forgot-password') ||
+      pathname.startsWith('/reset-password')
+    ) {
       if (user) {
         const { data: loginProfile } = await supabase
           .from('profiles')
-          .select('business_id')
+          .select('role, business_id')
           .eq('id', user.id)
           .maybeSingle()
+
+        if (loginProfile?.role === 'super_admin') {
+          // Super admin visiting a tenant login while already authenticated:
+          // redirect them straight to the admin portal — do NOT destroy their
+          // session, they simply ended up on the wrong subdomain.
+          const adminOrigin =
+            process.env.NODE_ENV === 'development'
+              ? `http://${SUPERADMIN_SUBDOMAIN}.localhost:${request.nextUrl.port || '3000'}`
+              : `https://${SUPERADMIN_SUBDOMAIN}.${ROOT_DOMAIN}`
+          return forwardAuthCookies(
+            supabaseResponse,
+            NextResponse.redirect(new URL('/superadmin/dashboard', adminOrigin))
+          )
+        }
 
         if (loginProfile && loginProfile.business_id !== business.id) {
           await supabase.auth.signOut()

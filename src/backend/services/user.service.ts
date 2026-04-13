@@ -65,4 +65,43 @@ export const UserService = {
     if (error) throw error
     return data
   },
+
+  /**
+   * Reset a team member's password. Only callable with the service-role admin
+   * client so no user session is required. Performs a strict ownership check:
+   * the target profile must belong to `businessId` and must not be a
+   * business_owner (owners manage their own password via account settings).
+   */
+  async resetPassword(
+    targetUserId: string,
+    businessId: string,
+    requesterId: string,
+    newPassword: string
+  ) {
+    const supabase = createAdminClient()
+
+    // Verify the target user belongs to this business and is a sub-user
+    const { data: profile, error: profileError } = await adminSupabase
+      .from('profiles')
+      .select('id, role, business_id')
+      .eq('id', targetUserId)
+      .eq('business_id', businessId)
+      .maybeSingle()
+
+    if (profileError) throw profileError
+    if (!profile) throw new Error('User not found in this business')
+    // Prevent resetting another business_owner's password (incl. self via this endpoint)
+    if (profile.role === 'business_owner') {
+      throw new Error('Business owner passwords cannot be changed via this endpoint')
+    }
+    if (targetUserId === requesterId) {
+      throw new Error('Use account settings to change your own password')
+    }
+
+    const { error: updateError } = await supabase.auth.admin.updateUserById(
+      targetUserId,
+      { password: newPassword }
+    )
+    if (updateError) throw updateError
+  },
 }

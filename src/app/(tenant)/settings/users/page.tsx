@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, KeyRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -45,18 +45,37 @@ const schema = z.object({
 })
 type FormData = z.infer<typeof schema>
 
+const resetPasswordSchema = z.object({
+  password: z.string().min(6, 'Min. 6 characters'),
+  confirmPassword: z.string(),
+}).refine((d) => d.password === d.confirmPassword, {
+  message: "Passwords don't match",
+  path: ['confirmPassword'],
+})
+type ResetPasswordForm = z.infer<typeof resetPasswordSchema>
+
 export default function UsersSettingsPage() {
-  const { branches } = useAuthStore()
+  const { branches, profile } = useAuthStore()
   const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [selectedBranch, setSelectedBranch] = useState<string>('')
+  // Set-password state
+  const [resetTarget, setResetTarget] = useState<UserRow | null>(null)
+  const [resetError, setResetError] = useState<string | null>(null)
+  const [resetSuccess, setResetSuccess] = useState(false)
+
+  const isOwner = (profile as { role?: string } | null)?.role === 'business_owner'
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { role: 'staff' },
   })
   const selectedRole = watch('role')
+
+  const resetPwForm = useForm<ResetPasswordForm>({
+    resolver: zodResolver(resetPasswordSchema),
+  })
 
   const fetchUsers = useCallback(async () => {
     setLoading(true)
@@ -67,6 +86,31 @@ export default function UsersSettingsPage() {
   }, [])
 
   useEffect(() => { fetchUsers() }, [fetchUsers])
+
+  function openResetSheet(user: UserRow) {
+    setResetTarget(user)
+    setResetError(null)
+    setResetSuccess(false)
+    resetPwForm.reset()
+  }
+
+  async function onResetPassword(data: ResetPasswordForm) {
+    if (!resetTarget) return
+    setResetError(null)
+    const res = await fetch(`/api/users/${resetTarget.id}/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: data.password }),
+    })
+    const json = await res.json() as { error?: { message?: string } | string }
+    if (!res.ok) {
+      const msg = typeof json.error === 'string' ? json.error : json.error?.message ?? 'Failed to update password'
+      setResetError(msg)
+      return
+    }
+    setResetSuccess(true)
+    resetPwForm.reset()
+  }
 
   async function onInvite(data: FormData) {
     const res = await fetch('/api/users/invite', {
@@ -137,9 +181,21 @@ export default function UsersSettingsPage() {
       id: 'actions',
       header: '',
       cell: ({ row }) => (
-        <Button size="sm" variant="ghost" onClick={() => toggleActive(row.original)}>
-          {row.original.is_active ? 'Deactivate' : 'Activate'}
-        </Button>
+        <div className="flex items-center gap-2 justify-end">
+          {isOwner && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => openResetSheet(row.original)}
+              title="Set password"
+            >
+              <KeyRound className="h-4 w-4" />
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={() => toggleActive(row.original)}>
+            {row.original.is_active ? 'Deactivate' : 'Activate'}
+          </Button>
+        </div>
       ),
     },
   ]
@@ -210,6 +266,61 @@ export default function UsersSettingsPage() {
             Send Invitation
           </Button>
         </form>
+      </InlineFormSheet>
+
+      {/* ── Set Password sheet (business_owner only) ───────────────────────── */}
+      <InlineFormSheet
+        open={!!resetTarget}
+        onClose={() => setResetTarget(null)}
+        title={`Set password — ${resetTarget?.full_name ?? ''}`}
+        description="The new password takes effect immediately. The user must use it on their next sign in."
+      >
+        {resetSuccess ? (
+          <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+            <p className="font-semibold">Password updated</p>
+            <p className="mt-0.5">
+              {resetTarget?.full_name}&apos;s password has been changed successfully.
+            </p>
+            <Button
+              className="mt-3 w-full"
+              variant="outline"
+              onClick={() => setResetTarget(null)}
+            >
+              Done
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={resetPwForm.handleSubmit(onResetPassword)} className="space-y-4">
+            {resetError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                {resetError}
+              </div>
+            )}
+            <Input
+              label="New password"
+              type="password"
+              placeholder="Min. 6 characters"
+              autoComplete="new-password"
+              error={resetPwForm.formState.errors.password?.message}
+              {...resetPwForm.register('password')}
+            />
+            <Input
+              label="Confirm new password"
+              type="password"
+              placeholder="Repeat password"
+              autoComplete="new-password"
+              error={resetPwForm.formState.errors.confirmPassword?.message}
+              {...resetPwForm.register('confirmPassword')}
+            />
+            <Button
+              type="submit"
+              className="w-full"
+              loading={resetPwForm.formState.isSubmitting}
+            >
+              Set password
+            </Button>
+          </form>
+        )}
       </InlineFormSheet>
     </div>
   )
