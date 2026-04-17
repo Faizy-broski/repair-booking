@@ -21,6 +21,11 @@ interface MiddlewareOptions {
   module?: string
   /** Skip IP whitelist check (e.g. for public/superadmin routes) */
   skipIpCheck?: boolean
+  /** Override rate limit for this specific route. 
+   * limit: max requests per window (default 300)
+   * prefix: namespace to isolate this limit from others (default 'default')
+   */
+  rateLimit?: { limit: number; prefix?: string }
 }
 
 /**
@@ -44,13 +49,19 @@ export function withMiddleware(
 ) {
   return async (request: NextRequest, routeCtx?: any): Promise<NextResponse> => {
     try {
-      // 0. Rate limiting (60 req/min per IP)
-      const rateLimitError = rateLimitMiddleware(request)
+      // 0. Rate limiting — keyed by business ID (set after auth), 300 req/min
+      // Auth hasn't run yet so we use a mutable header trick: inject x-business-id
+      // once we have the auth context, but for the pre-auth rate check we use IP.
+      const rateLimitError = await rateLimitMiddleware(request, options.rateLimit)
       if (rateLimitError) return rateLimitError
 
       // 1. Auth check
       const { context: authCtx, error: authErr } = await authMiddleware(request)
       if (authErr) return authErr
+
+      // Inject business ID into headers so downstream rate limit checks (e.g. message
+      // send endpoints) can key by business rather than IP.
+      request.headers.set('x-business-id', authCtx.businessId ?? '')
 
       // 2. RBAC check (if role required)
       if (options.requiredRole) {

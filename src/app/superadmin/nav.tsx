@@ -13,7 +13,7 @@ const NAV = [
   { href: '/superadmin/analytics',           label: 'Analytics',     icon: BarChart3 },
 ]
 
-export function SuperAdminNav() {
+export function SuperAdminNav({ onNavClick }: { onNavClick?: () => void }) {
   const pathname = usePathname()
 
   return (
@@ -24,6 +24,7 @@ export function SuperAdminNav() {
           <Link
             key={item.href}
             href={item.href}
+            onClick={onNavClick}
             className={cn(
               'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors',
               isActive

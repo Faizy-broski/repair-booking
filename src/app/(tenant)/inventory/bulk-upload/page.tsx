@@ -111,7 +111,7 @@ const PRODUCT_SAMPLE_ROWS = [
   [
     'iPhone 15 Pro Screen Assembly', 'SKU-PRD-001', '8901234567890', '89.99', '42.00',
     'Original OLED screen assembly with frame for iPhone 15 Pro',
-    'https://images.pexels.com/photos/699122/pexels-photo-699122.jpeg',
+    'https://images.pexels.com/photos/788946/pexels-photo-788946.jpeg',
     'Phones', 'Apple', 'iPhone 15 Pro', 'TechParts Ltd', '15', '3',
   ],
   [
@@ -151,25 +151,25 @@ const PART_SAMPLE_ROWS = [
   [
     'Samsung S24 Battery 4000mAh', 'SKU-PRT-002', '', '22.00', '9.00',
     'Original capacity 4000mAh Li-ion replacement battery for Galaxy S24',
-    'https://images.pexels.com/photos/1092671/pexels-photo-1092671.jpeg',
+    'https://images.pexels.com/photos/163124/pexels-photo-163124.jpeg',
     'Samsung', 'Samsung', 'Galaxy S24', 'Battery', 'Parts Supplier', '12', '3',
   ],
   [
     'MacBook Pro 14 Keyboard UK', 'SKU-PRT-003', '', '89.00', '38.00',
     'UK layout backlit replacement keyboard for MacBook Pro 14-inch M3',
-    'https://images.pexels.com/photos/3825586/pexels-photo-3825586.jpeg',
+    'https://images.pexels.com/photos/2399840/pexels-photo-2399840.jpeg',
     'Laptops', 'Apple', 'MacBook Pro 14', 'Keyboard', 'Laptop Parts Co', '5', '1',
   ],
   [
     'iPad Pro 12.9 Touch Digitizer', 'SKU-PRT-004', '', '65.00', '28.00',
     'Front glass touch digitizer panel for iPad Pro 12.9 inch 6th Gen',
-    'https://images.pexels.com/photos/4195342/pexels-photo-4195342.jpeg',
+    'https://images.pexels.com/photos/1334597/pexels-photo-1334597.jpeg',
     'Tablets', 'Apple', 'iPad Pro 12.9', 'Digitizer', 'Parts Supplier', '6', '2',
   ],
   [
     'iPhone 15 USB-C Charging Port', 'SKU-PRT-005', '', '18.00', '7.50',
     'USB-C charging port flex cable assembly for iPhone 15 and 15 Plus',
-    'https://images.pexels.com/photos/404280/pexels-photo-404280.jpeg',
+    'https://images.pexels.com/photos/4526408/pexels-photo-4526408.jpeg',
     'iPhone', 'Apple', 'iPhone 15', 'Charging Port', 'Parts Supplier', '20', '5',
   ],
 ]

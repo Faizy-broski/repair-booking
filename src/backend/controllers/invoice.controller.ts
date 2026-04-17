@@ -106,7 +106,7 @@ export const InvoiceController = {
 
   async generatePdf(request: NextRequest, ctx: RequestContext, id: string) {
     try {
-      const buffer = await InvoiceService.generatePdf(id)
+      const buffer = await InvoiceService.generatePdf(id, ctx.businessId ?? undefined)
       return new NextResponse(buffer, {
         status: 200,
         headers: {

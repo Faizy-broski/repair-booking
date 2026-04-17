@@ -153,18 +153,18 @@ export default function NotificationTemplatesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100">
             <Mail className="h-5 w-5 text-indigo-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Notification Templates</h1>
+            <h1 className="text-lg sm:text-2xl font-bold text-gray-900">Notification Templates</h1>
             <p className="text-sm text-gray-500">Customize the messages sent to customers for each event</p>
           </div>
         </div>
         {templates.length === 0 && (
-          <Button onClick={seedDefaults} loading={loading}>
+          <Button onClick={seedDefaults} loading={loading} className="self-start sm:self-auto">
             <RefreshCw className="h-4 w-4" /> Load Default Templates
           </Button>
         )}
@@ -180,9 +180,9 @@ export default function NotificationTemplatesPage() {
           </div>
         )}
         {templates.map((t) => (
-          <div key={t.id} className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
+          <div key={t.id} className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-gray-900">{TRIGGER_LABELS[t.trigger_event] ?? t.trigger_event}</span>
                 <Badge variant={t.is_active ? 'success' : 'secondary'}>{t.is_active ? 'Active' : 'Inactive'}</Badge>
                 <Badge variant={t.channel === 'email' ? 'default' : t.channel === 'sms' ? 'success' : 'purple'}>
@@ -198,7 +198,7 @@ export default function NotificationTemplatesPage() {
                 </div>
               )}
             </div>
-            <div className="ml-4 flex items-center gap-2">
+            <div className="flex items-center gap-2 sm:ml-4 sm:shrink-0">
               <Button variant="ghost" size="sm" onClick={() => previewTemplate(t.trigger_event)} title="Preview">
                 <EyeIcon className="h-4 w-4" />
               </Button>

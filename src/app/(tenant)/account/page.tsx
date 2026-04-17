@@ -3,11 +3,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   User, CreditCard, Receipt, CheckCircle2, AlertTriangle,
-  Clock, Download, ExternalLink, Loader2, RefreshCw, Zap,
+  Clock, Download, ExternalLink, Loader2, RefreshCw, Zap, PlayCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import { Button } from '@/components/ui/button'
+import { useTour } from '@/hooks/use-tour'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -105,6 +106,7 @@ function StatusBadge({ status }: { status: string }) {
 export default function AccountPage() {
   const { profile, subscriptionStatus, isOwner } = useAuthStore()
   const router = useRouter()
+  const { restart: restartTour } = useTour(profile?.id ?? null)
   const hasAccess = subscriptionStatus === null || subscriptionStatus.hasAccess
 
   const [tab, setTab] = useState<Tab>(hasAccess ? 'account' : 'billing')
@@ -141,7 +143,7 @@ export default function AccountPage() {
     if (tab === 'transactions') fetchInvoices()
   }, [tab, fetchInvoices])
 
-  // Fetch plans when billing tab is open and subscription is not active
+  // Fetch plans when billing tab is open
   useEffect(() => {
     if (tab === 'billing') {
       fetch('/api/plans')
@@ -181,6 +183,14 @@ export default function AccountPage() {
   const isTrialing = sub?.status === 'trialing' && trialDays > 0
   const isActive = sub?.status === 'active'
   const isCanceled = ['canceled', 'past_due', 'suspended'].includes(sub?.status ?? '')
+
+  // Plans eligible to show in the upgrade section:
+  // - If expired/no subscription: all paid plans (for resubscribing)
+  // - If active: only plans more expensive than the current one (genuine upgrades)
+  const currentPrice = plan?.price_monthly ?? 0
+  const upgradablePlans = isActive
+    ? plans.filter((p) => p.price_monthly > currentPrice)
+    : plans
 
   const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: 'account',      label: 'Account',                icon: User       },
@@ -228,20 +238,36 @@ export default function AccountPage() {
 
       {/* ── Account Tab ──────────────────────────────────────────────────── */}
       {tab === 'account' && (
-        <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6 space-y-5">
-          <h2 className="text-base font-semibold text-on-surface">Profile information</h2>
-          {loadingAccount ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-on-surface-variant" />
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6 space-y-5">
+            <h2 className="text-base font-semibold text-on-surface">Profile information</h2>
+            {loadingAccount ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-on-surface-variant" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <InfoRow label="Full name"   value={accountData?.user.full_name ?? profile?.full_name ?? '—'} />
+                <InfoRow label="Email"       value={accountData?.user.email ?? '—'} />
+                <InfoRow label="Role"        value={profile?.role?.replace(/_/g, ' ') ?? '—'} capitalize />
+                <InfoRow label="Business"    value={accountData?.business.name ?? '—'} />
+              </div>
+            )}
+          </div>
+
+          {/* ── Replay tour ─────────────────────────────────────────────── */}
+          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6 flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-base font-semibold text-on-surface">Onboarding tour</h2>
+              <p className="mt-0.5 text-sm text-on-surface-variant">
+                Revisit the step-by-step walkthrough of every feature on your plan.
+              </p>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <InfoRow label="Full name"   value={accountData?.user.full_name ?? profile?.full_name ?? '—'} />
-              <InfoRow label="Email"       value={accountData?.user.email ?? '—'} />
-              <InfoRow label="Role"        value={profile?.role?.replace(/_/g, ' ') ?? '—'} capitalize />
-              <InfoRow label="Business"    value={accountData?.business.name ?? '—'} />
-            </div>
-          )}
+            <Button variant="outline" onClick={restartTour} className="shrink-0 gap-2">
+              <PlayCircle className="h-4 w-4" />
+              Replay tour
+            </Button>
+          </div>
         </div>
       )}
 
@@ -299,8 +325,8 @@ export default function AccountPage() {
                 )}
               </div>
 
-              {/* Resubscribe / upgrade section */}
-              {plans.length > 0 && (
+              {/* Resubscribe / upgrade section — only when there are relevant plans */}
+              {upgradablePlans.length > 0 && (
                 <div className="rounded-2xl border border-brand-teal/30 bg-brand-teal/5 p-6">
                   <div className="flex items-center gap-2 mb-1">
                     <Zap className="h-5 w-5 text-brand-teal" />
@@ -311,7 +337,7 @@ export default function AccountPage() {
                   <p className="text-sm text-on-surface-variant mb-5">
                     {isExpired
                       ? 'Your subscription has ended. Choose a plan below to restore full access to all features.'
-                      : 'Upgrade now to unlock all features and keep uninterrupted access.'}
+                      : 'Unlock more features and capacity by moving to a higher plan.'}
                   </p>
 
                   {errorMsg && (
@@ -321,8 +347,8 @@ export default function AccountPage() {
                   )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {plans.map((p, i) => {
-                      const highlighted = plans.length >= 2 && i === Math.floor(plans.length / 2)
+                    {upgradablePlans.map((p, i) => {
+                      const highlighted = upgradablePlans.length >= 2 && i === Math.floor(upgradablePlans.length / 2)
                       return (
                         <div
                           key={p.id}

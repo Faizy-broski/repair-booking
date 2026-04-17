@@ -23,13 +23,13 @@ export function StatsCard({ title, value, subtitle, icon, trend, color = 'blue',
   const colors = COLOR_CLASSES[color]
 
   return (
-    <div className={cn('relative flex h-full flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-5 px-5 shadow-sm', className)}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="min-h-[1.5rem] text-[10px] font-bold uppercase leading-tight tracking-[0.05em] text-gray-700">{title}</p>
-          <p className="mt-1 text-[28px] font-bold tracking-tight text-gray-900 leading-none">{value}</p>
+    <div className={cn('relative flex h-full flex-col overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-4 px-4 sm:pt-5 sm:px-5 shadow-sm', className)}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="min-h-[1.5rem] text-[9px] sm:text-[10px] font-bold uppercase leading-tight tracking-[0.05em] text-gray-700">{title}</p>
+          <p className="mt-1 text-xl sm:text-[28px] font-bold tracking-tight text-gray-900 leading-none truncate">{value}</p>
           {subtitle && (
-            <p className={cn('mt-3 flex items-center gap-1 text-xs font-medium', colors.sub)}>
+            <p className={cn('mt-2 sm:mt-3 flex items-center gap-1 text-[11px] sm:text-xs font-medium', colors.sub)}>
               {trend !== undefined && (
                 <>
                   {trend > 0 ? (
@@ -47,13 +47,13 @@ export function StatsCard({ title, value, subtitle, icon, trend, color = 'blue',
           )}
         </div>
         {icon && (
-          <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-xl', colors.iconBg)}>
+          <div className={cn('flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl', colors.iconBg)}>
             <span className={colors.icon}>{icon}</span>
           </div>
         )}
       </div>
       {/* Coloured bottom accent stripe */}
-      <div className={cn('absolute bottom-0 left-0 right-0 h-2', colors.accent)} />
+      <div className={cn('absolute bottom-0 left-0 right-0 h-1.5 sm:h-2', colors.accent)} />
     </div>
   )
 }

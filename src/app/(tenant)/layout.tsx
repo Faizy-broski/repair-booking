@@ -2,6 +2,9 @@
 import { useState, useEffect } from 'react'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Topbar } from '@/components/layout/topbar'
+import { NotificationToasts } from '@/components/layout/notification-toasts'
+import { MessageBadge } from '@/components/layout/message-badge'
+import { TourGuide } from '@/components/shared/tour-guide'
 import { useAuthStore } from '@/store/auth.store'
 import { useModuleConfigStore } from '@/store/module-config.store'
 import { createClient } from '@/lib/supabase/client'
@@ -12,6 +15,12 @@ import type { SubscriptionStatus } from '@/store/auth.store'
 export default function TenantLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+
+  // Lock body scroll when mobile sidebar is open
+  useEffect(() => {
+    document.body.style.overflow = sidebarOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [sidebarOpen])
 
   // Gates the protected layout render.
   // Set to true as soon as Supabase confirms a live session (~100ms JWT check).
@@ -224,12 +233,14 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
 
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden">
+        <div className="fixed inset-0 z-50 flex lg:hidden">
+          {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-black/30"
+            className="absolute inset-0 bg-black/40"
             onClick={() => setSidebarOpen(false)}
           />
-          <div className="relative z-50">
+          {/* Slide-in panel */}
+          <div className="relative flex-shrink-0 animate-slide-in-left">
             <Sidebar onClose={() => setSidebarOpen(false)} />
           </div>
         </div>
@@ -242,6 +253,13 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
           {children}
         </main>
       </div>
+
+      {/* Global in-app toast notifications */}
+      <NotificationToasts />
+      {/* Global unread message badge tracker (invisible component) */}
+      <MessageBadge />
+      {/* Step-by-step onboarding tour for new users */}
+      <TourGuide />
     </div>
   )
 }

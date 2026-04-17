@@ -33,6 +33,9 @@ export default function PhonePage() {
   // to the callee peer via peer.signal(). Without this the callee peer cannot
   // generate an answer and the call hangs indefinitely.
   const incomingOfferRef = useRef<any>(null)
+  // Buffers trickle-ICE candidates that arrive before the callee peer is created
+  // (i.e. before the user clicks "Answer"). They are replayed in acceptCall().
+  const pendingIceCandidatesRef = useRef<any[]>([])
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -69,8 +72,13 @@ export default function PhonePage() {
           peerRef.current.signal(payload.data)
         }
 
-        if (payload.type === 'ice-candidate' && peerRef.current) {
-          peerRef.current.signal(payload.data)
+        if (payload.type === 'ice-candidate') {
+          if (peerRef.current) {
+            peerRef.current.signal(payload.data)
+          } else {
+            // Peer not yet created — buffer for replay after acceptCall() creates it
+            pendingIceCandidatesRef.current.push(payload.data)
+          }
         }
 
         if (payload.type === 'hangup') {
@@ -178,6 +186,9 @@ export default function PhonePage() {
         peer.signal(incomingOfferRef.current)
         incomingOfferRef.current = null
       }
+      // Replay any trickle-ICE candidates that arrived before this peer was created
+      pendingIceCandidatesRef.current.forEach((c) => peer.signal(c))
+      pendingIceCandidatesRef.current = []
     } catch {
       rejectCall()
     }
@@ -206,6 +217,7 @@ export default function PhonePage() {
     }
     if (peerRef.current) { peerRef.current.destroy(); peerRef.current = null }
     incomingOfferRef.current = null
+    pendingIceCandidatesRef.current = []
     if (localStreamRef.current) { localStreamRef.current.getTracks().forEach((t) => t.stop()); localStreamRef.current = null }
     if (callTimerRef.current) { clearInterval(callTimerRef.current); callTimerRef.current = null }
     setCallStatus('idle')
@@ -221,7 +233,7 @@ export default function PhonePage() {
 
   function toggleMute() {
     if (localStreamRef.current) {
-      localStreamRef.current.getAudioTracks().forEach((t) => { t.enabled = isMuted })
+      localStreamRef.current.getAudioTracks().forEach((t) => { t.enabled = !isMuted })
       setIsMuted(!isMuted)
     }
   }

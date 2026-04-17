@@ -15,7 +15,7 @@ export const ProductService = {
             brandId, supplierId, valuation, hideOutOfStock, itemType, modelId, partType } = params
 
     const inventorySelect = branchId
-      ? `*, categories(name), brands(name), inventory!left(quantity, low_stock_alert, branch_id, variant_id), product_variants(id), suppliers(name), service_devices(name)`
+      ? `*, categories(name), brands(name), inventory!left(quantity, low_stock_alert, branch_id, variant_id), product_variants(id), suppliers(name), service_devices(name), branch_products!inner(is_enabled)`
       : `*, categories(name), brands(name), product_variants(id), suppliers(name), service_devices(name)`
 
     let q = db
@@ -26,6 +26,14 @@ export const ProductService = {
       .range((page - 1) * limit, page * limit - 1)
 
     if (!includeInactive) q = q.eq('is_active', true)
+
+    // When listing for a specific branch, only return products that are enabled
+    // in that branch's catalog via the branch_products join.
+    if (branchId) {
+      q = q
+        .eq('branch_products.branch_id', branchId)
+        .eq('branch_products.is_enabled', true)
+    }
     if (search) q = q.or(`name.ilike.%${search}%,sku.ilike.%${search}%,barcode.ilike.%${search}%,imei.ilike.%${search}%`)
     if (categoryId) q = q.eq('category_id', categoryId)
     if (brandId) q = q.eq('brand_id', brandId)
@@ -46,7 +54,7 @@ export const ProductService = {
       const branchInv = (p.inventory as Array<{ branch_id: string; quantity: number; low_stock_alert: number | null; variant_id: string | null }>)
         .find((i) => i.branch_id === branchId && i.variant_id === null)
       const on_hand = branchInv?.quantity ?? 0
-      return { ...p, on_hand, low_stock_alert: branchInv?.low_stock_alert ?? null, inventory: undefined, variant_count: variantCount, product_variants: undefined }
+      return { ...p, on_hand, low_stock_alert: branchInv?.low_stock_alert ?? null, inventory: undefined, branch_products: undefined, variant_count: variantCount, product_variants: undefined }
     })
 
     if (hideOutOfStock) {
@@ -115,16 +123,45 @@ export const ProductService = {
     return data
   },
 
-  async delete(id: string, businessId: string) {
-    // Attempt to hard delete first (ideal for cleaning up accidental imports)
+  async delete(id: string, businessId: string, branchId?: string) {
+    // ── Branch-scoped delete ─────────────────────────────────────────────────
+    // When a branchId is provided we only remove the product from THAT branch's
+    // catalog.  The product row itself is only removed when no branch catalog
+    // references it any more (or when there was never a branch_products row).
+    if (branchId) {
+      // 1. Remove from this branch's catalog
+      await adminSupabase
+        .from('branch_products')
+        .delete()
+        .eq('branch_id', branchId)
+        .eq('product_id', id)
+
+      // 2. Also drop the inventory row for this branch so stock is clean
+      await adminSupabase
+        .from('inventory')
+        .delete()
+        .eq('branch_id', branchId)
+        .eq('product_id', id)
+
+      // 3. Check if any other branch still has this product
+      const { count } = await adminSupabase
+        .from('branch_products')
+        .select('id', { count: 'exact', head: true })
+        .eq('product_id', id)
+
+      // If other branches still use it, we're done — product row stays.
+      if ((count ?? 0) > 0) return
+      // Otherwise fall through and delete the product itself.
+    }
+
+    // ── Business-wide delete (no branchId, or last branch removed) ───────────
+    // Attempt hard delete first; fall back to soft-delete on FK violation.
     const { error: hardDeleteError } = await adminSupabase
       .from('products')
       .delete()
       .eq('id', id)
       .eq('business_id', businessId)
 
-    // If there is a foreign key constraint violation (e.g. product was sold or used in orders),
-    // gracefully fall back to a soft delete.
     if (hardDeleteError) {
       if (hardDeleteError.code === '23503') {
         const { error: softDeleteError } = await adminSupabase
@@ -132,11 +169,51 @@ export const ProductService = {
           .update({ is_active: false })
           .eq('id', id)
           .eq('business_id', businessId)
-        
         if (softDeleteError) throw softDeleteError
       } else {
         throw hardDeleteError
       }
+    }
+  },
+
+  // ── Branch availability ───────────────────────────────────────────────────
+
+  /** Returns the enabled/disabled status of a product across all business branches. */
+  async getBranchAvailability(productId: string, businessId: string) {
+    const { data, error } = await adminSupabase
+      .from('branches')
+      .select('id, name, is_main, branch_products!left(is_enabled)')
+      .eq('business_id', businessId)
+      .eq('is_active', true)
+      .order('is_main', { ascending: false })
+    if (error) throw error
+    return (data ?? []).map((b: any) => ({
+      branch_id: b.id,
+      name: b.name,
+      is_main: b.is_main,
+      // null means no branch_products row yet → product not in catalog
+      is_enabled: b.branch_products?.[0]?.is_enabled ?? false,
+    }))
+  },
+
+  /** Upserts a branch_products row to enable or disable a product for a branch. */
+  async setBranchAvailability(productId: string, branchId: string, isEnabled: boolean) {
+    const { error } = await adminSupabase
+      .from('branch_products')
+      .upsert(
+        { branch_id: branchId, product_id: productId, is_enabled: isEnabled },
+        { onConflict: 'branch_id,product_id' }
+      )
+    if (error) throw error
+
+    // When enabling, also ensure an inventory row exists for this branch
+    if (isEnabled) {
+      await adminSupabase
+        .from('inventory')
+        .upsert(
+          { branch_id: branchId, product_id: productId, quantity: 0, low_stock_alert: 5 },
+          { onConflict: 'branch_id,product_id' }
+        )
     }
   },
 

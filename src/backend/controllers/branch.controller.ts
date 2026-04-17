@@ -32,7 +32,10 @@ export const BranchController = {
     try {
       const limitCheck = await PlanLimitService.checkLimit(ctx.businessId, 'max_branches')
       if (!limitCheck.allowed) {
-        return forbidden(`Branch limit reached. Your plan allows ${limitCheck.limit} branch${limitCheck.limit === 1 ? '' : 'es'}.`)
+        const limitMsg = limitCheck.limit != null
+          ? `Your plan allows ${limitCheck.limit} branch${limitCheck.limit === 1 ? '' : 'es'}.`
+          : (limitCheck.reason ?? 'Upgrade your plan to add more branches.')
+        return forbidden(`Branch limit reached. ${limitMsg}`)
       }
 
       const branch = await BranchService.create({

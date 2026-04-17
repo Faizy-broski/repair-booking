@@ -323,8 +323,9 @@ export function ProductsTab() {
   return (
     <div className="flex h-full flex-col">
       {/* Toggle bar */}
-      <div className="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 py-2">
-        <div className="flex overflow-hidden rounded-lg border border-gray-200">
+      <div className="flex shrink-0 items-center gap-2 border-b border-gray-200 bg-white px-3 py-2">
+        <div className="flex min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex overflow-hidden rounded-lg border border-gray-200">
           {(['all_products', 'by_products', 'by_parts', 'custom_item'] as const).map((view, i) => {
             const labels = ['All Products', 'By Products', 'By Part Items', 'Custom Item']
             return (
@@ -335,7 +336,7 @@ export function ProductsTab() {
                   if (view === 'by_products' && catBreadcrumb.length === 0) loadCatLevel('device_types')
                   if (view === 'by_parts' && partBreadcrumb.length === 0) loadPartLevel('device_types')
                 }}
-                className={`px-5 py-2 text-sm font-medium transition-colors ${i > 0 ? 'border-l border-gray-200' : ''} ${
+                className={`shrink-0 px-3 py-2 text-xs font-medium transition-colors sm:px-5 sm:text-sm ${i > 0 ? 'border-l border-gray-200' : ''} ${
                   productsView === view ? 'bg-white text-brand-teal font-semibold border-b-2 border-brand-teal' : 'text-gray-500 hover:bg-gray-50'
                 }`}
               >
@@ -343,14 +344,15 @@ export function ProductsTab() {
               </button>
             )
           })}
+          </div>
         </div>
         <button
           onClick={openAdvSearch}
-          className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 sm:px-3"
         >
           <Search className="h-3.5 w-3.5" />
-          <span className="rounded bg-gray-100 px-1 text-[10px] font-mono text-gray-500">Ctrl S</span>
-          Advance Search
+          <span className="hidden rounded bg-gray-100 px-1 text-[10px] font-mono text-gray-500 sm:inline">Ctrl S</span>
+          <span className="hidden sm:inline">Advance Search</span>
         </button>
       </div>
 
@@ -396,11 +398,11 @@ export function ProductsTab() {
               {!allProductsLoading && <span className="ml-auto text-xs text-gray-400">{allProductsList.length} item{allProductsList.length !== 1 ? 's' : ''}</span>}
             </div>
             {allProductsLoading ? (
-              <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                 {Array.from({ length: 10 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}
               </div>
             ) : allProductsList.length > 0 ? (
-              <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                 {allProductsList.map(product => <ProductCard key={product.id} product={product} />)}
               </div>
             ) : (
@@ -432,9 +434,9 @@ export function ProductsTab() {
             )}
             {catLevel !== 'products' && (
               catItemsLoading ? (
-                <div className="grid grid-cols-3 gap-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-32 animate-pulse rounded-xl bg-gray-200" />)}</div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-32 animate-pulse rounded-xl bg-gray-200" />)}</div>
               ) : (
-                <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                   {catItems.map(item => (
                     <button key={item.id} onClick={() => selectCatItem(item)} className="flex flex-col w-full overflow-hidden rounded-xl border border-gray-200 bg-white hover:border-brand-teal hover:shadow-sm transition-all text-center min-h-[140px]">
                       {item.image_url ? (
@@ -463,9 +465,9 @@ export function ProductsTab() {
               <div className="space-y-2">
                 <h4 className="text-sm font-semibold text-gray-700">{catBreadcrumb[catBreadcrumb.length - 1]?.name}</h4>
                 {categoryProductsLoading ? (
-                  <div className="grid grid-cols-4 gap-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}</div>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}</div>
                 ) : categoryProducts.length > 0 ? (
-                  <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                     {categoryProducts.map(product => <ProductCard key={product.id} product={product} size="sm" />)}
                   </div>
                 ) : (
@@ -494,12 +496,12 @@ export function ProductsTab() {
               </div>
             )}
             {partItemsLoading ? (
-              <div className="grid grid-cols-4 gap-3">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-gray-200" />)}</div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-gray-200" />)}</div>
             ) : partLevel === 'parts' ? (
               partProductsLoading ? (
-                <div className="grid grid-cols-4 gap-3">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-32 animate-pulse rounded-xl bg-gray-200" />)}</div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-32 animate-pulse rounded-xl bg-gray-200" />)}</div>
               ) : partProducts.length > 0 ? (
-                <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                   {partProducts.map(product => {
                     const hasVariants = product.has_variants || (product as any).variant_count > 0
                     return (
@@ -522,7 +524,7 @@ export function ProductsTab() {
                 <p className="py-8 text-center text-sm text-gray-400">No parts found for this part type</p>
               )
             ) : (
-              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                 {partItems.map(item => (
                   <button key={item.id} onClick={() => selectPartItem(item)} className="flex flex-col w-full overflow-hidden rounded-xl border border-gray-200 bg-white hover:border-brand-teal hover:shadow-sm transition-all cursor-pointer text-center min-h-[140px]">
                     {item.image_url ? (

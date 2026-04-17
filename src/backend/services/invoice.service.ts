@@ -97,29 +97,57 @@ export const InvoiceService = {
     return summary
   },
 
-  async generatePdf(id: string): Promise<Buffer> {
+  async generatePdf(id: string, businessId?: string): Promise<Buffer> {
     const { data, error } = await adminSupabase
       .from('invoices')
-      .select('*, customers(first_name,last_name,email), branches(name,address,phone,email)')
+      .select('*, customers(*), branches(id,name,address,phone,email,business_id,logo_url)')
       .eq('id', id)
       .single()
     if (error || !data) throw error ?? new Error('Invoice not found')
 
     const { renderToBuffer } = await import('@react-pdf/renderer')
     const { InvoicePdf } = await import('@/components/pdf/invoice-pdf')
+    const { InvoiceSettingsService } = await import('@/backend/services/invoice-settings.service')
     const React = (await import('react')).default
 
+    const branch = data.branches as any
     const customer = data.customers as any
-    const items: Array<{ description: string; quantity: number; unit_price: number }> =
-      Array.isArray(data.items) ? (data.items as any[]) : []
+    const bizId = businessId ?? branch?.business_id
+    const items = Array.isArray(data.items) ? (data.items as any[]) : []
+
+    // Fetch branding settings (branch override falls back to business default)
+    const settings = bizId
+      ? await InvoiceSettingsService.get(bizId, branch?.id ?? null)
+      : (await import('@/types/invoice-settings')).DEFAULT_INVOICE_SETTINGS
+
+    // Use branch logo as fallback if no logo_url in settings
+    const effectiveSettings = {
+      ...settings,
+      logo_url: settings.logo_url ?? branch?.logo_url ?? null,
+    }
 
     const doc = React.createElement(InvoicePdf, {
+      settings: effectiveSettings,
       invoiceNumber: data.invoice_number,
-      customerName: customer ? `${customer.first_name} ${customer.last_name ?? ''}` : '—',
+      status: data.status ?? 'unpaid',
+      issuedAt: data.issued_at ?? data.created_at,
+      dueAt: data.due_at ?? null,
+      businessName: branch?.name ?? 'Business',
+      branchName: branch?.name ?? null,
+      branchAddress: branch?.address ?? null,
+      branchPhone: branch?.phone ?? null,
+      branchEmail: branch?.email ?? null,
+      customerName: customer ? `${customer.first_name} ${customer.last_name ?? ''}`.trim() : '—',
+      customerEmail: customer?.email ?? null,
+      customerPhone: customer?.phone ?? null,
+      customerAddress: customer?.address ?? null,
       items,
-      subtotal: data.subtotal,
-      tax: data.tax,
-      total: data.total,
+      subtotal: data.subtotal ?? 0,
+      discount: data.discount ?? 0,
+      tax: data.tax ?? 0,
+      total: data.total ?? 0,
+      amountPaid: data.amount_paid ?? 0,
+      notes: data.notes ?? null,
     })
 
     return await renderToBuffer(doc as any)

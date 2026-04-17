@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, use, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Save, Trash2 } from 'lucide-react'
+import { ChevronLeft, Save, Trash2, Store } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -10,6 +10,13 @@ import { ImageUpload } from '@/components/ui/image-upload'
 import { formatCurrency } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import Link from 'next/link'
+
+interface BranchAvailability {
+  branch_id: string
+  name: string
+  is_main: boolean
+  is_enabled: boolean
+}
 
 interface Product {
   id: string; name: string; sku: string | null; barcode: string | null
@@ -76,6 +83,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [commissionRate, setCommissionRate] = useState('')
   const [loyaltyEnabled, setLoyaltyEnabled] = useState(true)
 
+  const [branchAvailability, setBranchAvailability] = useState<BranchAvailability[]>([])
+  const [togglingBranch, setTogglingBranch] = useState<string | null>(null)
+
   const fetchProduct = useCallback(async () => {
     setLoading(true)
     const branchParam = activeBranch ? `?branch_id=${activeBranch.id}` : ''
@@ -107,6 +117,34 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   }, [id, activeBranch])
 
   useEffect(() => { fetchProduct() }, [fetchProduct])
+
+  const fetchBranchAvailability = useCallback(async () => {
+    const res = await fetch(`/api/products/${id}/branch-availability`)
+    const json = await res.json()
+    if (res.ok) setBranchAvailability(json.data ?? [])
+  }, [id])
+
+  useEffect(() => { fetchBranchAvailability() }, [fetchBranchAvailability])
+
+  async function toggleBranchAvailability(branchId: string, currentValue: boolean) {
+    setTogglingBranch(branchId)
+    // Optimistic update
+    setBranchAvailability(prev =>
+      prev.map(b => b.branch_id === branchId ? { ...b, is_enabled: !currentValue } : b)
+    )
+    const res = await fetch(`/api/products/${id}/branch-availability`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ branch_id: branchId, is_enabled: !currentValue }),
+    })
+    if (!res.ok) {
+      // Revert on failure
+      setBranchAvailability(prev =>
+        prev.map(b => b.branch_id === branchId ? { ...b, is_enabled: currentValue } : b)
+      )
+    }
+    setTogglingBranch(null)
+  }
   useEffect(() => {
     fetch('/api/categories').then(r => r.json()).then(j => setCategories(j.data ?? [])).catch(() => {})
     fetch('/api/brands').then(r => r.json()).then(j => setAllBrands(j.data ?? [])).catch(() => {})
@@ -395,6 +433,44 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               )}
             </div>
           </section>
+
+          {/* Branch Availability — only shown when business has multiple branches */}
+          {branchAvailability.length > 1 && (
+            <section>
+              <div className="mb-4 border-b border-gray-200 pb-2">
+                <h2 className="text-base font-semibold text-gray-900">Branch Availability</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Control which branches can see and sell this {itemType} in their inventory and POS.</p>
+              </div>
+              <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+                {branchAvailability.map((b) => (
+                  <div key={b.branch_id} className="flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100">
+                        <Store className="h-4 w-4 text-gray-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {b.name}
+                          {b.is_main && <span className="ml-1.5 text-[10px] uppercase tracking-wide font-semibold text-brand-teal">Main</span>}
+                        </p>
+                        <p className="text-xs text-gray-400">{b.is_enabled ? 'Enabled — visible in inventory & POS' : 'Disabled — hidden from this branch'}</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex cursor-pointer items-center">
+                      <input
+                        type="checkbox"
+                        className="sr-only peer"
+                        checked={b.is_enabled}
+                        disabled={togglingBranch === b.branch_id}
+                        onChange={() => toggleBranchAvailability(b.branch_id, b.is_enabled)}
+                      />
+                      <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-teal peer-checked:after:translate-x-full peer-disabled:opacity-50" />
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Pricing Options */}
           <section>

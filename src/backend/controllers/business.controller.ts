@@ -69,4 +69,23 @@ export const BusinessController = {
       return serverError('Failed to activate business', err)
     }
   },
+
+  async getDetails(_request: NextRequest, _ctx: RequestContext, id: string) {
+    try {
+      const details = await BusinessService.getFullDetails(id)
+      if (!details.business) return notFound('Business not found')
+      return ok(details)
+    } catch (err) {
+      return serverError('Failed to fetch business details', err)
+    }
+  },
+
+  async resetOwnerPassword(_request: NextRequest, _ctx: RequestContext, id: string) {
+    try {
+      const result = await BusinessService.resetOwnerPassword(id)
+      return ok(result)
+    } catch (err) {
+      return serverError('Failed to reset password', err)
+    }
+  },
 }

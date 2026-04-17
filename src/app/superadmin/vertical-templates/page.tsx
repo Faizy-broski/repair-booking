@@ -1,8 +1,9 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Plus, Pencil, Trash2, Play, Store, Wrench, ShoppingBag,
-  Scissors, Coffee, Monitor, ChevronRight, Package,
+  Scissors, Coffee, Monitor, Package, Eye,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +27,7 @@ const ICON_MAP: Record<string, typeof Store> = {
   scissors: Scissors, coffee: Coffee, monitor: Monitor, package: Package,
 }
 
+
 const schema = z.object({
   name: z.string().min(1),
   slug: z.string().min(1).regex(/^[a-z0-9-]+$/),
@@ -37,6 +39,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 export default function VerticalTemplatesPage() {
+  const router = useRouter()
   const [templates, setTemplates] = useState<BusinessVerticalTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -203,6 +206,9 @@ export default function VerticalTemplatesPage() {
                 <div className="mt-3 flex items-center gap-2 border-t border-gray-100 pt-3">
                   <Button size="sm" variant="outline" onClick={() => openEdit(t)}>
                     <Pencil className="h-3 w-3" /> Edit
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => router.push(`/superadmin/vertical-templates/${t.id}/preview`)}>
+                    <Eye className="h-3 w-3" /> Preview
                   </Button>
                   <Button
                     size="sm"

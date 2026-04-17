@@ -50,7 +50,7 @@ export default async function SuperAdminDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-on-surface">SuperAdmin Dashboard</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-on-surface">SuperAdmin Dashboard</h1>
         <p className="text-sm text-on-surface-variant">Platform-wide overview</p>
       </div>
 
@@ -71,38 +71,40 @@ export default async function SuperAdminDashboard() {
         <div className="border-b border-outline-variant px-5 py-4">
           <h2 className="font-semibold text-on-surface">Recent Businesses</h2>
         </div>
-        <table className="w-full">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[480px]">
           <thead>
             <tr className="border-b border-outline-variant text-left text-xs font-medium text-outline uppercase">
-              <th className="px-5 py-3">Business</th>
-              <th className="px-5 py-3">Subdomain</th>
-              <th className="px-5 py-3">Plan</th>
-              <th className="px-5 py-3">Status</th>
-              <th className="px-5 py-3">Joined</th>
+              <th className="px-4 sm:px-5 py-3">Business</th>
+              <th className="hidden sm:table-cell px-5 py-3">Subdomain</th>
+              <th className="px-4 sm:px-5 py-3">Plan</th>
+              <th className="px-4 sm:px-5 py-3">Status</th>
+              <th className="hidden sm:table-cell px-5 py-3">Joined</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-outline-variant">
             {recentBusinesses.map((biz: any) => (
               <tr key={biz.id} className="hover:bg-surface-container-low">
-                <td className="px-5 py-3 font-medium text-on-surface">{biz.name}</td>
-                <td className="px-5 py-3 text-sm text-on-surface-variant font-mono">{biz.subdomain}</td>
-                <td className="px-5 py-3 text-sm text-on-surface-variant">
+                <td className="px-4 sm:px-5 py-3 font-medium text-on-surface">{biz.name}</td>
+                <td className="hidden sm:table-cell px-5 py-3 text-sm text-on-surface-variant font-mono">{biz.subdomain}</td>
+                <td className="px-4 sm:px-5 py-3 text-sm text-on-surface-variant">
                   {biz.subscriptions?.[0]?.plans?.name ?? '—'}
                 </td>
-                <td className="px-5 py-3">
+                <td className="px-4 sm:px-5 py-3">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                     biz.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                   }`}>
                     {biz.is_active ? 'Active' : 'Suspended'}
                   </span>
                 </td>
-                <td className="px-5 py-3 text-sm text-outline">
+                <td className="hidden sm:table-cell px-5 py-3 text-sm text-outline">
                   {new Date(biz.created_at).toLocaleDateString()}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   )

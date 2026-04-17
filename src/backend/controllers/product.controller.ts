@@ -115,38 +115,30 @@ export const ProductController = {
       const { initial_stock, low_stock_alert, branch_id, ...productData } = data
       const product = await ProductService.create({ ...productData, business_id: ctx.businessId } as any)
 
-      // Seed inventory rows across ALL active branches so every branch has a
-      // tracked stock level (0 by default). The branch that was active at
-      // creation time gets the specified initial_stock quantity.
+      // Seed inventory + branch catalog only for the creating branch.
+      // Other branches must explicitly enable the product via the branch
+      // availability toggle — they do NOT get auto-seeded anymore.
       const needsStock = productData.item_type === 'part' || !productData.is_service
-      if (needsStock) {
+      const targetBranch = branch_id ?? ctx.auth.branchId
+      if (targetBranch) {
         const { adminSupabase } = await import('@/backend/config/supabase')
-        const targetBranch = branch_id ?? ctx.auth.branchId
 
-        const { data: allBranches } = await adminSupabase
-          .from('branches')
-          .select('id')
-          .eq('business_id', ctx.businessId)
-          .eq('is_active', true)
-
-        const branches = allBranches ?? []
-
-        if (branches.length > 0) {
-          const inventoryRows = branches.map((b: { id: string }) => ({
-            branch_id: b.id,
-            product_id: product.id,
-            quantity: b.id === targetBranch ? (initial_stock ?? 0) : 0,
-            low_stock_alert: low_stock_alert ?? 5,
-          }))
-          await adminSupabase
-            .from('inventory')
-            .upsert(inventoryRows, { onConflict: 'branch_id,product_id' })
-        } else if (targetBranch) {
-          // Fallback: no branches found — at least seed the active branch
-          await adminSupabase.from('inventory').upsert(
-            { branch_id: targetBranch, product_id: product.id, quantity: initial_stock ?? 0, low_stock_alert: low_stock_alert ?? 5 },
+        // 1. Enable product in the creating branch's catalog
+        await adminSupabase
+          .from('branch_products')
+          .upsert(
+            { branch_id: targetBranch, product_id: product.id, is_enabled: true },
             { onConflict: 'branch_id,product_id' }
           )
+
+        // 2. Seed the inventory row with the specified initial_stock
+        if (needsStock) {
+          await adminSupabase
+            .from('inventory')
+            .upsert(
+              { branch_id: targetBranch, product_id: product.id, quantity: initial_stock ?? 0, low_stock_alert: low_stock_alert ?? 5 },
+              { onConflict: 'branch_id,product_id' }
+            )
         }
       }
 
@@ -198,8 +190,9 @@ export const ProductController = {
   },
 
   async delete(request: NextRequest, ctx: RequestContext, id: string) {
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? undefined
     try {
-      await ProductService.delete(id, ctx.businessId)
+      await ProductService.delete(id, ctx.businessId, branchId)
       return ok({ deleted: true })
     } catch (err) {
       return serverError('Failed to delete product', err)
@@ -243,6 +236,32 @@ export const ProductController = {
       return ok(data)
     } catch (err) {
       return serverError('Failed to fetch product history', err)
+    }
+  },
+
+  // ── Branch availability endpoints ─────────────────────────────────────────
+
+  async getBranchAvailability(_request: NextRequest, ctx: RequestContext, productId: string) {
+    try {
+      const data = await ProductService.getBranchAvailability(productId, ctx.businessId)
+      return ok(data)
+    } catch (err) {
+      return serverError('Failed to fetch branch availability', err)
+    }
+  },
+
+  async setBranchAvailability(request: NextRequest, ctx: RequestContext, productId: string) {
+    const schema = z.object({
+      branch_id: z.string().uuid(),
+      is_enabled: z.boolean(),
+    })
+    const { data, error } = await validateBody(request, schema)
+    if (error) return error
+    try {
+      await ProductService.setBranchAvailability(productId, data.branch_id, data.is_enabled)
+      return ok({ updated: true })
+    } catch (err) {
+      return serverError('Failed to update branch availability', err)
     }
   },
 

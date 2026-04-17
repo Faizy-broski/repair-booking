@@ -169,65 +169,89 @@ export default function PlansPage() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-5">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-48 animate-pulse rounded-xl bg-gray-100" />
+            <div key={i} className="h-56 animate-pulse rounded-2xl bg-surface-container-low" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-5">
           {plans.map((plan) => {
             const enabledModules = plan.features ?? []
             return (
-              <div key={plan.id} className="rounded-xl border border-gray-200 bg-white p-5">
-                <div className="flex items-start justify-between">
+              <div
+                key={plan.id}
+                className="group rounded-2xl border border-outline-variant/50 bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+              >
+                {/* Teal header stripe */}
+                <div className="bg-primary px-5 py-4 flex items-start justify-between">
                   <div>
-                    <h3 className="font-semibold text-gray-900">{plan.name}</h3>
-                    <p className="text-2xl font-bold text-blue-600 mt-1">
-                      {formatCurrency(plan.price_monthly)}
-                      <span className="text-sm font-normal text-gray-400">/mo</span>
-                    </p>
-                    <p className="text-sm text-gray-400">{formatCurrency(plan.price_yearly)}/yr</p>
+                    <h3 className="font-semibold text-white text-base">{plan.name}</h3>
+                    <div className="flex items-baseline gap-1 mt-1">
+                      <span className="text-3xl font-bold text-white">{formatCurrency(plan.price_monthly)}</span>
+                      <span className="text-sm text-white/70">/mo</span>
+                    </div>
+                    <p className="text-xs text-white/60 mt-0.5">{formatCurrency(plan.price_yearly)}/yr</p>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
+                  <div className="flex flex-col items-end gap-2 mt-0.5">
                     <Badge variant={plan.is_active ? 'success' : 'destructive'}>
                       {plan.is_active ? 'Active' : 'Inactive'}
                     </Badge>
-                    <Button size="sm" variant="ghost" onClick={() => openEdit(plan)}>
+                    <button
+                      onClick={() => openEdit(plan)}
+                      className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/15 text-white hover:bg-white/25 transition-colors"
+                    >
                       <Edit2 className="h-3.5 w-3.5" />
-                    </Button>
+                    </button>
                   </div>
                 </div>
 
-                <div className="mt-3 space-y-1 text-sm text-gray-500">
-                  <p>Up to {plan.max_branches} {plan.max_branches === 1 ? 'branch' : 'branches'}</p>
-                  <p>Up to {plan.max_users} users</p>
-                  {Object.values(plan.limits ?? {}).some((v) => v === true) && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <Shield className="h-3 w-3 text-green-500" />
-                      <span className="text-xs text-green-600">
-                        {Object.values(plan.limits ?? {}).filter((v) => v === true).length} premium features
+                {/* Body */}
+                <div className="px-5 py-4 space-y-3">
+                  {/* Limits */}
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="flex items-center gap-1.5 text-on-surface-variant">
+                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary-container text-primary text-[10px] font-bold">
+                        {plan.max_branches}
                       </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Module badges — sourced from the array */}
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {enabledModules.slice(0, 6).map((mod) => (
-                    <span
-                      key={mod}
-                      className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600"
-                    >
-                      {MODULE_LABELS[mod] ?? mod}
+                      {plan.max_branches === 1 ? 'branch' : 'branches'}
                     </span>
-                  ))}
-                  {enabledModules.length > 6 && (
-                    <span className="text-[10px] text-gray-400">+{enabledModules.length - 6} more</span>
-                  )}
-                  {enabledModules.length === 0 && (
-                    <span className="text-[10px] text-gray-400 italic">No modules</span>
-                  )}
+                    <span className="flex items-center gap-1.5 text-on-surface-variant">
+                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary-container text-primary text-[10px] font-bold">
+                        {plan.max_users > 99 ? '∞' : plan.max_users}
+                      </span>
+                      users
+                    </span>
+                    {Object.values(plan.limits ?? {}).some((v) => v === true) && (
+                      <span className="flex items-center gap-1 text-green-600">
+                        <Shield className="h-3 w-3" />
+                        <span className="text-xs">{Object.values(plan.limits ?? {}).filter((v) => v === true).length} premium</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Divider */}
+                  <div className="border-t border-outline-variant/40" />
+
+                  {/* Module badges */}
+                  <div className="flex flex-wrap gap-1">
+                    {enabledModules.slice(0, 6).map((mod) => (
+                      <span
+                        key={mod}
+                        className="rounded-full bg-primary-container/60 px-2 py-0.5 text-[10px] font-medium text-on-primary-container"
+                      >
+                        {MODULE_LABELS[mod] ?? mod}
+                      </span>
+                    ))}
+                    {enabledModules.length > 6 && (
+                      <span className="rounded-full bg-surface-container px-2 py-0.5 text-[10px] text-on-surface-variant">
+                        +{enabledModules.length - 6} more
+                      </span>
+                    )}
+                    {enabledModules.length === 0 && (
+                      <span className="text-[10px] text-outline italic">No modules</span>
+                    )}
+                  </div>
                 </div>
               </div>
             )

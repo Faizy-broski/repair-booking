@@ -15,7 +15,7 @@ export function withPublicMiddleware(
   return async (request: NextRequest): Promise<NextResponse> => {
     try {
       // Rate limit: stricter for public endpoints (30/min default)
-      const rateLimitError = rateLimitMiddleware(request, { limit: options?.rateLimit ?? 30 })
+      const rateLimitError = await rateLimitMiddleware(request, { limit: options?.rateLimit ?? 30 })
       if (rateLimitError) return rateLimitError
 
       return await handler(request)

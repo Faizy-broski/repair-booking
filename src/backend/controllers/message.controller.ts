@@ -8,7 +8,8 @@ import { z } from 'zod'
 
 const createSchema = z.object({
   to_branch_id: z.string().uuid().optional().nullable(),
-  subject: z.string().min(1),
+  from_branch_id: z.string().uuid().optional().nullable(), // allow client to pass sender branch
+  subject: z.string().optional().nullable(),
   body: z.string().min(1),
   parent_id: z.string().uuid().optional().nullable(),
 })
@@ -41,9 +42,11 @@ export const MessageController = {
     try {
       const message = await MessageService.send({
         business_id: ctx.businessId,
-        from_branch_id: ctx.auth.branchId ?? null,
         sender_id: ctx.auth.userId,
         ...data,
+        // Client-supplied from_branch_id wins (covers business owners with no fixed branch),
+        // fall back to auth context branch_id
+        from_branch_id: data.from_branch_id ?? ctx.auth.branchId ?? null,
       })
       return created(message)
     } catch (err) {
@@ -57,6 +60,26 @@ export const MessageController = {
       return ok({ updated: true })
     } catch (err) {
       return serverError('Failed to mark message as read', err)
+    }
+  },
+
+  async unreadCount(request: NextRequest, ctx: RequestContext) {
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? undefined
+    try {
+      const count = await MessageService.unreadCount(ctx.businessId, branchId)
+      return ok({ count })
+    } catch (err) {
+      return serverError('Failed to fetch unread count', err)
+    }
+  },
+
+  async listUnread(request: NextRequest, ctx: RequestContext) {
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? undefined
+    try {
+      const result = await MessageService.listUnread(ctx.businessId, branchId)
+      return ok(result)
+    } catch (err) {
+      return serverError('Failed to fetch unread messages', err)
     }
   },
 }

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus } from 'lucide-react'
+import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/data-table'
@@ -8,6 +8,7 @@ import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
 import { formatDate } from '@/lib/utils'
 import type { ColumnDef } from '@tanstack/react-table'
 import { MODULES } from '@/backend/config/constants'
+import { useRouter } from 'next/navigation'
 
 const MODULE_LABELS: Record<string, string> = {
   pos:            'POS',
@@ -228,6 +229,7 @@ function ModuleSheet({
 // ── Main businesses page ──────────────────────────────────────────────────────
 
 export default function BusinessesPage() {
+  const router = useRouter()
   const [businesses, setBusinesses] = useState<BusinessRow[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
@@ -326,6 +328,15 @@ export default function BusinessesPage() {
       header: '',
       cell: ({ row }) => (
         <div className="flex gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => router.push(`/superadmin/businesses/${row.original.id}`)}
+            title="View full business details"
+            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+          >
+            <Eye className="h-3.5 w-3.5 mr-1" /> View Details
+          </Button>
           <Button
             size="sm"
             variant="ghost"

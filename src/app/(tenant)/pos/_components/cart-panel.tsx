@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   Search, Plus, Minus, Trash2, UserPlus, X, AlertTriangle,
   Gift, Phone, Mail, ExternalLink, CheckCircle2, DollarSign,
-  Banknote, SplitSquareHorizontal, Check,
+  Banknote, SplitSquareHorizontal, Check, ChevronUp, ChevronDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -52,6 +52,9 @@ export function CartPanel({ mobileView }: Props) {
   const [gcLooking, setGcLooking]     = useState(false)
   const [gcError, setGcError]         = useState('')
   const [gcModalOpen, setGcModalOpen] = useState(false)
+
+  // ── Checkout panel collapsed/expanded (mobile) ────────────────────────────
+  const [showFullTotals, setShowFullTotals] = useState(false)
 
   // ── Computed totals ────────────────────────────────────────────────────────
   const subtotal        = pos.subtotal()
@@ -364,54 +367,53 @@ export function CartPanel({ mobileView }: Props) {
       </div>
 
       {/* Cart table */}
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {pos.cart.length === 0 ? (
           <div className="flex h-full items-center justify-center text-base text-gray-400">No items added yet</div>
         ) : (
           <table className="w-full table-fixed text-base">
-            <thead className="sticky top-0 bg-gray-50 border-b border-gray-200">
+            <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="w-[96px] px-2 py-3 text-left font-bold text-gray-700">QTY</th>
-                <th className="px-3 py-3 text-left font-bold text-gray-700">Item Name</th>
-                <th className="w-[80px] px-2 py-3 text-right font-bold text-gray-700">Price</th>
-                <th className="w-[64px] px-2 py-3 text-right font-bold text-gray-700">Disc</th>
-                <th className="w-[84px] px-2 py-3 text-right font-bold text-gray-700">Total</th>
-                <th className="w-[32px]"></th>
+                <th className="w-[90px] px-1 py-2.5 text-left text-xs font-bold text-gray-700">QTY</th>
+                <th className="px-2 py-2.5 text-left text-xs font-bold text-gray-700">Item</th>
+                <th className="w-[54px] px-1 py-2.5 text-right text-xs font-bold text-gray-700">Disc</th>
+                <th className="w-[72px] px-1 py-2.5 text-right text-xs font-bold text-gray-700">Total</th>
+                <th className="w-[28px]"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50">
+            <tbody className="divide-y divide-gray-200">
               {pos.cart.map(item => {
                 const lineTotal = (item.unitPrice - item.discount) * item.quantity
                 return (
-                  <tr key={`${item.product.id}-${item.variant?.id}`} className="hover:bg-gray-50/50">
-                    <td className="px-1 py-2.5">
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity - 1)} className="flex h-7 w-7 items-center justify-center rounded bg-gray-100 hover:bg-gray-200 transition-colors">
-                          <Minus className="h-3.5 w-3.5" />
+                  <tr key={`${item.product.id}-${item.variant?.id}`} className="bg-white hover:bg-gray-50">
+                    <td className="px-1 py-2">
+                      <div className="flex items-center justify-center gap-1">
+                        <button onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity - 1)} className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded bg-gray-100 hover:bg-gray-200 transition-colors">
+                          <Minus className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                         </button>
-                        <span className="w-7 text-center text-base font-bold text-gray-900">{item.quantity}</span>
-                        <button onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity + 1)} className="flex h-7 w-7 items-center justify-center rounded bg-gray-100 hover:bg-gray-200 transition-colors">
-                          <Plus className="h-3.5 w-3.5" />
+                        <span className="w-5 sm:w-7 text-center text-sm font-bold text-gray-900">{item.quantity}</span>
+                        <button onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity + 1)} className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded bg-gray-100 hover:bg-gray-200 transition-colors">
+                          <Plus className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                         </button>
                       </div>
                     </td>
-                    <td className="px-2 py-2.5 overflow-hidden">
-                      <p className="truncate text-sm font-semibold text-gray-900">{item.product.name}</p>
-                      {item.product.sku && <p className="text-gray-400 text-xs truncate">#{item.product.sku}</p>}
+                    <td className="px-1.5 py-2 overflow-hidden">
+                      <p className="truncate text-xs font-semibold text-gray-900">{item.product.name}</p>
+                      {item.product.sku && <p className="text-gray-400 text-[10px] truncate">#{item.product.sku}</p>}
+                      <p className="text-[10px] text-gray-500">{formatCurrency(item.unitPrice)}</p>
                     </td>
-                    <td className="px-1 py-2.5 text-right font-medium text-gray-700 text-sm">{formatCurrency(item.unitPrice)}</td>
                     <td className="px-1 py-2">
                       <input
                         type="number" min="0" step="0.01" placeholder="0"
                         value={item.discount || ''}
                         onChange={e => pos.setItemDiscount(item.product.id, item.variant?.id ?? null, Math.min(parseFloat(e.target.value) || 0, item.unitPrice))}
-                        className="h-7 w-full rounded border border-gray-200 px-1 text-right text-sm text-green-600 focus:border-brand-teal focus:outline-none"
+                        className="h-6 sm:h-7 w-full rounded border border-gray-200 px-1 text-right text-xs sm:text-sm text-green-600 focus:border-brand-teal focus:outline-none"
                       />
                     </td>
-                    <td className="px-1 py-2.5 text-right font-bold text-gray-900 text-sm">{formatCurrency(lineTotal)}</td>
+                    <td className="px-1 py-2.5 text-right font-bold text-gray-900 text-xs sm:text-sm">{formatCurrency(lineTotal)}</td>
                     <td className="pr-1 py-2.5">
                       <button onClick={() => pos.removeFromCart(item.product.id, item.variant?.id ?? null)} className="text-gray-300 hover:text-red-500 transition-colors">
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </button>
                     </td>
                   </tr>
@@ -422,58 +424,75 @@ export function CartPanel({ mobileView }: Props) {
         )}
       </div>
 
-      {/* Totals */}
-      <div className="shrink-0 border-t-2 border-gray-200 bg-gray-50 px-4 py-3 space-y-2">
-        <div className="flex justify-between text-sm text-gray-500"><span>Total Items</span><span className="font-semibold text-gray-700">{pos.itemCount()}</span></div>
-        <div className="flex justify-between text-base text-gray-600"><span>Sub Total</span><span className="font-bold text-gray-800">{formatCurrency(grossSubtotal)}</span></div>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-medium text-gray-600">Discount</span>
-            <div className="flex overflow-hidden rounded border border-gray-200">
-              <button onClick={() => setDiscountType('fixed')}   className={`px-2 py-0.5 text-sm font-medium ${discountType === 'fixed'   ? 'bg-brand-teal text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>£</button>
-              <button onClick={() => setDiscountType('percent')} className={`px-2 py-0.5 text-sm font-medium ${discountType === 'percent' ? 'bg-brand-teal text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>%</button>
+      {/* Checkout panel — collapsible on mobile */}
+      <div className="shrink-0 border-t-2 border-gray-200 bg-gray-50">
+
+        {/* Expanded details (Discount, Gift Card, Sub Total breakdown) */}
+        {showFullTotals && (
+          <div className="px-4 pt-3 pb-2 space-y-2">
+            <div className="flex justify-between text-sm text-gray-500"><span>Total Items</span><span className="font-semibold text-gray-700">{pos.itemCount()}</span></div>
+            <div className="flex justify-between text-sm text-gray-600"><span>Sub Total</span><span className="font-medium text-gray-800">{formatCurrency(grossSubtotal)}</span></div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-medium text-gray-600">Discount</span>
+                <div className="flex overflow-hidden rounded border border-gray-200">
+                  <button onClick={() => setDiscountType('fixed')}   className={`px-2 py-0.5 text-sm font-medium ${discountType === 'fixed'   ? 'bg-brand-teal text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>£</button>
+                  <button onClick={() => setDiscountType('percent')} className={`px-2 py-0.5 text-sm font-medium ${discountType === 'percent' ? 'bg-brand-teal text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>%</button>
+                </div>
+              </div>
+              <input
+                type="number" min="0" step="0.01" placeholder="0"
+                value={pos.discount || ''}
+                onChange={e => pos.setDiscount(Math.max(0, parseFloat(e.target.value) || 0))}
+                className="h-8 w-24 rounded border border-gray-200 px-2 text-right text-sm text-green-700 focus:border-brand-teal focus:outline-none"
+              />
             </div>
+            {totalDiscount > 0 && (
+              <div className="flex justify-between text-sm font-medium text-green-600"><span>Discount Applied</span><span>-{formatCurrency(totalDiscount)}</span></div>
+            )}
+            {/* Gift card */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex shrink-0 items-center gap-1.5">
+                <Gift className="h-4 w-4 text-purple-500" />
+                <span className="text-sm font-medium text-gray-600 whitespace-nowrap">Gift Card</span>
+              </div>
+              <div className="flex min-w-0 flex-1 items-center gap-1.5 justify-end">
+                <input
+                  type="text" placeholder="Enter code"
+                  value={gcCode}
+                  onChange={e => { setGcCode(e.target.value); setGcError('') }}
+                  className="h-8 min-w-0 flex-1 max-w-[120px] rounded border border-gray-200 px-2 text-right text-sm text-purple-700 focus:border-purple-400 focus:outline-none"
+                />
+                <button
+                  onClick={() => pos.cart.length > 0 && setGcModalOpen(true)}
+                  disabled={!gcCode.trim() || pos.cart.length === 0}
+                  className="h-8 shrink-0 rounded bg-purple-600 px-3 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+            {gcError && <p className="text-xs text-red-500">{gcError}</p>}
+            {pos.taxRate > 0 && (
+              <div className="flex justify-between text-sm text-gray-500"><span>Tax ({pos.taxRate}%)</span><span>{formatCurrency(taxAmt)}</span></div>
+            )}
           </div>
-          <input
-            type="number" min="0" step="0.01" placeholder="0"
-            value={pos.discount || ''}
-            onChange={e => pos.setDiscount(Math.max(0, parseFloat(e.target.value) || 0))}
-            className="h-8 w-24 rounded border border-gray-200 px-2 text-right text-base text-green-700 focus:border-brand-teal focus:outline-none"
-          />
-        </div>
-        {totalDiscount > 0 && (
-          <div className="flex justify-between text-sm font-medium text-green-600"><span>Discount Applied</span><span>-{formatCurrency(totalDiscount)}</span></div>
         )}
-        {/* Gift card inline */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <Gift className="h-4 w-4 text-purple-500" />
-            <span className="text-sm font-medium text-gray-600">Gift Card</span>
+
+        {/* Always-visible total bar + toggle */}
+        <button
+          onClick={() => setShowFullTotals(v => !v)}
+          className="flex w-full items-center justify-between px-4 py-2.5 hover:bg-gray-100 transition-colors"
+        >
+          <span className="text-base font-bold text-gray-900">Total</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-bold text-gray-900">{formatCurrency(total)}</span>
+            {showFullTotals
+              ? <ChevronDown className="h-4 w-4 text-gray-500" />
+              : <ChevronUp className="h-4 w-4 text-gray-500" />
+            }
           </div>
-          <div className="flex items-center gap-1.5">
-            <input
-              type="text" placeholder="Enter code"
-              value={gcCode}
-              onChange={e => { setGcCode(e.target.value); setGcError('') }}
-              className="h-8 w-28 rounded border border-gray-200 px-2 text-right text-sm text-purple-700 focus:border-purple-400 focus:outline-none"
-            />
-            <button
-              onClick={() => pos.cart.length > 0 && setGcModalOpen(true)}
-              disabled={!gcCode.trim() || pos.cart.length === 0}
-              className="h-8 rounded bg-purple-600 px-3 text-sm font-semibold text-white hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              Apply
-            </button>
-          </div>
-        </div>
-        {gcError && <p className="text-xs text-red-500">{gcError}</p>}
-        {pos.taxRate > 0 && (
-          <div className="flex justify-between text-sm text-gray-500"><span>Tax ({pos.taxRate}%)</span><span>{formatCurrency(taxAmt)}</span></div>
-        )}
-        <div className="flex justify-between border-t-2 border-gray-300 pt-2">
-          <span className="text-lg font-bold text-gray-900">Total</span>
-          <span className="text-2xl font-bold text-gray-900">{formatCurrency(total)}</span>
-        </div>
+        </button>
       </div>
 
       {/* Payment buttons */}

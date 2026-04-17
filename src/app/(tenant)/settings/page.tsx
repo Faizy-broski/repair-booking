@@ -1,7 +1,8 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { Save, Wrench, ChevronRight, ChevronDown, GitBranch, Users, Star, Bell, Calendar, Plus, Code2, Sliders, Pencil, Trash2, Tag, Package, Check, X, Cpu, KeyRound } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Save, Wrench, ChevronRight, ChevronDown, GitBranch, Users, Star, Bell, Calendar, Plus, Code2, Sliders, Pencil, Trash2, Tag, Package, Check, X, Cpu, KeyRound, Store, ShoppingBag, Scissors, Coffee, Monitor, Layers, CheckCircle2 } from 'lucide-react'
 import { CustomFieldBuilder } from '@/components/shared/custom-field-builder'
+import { InvoiceDesignTab } from '@/components/settings/invoice-design-tab'
 import Link from 'next/link'
 import * as Tabs from '@radix-ui/react-tabs'
 import { Button } from '@/components/ui/button'
@@ -316,24 +317,34 @@ export default function SettingsPage() {
         <p className="text-sm text-gray-500">Manage your business configuration</p>
       </div>
       <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
-        <Tabs.List className="flex gap-2 rounded-xl bg-gray-100/80 p-1.5 border border-gray-200 w-fit">
-          <Tabs.Trigger value="general" className="rounded-lg px-5 py-2 text-sm font-medium text-gray-600 transition-all hover:bg-gray-200/50 hover:text-gray-900 data-[state=active]:bg-brand-teal data-[state=active]:text-white data-[state=active]:shadow-md">
+        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-gray-100/80 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <Tabs.List className="flex min-w-max gap-1 p-1.5">
+          <Tabs.Trigger value="general" className="shrink-0 rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-all hover:bg-gray-200/50 hover:text-gray-900 data-[state=active]:bg-brand-teal data-[state=active]:text-white data-[state=active]:shadow-md">
             General
           </Tabs.Trigger>
           {isOwner() && (
             <>
-              <Tabs.Trigger value="branches" className="rounded-lg px-5 py-2 text-sm font-medium text-gray-600 transition-all hover:bg-gray-200/50 hover:text-gray-900 data-[state=active]:bg-brand-teal data-[state=active]:text-white data-[state=active]:shadow-md">
+              <Tabs.Trigger value="branches" className="shrink-0 rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-all hover:bg-gray-200/50 hover:text-gray-900 data-[state=active]:bg-brand-teal data-[state=active]:text-white data-[state=active]:shadow-md">
                 Branches
               </Tabs.Trigger>
-              <Tabs.Trigger value="users" className="rounded-lg px-5 py-2 text-sm font-medium text-gray-600 transition-all hover:bg-gray-200/50 hover:text-gray-900 data-[state=active]:bg-brand-teal data-[state=active]:text-white data-[state=active]:shadow-md">
+              <Tabs.Trigger value="users" className="shrink-0 rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-all hover:bg-gray-200/50 hover:text-gray-900 data-[state=active]:bg-brand-teal data-[state=active]:text-white data-[state=active]:shadow-md">
                 Users
               </Tabs.Trigger>
             </>
           )}
-          <Tabs.Trigger value="custom_fields" className="rounded-lg px-5 py-2 text-sm font-medium text-gray-600 transition-all hover:bg-gray-200/50 hover:text-gray-900 data-[state=active]:bg-brand-teal data-[state=active]:text-white data-[state=active]:shadow-md">
+          {isOwner() && (
+            <Tabs.Trigger value="business_type" className="shrink-0 rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-all hover:bg-gray-200/50 hover:text-gray-900 data-[state=active]:bg-brand-teal data-[state=active]:text-white data-[state=active]:shadow-md">
+              Business Type
+            </Tabs.Trigger>
+          )}
+          <Tabs.Trigger value="custom_fields" className="shrink-0 rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-all hover:bg-gray-200/50 hover:text-gray-900 data-[state=active]:bg-brand-teal data-[state=active]:text-white data-[state=active]:shadow-md">
             Custom Fields
           </Tabs.Trigger>
+          <Tabs.Trigger value="invoice_design" className="shrink-0 rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-all hover:bg-gray-200/50 hover:text-gray-900 data-[state=active]:bg-brand-teal data-[state=active]:text-white data-[state=active]:shadow-md">
+            Invoice Design
+          </Tabs.Trigger>
         </Tabs.List>
+        </div>
         {/* General settings */}
         <Tabs.Content value="general" className="mt-4">
           <div className="rounded-xl border border-gray-200 bg-white p-6">
@@ -858,6 +869,16 @@ export default function SettingsPage() {
             </div>
           </div>
         </Tabs.Content>}
+
+        {/* ── Business Type tab ──────────────────────────────────────── */}
+        <Tabs.Content value="business_type" className="mt-4">
+          <BusinessTypeTab />
+        </Tabs.Content>
+
+        {/* ── Invoice Design tab ─────────────────────────────────────── */}
+        <Tabs.Content value="invoice_design" className="mt-4">
+          <InvoiceDesignTab />
+        </Tabs.Content>
       </Tabs.Root>
 
       {/* ── Set Password overlay (business_owner only) ──────────────────────── */}
@@ -913,6 +934,185 @@ export default function SettingsPage() {
               )}
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── BusinessTypeTab ───────────────────────────────────────────────────────────
+// Displayed under Settings → Business Type (owners only).
+// Shows all active vertical templates with module previews; lets the owner
+// switch their current template by re-applying it.
+
+const BIZ_ICON_MAP: Record<string, React.ElementType> = {
+  store: Store, wrench: Wrench, 'shopping-bag': ShoppingBag,
+  scissors: Scissors, coffee: Coffee, monitor: Monitor, package: Package,
+}
+const BIZ_MODULE_LABELS: Record<string, string> = {
+  pos: 'POS', inventory: 'Inventory', repairs: 'Repairs', customers: 'Customers',
+  appointments: 'Appointments', expenses: 'Expenses', employees: 'Employees',
+  reports: 'Reports', messages: 'Messages', invoices: 'Invoices',
+  gift_cards: 'Gift Cards', google_reviews: 'Google Reviews', phone: 'Phone',
+}
+
+interface VerticalTemplate {
+  id: string; name: string; slug: string; description: string | null
+  icon: string; modules_enabled: string[]
+}
+
+function BusinessTypeTab() {
+  const { profile } = useAuthStore()
+  const [templates, setTemplates] = useState<VerticalTemplate[]>([])
+  const [loading, setLoading] = useState(true)
+  const [currentSlug, setCurrentSlug] = useState<string | null>(null)
+  const [applying, setApplying] = useState<string | null>(null)
+  const [applied, setApplied] = useState<string | null>(null)
+
+  // Fetch templates from public cached endpoint + current business template
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [tRes, bRes] = await Promise.all([
+        fetch('/api/vertical-templates/public'),
+        fetch('/api/businesses/me'),
+      ])
+      const [tJson, bJson] = await Promise.all([tRes.json(), bRes.json()])
+      setTemplates(tJson.data ?? [])
+      const biz = bJson.data ?? bJson
+      // vertical_template_id resolved to slug via template list
+      const vtId: string | null = biz?.vertical_template_id ?? null
+      if (vtId) {
+        const t = (tJson.data ?? []).find((t: VerticalTemplate) => t.id === vtId)
+        setCurrentSlug(t?.slug ?? null)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  async function applyTemplate(t: VerticalTemplate) {
+    if (!profile?.business_id) return
+    setApplying(t.slug)
+    try {
+      // Use the admin apply endpoint from the frontend — this is a business_owner
+      // action so we go through the standard tenant API instead of admin API.
+      await fetch(`/api/vertical-templates/${t.id}/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ business_id: profile.business_id, mode: 'merge' }),
+      })
+      setCurrentSlug(t.slug)
+      setApplied(t.slug)
+      setTimeout(() => setApplied(null), 3000)
+    } finally {
+      setApplying(null)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="rounded-xl border border-gray-200 bg-white p-6 space-y-3">
+        {[1,2,3].map(i => <div key={i} className="h-24 animate-pulse rounded-xl bg-gray-100" />)}
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-6 space-y-5">
+      <div>
+        <h3 className="font-semibold text-gray-900">Business Type</h3>
+        <p className="text-sm text-gray-500 mt-0.5">
+          Choose the template that best matches your business. Applying a template adds missing modules — it never removes existing settings.
+        </p>
+      </div>
+
+      {templates.length === 0 ? (
+        <div className="flex flex-col items-center gap-2 py-12 text-gray-300">
+          <Layers className="h-8 w-8" />
+          <p className="text-sm text-gray-400">No templates configured yet</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {templates.map((t) => {
+            const IconComp = BIZ_ICON_MAP[t.icon] ?? Store
+            const isCurrent = currentSlug === t.slug
+            const isApplying = applying === t.slug
+            const wasApplied = applied === t.slug
+
+            return (
+              <div
+                key={t.slug}
+                className={[
+                  'flex flex-col gap-3 rounded-xl border-2 p-4 transition-all',
+                  isCurrent
+                    ? 'border-brand-teal bg-teal-50/40'
+                    : 'border-gray-200 bg-gray-50 hover:border-gray-300',
+                ].join(' ')}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white border border-gray-200 shadow-sm">
+                    <IconComp className="h-4.5 w-4.5 text-gray-600" style={{ width: '1.125rem', height: '1.125rem' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-gray-900 text-sm">{t.name}</p>
+                      {isCurrent && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-teal-100 px-2 py-0.5 text-[10px] font-semibold text-teal-700">
+                          <CheckCircle2 className="h-3 w-3" /> Current
+                        </span>
+                      )}
+                    </div>
+                    {t.description && (
+                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{t.description}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Module chips */}
+                <div className="flex flex-wrap gap-1">
+                  {t.modules_enabled.slice(0, 7).map((mod) => (
+                    <span
+                      key={mod}
+                      className="rounded-md bg-white border border-gray-200 px-2 py-0.5 text-[10px] font-medium text-gray-600"
+                    >
+                      {BIZ_MODULE_LABELS[mod] ?? mod}
+                    </span>
+                  ))}
+                  {t.modules_enabled.length > 7 && (
+                    <span className="rounded-md bg-white border border-gray-200 px-2 py-0.5 text-[10px] text-gray-400">
+                      +{t.modules_enabled.length - 7} more
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 border-t border-gray-200 pt-3">
+                  <span className="text-xs text-gray-400">{t.modules_enabled.length} modules</span>
+                  <div className="ml-auto">
+                    {wasApplied ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600">
+                        <Check className="h-3.5 w-3.5" /> Applied!
+                      </span>
+                    ) : isCurrent ? (
+                      <span className="text-xs text-gray-400">Currently active</span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        loading={isApplying}
+                        onClick={() => applyTemplate(t)}
+                        className="text-xs"
+                      >
+                        Apply this template
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

@@ -177,7 +177,7 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
         {onClose && (
           <button
             onClick={onClose}
-            className="lg:hidden ml-auto flex h-8 w-8 items-center justify-center rounded-lg text-white/40 hover:bg-white/10 hover:text-white transition-colors"
+            className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/40 hover:bg-white/10 hover:text-white transition-colors"
             aria-label="Close sidebar"
           >
             <X className="h-5 w-5" />

@@ -258,15 +258,15 @@ export function RepairsTab() {
                 type="text"
                 placeholder={`Search ${repairLevel === 'categories' ? 'category' : repairLevel === 'brands' ? 'brand' : 'device'}...`}
                 value={repairSearch} onChange={e => setRepairSearch(e.target.value)}
-                className="h-10 w-full max-w-xs rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-base focus:border-brand-teal focus:outline-none"
+                className="h-10 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-base focus:border-brand-teal focus:outline-none"
               />
             </div>
             {repairLoading ? (
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}
               </div>
             ) : (
-              <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                 <button
                   onClick={() => router.push('/repairs/service-catalogue')}
                   className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-brand-teal-light bg-brand-teal p-4 text-white hover:bg-brand-teal-dark transition-colors min-h-[100px]"
@@ -306,7 +306,7 @@ export function RepairsTab() {
         {/* PROBLEMS step */}
         {repairLevel === 'problems' && (
           <div className="space-y-3">
-            <div className="relative max-w-xs">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
                 type="text" placeholder="Search device problem"
@@ -315,11 +315,11 @@ export function RepairsTab() {
               />
             </div>
             {repairLoading ? (
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}
               </div>
             ) : (
-              <div className="grid grid-cols-4 gap-3 sm:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                 <button
                   onClick={() => router.push('/repairs/service-catalogue')}
                   className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-brand-teal-light bg-brand-teal p-4 text-white hover:bg-brand-teal-dark transition-colors min-h-[130px]"

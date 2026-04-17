@@ -272,7 +272,7 @@ export const NotificationController = {
       if (data.channel === 'email') {
         const subject = template.subject ? NotificationEngine.resolveMacros(template.subject, sampleVars) : 'Test Notification'
         const body = template.email_body ? NotificationEngine.resolveMacros(template.email_body, sampleVars) : '<p>Test</p>'
-        await EmailService.sendTemplated({ to: data.recipient, subject, html: body })
+        await EmailService.sendTemplated({ to: data.recipient, subject, html: body, businessId: ctx.businessId })
         return ok({ sent: true, channel: 'email' })
       }
 
@@ -384,11 +384,19 @@ export const NotificationController = {
     const { data, error } = await validateBody(request, smtpTestSchema)
     if (error) return error
     try {
-      const { data: biz } = await db('businesses').select('name').eq('id', ctx.businessId).single()
+      const { data: biz } = await db('businesses')
+        .select('name, smtp_pass')
+        .eq('id', ctx.businessId)
+        .single()
       const businessName = biz?.name ?? 'RepairBooking'
 
+      // If the UI sent back the masked placeholder, use the stored password instead
+      const resolvedPass = (data.pass === '••••••••' && biz?.smtp_pass)
+        ? biz.smtp_pass
+        : data.pass
+
       const result = await EmailService.sendTestEmail(
-        { host: data.host, port: data.port, secure: data.secure, user: data.user, pass: data.pass, from: data.from },
+        { host: data.host, port: data.port, secure: data.secure, user: data.user, pass: resolvedPass, from: data.from },
         data.test_to,
         businessName,
       )

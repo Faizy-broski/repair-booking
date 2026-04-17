@@ -40,21 +40,21 @@ export function DataTable<T>({
 
   return (
     <div className="w-full">
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
+      <div className="overflow-x-auto rounded-xl border border-outline-variant/50 shadow-sm">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50">
+          <thead>
             {table.getHeaderGroups().map((hg) => (
-              <tr key={hg.id}>
+              <tr key={hg.id} className="border-b border-outline-variant/40 bg-primary">
                 {hg.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500"
+                    className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-white/80"
                     style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}
                   >
                     {header.isPlaceholder ? null : header.column.getCanSort() ? (
                       <button
                         onClick={header.column.getToggleSortingHandler()}
-                        className="flex items-center gap-1 hover:text-gray-700"
+                        className="flex items-center gap-1 hover:text-white"
                       >
                         {flexRender(header.column.columnDef.header, header.getContext())}
                         {header.column.getIsSorted() === 'asc' ? (
@@ -62,7 +62,7 @@ export function DataTable<T>({
                         ) : header.column.getIsSorted() === 'desc' ? (
                           <ChevronDown className="h-3 w-3" />
                         ) : (
-                          <ChevronsUpDown className="h-3 w-3 opacity-40" />
+                          <ChevronsUpDown className="h-3 w-3 opacity-50" />
                         )}
                       </button>
                     ) : (
@@ -76,25 +76,30 @@ export function DataTable<T>({
           <tbody>
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} className="border-t border-gray-100">
+                <tr key={i} className={`border-t border-outline-variant/30 ${i % 2 === 0 ? 'bg-white' : 'bg-surface-container-low'}`}>
                   {columns.map((_, j) => (
                     <td key={j} className="px-4 py-3">
-                      <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
+                      <div className="h-4 w-full animate-pulse rounded bg-surface-container" />
                     </td>
                   ))}
                 </tr>
               ))
             ) : table.getRowModel().rows.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-10 text-center text-gray-400">
+                <td colSpan={columns.length} className="px-4 py-10 text-center text-outline">
                   {emptyMessage}
                 </td>
               </tr>
             ) : (
-              table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="border-t border-gray-100 hover:bg-gray-50 transition-colors">
+              table.getRowModel().rows.map((row, i) => (
+                <tr
+                  key={row.id}
+                  className={`border-t border-outline-variant/30 transition-colors hover:bg-primary-container/20 ${
+                    i % 2 === 0 ? 'bg-white' : 'bg-surface-container-low/60'
+                  }`}
+                >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-3 text-gray-700">
+                    <td key={cell.id} className="px-4 py-3 text-on-surface">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}

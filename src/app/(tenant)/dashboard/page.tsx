@@ -118,7 +118,7 @@ export default function DashboardPage() {
 
       {/* ── Header ── */}
       <div>
-        <h1 className="text-xl font-bold text-on-surface">
+        <h1 className="text-lg sm:text-xl font-bold text-on-surface">
           {isOwner() ? 'Business Overview' : `${activeBranch?.name ?? ''} Dashboard`}
         </h1>
         <p className="text-sm text-on-surface-variant">Last 30 days</p>
@@ -126,15 +126,15 @@ export default function DashboardPage() {
 
       {/* ── Stats Grid (6 cards) ── */}
       {loading && (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-32 animate-pulse rounded-xl bg-surface-container" />
+            <div key={i} className="h-28 sm:h-32 animate-pulse rounded-xl bg-surface-container" />
           ))}
         </div>
       )}
 
       {stats && (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
           <StatsCard
             title="Total Sales"
             value={formatCurrencyCompact(stats.total_sales)}

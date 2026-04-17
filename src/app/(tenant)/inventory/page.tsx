@@ -83,6 +83,11 @@ export default function InventoryPage() {
   const [valuationFilter, setValuationFilter] = useState('')
   const [hideOutOfStock, setHideOutOfStock] = useState(false)
 
+  // Bulk select
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
+
   // View Variants drawer
   const [variantDrawer, setVariantDrawer] = useState<ProductRow | null>(null)
   const [drawerVariants, setDrawerVariants] = useState<ProductVariant[]>([])
@@ -173,9 +178,21 @@ export default function InventoryPage() {
   async function handleDelete() {
     if (!deleteTarget) return
     setDeleting(true)
-    await fetch(`/api/products/${deleteTarget.id}`, { method: 'DELETE' })
+    const qs = branchId ? `?branch_id=${branchId}` : ''
+    await fetch(`/api/products/${deleteTarget.id}${qs}`, { method: 'DELETE' })
     setDeleting(false)
     setDeleteTarget(null)
+    fetchProducts()
+    fetchStats()
+  }
+
+  async function handleBulkDelete() {
+    setBulkDeleting(true)
+    const qs = branchId ? `?branch_id=${branchId}` : ''
+    await Promise.all([...selectedIds].map((id) => fetch(`/api/products/${id}${qs}`, { method: 'DELETE' })))
+    setBulkDeleting(false)
+    setShowBulkDeleteConfirm(false)
+    setSelectedIds(new Set())
     fetchProducts()
     fetchStats()
   }
@@ -195,7 +212,43 @@ export default function InventoryPage() {
 
   const displayProducts = products
 
+  const allOnPageSelected = displayProducts.length > 0 && displayProducts.every((p) => selectedIds.has(p.id))
+  const someOnPageSelected = displayProducts.some((p) => selectedIds.has(p.id))
+
   const columns: ColumnDef<ProductRow>[] = [
+    {
+      id: 'select',
+      header: () => (
+        <input
+          type="checkbox"
+          checked={allOnPageSelected}
+          ref={(el) => { if (el) el.indeterminate = someOnPageSelected && !allOnPageSelected }}
+          onChange={() => {
+            if (allOnPageSelected) {
+              setSelectedIds((prev) => { const n = new Set(prev); displayProducts.forEach((p) => n.delete(p.id)); return n })
+            } else {
+              setSelectedIds((prev) => { const n = new Set(prev); displayProducts.forEach((p) => n.add(p.id)); return n })
+            }
+          }}
+          className="rounded border-gray-300 cursor-pointer"
+        />
+      ),
+      cell: ({ row }) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(row.original.id)}
+          onChange={() => {
+            setSelectedIds((prev) => {
+              const n = new Set(prev)
+              if (n.has(row.original.id)) n.delete(row.original.id)
+              else n.add(row.original.id)
+              return n
+            })
+          }}
+          className="rounded border-gray-300 cursor-pointer"
+        />
+      ),
+    },
     {
       accessorKey: 'name',
       header: 'Product',
@@ -499,6 +552,19 @@ export default function InventoryPage() {
         )}
       </div>
 
+      {/* Bulk action bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5">
+          <span className="text-sm font-medium text-red-700">{selectedIds.size} item{selectedIds.size !== 1 ? 's' : ''} selected</span>
+          <Button size="sm" variant="destructive" onClick={() => setShowBulkDeleteConfirm(true)}>
+            <Trash2 className="h-4 w-4" /> Delete selected
+          </Button>
+          <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-xs text-gray-400 hover:text-gray-600 underline">
+            Clear selection
+          </button>
+        </div>
+      )}
+
       <DataTable
         data={displayProducts}
         columns={columns}
@@ -509,6 +575,21 @@ export default function InventoryPage() {
         onPageChange={setPage}
         emptyMessage="No products yet. Click Add Product to get started!"
       />
+
+      {/* Bulk Delete Confirm Modal */}
+      <Modal open={showBulkDeleteConfirm} onClose={() => !bulkDeleting && setShowBulkDeleteConfirm(false)} title="Delete Products" size="sm">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Are you sure you want to delete <strong>{selectedIds.size} product{selectedIds.size !== 1 ? 's' : ''}</strong>? Stock movement history is preserved.
+          </p>
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={() => setShowBulkDeleteConfirm(false)} disabled={bulkDeleting}>Cancel</Button>
+            <Button variant="destructive" className="flex-1" onClick={handleBulkDelete} loading={bulkDeleting}>
+              {bulkDeleting ? 'Deleting...' : `Delete ${selectedIds.size}`}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Delete Confirm Modal */}
       <Modal open={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)} title="Delete Product" size="sm">

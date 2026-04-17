@@ -3,18 +3,20 @@ import { z } from 'zod'
 import { AuthService } from '@/backend/services/auth.service'
 import { EmailService } from '@/backend/services/email.service'
 import { createAdminClient } from '@/backend/config/supabase'
+import { VerticalTemplateService } from '@/backend/services/vertical-template.service'
 import { created, conflict, serverError } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 
 const schema = z.object({
-  businessName:   z.string().min(2),
-  subdomain:      z.string().min(2).max(30).regex(/^[a-z0-9-]+$/),
-  email:          z.string().email(),
-  phone:          z.string().optional(),
-  fullName:       z.string().min(2),
-  password:       z.string().min(8),
-  mainBranchName: z.string().min(2),
-  planId:         z.string().optional(),  // UUID from plans table
+  businessName:          z.string().min(2),
+  subdomain:             z.string().min(2).max(30).regex(/^[a-z0-9-]+$/),
+  email:                 z.string().email(),
+  phone:                 z.string().optional(),
+  fullName:              z.string().min(2),
+  password:              z.string().min(8),
+  mainBranchName:        z.string().min(2),
+  planId:                z.string().optional(),  // UUID from plans table
+  verticalTemplateSlug:  z.string().optional(),  // slug chosen during onboarding
 })
 
 export async function POST(request: NextRequest) {
@@ -71,6 +73,22 @@ export async function POST(request: NextRequest) {
         fullName:     data.fullName,
         phone:        data.phone,
       }).catch(() => {})
+    }
+
+    // Apply vertical template if one was chosen during onboarding (fire-and-forget)
+    if (data.verticalTemplateSlug) {
+      VerticalTemplateService.getBySlug(data.verticalTemplateSlug)
+        .then((template) => {
+          if (template) {
+            return VerticalTemplateService.applyToBusiness(
+              template.id,
+              result.business.id,
+              null,   // applied_by: system (no user session yet)
+              'initial'
+            )
+          }
+        })
+        .catch(() => {}) // non-fatal — business is created regardless
     }
 
     return created({ businessId: result.business.id })
