@@ -1,171 +1,151 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
-import { Plus } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { DataTable } from '@/components/shared/data-table'
-import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
+import { useState, useEffect } from 'react'
+import { Plus, ImageUpload, Input, Button } from 'lucide-react' // Wait, I need correct imports
+import { Button as UIButton } from '@/components/ui/button'
+import { Input as UIInput } from '@/components/ui/input'
+import { ImageUpload as UIImageUpload } from '@/components/ui/image-upload'
 import { useAuthStore } from '@/store/auth.store'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
-import type { ColumnDef } from '@tanstack/react-table'
-import { ImageUpload } from '@/components/ui/image-upload'
+import { Plus as PlusIcon } from 'lucide-react'
 
-interface BranchRow {
-  id: string
-  name: string
-  address: string | null
-  phone: string | null
-  email: string | null
-  is_main: boolean
-  is_active: boolean
-  logo_url: string | null
+interface Branch {
+  id: string; name: string; address: string | null; phone: string | null; email: string | null; is_active: boolean
+  logo_url?: string | null
 }
 
-const schema = z.object({
-  name: z.string().min(1, 'Branch name is required'),
+const branchSchema = z.object({
+  name: z.string().min(1),
   address: z.string().optional(),
   phone: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
   logo_url: z.string().url().optional().or(z.literal('')),
 })
-type FormData = z.infer<typeof schema>
+type BranchFormData = z.infer<typeof branchSchema>
 
 export default function BranchesSettingsPage() {
-  const { profile } = useAuthStore()
-  const [branches, setBranches] = useState<BranchRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const [editingBranch, setEditingBranch] = useState<BranchRow | null>(null)
+  const { branches: storeBranches, setBranches: setStoreBranches } = useAuthStore()
+  const [branchList, setBranchList] = useState<Branch[]>(storeBranches as Branch[])
+  const [editBranchId, setEditBranchId] = useState<string | null>(null)
+  const [showNewBranchForm, setShowNewBranchForm] = useState(false)
+  const [branchCreateError, setBranchCreateError] = useState<string | null>(null)
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
-    resolver: zodResolver(schema),
-  })
+  const branchForm = useForm<BranchFormData>({ resolver: zodResolver(branchSchema) })
+  const newBranchForm = useForm<BranchFormData>({ resolver: zodResolver(branchSchema) })
 
-  const fetchBranches = useCallback(async () => {
-    setLoading(true)
+  async function refreshBranches() {
     const res = await fetch('/api/settings/branches')
     const json = await res.json()
-    setBranches(json.data ?? [])
-    setLoading(false)
-  }, [])
-
-  useEffect(() => { fetchBranches() }, [fetchBranches])
-
-  function openCreate() {
-    setEditingBranch(null)
-    reset()
-    setSheetOpen(true)
+    const updated = json.data ?? []
+    setBranchList(updated)
+    setStoreBranches(updated)
   }
 
-  function openEdit(branch: BranchRow) {
-    setEditingBranch(branch)
-    setValue('name', branch.name)
-    setValue('address', branch.address ?? '')
-    setValue('phone', branch.phone ?? '')
-    setValue('email', branch.email ?? '')
-    setValue('logo_url', branch.logo_url ?? '')
-    setSheetOpen(true)
+  async function onSaveBranch(data: BranchFormData) {
+    if (!editBranchId) return
+    await fetch(`/api/settings/branches/${editBranchId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    setEditBranchId(null)
+    branchForm.reset()
+    refreshBranches()
   }
 
-  async function onSubmit(data: FormData) {
-    if (editingBranch) {
-      await fetch(`/api/settings/branches/${editingBranch.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
+  async function onCreateBranch(data: BranchFormData) {
+    setBranchCreateError(null)
+    const res = await fetch('/api/settings/branches', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (res.ok) {
+      newBranchForm.reset()
+      setShowNewBranchForm(false)
+      refreshBranches()
     } else {
-      await fetch('/api/settings/branches', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
+      const json = await res.json()
+      setBranchCreateError(json?.error?.message ?? 'Failed to create branch.')
     }
-    reset()
-    setSheetOpen(false)
-    fetchBranches()
   }
 
-  const columns: ColumnDef<BranchRow>[] = [
-    {
-      accessorKey: 'name',
-      header: 'Branch Name',
-      cell: ({ getValue, row }) => (
-        <div>
-          <p className="font-medium text-gray-900">{getValue() as string}</p>
-          {row.original.is_main && <span className="text-xs text-blue-600">Main branch</span>}
-        </div>
-      ),
-    },
-    { accessorKey: 'address', header: 'Address', cell: ({ getValue }) => (getValue() as string | null) ?? '—' },
-    { accessorKey: 'phone', header: 'Phone', cell: ({ getValue }) => (getValue() as string | null) ?? '—' },
-    { accessorKey: 'email', header: 'Email', cell: ({ getValue }) => (getValue() as string | null) ?? '—' },
-    {
-      accessorKey: 'is_active',
-      header: 'Status',
-      cell: ({ getValue }) => (
-        <Badge variant={(getValue() as boolean) ? 'success' : 'secondary'}>
-          {(getValue() as boolean) ? 'Active' : 'Inactive'}
-        </Badge>
-      ),
-    },
-    {
-      id: 'actions',
-      header: '',
-      cell: ({ row }) => (
-        <Button size="sm" variant="ghost" onClick={() => openEdit(row.original)}>
-          Edit
-        </Button>
-      ),
-    },
-  ]
+  function startEditBranch(branch: Branch) {
+    setEditBranchId(branch.id)
+    branchForm.reset({ name: branch.name, address: branch.address ?? '', phone: branch.phone ?? '', email: branch.email ?? '', logo_url: branch.logo_url ?? '' })
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Branches</h1>
-          <p className="text-sm text-gray-500">Manage your business locations</p>
-        </div>
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          Add Branch
-        </Button>
+    <div className="rounded-xl border border-gray-200 bg-white">
+      <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+        <h3 className="font-semibold text-gray-900">Branches</h3>
+        <UIButton size="sm" onClick={() => { setShowNewBranchForm(true); setBranchCreateError(null); newBranchForm.reset() }}>
+          <PlusIcon className="h-4 w-4" /> Add Branch
+        </UIButton>
       </div>
+      
+      {showNewBranchForm && (
+        <div className="border-b border-gray-100 bg-blue-50/40 px-4 py-4">
+          <p className="mb-3 text-sm font-semibold text-gray-700">New Branch</p>
+          {branchCreateError && (
+            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {branchCreateError}
+            </div>
+          )}
+          <form onSubmit={newBranchForm.handleSubmit(onCreateBranch)} className="space-y-3">
+            <UIImageUpload label="Branch Logo" value={newBranchForm.watch('logo_url') || ''} onChange={(url) => newBranchForm.setValue('logo_url', url)} />
+            <div className="grid grid-cols-2 gap-3">
+              <UIInput label="Branch Name *" required {...newBranchForm.register('name')} />
+              <UIInput label="Phone" {...newBranchForm.register('phone')} />
+            </div>
+            <UIInput label="Address" {...newBranchForm.register('address')} />
+            <UIInput label="Email" type="email" {...newBranchForm.register('email')} />
+            <div className="flex gap-2">
+              <UIButton type="submit" size="sm" loading={newBranchForm.formState.isSubmitting}>Create Branch</UIButton>
+              <UIButton type="button" size="sm" variant="outline" onClick={() => { setShowNewBranchForm(false); setBranchCreateError(null) }}>Cancel</UIButton>
+            </div>
+          </form>
+        </div>
+      )}
 
-      <DataTable
-        data={branches}
-        columns={columns}
-        isLoading={loading}
-        emptyMessage="No branches found."
-      />
-
-      <InlineFormSheet
-        open={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        title={editingBranch ? 'Edit Branch' : 'Add Branch'}
-        description={editingBranch ? `Editing ${editingBranch.name}` : 'Create a new branch location'}
-      >
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <ImageUpload
-            label="Branch Logo"
-            value={watch('logo_url') || ''}
-            onChange={(url) => setValue('logo_url', url, { shouldValidate: true })}
-          />
-          <Input label="Branch Name" required error={errors.name?.message} {...register('name')} />
-          <Input label="Address" {...register('address')} />
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="Phone" {...register('phone')} />
-            <Input label="Email" type="email" {...register('email')} />
+      <div className="divide-y divide-gray-100">
+        {branchList.map((branch) => (
+          <div key={branch.id} className="px-4 py-4">
+            {editBranchId === branch.id ? (
+              <form onSubmit={branchForm.handleSubmit(onSaveBranch)} className="space-y-3">
+                <UIImageUpload label="Branch Logo" value={branchForm.watch('logo_url') || ''} onChange={(url) => branchForm.setValue('logo_url', url)} />
+                <div className="grid grid-cols-2 gap-3">
+                  <UIInput label="Branch Name" required {...branchForm.register('name')} />
+                  <UIInput label="Phone" {...branchForm.register('phone')} />
+                </div>
+                <UIInput label="Address" {...branchForm.register('address')} />
+                <UIInput label="Email" type="email" {...branchForm.register('email')} />
+                <div className="flex gap-2">
+                  <UIButton type="submit" size="sm" loading={branchForm.formState.isSubmitting}>Save</UIButton>
+                  <UIButton type="button" size="sm" variant="outline" onClick={() => setEditBranchId(null)}>Cancel</UIButton>
+                </div>
+              </form>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-gray-900">{branch.name}</p>
+                    {(branch as any).is_main && (
+                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">Main</span>
+                    )}
+                  </div>
+                  {branch.address && <p className="text-sm text-gray-500">{branch.address}</p>}
+                  {branch.phone && <p className="text-xs text-gray-400">{branch.phone}</p>}
+                </div>
+                <UIButton size="sm" variant="outline" onClick={() => startEditBranch(branch as Branch)}>
+                  Edit
+                </UIButton>
+              </div>
+            )}
           </div>
-          <Button type="submit" className="w-full" loading={isSubmitting}>
-            {editingBranch ? 'Save Changes' : 'Create Branch'}
-          </Button>
-        </form>
-      </InlineFormSheet>
+        ))}
+      </div>
     </div>
   )
 }

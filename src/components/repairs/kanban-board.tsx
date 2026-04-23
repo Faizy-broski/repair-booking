@@ -63,9 +63,9 @@ function RepairCard({ repair, isDragOverlay = false }: { repair: RepairRow; isDr
           {repair.customers.first_name} {repair.customers.last_name ?? ''}
         </p>
       )}
-      {(repair.device_brand || repair.device_model) && (
+      {(repair.device_type || repair.device_brand || repair.device_model) && (
         <p className="text-xs text-gray-500 truncate">
-          {[repair.device_brand, repair.device_model].filter(Boolean).join(' ')}
+          {[repair.device_type, repair.device_brand, repair.device_model].filter(Boolean).join(' ')}
         </p>
       )}
       {repair.issue && (

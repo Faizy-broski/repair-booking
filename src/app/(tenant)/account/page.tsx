@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   User, CreditCard, Receipt, CheckCircle2, AlertTriangle,
-  Clock, Download, ExternalLink, Loader2, RefreshCw, Zap, PlayCircle,
+  Clock, Download, ExternalLink, Loader2, RefreshCw, Zap, PlayCircle, XCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
@@ -117,6 +117,7 @@ export default function AccountPage() {
   const [upgrading, setUpgrading] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [plans, setPlans] = useState<Plan[]>([])
+  const [openingPortal, setOpeningPortal] = useState(false)
 
   // Fetch account + subscription details
   useEffect(() => {
@@ -174,6 +175,21 @@ export default function AccountPage() {
     }
   }
 
+  async function handleUpdatePaymentMethod() {
+    setOpeningPortal(true)
+    setErrorMsg(null)
+    try {
+      const res = await fetch('/api/stripe/portal', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) setErrorMsg(json.error ?? 'Something went wrong')
+      else window.location.href = json.data.url
+    } catch {
+      setErrorMsg('Network error — please try again')
+    } finally {
+      setOpeningPortal(false)
+    }
+  }
+
   const sub = accountData?.subscription
   const plan = sub?.plan ?? null
   const isExpired = !hasAccess
@@ -182,15 +198,20 @@ export default function AccountPage() {
   const trialDays = sub?.trial_ends_at ? daysLeft(sub.trial_ends_at) : 0
   const isTrialing = sub?.status === 'trialing' && trialDays > 0
   const isActive = sub?.status === 'active'
-  const isCanceled = ['canceled', 'past_due', 'suspended'].includes(sub?.status ?? '')
+  const isPastDue = sub?.status === 'past_due'
+  // Truly ended — no point updating payment method, need full resubscribe
+  const isCanceled = ['canceled', 'suspended'].includes(sub?.status ?? '')
 
-  // Plans eligible to show in the upgrade section:
-  // - If expired/no subscription: all paid plans (for resubscribing)
-  // - If active: only plans more expensive than the current one (genuine upgrades)
+  // Plans eligible for the upgrade/resubscribe section:
+  // - past_due: don't show plans — owner needs to fix payment, not create a new sub
+  // - active: only plans more expensive (genuine upgrade)
+  // - expired/canceled/no sub: all paid plans (resubscribe)
   const currentPrice = plan?.price_monthly ?? 0
-  const upgradablePlans = isActive
-    ? plans.filter((p) => p.price_monthly > currentPrice)
-    : plans
+  const upgradablePlans = isPastDue
+    ? []
+    : isActive
+      ? plans.filter((p) => p.price_monthly > currentPrice)
+      : plans
 
   const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: 'account',      label: 'Account',                icon: User       },
@@ -204,8 +225,30 @@ export default function AccountPage() {
     <div className="mx-auto max-w-5xl space-y-6">
       <h1 className="text-2xl font-bold text-on-surface">Account settings</h1>
 
-      {/* Expired banner */}
-      {isExpired && (
+      {/* Past-due payment failure banner */}
+      {isPastDue && (
+        <div className="flex items-start justify-between gap-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+            <div>
+              <p className="text-sm font-semibold text-amber-300">Payment failed — action required</p>
+              <p className="text-xs text-amber-400/80 mt-0.5">
+                Your last payment could not be collected. Update your payment method to keep your access.
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={handleUpdatePaymentMethod}
+            disabled={openingPortal}
+            className="shrink-0 bg-amber-500 text-white hover:bg-amber-600 text-xs px-3 py-1.5 h-auto"
+          >
+            {openingPortal ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Update card'}
+          </Button>
+        </div>
+      )}
+
+      {/* Fully expired / canceled banner */}
+      {isExpired && !isPastDue && (
         <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
           <div>
@@ -304,6 +347,9 @@ export default function AccountPage() {
                         value={sub.current_period_end ? formatDate(sub.current_period_end) : 'Manual / no expiry'}
                       />
                     )}
+                    {isPastDue && sub.current_period_end && (
+                      <InfoRow label="Next retry by" value={formatDate(sub.current_period_end)} />
+                    )}
                     {isCanceled && sub.current_period_end && (
                       <InfoRow label="Expired on" value={formatDate(sub.current_period_end)} />
                     )}
@@ -324,6 +370,41 @@ export default function AccountPage() {
                   </div>
                 )}
               </div>
+
+              {/* Payment method update card — only for past_due */}
+              {isPastDue && (
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-6">
+                  <div className="flex items-center gap-2 mb-1">
+                    <XCircle className="h-5 w-5 text-amber-400" />
+                    <h3 className="text-base font-semibold text-on-surface">Update your payment method</h3>
+                  </div>
+                  <p className="text-sm text-on-surface-variant mb-5">
+                    Your last payment failed. Stripe will retry automatically — update your card now to
+                    avoid losing access when retries are exhausted.
+                  </p>
+
+                  {errorMsg && (
+                    <p className="mb-4 text-sm text-red-400 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
+                      {errorMsg}
+                    </p>
+                  )}
+
+                  <Button
+                    onClick={handleUpdatePaymentMethod}
+                    disabled={openingPortal}
+                    className="bg-amber-500 text-white hover:bg-amber-600 font-semibold gap-2"
+                  >
+                    {openingPortal
+                      ? <><Loader2 className="h-4 w-4 animate-spin" /> Opening billing portal…</>
+                      : <><CreditCard className="h-4 w-4" /> Update payment method</>
+                    }
+                  </Button>
+
+                  <p className="mt-3 text-xs text-on-surface-variant">
+                    You'll be redirected to the Stripe billing portal. Your subscription and data are preserved.
+                  </p>
+                </div>
+              )}
 
               {/* Resubscribe / upgrade section — only when there are relevant plans */}
               {upgradablePlans.length > 0 && (

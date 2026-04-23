@@ -14,8 +14,8 @@ import { z } from 'zod'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-interface Brand       { id: string; name: string }
-interface Device      { id: string; name: string; manufacturer_id: string }
+interface Brand       { id: string; name: string; category_id: string | null }
+interface Device      { id: string; name: string; manufacturer_id: string; category_id: string | null }
 interface DeviceType  { id: string; name: string; slug: string; show_on_pos: boolean }
 interface Service     {
   id: string; name: string; price: number; cost: number
@@ -211,11 +211,11 @@ export default function ServiceCataloguePage() {
   // ── Brands (was Manufacturers) ──────────────────────────────────────────
 
   async function addBrand() {
-    if (!newBrandName.trim()) return
+    if (!newBrandName.trim() || !selectedTypeId) return
     setSaving(true)
     await fetch('/api/services/manufacturers', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newBrandName.trim() }),
+      body: JSON.stringify({ name: newBrandName.trim(), category_id: selectedTypeId }),
     })
     setNewBrandName(''); await load(); setSaving(false)
   }
@@ -237,11 +237,15 @@ export default function ServiceCataloguePage() {
   // ── Devices ─────────────────────────────────────────────────────────────
 
   async function addDevice() {
-    if (!newDevName.trim() || !selectedBrandId) return
+    if (!newDevName.trim() || !selectedBrandId || !selectedTypeId) return
     setSaving(true)
     await fetch('/api/services/devices', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newDevName.trim(), manufacturer_id: selectedBrandId }),
+      body: JSON.stringify({
+        name: newDevName.trim(),
+        manufacturer_id: selectedBrandId,
+        category_id: selectedTypeId
+      }),
     })
     setNewDevName(''); await load(); setSaving(false)
   }
@@ -298,9 +302,16 @@ export default function ServiceCataloguePage() {
   }
 
   // ── Derived ──────────────────────────────────────────────────────────────
+  
+  // Filter brands strictly by the selected type, just like the Device Catalogue
+  const displayBrands = selectedTypeId 
+    ? brands.filter(b => b.category_id === selectedTypeId)
+    : []
 
-  // Device types show all brands (no FK link in DB yet) — type selection is a visual gateway
-  const filteredDevices  = selectedBrandId ? devices.filter(d => d.manufacturer_id === selectedBrandId) : []
+  const filteredDevices = devices.filter(d => 
+    d.manufacturer_id === selectedBrandId && 
+    (selectedTypeId ? d.category_id === selectedTypeId : true)
+  )
   const filteredServices = selectedDevId   ? services.filter(s => s.device_id === selectedDevId)        : []
 
   const selectedType  = deviceTypes.find(t => t.id === selectedTypeId)
@@ -480,7 +491,7 @@ export default function ServiceCataloguePage() {
 
           {/* ── Col 2: Brands (was Manufacturers) ── */}
           <div className={`flex flex-col border-b lg:border-b-0 border-gray-200 ${mobileStep !== 1 ? 'hidden lg:flex' : 'flex'}`}>
-            <ColHeader icon={Layers} iconColor="text-brand-teal" label="Brands" count={selectedTypeId ? brands.length : null} />
+            <ColHeader icon={Layers} iconColor="text-brand-teal" label="Brands" count={selectedTypeId ? displayBrands.length : null} />
 
             {!selectedTypeId ? (
               <EmptyPrompt icon={Layers} text="Select a device type first" />
@@ -494,11 +505,11 @@ export default function ServiceCataloguePage() {
                   disabled={saving}
                 />
                 <div className="flex-1 overflow-y-auto">
-                  {brands.length === 0 && <p className="text-xs text-gray-400 text-center py-10">No brands yet</p>}
-                  {brands.map(brand => {
+                  {displayBrands.length === 0 && <p className="text-xs text-gray-400 text-center py-10">No brands yet</p>}
+                  {displayBrands.map(brand => {
                     const isSelected = selectedBrandId === brand.id
                     const isEditing  = editingBrandId === brand.id
-                    const devCount   = devices.filter(d => d.manufacturer_id === brand.id).length
+                    const devCount   = devices.filter(d => d.manufacturer_id === brand.id && (selectedTypeId ? d.category_id === selectedTypeId : true)).length
                     return (
                       <div
                         key={brand.id}

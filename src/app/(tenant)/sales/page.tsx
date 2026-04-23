@@ -70,6 +70,7 @@ export default function SalesPage() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [invoiceSettings, setInvoiceSettings] = useState<any>(null)
 
   // Filters
   const [dateFrom, setDateFrom] = useState('')
@@ -114,6 +115,18 @@ export default function SalesPage() {
     setLoading(false)
   }, [activeBranch, page, dateFrom, dateTo, statusFilter])
 
+  useEffect(() => {
+    async function fetchSettings() {
+      if (!activeBranch) return
+      const res = await fetch(`/api/settings/invoice?branch_id=${activeBranch.id}`)
+      if (res.ok) {
+        const json = await res.json()
+        setInvoiceSettings(json.data)
+      }
+    }
+    fetchSettings()
+  }, [activeBranch])
+
   useEffect(() => { fetchSales() }, [fetchSales])
 
   async function viewDetail(id: string) {
@@ -154,6 +167,7 @@ export default function SalesPage() {
         branchEmail={activeBranch?.email ?? undefined}
         logoUrl={activeBranch?.logo_url ?? undefined}
         currency="£"
+        settings={invoiceSettings}
       />
     ).toBlob()
     const url = URL.createObjectURL(blob)

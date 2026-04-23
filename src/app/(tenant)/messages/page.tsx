@@ -93,6 +93,8 @@ export default function MessagesPage() {
   // Stable ref to onSelectMessage so auto-open useEffect can call it without
   // needing it as a dependency (avoids infinite effect loops)
   const onSelectMessageRef = useRef<(msg: MessageRow) => void>(() => {})
+  /** true while the Supabase Realtime WS is SUBSCRIBED — polling skips when healthy */
+  const realtimeHealthyRef = useRef(false)
 
   useEffect(() => { selectedRef.current = selected }, [selected])
   useEffect(() => { notifyRef.current = notify }, [notify])
@@ -174,19 +176,24 @@ export default function MessagesPage() {
   }, [fetchMessages])
 
   // ── Polling fallback + Page Visibility reconciliation ──────────────────────
-  // Fires every 8 s to keep the conversation list accurate even when realtime
-  // is unavailable (migration not applied, WS blocked, cold reconnect, etc.).
-  // Also fires immediately when the tab comes back into focus.
+  // Both intervals are skipped when realtimeHealthyRef is true (WS is SUBSCRIBED).
+  // This eliminates the concurrent request pile-up (list + thread + badge all
+  // firing at once) while keeping polling as an automatic fallback if WS drops.
+  // Page-visibility always fires unconditionally to reconcile after tab sleep.
   useEffect(() => {
     if (!activeBranch) return
 
     const LIST_POLL_MS   = 8_000
     const THREAD_POLL_MS = 5_000
 
-    const listInterval = setInterval(() => fetchMessagesRef.current(), LIST_POLL_MS)
+    const listInterval = setInterval(() => {
+      if (realtimeHealthyRef.current) return
+      fetchMessagesRef.current()
+    }, LIST_POLL_MS)
 
     // Poll the open thread so new replies appear without reload
     const threadInterval = setInterval(() => {
+      if (realtimeHealthyRef.current) return
       const sel = selectedRef.current
       if (!sel) return
       const rootId = sel.parent_id ?? sel.id
@@ -194,6 +201,7 @@ export default function MessagesPage() {
     }, THREAD_POLL_MS)
 
     const onVisible = () => {
+      // Always reconcile on tab focus regardless of WS state
       if (document.visibilityState !== 'visible') return
       fetchMessagesRef.current()
       const sel = selectedRef.current
@@ -305,7 +313,10 @@ export default function MessagesPage() {
       })
 
       .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        if (status === 'SUBSCRIBED') {
+          realtimeHealthyRef.current = true
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          realtimeHealthyRef.current = false
           // Polling fallback above keeps the UI current even when realtime fails
           console.warn('[Messages] Realtime subscription:', status, '— polling active')
         }

@@ -100,7 +100,7 @@ export async function signOutWrongTenant(): Promise<void> {
   const { useModuleConfigStore } = await import('@/store/module-config.store')
 
   const supabase = createClient()
-  await supabase.auth.signOut()
+  await supabase.auth.signOut({ scope: 'local' })
 
   // Wipe cached Zustand state so no stale tenant data lingers
   useAuthStore.getState().clear()

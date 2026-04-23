@@ -13,6 +13,7 @@ const createSchema = z.object({
   email: z.string().email().optional().nullable().or(z.literal('')),
   phone: z.string().optional().nullable(),
   address: z.string().optional().nullable(),
+  business_name: z.string().optional().nullable(),
   branch_id: z.string().uuid().optional().nullable(),
   custom_fields: z.record(z.string(), z.unknown()).default({}),
 })
@@ -83,6 +84,15 @@ export const CustomerController = {
       return ok(customer)
     } catch (err) {
       return serverError('Failed to update customer', err)
+    }
+  },
+
+  async remove(_request: NextRequest, ctx: RequestContext, id: string) {
+    try {
+      await CustomerService.remove(id, ctx.businessId)
+      return ok({ deleted: true })
+    } catch (err) {
+      return serverError('Failed to delete customer', err)
     }
   },
 }

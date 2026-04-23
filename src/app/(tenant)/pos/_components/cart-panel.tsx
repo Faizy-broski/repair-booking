@@ -55,6 +55,7 @@ export function CartPanel({ mobileView }: Props) {
 
   // ── Checkout panel collapsed/expanded (mobile) ────────────────────────────
   const [showFullTotals, setShowFullTotals] = useState(false)
+  const [invoiceSettings, setInvoiceSettings] = useState<any>(null)
 
   // ── Computed totals ────────────────────────────────────────────────────────
   const subtotal        = pos.subtotal()
@@ -83,6 +84,18 @@ export function CartPanel({ mobileView }: Props) {
     }, 300)
     return () => clearTimeout(t)
   }, [customerSearch])
+
+  useEffect(() => {
+    async function fetchSettings() {
+      if (!activeBranch) return
+      const res = await fetch(`/api/settings/invoice?branch_id=${activeBranch.id}`)
+      if (res.ok) {
+        const json = await res.json()
+        setInvoiceSettings(json.data)
+      }
+    }
+    fetchSettings()
+  }, [activeBranch])
 
   useEffect(() => {
     function h(e: MouseEvent) {
@@ -168,6 +181,7 @@ export function CartPanel({ mobileView }: Props) {
           logoUrl={(activeBranch as any)?.logo_url ?? undefined}
           currency="£"
           taxRate={pos.taxRate > 0 ? pos.taxRate : undefined}
+          settings={invoiceSettings}
         />
       ).toBlob()
       const url = URL.createObjectURL(blob)

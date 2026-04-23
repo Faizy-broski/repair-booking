@@ -5,8 +5,8 @@ const db = (t: string): any => (adminSupabase as any).from(t)
 const rpc = (fn: string, args?: Record<string, unknown>): any => (adminSupabase as any).rpc(fn, args)
 
 export const RepairService = {
-  async list(branchId: string | undefined, params: { page?: number; limit?: number; status?: string; search?: string; businessId?: string }) {
-    const { page = 1, limit = 20, status, search, businessId } = params
+  async list(branchId: string | undefined, params: { page?: number; limit?: number; status?: string; search?: string; businessId?: string; customerId?: string }) {
+    const { page = 1, limit = 20, status, search, businessId, customerId } = params
     let q = adminSupabase
       .from('repairs')
       .select('*, customers(first_name,last_name,phone,email), employees!assigned_to(id,first_name,last_name)', { count: 'exact' })
@@ -28,6 +28,7 @@ export const RepairService = {
     }
 
     if (status) q = q.eq('status', status)
+    if (customerId) q = q.eq('customer_id', customerId)
     if (search) q = q.or(`job_number.ilike.%${search}%,device_model.ilike.%${search}%`)
 
     const { data, error, count } = await q
@@ -88,5 +89,12 @@ export const RepairService = {
       .order('created_at', { ascending: false })
     if (error) throw error
     return data
+  },
+
+  async remove(id: string, branchId?: string) {
+    let q = adminSupabase.from('repairs').delete().eq('id', id)
+    if (branchId) q = q.eq('branch_id', branchId)
+    const { error } = await q
+    if (error) throw error
   },
 }

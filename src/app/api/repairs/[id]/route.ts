@@ -9,3 +9,7 @@ export const PATCH = withMiddleware(
   (req, ctx, { params }) => params.then((p) => RepairController.update(req, ctx, p.id)),
   { requiredRole: 'staff' }
 )
+export const DELETE = withMiddleware(
+  (req, ctx, { params }) => params.then((p) => RepairController.remove(req, ctx, p.id)),
+  { requiredRole: 'branch_manager' }
+)

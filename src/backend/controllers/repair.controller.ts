@@ -7,13 +7,13 @@ import { adminSupabase } from '@/backend/config/supabase'
 import { ok, created, notFound, serverError } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
-import { REPAIR_STATUSES } from '@/backend/config/constants'
 import { z } from 'zod'
 
 const createSchema = z.object({
   branch_id: z.string().uuid(),
   customer_id: z.string().uuid().optional().nullable(),
   assigned_to: z.string().uuid().optional().nullable(),
+  status: z.string().optional(),
   device_type: z.string().optional().nullable(),
   device_brand: z.string().optional().nullable(),
   device_model: z.string().optional().nullable(),
@@ -39,7 +39,7 @@ const createSchema = z.object({
 const updateSchema = createSchema.partial().omit({ branch_id: true })
 
 const statusSchema = z.object({
-  status: z.enum(REPAIR_STATUSES),
+  status: z.string().min(1),
   note: z.string().optional().default(''),
   send_email: z.boolean().default(false),
 })
@@ -56,6 +56,7 @@ export const RepairController = {
         status: searchParams.get('status') ?? undefined,
         search: searchParams.get('search') ?? undefined,
         businessId: ctx.businessId,
+        customerId: searchParams.get('customer_id') ?? undefined,
       })
       return ok(data, { page, limit, total: count ?? 0 })
     } catch (err) {
@@ -229,6 +230,16 @@ export const RepairController = {
       return ok(history)
     } catch (err) {
       return serverError('Failed to fetch status history', err)
+    }
+  },
+
+  async remove(_request: NextRequest, ctx: RequestContext, id: string) {
+    const branchId = ctx.auth.branchId ?? undefined
+    try {
+      await RepairService.remove(id, branchId)
+      return ok({ deleted: true })
+    } catch (err) {
+      return serverError('Failed to delete repair', err)
     }
   },
 }

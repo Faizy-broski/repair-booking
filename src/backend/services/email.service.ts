@@ -228,6 +228,72 @@ export const EmailService = {
     })
   },
 
+  async sendPaymentFailed(payload: {
+    to: string
+    businessName: string
+    subdomain: string
+    amountDue: number
+    currency: string
+    attemptCount: number
+    nextAttemptAt: string | null
+  }) {
+    const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'repairbooking.co.uk'
+    const accountUrl = `https://${payload.subdomain}.${ROOT_DOMAIN}/account`
+    const amount = new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: payload.currency.toUpperCase(),
+    }).format(payload.amountDue / 100)
+
+    const nextAttemptLine = payload.nextAttemptAt
+      ? `<p style="color:#6B7280;font-size:14px;margin:0 0 24px;">
+           We will automatically retry the charge on
+           <strong>${new Date(payload.nextAttemptAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>.
+           Update your payment method before then to avoid losing access.
+         </p>`
+      : `<p style="color:#6B7280;font-size:14px;margin:0 0 24px;">
+           No further automatic retries will be made. Please update your payment method immediately to restore full access.
+         </p>`
+
+    await getGlobalTransporter().sendMail({
+      from: `"RepairBooking" <${process.env.SMTP_FROM ?? process.env.SMTP_USER}>`,
+      to: payload.to,
+      subject: `Action required: Payment failed for ${payload.businessName}`,
+      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8f9fa;font-family:Arial,sans-serif;">
+        <div style="max-width:600px;margin:40px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+          <div style="background:#ef4444;padding:32px 40px;text-align:center;">
+            <h1 style="color:#fff;margin:0;font-size:24px;font-weight:800;">RepairBooking</h1>
+            <p style="color:rgba(255,255,255,0.9);margin:8px 0 0;font-size:14px;">Payment failed — action required</p>
+          </div>
+          <div style="padding:40px;">
+            <p style="color:#374151;font-size:16px;margin:0 0 8px;">Hi there,</p>
+            <p style="color:#6B7280;font-size:14px;line-height:1.6;margin:0 0 24px;">
+              We were unable to process the payment of <strong>${amount}</strong> for your
+              <strong>${payload.businessName}</strong> subscription
+              ${payload.attemptCount > 1 ? `(attempt ${payload.attemptCount})` : ''}.
+              Your account is still active but access will be revoked if the payment cannot be collected.
+            </p>
+            ${nextAttemptLine}
+            <div style="text-align:center;margin-bottom:32px;">
+              <a href="${accountUrl}" style="display:inline-block;background:#3BB3C3;color:#fff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">Update Payment Method →</a>
+            </div>
+            <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px 20px;">
+              <p style="margin:0;font-size:13px;color:#991b1b;font-weight:600;">What happens if I don't act?</p>
+              <ul style="margin:8px 0 0;padding-left:20px;color:#b91c1c;font-size:13px;line-height:1.8;">
+                <li>Stripe will retry the payment automatically</li>
+                <li>After all retries fail, your subscription will be cancelled</li>
+                <li>All staff will lose access to the dashboard</li>
+                <li>Your data is retained and will be restored when you resubscribe</li>
+              </ul>
+            </div>
+          </div>
+          <div style="background:#F9FAFB;border-top:1px solid #F3F4F6;padding:20px 40px;text-align:center;">
+            <p style="color:#9CA3AF;font-size:12px;margin:0;">© ${new Date().getFullYear()} The Social Nexus Ltd · <a href="https://${ROOT_DOMAIN}" style="color:#9CA3AF;">repairbooking.co.uk</a></p>
+          </div>
+        </div>
+      </body></html>`,
+    })
+  },
+
   async sendEnterpriseEnquiry(payload: { businessName: string; email: string; fullName: string; phone?: string }) {
     const t = getGlobalTransporter()
     await t.sendMail({

@@ -9,3 +9,8 @@ export const PATCH = withMiddleware(
   (req, ctx, { params }) => params.then((p) => CustomerController.update(req, ctx, p.id)),
   { requiredRole: 'staff' }
 )
+
+export const DELETE = withMiddleware(
+  (req, ctx, { params }) => params.then((p) => CustomerController.remove(req, ctx, p.id)),
+  { requiredRole: 'staff' }
+)

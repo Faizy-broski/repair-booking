@@ -29,7 +29,7 @@ export default function ForgotPasswordPage() {
 
     // Clear any existing session so a stale auth state on this device cannot
     // cause getUser()/getSession() on the reset page to return a false positive.
-    await supabase.auth.signOut().catch(() => {})
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
 
     // redirectTo: the callback URL on this exact origin (subdomain).
     // Supabase will append ?code=... so exchangeCodeForSession works.

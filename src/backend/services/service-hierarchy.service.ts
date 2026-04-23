@@ -49,12 +49,16 @@ export const ServiceCategoryService = {
 // ── Manufacturers ────────────────────────────────────────────────────────────
 
 export const ServiceManufacturerService = {
-  async list(businessId: string) {
-    const { data, error } = await adminSupabase
+  async list(businessId: string, categoryId?: string) {
+    let q = adminSupabase
       .from('service_manufacturers')
       .select('*')
       .eq('business_id', businessId)
       .order('name', { ascending: true })
+
+    if (categoryId) q = q.eq('category_id', categoryId)
+
+    const { data, error } = await q
     if (error) throw error
     return data
   },
@@ -92,15 +96,16 @@ export const ServiceManufacturerService = {
 // ── Devices ──────────────────────────────────────────────────────────────────
 
 export const ServiceDeviceService = {
-  async list(businessId: string, manufacturerId?: string, brandId?: string) {
+  async list(businessId: string, params: { manufacturerId?: string; brandId?: string; categoryId?: string }) {
     let q = adminSupabase
       .from('service_devices')
       .select('*, service_manufacturers(name)')
       .eq('business_id', businessId)
       .order('name', { ascending: true })
 
-    if (manufacturerId) q = q.eq('manufacturer_id', manufacturerId)
-    if (brandId) q = q.eq('brand_id', brandId)
+    if (params.manufacturerId) q = q.eq('manufacturer_id', params.manufacturerId)
+    if (params.brandId)        q = q.eq('brand_id', params.brandId)
+    if (params.categoryId)     q = q.eq('category_id', params.categoryId)
 
     const { data, error } = await q
     if (error) throw error

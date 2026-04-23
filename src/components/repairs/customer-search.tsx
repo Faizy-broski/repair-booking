@@ -10,6 +10,8 @@ interface Customer {
   last_name: string | null
   phone: string | null
   email: string | null
+  business_name?: string | null
+  address?: string | null
 }
 
 interface CustomerSearchProps {

@@ -1,6 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
-import { Plus, Search } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Plus, Search, Eye, Pencil, Trash2, FileDown, FileSpreadsheet, Printer, Columns, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DataTable } from '@/components/shared/data-table'
@@ -11,8 +11,9 @@ import { formatDate } from '@/lib/utils'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
-import type { ColumnDef } from '@tanstack/react-table'
+import type { ColumnDef, VisibilityState } from '@tanstack/react-table'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 
 interface CustomerRow {
   id: string
@@ -20,6 +21,8 @@ interface CustomerRow {
   last_name: string | null
   email: string | null
   phone: string | null
+  address: string | null
+  business_name: string | null
   created_at: string
 }
 
@@ -29,9 +32,62 @@ const schema = z.object({
   email: z.string().email().optional().or(z.literal('')),
   phone: z.string().optional(),
   address: z.string().optional(),
+  business_name: z.string().optional(),
 })
 
 type FormData = z.infer<typeof schema>
+
+const EXPORTABLE_COLUMNS = ['Sr#', 'Name', 'Email', 'Business Name', 'Contact No', 'Address']
+
+function exportCSV(customers: CustomerRow[]) {
+  const rows = [
+    EXPORTABLE_COLUMNS.join(','),
+    ...customers.map((c, i) =>
+      [
+        i + 1,
+        `"${[c.first_name, c.last_name].filter(Boolean).join(' ')}"`,
+        `"${c.email ?? 'N/A'}"`,
+        `"${c.business_name ?? 'N/A'}"`,
+        `"${c.phone ?? 'N/A'}"`,
+        `"${c.address ?? 'N/A'}"`,
+      ].join(',')
+    ),
+  ]
+  const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = 'customers.csv'
+  a.click()
+}
+
+function exportExcel(customers: CustomerRow[]) {
+  const rows = [
+    EXPORTABLE_COLUMNS,
+    ...customers.map((c, i) => [
+      i + 1,
+      [c.first_name, c.last_name].filter(Boolean).join(' '),
+      c.email ?? 'N/A',
+      c.business_name ?? 'N/A',
+      c.phone ?? 'N/A',
+      c.address ?? 'N/A',
+    ]),
+  ]
+  const xml = `<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Customers"><Table>${rows.map((r) => `<Row>${r.map((v) => `<Cell><Data ss:Type="String">${String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;')}</Data></Cell>`).join('')}</Row>`).join('')}</Table></Worksheet></Workbook>`
+  const blob = new Blob([xml], { type: 'application/vnd.ms-excel' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = 'customers.xls'
+  a.click()
+}
+
+function exportPDF(customers: CustomerRow[]) {
+  const html = `<html><head><title>Customers</title><style>body{font-family:sans-serif;font-size:12px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:#0d7070;color:#fff}</style></head><body><h2>Customers</h2><table><thead><tr>${EXPORTABLE_COLUMNS.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${customers.map((c, i) => `<tr><td>${i + 1}</td><td>${[c.first_name, c.last_name].filter(Boolean).join(' ')}</td><td>${c.email ?? 'N/A'}</td><td>${c.business_name ?? 'N/A'}</td><td>${c.phone ?? 'N/A'}</td><td>${c.address ?? 'N/A'}</td></tr>`).join('')}</tbody></table></body></html>`
+  const w = window.open('', '_blank')
+  if (!w) return
+  w.document.write(html)
+  w.document.close()
+  w.print()
+}
 
 export default function CustomersPage() {
   const { activeBranch } = useAuthStore()
@@ -41,14 +97,25 @@ export default function CustomersPage() {
   const [page, setPage] = useState(0)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+
+  // Create sheet
   const [sheetOpen, setSheetOpen] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [customFields, setCustomFields] = useState<Record<string, unknown>>({})
   const { defs: customerFieldDefs } = useCustomFieldDefs('customers')
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
-    resolver: zodResolver(schema),
-  })
+  // Edit sheet
+  const [editSheetOpen, setEditSheetOpen] = useState(false)
+  const [editingCustomer, setEditingCustomer] = useState<CustomerRow | null>(null)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  // Column visibility
+  const [colVisibility, setColVisibility] = useState<VisibilityState>({})
+  const [colMenuOpen, setColMenuOpen] = useState(false)
+  const colMenuRef = useRef<HTMLDivElement>(null)
+
+  const createForm = useForm<FormData>({ resolver: zodResolver(schema) })
+  const editForm = useForm<FormData>({ resolver: zodResolver(schema) })
 
   const fetchCustomers = useCallback(async () => {
     if (!activeBranch) return
@@ -68,6 +135,17 @@ export default function CustomersPage() {
 
   useEffect(() => { fetchCustomers() }, [fetchCustomers])
 
+  // Close column menu on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (colMenuRef.current && !colMenuRef.current.contains(e.target as Node)) {
+        setColMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
   async function onCreate(data: FormData) {
     if (!activeBranch) return
     setCreateError(null)
@@ -76,31 +154,98 @@ export default function CustomersPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, branch_id: activeBranch.id, custom_fields: customFields }),
     })
-    if (res.ok) { reset(); setSheetOpen(false); fetchCustomers() }
+    if (res.ok) { createForm.reset(); setSheetOpen(false); fetchCustomers() }
     else { const j = await res.json(); setCreateError(j?.error?.message ?? 'Failed to create customer.') }
   }
 
+  function openEdit(customer: CustomerRow) {
+    setEditingCustomer(customer)
+    editForm.reset({
+      first_name: customer.first_name,
+      last_name: customer.last_name ?? '',
+      email: customer.email ?? '',
+      phone: customer.phone ?? '',
+      address: customer.address ?? '',
+      business_name: customer.business_name ?? '',
+    })
+    setEditError(null)
+    setEditSheetOpen(true)
+  }
+
+  async function onEdit(data: FormData) {
+    if (!editingCustomer) return
+    setEditError(null)
+    const res = await fetch(`/api/customers/${editingCustomer.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...data, email: data.email || null }),
+    })
+    if (res.ok) { setEditSheetOpen(false); fetchCustomers() }
+    else { const j = await res.json(); setEditError(j?.error?.message ?? 'Failed to update customer.') }
+  }
+
+  async function onDelete(customer: CustomerRow) {
+    const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ')
+    toast.warning(`Delete customer "${name}"?`, {
+      description: 'This action cannot be undone and will affect related repairs.',
+      action: {
+        label: 'Delete',
+        onClick: async () => {
+          const res = await fetch(`/api/customers/${customer.id}`, { method: 'DELETE' })
+          if (res.ok) {
+            toast.success(`Customer "${name}" deleted.`)
+            fetchCustomers()
+          } else {
+            toast.error('Failed to delete customer.')
+          }
+        },
+      },
+    })
+  }
+
+  const TOGGLEABLE_COLS = ['email', 'address', 'phone', 'created_at']
+  const COL_LABELS: Record<string, string> = { email: 'Email', address: 'Address', phone: 'Contact No', created_at: 'Added' }
+
   const columns: ColumnDef<CustomerRow>[] = [
+    {
+      id: 'sr',
+      header: 'Sr No#',
+      size: 70,
+      cell: ({ row }) => <span className="text-gray-500">{page * 20 + row.index + 1}</span>,
+    },
     {
       id: 'name',
       header: 'Name',
       cell: ({ row }) => (
-        <div>
-          <p className="font-medium text-gray-900">
-            {row.original.first_name} {row.original.last_name ?? ''}
-          </p>
-        </div>
+        <p className="font-medium text-gray-900">
+          {row.original.first_name} {row.original.last_name ?? ''}
+        </p>
       ),
     },
     {
       accessorKey: 'email',
       header: 'Email',
-      cell: ({ getValue }) => (getValue() as string) || '—',
+      cell: ({ getValue }) => (getValue() as string) || 'N/A',
+    },
+    {
+      id: 'business',
+      header: 'Business Name',
+      cell: ({ row }) => row.original.business_name
+        ? <span className="text-gray-900">{row.original.business_name}</span>
+        : <span className="text-gray-400">N/A</span>,
     },
     {
       accessorKey: 'phone',
-      header: 'Phone',
-      cell: ({ getValue }) => (getValue() as string) || '—',
+      header: 'Contact No',
+      cell: ({ getValue }) => (getValue() as string) || 'N/A',
+    },
+    {
+      accessorKey: 'address',
+      header: 'Address',
+      cell: ({ getValue }) => {
+        const v = getValue() as string | null
+        return v ? <span className="max-w-[160px] truncate block" title={v}>{v}</span> : 'N/A'
+      },
     },
     {
       accessorKey: 'created_at',
@@ -109,20 +254,43 @@ export default function CustomersPage() {
     },
     {
       id: 'actions',
-      header: '',
+      header: 'Action',
+      size: 120,
       cell: ({ row }) => (
-        <Button size="sm" variant="ghost" className="bg-brand-teal/10 text-brand-teal hover:bg-brand-teal/20 hover:text-brand-teal" onClick={() => router.push(`/customers/${row.original.id}`)}>
-          View
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => router.push(`/customers/${row.original.id}`)}
+            className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors"
+          >
+            <Eye className="h-3 w-3" /> Details
+          </button>
+          <button
+            onClick={() => openEdit(row.original)}
+            className="flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-600 hover:bg-amber-100 transition-colors border border-amber-200"
+          >
+            <Pencil className="h-3 w-3" /> Edit
+          </button>
+          <button
+            onClick={() => onDelete(row.original)}
+            className="flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-500 hover:bg-red-100 transition-colors border border-red-200"
+          >
+            <Trash2 className="h-3 w-3" /> Delete
+          </button>
+        </div>
       ),
     },
   ]
+
+  const visibleColumns = columns.filter((col) => {
+    const key = (col as { accessorKey?: string }).accessorKey ?? col.id
+    return key === undefined || colVisibility[key] !== false
+  })
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Customers</h1>
+          <h1 className="text-xl font-bold text-gray-900">Manage Customers</h1>
           <p className="text-sm text-gray-500">{total} customers</p>
         </div>
         <Button onClick={() => setSheetOpen(true)}>
@@ -130,20 +298,71 @@ export default function CustomersPage() {
         </Button>
       </div>
 
-      <div className="relative max-w-xs">
-        <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-        <input
-          type="search"
-          placeholder="Search customers..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
-        />
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => exportCSV(customers)}
+          className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+        >
+          <FileDown className="h-3.5 w-3.5" /> Export CSV
+        </button>
+        <button
+          onClick={() => exportExcel(customers)}
+          className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+        >
+          <FileSpreadsheet className="h-3.5 w-3.5" /> Export Excel
+        </button>
+        <button
+          onClick={() => exportPDF(customers)}
+          className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+        >
+          <Printer className="h-3.5 w-3.5" /> Print
+        </button>
+        <div className="relative" ref={colMenuRef}>
+          <button
+            onClick={() => setColMenuOpen((v) => !v)}
+            className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <Columns className="h-3.5 w-3.5" /> Column visibility
+          </button>
+          {colMenuOpen && (
+            <div className="absolute left-0 top-full z-20 mt-1 w-44 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
+              {TOGGLEABLE_COLS.map((key) => (
+                <label key={key} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50">
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 rounded"
+                    checked={colVisibility[key] !== false}
+                    onChange={(e) => setColVisibility((v) => ({ ...v, [key]: e.target.checked }))}
+                  />
+                  {COL_LABELS[key]}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+        <button
+          onClick={() => exportPDF(customers)}
+          className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+        >
+          <FileText className="h-3.5 w-3.5" /> Export PDF
+        </button>
+
+        <div className="ml-auto relative max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            type="search"
+            placeholder="Search customers..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
+          />
+        </div>
       </div>
 
       <DataTable
         data={customers}
-        columns={columns}
+        columns={visibleColumns}
         isLoading={loading}
         totalCount={total}
         pageIndex={page}
@@ -152,39 +371,61 @@ export default function CustomersPage() {
         emptyMessage="No customers yet."
       />
 
+      {/* Add Customer Sheet */}
       <InlineFormSheet open={sheetOpen} onClose={() => { setSheetOpen(false); setCreateError(null) }} title="Add Customer">
-        <form onSubmit={handleSubmit(onCreate)} className="space-y-4">
+        <form onSubmit={createForm.handleSubmit(onCreate)} className="space-y-4">
           {createError && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{createError}</div>
           )}
           <div className="grid grid-cols-2 gap-3">
-            <Input label="First Name" required error={errors.first_name?.message} {...register('first_name')} />
-            <Input label="Last Name" {...register('last_name')} />
+            <Input label="First Name" required error={createForm.formState.errors.first_name?.message} {...createForm.register('first_name')} />
+            <Input label="Last Name" {...createForm.register('last_name')} />
           </div>
-          <Input label="Email" type="email" {...register('email')} />
-          <Input label="Phone" type="tel" {...register('phone')} />
+          <Input label="Business Name" {...createForm.register('business_name')} />
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Email" type="email" {...createForm.register('email')} />
+            <Input label="Phone" type="tel" {...createForm.register('phone')} />
+          </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Address</label>
-            <textarea
-              rows={2}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              {...register('address')}
-            />
+            <textarea rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" {...createForm.register('address')} />
           </div>
-          
           {customerFieldDefs.length > 0 && (
             <div className="border-t border-gray-100 pt-3 mt-2">
               <p className="mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Additional Info</p>
-              <CustomFieldRenderer 
-                definitions={customerFieldDefs} 
-                values={customFields} 
+              <CustomFieldRenderer
+                definitions={customerFieldDefs}
+                values={customFields}
                 onSave={async (v) => setCustomFields(v)}
                 readOnly={false}
-                showSave={false} 
+                showSave={false}
               />
             </div>
           )}
-          <Button type="submit" className="w-full" loading={isSubmitting}>Add Customer</Button>
+          <Button type="submit" className="w-full" loading={createForm.formState.isSubmitting}>Add Customer</Button>
+        </form>
+      </InlineFormSheet>
+
+      {/* Edit Customer Sheet */}
+      <InlineFormSheet open={editSheetOpen} onClose={() => { setEditSheetOpen(false); setEditError(null) }} title="Edit Customer">
+        <form onSubmit={editForm.handleSubmit(onEdit)} className="space-y-4">
+          {editError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{editError}</div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="First Name" required error={editForm.formState.errors.first_name?.message} {...editForm.register('first_name')} />
+            <Input label="Last Name" {...editForm.register('last_name')} />
+          </div>
+          <Input label="Business Name" {...editForm.register('business_name')} />
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Email" type="email" {...editForm.register('email')} />
+            <Input label="Phone" type="tel" {...editForm.register('phone')} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Address</label>
+            <textarea rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" {...editForm.register('address')} />
+          </div>
+          <Button type="submit" className="w-full" loading={editForm.formState.isSubmitting}>Save Changes</Button>
         </form>
       </InlineFormSheet>
     </div>

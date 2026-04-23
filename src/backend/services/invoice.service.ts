@@ -47,35 +47,37 @@ export const InvoiceService = {
     return data
   },
 
-  async updateStatus(id: string, branchId: string, status: string) {
-    const { data, error } = await db('invoices')
-      .update({ status })
-      .eq('id', id)
-      .eq('branch_id', branchId)
-      .select()
-      .single()
+  async updateStatus(id: string, branchId: string | null, status: string) {
+    let q = adminSupabase.from('invoices').update({ status }).eq('id', id)
+    
+    if (branchId && branchId !== 'null') {
+      q = q.eq('branch_id', branchId)
+    }
+
+    const { data, error } = await q.select().single()
     if (error) throw error
     return data
   },
 
-  async recordPayment(id: string, branchId: string, amountPaid: number) {
+  async recordPayment(id: string, branchId: string | null, amountPaid: number) {
     // First fetch the invoice total to determine new status
-    const { data: inv, error: fetchErr } = await db('invoices')
-      .select('total, amount_paid')
-      .eq('id', id)
-      .eq('branch_id', branchId)
-      .single()
+    let fetchQ = adminSupabase.from('invoices').select('total, amount_paid').eq('id', id)
+    if (branchId && branchId !== 'null') {
+      fetchQ = fetchQ.eq('branch_id', branchId)
+    }
+    
+    const { data: inv, error: fetchErr } = await fetchQ.single()
     if (fetchErr) throw fetchErr
 
     const newAmountPaid = ((inv as any).amount_paid ?? 0) + amountPaid
     const newStatus = newAmountPaid >= (inv as any).total ? 'paid' : 'partial'
 
-    const { data, error } = await db('invoices')
-      .update({ amount_paid: newAmountPaid, status: newStatus })
-      .eq('id', id)
-      .eq('branch_id', branchId)
-      .select()
-      .single()
+    let updateQ = adminSupabase.from('invoices').update({ amount_paid: newAmountPaid, status: newStatus }).eq('id', id)
+    if (branchId && branchId !== 'null') {
+      updateQ = updateQ.eq('branch_id', branchId)
+    }
+
+    const { data, error } = await updateQ.select().single()
     if (error) throw error
     return data
   },

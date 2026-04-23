@@ -9,6 +9,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { useModuleConfigStore } from '@/store/module-config.store'
 import { createClient } from '@/lib/supabase/client'
 import { getSubdomain } from '@/lib/utils'
+import { Toaster } from 'sonner'
 import type { Profile, Branch } from '@/types/database'
 import type { SubscriptionStatus } from '@/store/auth.store'
 
@@ -112,7 +113,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
           .maybeSingle()
 
         if (!bizError && subBiz && subBiz.id !== profile.business_id) {
-          await supabase.auth.signOut()
+          await supabase.auth.signOut({ scope: 'local' })
           clear()
           window.location.replace('/login?error=wrong_tenant')
           return
@@ -260,6 +261,8 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
       <MessageBadge />
       {/* Step-by-step onboarding tour for new users */}
       <TourGuide />
+      {/* Premium Toast Notifications */}
+      <Toaster richColors position="top-center" />
     </div>
   )
 }

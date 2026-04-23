@@ -9,7 +9,7 @@ interface ModalProps {
   title: string
   description?: string
   children: React.ReactNode
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full'
 }
 
 const SIZE_CLASSES = {
@@ -17,6 +17,8 @@ const SIZE_CLASSES = {
   md: 'max-w-md',
   lg: 'max-w-lg',
   xl: 'max-w-2xl',
+  '2xl': 'max-w-3xl',
+  full: 'max-w-none',
 }
 
 export function Modal({ open, onClose, title, description, children, size = 'md' }: ModalProps) {
@@ -26,7 +28,13 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <Dialog.Content
           className={cn(
-            'fixed left-1/2 top-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 rounded-xl bg-white shadow-xl',
+            // Positioning: center by default, but fullscreen should cover viewport
+            size === 'full'
+              ? 'fixed left-0 top-0 z-50 w-screen h-screen -translate-x-0 -translate-y-0 rounded-none'
+              : 'fixed left-1/2 top-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 rounded-xl',
+            'bg-white shadow-xl',
+            // For fullscreen we allow full height and hide scrollbars visually
+            size === 'full' ? 'overflow-auto no-scrollbar' : 'max-h-[80vh] overflow-auto no-scrollbar',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
             'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',

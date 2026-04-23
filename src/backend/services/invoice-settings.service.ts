@@ -9,11 +9,12 @@ export const InvoiceSettingsService = {
    *   3. Hard-coded defaults if neither exists
    */
   async get(businessId: string, branchId?: string | null): Promise<InvoiceSettings> {
+    const bId = (branchId === 'null' || !branchId) ? null : branchId
     const results = await adminSupabase
       .from('invoice_settings')
       .select('*')
       .eq('business_id', businessId)
-      .or(branchId ? `branch_id.eq.${branchId},branch_id.is.null` : 'branch_id.is.null')
+      .or(bId ? `branch_id.eq.${bId},branch_id.is.null` : 'branch_id.is.null')
       .order('branch_id', { ascending: false, nullsFirst: false }) // branch row before null
 
     const rows = (results.data ?? []) as any[]
@@ -63,26 +64,42 @@ export const InvoiceSettingsService = {
     branchId: string | null,
     data: Partial<InvoiceSettings>
   ): Promise<InvoiceSettings> {
+    const bId = (branchId === 'null' || !branchId) ? null : branchId
     const payload: Record<string, unknown> = {
       business_id: businessId,
-      branch_id: branchId,
+      branch_id: bId,
       updated_at: new Date().toISOString(),
       ...data,
     }
     delete payload.id
 
-    const { data: row, error } = await adminSupabase
+    let query = adminSupabase
       .from('invoice_settings')
-      .upsert(payload, {
-        onConflict: branchId
-          ? 'business_id,branch_id'
-          : 'business_id',        // handled by partial unique index
-        ignoreDuplicates: false,
-      })
-      .select()
-      .single()
+      .select('id')
+      .eq('business_id', businessId)
+    
+    if (bId) query = query.eq('branch_id', bId)
+    else query = query.is('branch_id', null)
 
-    if (error) throw error
+    const { data: existing } = await query.maybeSingle()
+
+    let result
+    if (existing?.id) {
+      result = await adminSupabase
+        .from('invoice_settings')
+        .update(payload)
+        .eq('id', existing.id)
+        .select()
+        .single()
+    } else {
+      result = await adminSupabase
+        .from('invoice_settings')
+        .insert(payload)
+        .select()
+        .single()
+    }
+
+    if (result.error) throw result.error
     return this.get(businessId, branchId)
   },
 }

@@ -25,11 +25,13 @@ const categorySchema = z.object({
 const manufacturerSchema = z.object({
   name: z.string().min(1),
   logo_url: z.string().url().nullable().optional(),
+  category_id: z.string().uuid().nullable().optional(),
 })
 
 const deviceSchema = z.object({
   manufacturer_id: z.string().uuid().optional(),
   brand_id: z.string().uuid().nullable().optional(),
+  category_id: z.string().uuid().nullable().optional(),
   name: z.string().min(1),
   image_url: z.string().url().nullable().optional(),
   colors: z.array(z.string()).default([]),
@@ -104,9 +106,10 @@ export const ServiceCategoryController = {
 // ── Manufacturer Controller ──────────────────────────────────────────────────
 
 export const ServiceManufacturerController = {
-  async list(_req: NextRequest, ctx: RequestContext) {
+  async list(req: NextRequest, ctx: RequestContext) {
+    const categoryId = req.nextUrl.searchParams.get('category_id') ?? undefined
     try {
-      const data = await ServiceManufacturerService.list(ctx.businessId)
+      const data = await ServiceManufacturerService.list(ctx.businessId, categoryId)
       return ok(data)
     } catch (err) {
       return serverError('Failed to fetch manufacturers', err)
@@ -150,10 +153,13 @@ export const ServiceManufacturerController = {
 
 export const ServiceDeviceController = {
   async list(req: NextRequest, ctx: RequestContext) {
-    const manufacturerId = req.nextUrl.searchParams.get('manufacturer_id') ?? undefined
-    const brandId = req.nextUrl.searchParams.get('brand_id') ?? undefined
+    const { searchParams } = req.nextUrl
     try {
-      const data = await ServiceDeviceService.list(ctx.businessId, manufacturerId, brandId)
+      const data = await ServiceDeviceService.list(ctx.businessId, {
+        manufacturerId: searchParams.get('manufacturer_id') ?? undefined,
+        brandId:        searchParams.get('brand_id')        ?? undefined,
+        categoryId:     searchParams.get('category_id')     ?? undefined,
+      })
       return ok(data)
     } catch (err) {
       return serverError('Failed to fetch devices', err)

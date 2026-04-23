@@ -1,6 +1,8 @@
 import {
   Document, Page, Text, View, StyleSheet, Image, Font,
 } from '@react-pdf/renderer'
+import type { InvoiceSettings } from '@/types/invoice-settings'
+import { DEFAULT_INVOICE_SETTINGS } from '@/types/invoice-settings'
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
@@ -19,83 +21,21 @@ const C = {
   amber:    '#d97706',
 }
 
-const s = StyleSheet.create({
-  page:        { padding: 0, fontFamily: 'Helvetica', fontSize: 10, backgroundColor: '#ffffff' },
+const PAPER_SIZES: Record<string, any> = {
+  A4: 'A4',
+  A5: 'A5',
+  Letter: 'LETTER',
+  Receipt80: [227, 841],
+  Receipt58: [165, 841],
+}
 
-  // Header band
-  headerBand:  { backgroundColor: C.brand, paddingHorizontal: 32, paddingTop: 24, paddingBottom: 20 },
-  logoBox:     { width: 56, height: 56, borderRadius: 10, backgroundColor: '#ffffff22', marginBottom: 12, overflow: 'hidden' },
-  logoImage:   { width: 56, height: 56, objectFit: 'contain' },
-  logoFallback:{ width: 56, height: 56, borderRadius: 10, backgroundColor: '#ffffff33', alignItems: 'center', justifyContent: 'center' },
-  logoPadding: { paddingTop: 8 },
-  brandName:   { fontSize: 18, fontWeight: 'bold', color: '#ffffff', letterSpacing: 0.3 },
-  brandSub:    { fontSize: 8.5, color: '#ccfbf1', marginTop: 2 },
-  receiptLabel:{ fontSize: 9, color: '#ccfbf1', letterSpacing: 1, textTransform: 'uppercase', marginTop: 14 },
-  receiptTitle:{ fontSize: 22, fontWeight: 'bold', color: '#ffffff', marginTop: 2 },
-  receiptId:   { fontSize: 9, color: '#99f6e4', marginTop: 4 },
+function boldFont(family: string): string {
+  if (family === 'Times-Roman') return 'Times-Bold'
+  if (family === 'Courier') return 'Courier-Bold'
+  return 'Helvetica-Bold'
+}
 
-  // Body
-  body:        { paddingHorizontal: 32, paddingTop: 20, paddingBottom: 32 },
-
-  // Meta info grid
-  metaGrid:    { flexDirection: 'row', backgroundColor: C.bg, borderRadius: 8, padding: 14, marginBottom: 18, gap: 8 },
-  metaCell:    { flex: 1 },
-  metaLabel:   { fontSize: 7.5, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 3 },
-  metaValue:   { fontSize: 9.5, color: C.dark, fontWeight: 'bold' },
-
-  // Rush badge
-  rushBadge:   { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff7ed', borderRadius: 6,
-                 borderWidth: 1, borderColor: '#fed7aa', paddingHorizontal: 10, paddingVertical: 5, marginBottom: 16 },
-  rushDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: C.orange, marginRight: 6 },
-  rushText:    { fontSize: 8.5, color: C.amber, fontWeight: 'bold' },
-
-  // Refund banner
-  refundBanner:{ backgroundColor: '#fef2f2', borderRadius: 6, borderWidth: 1, borderColor: '#fecaca',
-                 paddingHorizontal: 10, paddingVertical: 6, marginBottom: 14 },
-  refundText:  { fontSize: 8.5, color: '#991b1b' },
-
-  // Items table
-  tableHead:   { flexDirection: 'row', paddingBottom: 6, borderBottomWidth: 1.5, borderBottomColor: C.border, marginBottom: 4 },
-  thText:      { fontSize: 7.5, fontWeight: 'bold', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
-  tableRow:    { flexDirection: 'row', paddingVertical: 7, borderBottomWidth: 0.5, borderBottomColor: C.border },
-  tableRowAlt: { backgroundColor: C.bg },
-  tdText:      { fontSize: 9.5, color: C.dark },
-  tdMuted:     { fontSize: 8.5, color: C.muted },
-
-  cItem:  { flex: 4 },
-  cQty:   { flex: 1, textAlign: 'center' },
-  cPrice: { flex: 1.4, textAlign: 'right' },
-  cDisc:  { flex: 1.4, textAlign: 'right' },
-  cTotal: { flex: 1.6, textAlign: 'right' },
-
-  // Totals block
-  totalsWrap:  { marginTop: 14, borderTopWidth: 1.5, borderTopColor: C.border, paddingTop: 12 },
-  totalRow:    { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 5 },
-  totalLabel:  { width: 100, textAlign: 'right', color: C.muted, fontSize: 9 },
-  totalVal:    { width: 90, textAlign: 'right', fontSize: 9.5, color: C.dark },
-  grandRow:    { flexDirection: 'row', justifyContent: 'flex-end',
-                 marginTop: 6, paddingTop: 6, borderTopWidth: 1, borderTopColor: C.border },
-  grandLabel:  { width: 100, textAlign: 'right', fontWeight: 'bold', fontSize: 11, color: C.dark },
-  grandVal:    { width: 90, textAlign: 'right', fontWeight: 'bold', fontSize: 13, color: C.brand },
-
-  // Payment splits
-  splitsWrap:  { marginTop: 12, backgroundColor: C.bgBrand, borderRadius: 6, padding: 10 },
-  splitsTitle: { fontSize: 7.5, color: C.brand, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 5, fontWeight: 'bold' },
-  splitRow:    { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
-  splitMethod: { fontSize: 9, color: C.mid },
-  splitAmt:    { fontSize: 9, color: C.dark, fontWeight: 'bold' },
-
-  // Notes
-  notesWrap:   { marginTop: 14, padding: 10, backgroundColor: C.bg, borderRadius: 6 },
-  notesLabel:  { fontSize: 7.5, color: C.faint, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  notesText:   { fontSize: 9, color: C.mid },
-
-  // Footer
-  footer:      { marginTop: 28, borderTopWidth: 0.5, borderTopColor: C.border, paddingTop: 14, alignItems: 'center' },
-  footerMain:  { fontSize: 10, color: C.mid, textAlign: 'center', marginBottom: 4 },
-  footerSub:   { fontSize: 8, color: C.faint, textAlign: 'center' },
-  footerBrand: { fontSize: 7.5, color: C.faint, marginTop: 10, textAlign: 'center' },
-})
+// Global styles removed to prevent conflicts
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -133,6 +73,7 @@ export interface SaleReceiptPdfProps {
   taxRate?: number
   // Rush job flag — shown prominently on receipt
   isRushJob?: boolean
+  settings?: InvoiceSettings
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -154,39 +95,168 @@ export function SaleReceiptPdf({
   isRefund, refundReason, paymentSplits, notes,
   branchName, branchAddress, branchPhone, branchEmail, logoUrl,
   currency = '£', taxRate, isRushJob,
+  settings = DEFAULT_INVOICE_SETTINGS,
 }: SaleReceiptPdfProps) {
   const fmt = (n: number) => `${currency}${Number(n).toFixed(2)}`
   const statusColor = STATUS_COLORS[paymentStatus] ?? C.muted
 
+  const isReceipt = settings.paper_size?.startsWith('Receipt')
+  const family = settings.font_family || 'Helvetica'
+  const bold = boldFont(family)
+  const pc = settings.primary_color || C.brand
+  const tc = settings.text_color || C.dark
+  const sc = settings.secondary_color || C.bgBrand
+
+  const paperSizeKey = settings.paper_size in PAPER_SIZES ? settings.paper_size : 'A4'
+  const pageSize = PAPER_SIZES[paperSizeKey]
+
+  const s = StyleSheet.create({
+    page: { 
+      padding: 0, 
+      fontFamily: family, 
+      fontSize: 10, 
+      backgroundColor: '#ffffff' 
+    },
+    headerBand: { 
+      backgroundColor: pc, 
+      paddingHorizontal: isReceipt ? 12 : 32, 
+      paddingTop: isReceipt ? 16 : 24, 
+      paddingBottom: isReceipt ? 12 : 20,
+      alignItems: isReceipt ? 'center' : 'flex-start'
+    },
+    logoImage: { 
+      width: isReceipt ? 48 : 56, 
+      height: isReceipt ? 48 : 56, 
+      objectFit: 'contain', 
+      marginBottom: 10 
+    },
+    brandName: { 
+      fontSize: isReceipt ? 14 : 18, 
+      fontFamily: bold, 
+      color: '#ffffff', 
+      textAlign: isReceipt ? 'center' : 'left' 
+    },
+    brandSub: { 
+      fontSize: 8, 
+      color: '#ffffffdd', 
+      marginTop: 2, 
+      textAlign: isReceipt ? 'center' : 'left' 
+    },
+    receiptLabel: { 
+      fontSize: 8, 
+      color: '#ffffffaa', 
+      letterSpacing: 1, 
+      textTransform: 'uppercase', 
+      marginTop: isReceipt ? 8 : 14,
+      textAlign: isReceipt ? 'center' : 'left'
+    },
+    receiptTitle: { 
+      fontSize: isReceipt ? 14 : 22, 
+      fontFamily: bold, 
+      color: '#ffffff', 
+      marginTop: 2,
+      textAlign: isReceipt ? 'center' : 'left'
+    },
+    receiptId: { 
+      fontSize: isReceipt ? 7.5 : 8, 
+      color: '#ffffffaa', 
+      marginTop: 4,
+      textAlign: isReceipt ? 'center' : 'left'
+    },
+    body: { 
+      paddingHorizontal: isReceipt ? 12 : 32, 
+      paddingTop: 16, 
+      paddingBottom: 32 
+    },
+    metaGrid: { 
+      flexDirection: 'column', 
+      backgroundColor: isReceipt ? 'transparent' : '#f9fafb', 
+      borderRadius: 8, 
+      padding: isReceipt ? 0 : 14, 
+      marginBottom: 16, 
+      gap: isReceipt ? 8 : 8,
+    },
+    metaCell: { 
+      flexDirection: 'column',
+      justifyContent: 'flex-start',
+      alignItems: 'flex-start',
+      borderBottomWidth: isReceipt ? 0.5 : 0,
+      borderBottomColor: C.border,
+      paddingVertical: isReceipt ? 2 : 0,
+      marginBottom: isReceipt ? 4 : 0,
+      width: '100%',
+    },
+    metaLabel: { 
+      fontSize: 7.5, 
+      color: C.faint, 
+      textTransform: 'uppercase', 
+      marginBottom: 2,
+      width: '100%',
+    },
+    metaValue: { 
+      fontSize: 9.5, 
+      color: tc, 
+      fontFamily: bold,
+      textAlign: 'left',
+      width: '100%',
+    },
+    tableHead: { 
+      flexDirection: 'row', 
+      paddingBottom: 6, 
+      borderBottomWidth: 1.5, 
+      borderBottomColor: C.border, 
+      marginBottom: 4 
+    },
+    thText: { fontSize: 7, fontFamily: bold, color: C.muted, textTransform: 'uppercase' },
+    tableRow: { 
+      flexDirection: 'row', 
+      paddingVertical: 7, 
+      borderBottomWidth: 0.5, 
+      borderBottomColor: C.border 
+    },
+    tdText: { fontSize: 9, color: tc },
+    totalsWrap: { marginTop: 14, borderTopWidth: 1.5, borderTopColor: C.border, paddingTop: 10 },
+    totalRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 4 },
+    totalLabel: { width: 100, textAlign: 'right', color: C.muted, fontSize: 8.5 },
+    totalVal: { width: 90, textAlign: 'right', fontSize: 9, color: tc },
+    grandRow: { 
+      flexDirection: 'row', 
+      justifyContent: 'flex-end', 
+      marginTop: 4, 
+      paddingTop: 6, 
+      borderTopWidth: 1, 
+      borderTopColor: C.border 
+    },
+    grandLabel: { width: 100, textAlign: 'right', fontFamily: bold, fontSize: 10, color: tc },
+    grandVal: { width: 90, textAlign: 'right', fontFamily: bold, fontSize: 14, color: pc },
+    footer: { marginTop: 24, borderTopWidth: 0.5, borderTopColor: C.border, paddingTop: 12, alignItems: 'center' },
+    footerMain: { fontSize: 9, fontFamily: bold, color: pc, textAlign: 'center', marginBottom: 3 },
+    footerSub: { fontSize: 7.5, color: C.muted, textAlign: 'center', marginBottom: 1 },
+    footerBrand: { fontSize: 7, color: C.faint, marginTop: 8, textAlign: 'center' },
+  })
   return (
     <Document>
-      <Page size="A4" style={s.page}>
+      <Page size={pageSize} orientation={settings.orientation === 'landscape' ? 'landscape' : 'portrait'} style={s.page}>
 
         {/* ── Header band ── */}
         <View style={s.headerBand}>
           {/* Logo */}
-          {logoUrl ? (
-            <Image src={logoUrl} style={s.logoImage} />
-          ) : (
-            <View style={[s.logoFallback, s.logoPadding]}>
-              <Text style={{ fontSize: 22, color: '#ffffff', fontWeight: 'bold' }}>
-                {(branchName ?? 'B').charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
+          {settings.show_logo && (settings.logo_url || logoUrl) ? (
+            <Image src={settings.logo_url || (logoUrl ?? '')} style={s.logoImage} />
+          ) : null}
 
           {/* Branch name / address */}
-          <Text style={s.brandName}>{branchName ?? 'Business Name'}</Text>
-          {branchAddress && <Text style={s.brandSub}>{branchAddress}</Text>}
-          {(branchPhone || branchEmail) && (
-            <Text style={s.brandSub}>
-              {[branchPhone, branchEmail].filter(Boolean).join('  ·  ')}
-            </Text>
-          )}
+          {settings.show_business_name && <Text style={s.brandName}>{branchName ?? 'Business Name'}</Text>}
+          {settings.show_address && branchAddress && <Text style={s.brandSub}>{branchAddress}</Text>}
+          <View style={{ flexDirection: isReceipt ? 'column' : 'row', alignItems: isReceipt ? 'center' : 'flex-start', marginTop: 2 }}>
+            {settings.show_phone && branchPhone && <Text style={s.brandSub}>{branchPhone}</Text>}
+            {settings.show_phone && settings.show_email && branchPhone && branchEmail && !isReceipt && <Text style={[s.brandSub, { marginHorizontal: 6 }]}>·</Text>}
+            {settings.show_email && branchEmail && <Text style={s.brandSub}>{branchEmail}</Text>}
+          </View>
 
           {/* Receipt type label */}
           <Text style={s.receiptLabel}>{isRefund ? 'Refund Receipt' : 'Sale Receipt'}</Text>
-          <Text style={s.receiptTitle}>{isRefund ? 'Refund' : 'Invoice'}</Text>
+          <Text style={s.receiptTitle}>{isRefund ? 'Refund' : 'ORDER RECEIPT'}</Text>
           <Text style={s.receiptId}>
             #{saleId.slice(-8).toUpperCase()}  ·  {date}
           </Text>
@@ -197,16 +267,15 @@ export function SaleReceiptPdf({
 
           {/* Rush Job Banner */}
           {isRushJob && (
-            <View style={s.rushBadge}>
-              <View style={s.rushDot} />
-              <Text style={s.rushText}>⚡  RUSH JOB — Priority Repair</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff7ed', borderRadius: 6, borderWidth: 1, borderColor: '#fed7aa', padding: 8, marginBottom: 12 }}>
+              <Text style={{ fontSize: 9, color: '#d97706', fontFamily: bold }}>⚡  RUSH JOB — Priority Repair</Text>
             </View>
           )}
 
           {/* Refund reason */}
           {isRefund && refundReason && (
-            <View style={s.refundBanner}>
-              <Text style={s.refundText}>Refund reason: {refundReason}</Text>
+            <View style={{ backgroundColor: '#fef2f2', borderRadius: 6, borderWidth: 1, borderColor: '#fecaca', padding: 8, marginBottom: 12 }}>
+              <Text style={{ fontSize: 9, color: '#991b1b' }}>Refund reason: {refundReason}</Text>
             </View>
           )}
 
@@ -228,32 +297,34 @@ export function SaleReceiptPdf({
                   : PAYMENT_LABELS[paymentMethod] ?? paymentMethod}
               </Text>
             </View>
-            <View style={s.metaCell}>
-              <Text style={s.metaLabel}>Status</Text>
-              <Text style={[s.metaValue, { color: statusColor }]}>
-                {paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1)}
-              </Text>
-            </View>
+            {!isReceipt && (
+              <View style={s.metaCell}>
+                <Text style={s.metaLabel}>Status</Text>
+                <Text style={[s.metaValue, { color: statusColor }]}>
+                  {paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1)}
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* ── Items table ── */}
           <View style={s.tableHead}>
-            <Text style={[s.thText, s.cItem]}>Item</Text>
-            <Text style={[s.thText, s.cQty]}>Qty</Text>
-            <Text style={[s.thText, s.cPrice]}>Price</Text>
-            <Text style={[s.thText, s.cDisc]}>Disc.</Text>
-            <Text style={[s.thText, s.cTotal]}>Total</Text>
+            <Text style={[s.thText, { flex: 4 }]}>Item</Text>
+            <Text style={[s.thText, { flex: 1, textAlign: 'center' }]}>Qty</Text>
+            <Text style={[s.thText, { flex: 1.4, textAlign: 'right' }]}>Price</Text>
+            <Text style={[s.thText, { flex: 1.4, textAlign: 'right' }]}>Disc.</Text>
+            <Text style={[s.thText, { flex: 1.6, textAlign: 'right' }]}>Total</Text>
           </View>
 
           {items.map((item, i) => (
-            <View key={i} style={[s.tableRow, i % 2 === 1 ? s.tableRowAlt : {}]}>
-              <Text style={[s.tdText, s.cItem]}>{item.name}</Text>
-              <Text style={[s.tdText, s.cQty]}>{item.quantity}</Text>
-              <Text style={[s.tdText, s.cPrice]}>{fmt(Number(item.unit_price))}</Text>
-              <Text style={[s.tdMuted, s.cDisc]}>
+            <View key={i} style={s.tableRow}>
+              <Text style={[s.tdText, { flex: 4 }]}>{item.name}</Text>
+              <Text style={[s.tdText, { flex: 1, textAlign: 'center' }]}>{item.quantity}</Text>
+              <Text style={[s.tdText, { flex: 1.4, textAlign: 'right' }]}>{fmt(Number(item.unit_price))}</Text>
+              <Text style={[s.tdText, { color: C.muted, flex: 1.4, textAlign: 'right' }]}>
                 {Number(item.discount) > 0 ? `-${fmt(Number(item.discount))}` : '—'}
               </Text>
-              <Text style={[s.tdText, s.cTotal, { fontWeight: 'bold' }]}>
+              <Text style={[s.tdText, { flex: 1.6, textAlign: 'right', fontFamily: bold }]}>
                 {fmt(Number(item.total))}
               </Text>
             </View>
@@ -267,11 +338,11 @@ export function SaleReceiptPdf({
             </View>
             {discount > 0 && (
               <View style={s.totalRow}>
-                <Text style={[s.totalLabel, { color: C.green }]}>Discount</Text>
-                <Text style={[s.totalVal, { color: C.green }]}>-{fmt(discount)}</Text>
+                <Text style={[s.totalLabel, { color: '#10b981' }]}>Discount</Text>
+                <Text style={[s.totalVal, { color: '#10b981' }]}>-{fmt(discount)}</Text>
               </View>
             )}
-            {tax > 0 && (
+            {settings.show_tax_breakdown && tax > 0 && (
               <View style={s.totalRow}>
                 <Text style={s.totalLabel}>Tax{taxRate ? ` (${taxRate}%)` : ''}</Text>
                 <Text style={s.totalVal}>{fmt(tax)}</Text>
@@ -284,13 +355,13 @@ export function SaleReceiptPdf({
           </View>
 
           {/* ── Payment splits breakdown ── */}
-          {paymentMethod === 'split' && paymentSplits && paymentSplits.length > 0 && (
-            <View style={s.splitsWrap}>
-              <Text style={s.splitsTitle}>Payment Breakdown</Text>
+          {settings.show_payment_method && paymentMethod === 'split' && paymentSplits && paymentSplits.length > 0 && (
+            <View style={{ marginTop: 12, backgroundColor: '#f0fdfa', borderRadius: 6, padding: 10 }}>
+              <Text style={{ fontSize: 7, color: pc, textTransform: 'uppercase', marginBottom: 5, fontFamily: bold }}>Payment Breakdown</Text>
               {paymentSplits.map((sp, i) => (
-                <View key={i} style={s.splitRow}>
-                  <Text style={s.splitMethod}>{PAYMENT_LABELS[sp.method] ?? sp.method}</Text>
-                  <Text style={s.splitAmt}>{fmt(sp.amount)}</Text>
+                <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
+                  <Text style={{ fontSize: 9, color: C.mid }}>{PAYMENT_LABELS[sp.method] ?? sp.method}</Text>
+                  <Text style={{ fontSize: 9, color: tc, fontFamily: bold }}>{fmt(sp.amount)}</Text>
                 </View>
               ))}
             </View>
@@ -298,21 +369,39 @@ export function SaleReceiptPdf({
 
           {/* ── Notes ── */}
           {notes && (
-            <View style={s.notesWrap}>
-              <Text style={s.notesLabel}>Notes</Text>
-              <Text style={s.notesText}>{notes}</Text>
+            <View style={{ marginTop: 14, padding: 10, backgroundColor: '#f9fafb', borderRadius: 6 }}>
+              <Text style={{ fontSize: 7, color: C.faint, textTransform: 'uppercase', marginBottom: 4 }}>Notes</Text>
+              <Text style={{ fontSize: 9, color: C.mid }}>{notes}</Text>
             </View>
           )}
 
           {/* ── Footer ── */}
           <View style={s.footer}>
-            <Text style={s.footerMain}>
-              {isRefund ? 'Your refund has been processed.' : 'Thank you for your business!'}
-            </Text>
-            {branchPhone && (
-              <Text style={s.footerSub}>Questions? Call us at {branchPhone}</Text>
+            {settings.thank_you_message && (
+              <Text style={s.footerMain}>
+                {isRefund ? 'Your refund has been processed.' : settings.thank_you_message}
+              </Text>
             )}
-            {branchEmail && <Text style={s.footerSub}>{branchEmail}</Text>}
+            {settings.footer_line_1 && <Text style={s.footerSub}>{settings.footer_line_1}</Text>}
+            {settings.footer_line_2 && <Text style={s.footerSub}>{settings.footer_line_2}</Text>}
+            {settings.footer_line_3 && <Text style={s.footerSub}>{settings.footer_line_3}</Text>}
+            
+            {settings.social_links && Object.entries(settings.social_links).filter(([_,v])=>v).length > 0 && (
+              <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 5 }}>
+                {Object.entries(settings.social_links).filter(([_,v])=>v).map(([k,v], i) => (
+                   <Text key={k} style={{ fontSize: 7, color: C.faint }}>
+                     {i > 0 ? ' · ' : ''}{k}: {String(v).replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
+                   </Text>
+                ))}
+              </View>
+            )}
+
+            {settings.policy_text && (
+              <Text style={{ fontSize: 6.5, color: C.faint, textAlign: 'center', marginTop: 10, borderTopWidth: 0.5, borderTopColor: C.border, paddingTop: 8 }}>
+                {settings.policy_text}
+              </Text>
+            )}
+            
             <Text style={s.footerBrand}>
               Receipt generated by RepairPOS · {date}
             </Text>
@@ -323,3 +412,4 @@ export function SaleReceiptPdf({
     </Document>
   )
 }
+

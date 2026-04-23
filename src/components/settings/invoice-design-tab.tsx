@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/auth.store'
 import {
   Save, Building2, Palette, Type, AlignLeft, Share2,
   FileText, Settings2, Eye, RefreshCw, CheckCircle2,
-  Globe, Facebook, Instagram, Twitter, Phone, Layers,
+  Globe, Facebook, Instagram, Twitter, Phone, Layers, AlertCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -264,12 +264,13 @@ export function InvoiceDesignTab() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // On mount, default to the active branch
   useEffect(() => {
     if (activeBranch) setSelectedBranchId(activeBranch.id)
     if (!isOwner()) setScope('branch')
-  }, [activeBranch]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeBranch?.id, isOwner])
 
   const fetchSettings = useCallback(async () => {
     setLoading(true)
@@ -312,7 +313,11 @@ export function InvoiceDesignTab() {
     setSaving(false)
     if (res.ok) {
       setSaved(true)
+      setError(null)
       setTimeout(() => setSaved(false), 3000)
+    } else {
+      const json = await res.json()
+      setError(json?.error?.message || json?.error || 'Failed to save settings. Please check your inputs.')
     }
   }
 
@@ -359,6 +364,13 @@ export function InvoiceDesignTab() {
           {saved ? <><CheckCircle2 className="h-4 w-4 mr-1.5 text-green-300" />Saved!</> : <><Save className="h-4 w-4 mr-1.5" />Save Settings</>}
         </Button>
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <p>{error}</p>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex h-32 items-center justify-center">
@@ -440,7 +452,7 @@ export function InvoiceDesignTab() {
                       <input
                         type="text"
                         value={settings[key]}
-                        onChange={(e) => /^#[0-9a-fA-F]{0,6}$/.test(e.target.value) && patch({ [key]: e.target.value })}
+                        onChange={(e) => /^#([0-9a-fA-F]{3}){1,2}$/.test(e.target.value) && patch({ [key]: e.target.value })}
                         className="min-w-0 flex-1 font-mono text-xs text-gray-700 focus:outline-none"
                       />
                     </div>

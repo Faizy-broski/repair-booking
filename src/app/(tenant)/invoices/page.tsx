@@ -14,6 +14,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
 import type { ColumnDef } from '@tanstack/react-table'
+import { toast } from 'sonner'
 
 interface InvoiceRow {
   id: string
@@ -105,7 +106,13 @@ export default function InvoicesPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus }),
     })
-    if (res.ok) fetchData()
+    if (res.ok) {
+      toast.success(`Invoice status updated to ${newStatus}`)
+      fetchData()
+    } else {
+      const err = await res.json()
+      toast.error(err?.error?.message ?? 'Failed to update status')
+    }
   }
 
   function addLineItem() {
@@ -154,9 +161,13 @@ export default function InvoicesPage() {
       body: JSON.stringify({ amount: parseFloat(paymentAmount) }),
     })
     if (res.ok) {
+      toast.success('Payment recorded successfully')
       setPaymentModal(null)
       setPaymentAmount('')
       fetchData()
+    } else {
+      const err = await res.json()
+      toast.error(err?.error?.message ?? 'Failed to record payment')
     }
     setRecordingPayment(false)
   }

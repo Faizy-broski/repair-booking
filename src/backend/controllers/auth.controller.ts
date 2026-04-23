@@ -58,7 +58,7 @@ export const AuthController = {
   async logout(request: NextRequest) {
     try {
       const supabase = await createClient()
-      const { error } = await supabase.auth.signOut()
+      const { error } = await supabase.auth.signOut({ scope: 'local' })
       if (error) return serverError('Logout failed', error)
       return ok({ logged_out: true })
     } catch (err) {

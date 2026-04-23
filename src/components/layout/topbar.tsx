@@ -14,8 +14,8 @@ interface TopbarProps {
 
 export function Topbar({ onMenuClick }: TopbarProps) {
   const { profile, branches } = useAuthStore()
-  const unreadCount       = useMessageStore((s) => s.unreadCount)
-  const unreadMessages    = useMessageStore((s) => s.unreadMessages)
+  const unreadCount = useMessageStore((s) => s.unreadCount)
+  const unreadMessages = useMessageStore((s) => s.unreadMessages)
   const setPendingThreadId = useMessageStore((s) => s.setPendingThreadId)
   const router = useRouter()
   const initials = (profile?.full_name ?? 'U').charAt(0).toUpperCase()
@@ -28,7 +28,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
 
   async function handleSignOut() {
     const supabase = createClient()
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
     router.push('/login')
   }
 
@@ -60,14 +60,14 @@ export function Topbar({ onMenuClick }: TopbarProps) {
       </button>
 
       {/* Search */}
-      <div className="flex flex-1 items-center gap-2.5 rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 transition-colors focus-within:border-primary-fixed-dim focus-within:bg-surface-container-lowest focus-within:shadow-sm max-w-sm">
+      {/* <div className="flex flex-1 items-center gap-2.5 rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 transition-colors focus-within:border-primary-fixed-dim focus-within:bg-surface-container-lowest focus-within:shadow-sm max-w-sm">
         <Search className="h-4 w-4 shrink-0 text-outline" />
         <input
           type="search"
           placeholder="Search tickets, customers, products..."
           className="flex-1 bg-transparent text-sm text-on-surface outline-none placeholder:text-outline"
         />
-      </div>
+      </div> */}
 
       <div className="flex items-center gap-1.5 ml-auto">
         {/* ── Bell / Messages dropdown ── */}

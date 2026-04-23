@@ -6,6 +6,8 @@ import { EmailService } from '@/backend/services/email.service'
 import { SubscriptionSyncService } from '@/backend/services/subscription-sync.service'
 import { invalidateBusinessCache } from '@/backend/services/module-config.service'
 
+const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'repairbooking.co.uk'
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', { apiVersion: '2026-02-25.clover' })
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET ?? ''
 
@@ -197,10 +199,11 @@ export async function POST(request: NextRequest) {
     const dbStatus: SubscriptionPayload['status'] =
       ['active', 'trialing', 'past_due', 'canceled'].includes(stripeStatus) ? stripeStatus : 'active'
 
-    // Update business.is_active based on status
+    // Deactivate only on hard cancellation — past_due keeps access so the owner
+    // can log in, see the warning, and fix their payment method.
     await supabase
       .from('businesses')
-      .update({ is_active: !['canceled', 'past_due'].includes(dbStatus) })
+      .update({ is_active: dbStatus !== 'canceled' })
       .eq('id', businessId)
 
     await SubscriptionSyncService.upsert({
@@ -221,7 +224,8 @@ export async function POST(request: NextRequest) {
 
   // ── invoice.payment_succeeded ───────────────────────────────────────────────
   // Fires on every successful charge (initial + renewals).
-  // Updates current_period_end so the "Renews on" date in Account page is correct.
+  // Updates current_period_end and re-activates the business in case a prior
+  // invoice.payment_failed had put it into past_due.
   if (event.type === 'invoice.payment_succeeded') {
     const invoice = event.data.object as Stripe.Invoice
     const stripeSubId = typeof invoice.subscription === 'string'
@@ -236,8 +240,71 @@ export async function POST(request: NextRequest) {
         currentPeriodStart: ts(lines?.period?.start),
         currentPeriodEnd:   ts(lines?.period?.end),
       })
+
+      // Re-activate the business in case a prior payment failure deactivated it.
+      const businessId = await SubscriptionSyncService.businessIdFromStripeSubId(stripeSubId)
+      if (businessId) {
+        const supabase = getAdminSupabase() as any
+        await supabase.from('businesses').update({ is_active: true }).eq('id', businessId)
+        await invalidateBusinessCache(businessId)
+      }
     }
 
+    return NextResponse.json({ received: true })
+  }
+
+  // ── invoice.payment_failed ─────────────────────────────────────────────────
+  // Fires on every failed charge attempt (Stripe retries up to 4 times by default).
+  // We mark the subscription past_due and email the owner — but do NOT deactivate
+  // the business. The owner keeps access so they can log in and fix their card.
+  // Access is only fully revoked when the subscription reaches 'canceled' status
+  // (after all retries are exhausted), handled by customer.subscription.deleted.
+  if (event.type === 'invoice.payment_failed') {
+    const invoice = event.data.object as Stripe.Invoice
+    const stripeSubId = typeof invoice.subscription === 'string'
+      ? invoice.subscription
+      : (invoice.subscription as Stripe.Subscription | null)?.id ?? null
+
+    if (!stripeSubId) return NextResponse.json({ received: true })
+
+    const businessId = await SubscriptionSyncService.businessIdFromStripeSubId(stripeSubId)
+    if (!businessId) {
+      console.warn('[webhook] invoice.payment_failed: no businessId for sub', stripeSubId)
+      return NextResponse.json({ received: true })
+    }
+
+    const supabase = getAdminSupabase() as any
+
+    // Mark subscription past_due in our DB (subscription.updated may also fire, this is a belt-and-suspenders update)
+    await supabase
+      .from('subscriptions')
+      .update({ status: 'past_due' })
+      .eq('stripe_sub_id', stripeSubId)
+
+    // Fetch business contact details for the email
+    const { data: business } = await supabase
+      .from('businesses')
+      .select('email, name, subdomain')
+      .eq('id', businessId)
+      .single()
+
+    if (business?.email) {
+      const attemptCount: number = (invoice as any).attempt_count ?? 1
+      const nextAttemptUnix: number | null = (invoice as any).next_payment_attempt ?? null
+      const nextAttemptAt = nextAttemptUnix ? new Date(nextAttemptUnix * 1000).toISOString() : null
+
+      EmailService.sendPaymentFailed({
+        to:            business.email,
+        businessName:  business.name,
+        subdomain:     business.subdomain,
+        amountDue:     (invoice as any).amount_due ?? 0,
+        currency:      invoice.currency ?? 'gbp',
+        attemptCount,
+        nextAttemptAt,
+      }).catch((e: unknown) => console.error('[webhook] sendPaymentFailed error:', e))
+    }
+
+    await invalidateBusinessCache(businessId)
     return NextResponse.json({ received: true })
   }
 

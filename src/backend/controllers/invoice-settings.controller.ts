@@ -24,9 +24,9 @@ const schema = z.object({
 
   // Branding
   logo_url:        z.string().url().nullable().optional().or(z.literal('')),
-  primary_color:   z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  secondary_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  text_color:      z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  primary_color:   z.string().regex(/^#([0-9a-fA-F]{3}){1,2}$/).optional(),
+  secondary_color: z.string().regex(/^#([0-9a-fA-F]{3}){1,2}$/).optional(),
+  text_color:      z.string().regex(/^#([0-9a-fA-F]{3}){1,2}$/).optional(),
   font_family:     z.string().optional(),
 
   // Header toggles

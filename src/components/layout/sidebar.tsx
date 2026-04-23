@@ -7,7 +7,8 @@ import {
   DollarSign, BarChart2, MessageSquare, FileText, Gift, Star,
   Phone, Settings, UserCheck, LogOut, Receipt, X, UploadCloud,
   CreditCard, AlertCircle, Smartphone, BookOpen, TrendingUp, PieChart,
-  ChevronDown, Bell, Server, Clock, Activity, Mail,
+  ChevronDown, Bell, Server, Clock, Activity, Mail, Users2,
+  Store, GitBranch, Sliders, Layers,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
@@ -39,6 +40,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Sales',          href: '/sales',           icon: Receipt,         requiredRole: 'cashier',        module: 'pos' },
   { label: 'Repairs',        href: '/repairs',         icon: Wrench,          requiredRole: 'staff',          module: 'repairs' },
   { label: 'Service Catalogue', href: '/repairs/service-catalogue', icon: BookOpen, requiredRole: 'branch_manager', module: 'repairs', subItem: true },
+  { label: 'Repair Customers',  href: '/repairs/customers',         icon: Users2,   requiredRole: 'staff',          module: 'repairs', subItem: true },
+  { label: 'Repair Settings',   href: '/repairs/settings',          icon: Settings, requiredRole: 'branch_manager', module: 'repairs', subItem: true },
   { label: 'Inventory',      href: '/inventory',       icon: Package,         requiredRole: 'staff',          module: 'inventory' },
   { label: 'Bulk Upload',    href: '/inventory/bulk-upload', icon: UploadCloud, requiredRole: 'branch_manager', module: 'inventory', subItem: true },
   { label: 'Catalogue',      href: '/inventory/catalogue',   icon: Smartphone,  requiredRole: 'branch_manager', module: 'inventory', subItem: true },
@@ -67,6 +70,11 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Invoice Reminders',href: '/settings/notifications/reminders',        icon: Clock,         requiredRole: 'branch_manager', module: 'notifications', subItem: true },
   { label: 'Delivery Logs',    href: '/settings/notifications/delivery-logs',    icon: Activity,      requiredRole: 'branch_manager', module: 'notifications', subItem: true },
   { label: 'Settings',         href: '/settings',                                icon: Settings,      requiredRole: 'branch_manager' },
+  { label: 'Business Information', href: '/settings/general',                    icon: Store,         requiredRole: 'branch_manager', subItem: true },
+  { label: 'Branches',         href: '/settings/branches',                       icon: GitBranch,     requiredRole: 'business_owner', subItem: true },
+  { label: 'Users',            href: '/settings/users',                          icon: Users,         requiredRole: 'business_owner', subItem: true },
+  { label: 'Custom Fields',    href: '/settings/custom-fields',                  icon: Sliders,       requiredRole: 'branch_manager', subItem: true },
+  { label: 'Invoice Design',   href: '/settings/invoice-design',                 icon: Layers,        requiredRole: 'branch_manager', subItem: true },
   { label: 'Account',          href: '/account',                                 icon: CreditCard,    requiredRole: 'cashier' },
 ]
 
@@ -104,7 +112,7 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
 
   async function handleLogout() {
     const supabase = createClient()
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
     clear()
     // Do NOT invalidateConfigs() here — clearing the persisted config cache causes
     // sidebar skeletons on the very next login. Instead, keep the stale cache in
@@ -341,24 +349,42 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
         })}
       </nav>
 
-      {/* Expired subscription banner */}
+      {/* Subscription warning banner — shown when access is revoked */}
       {!hasSubscriptionAccess && subscriptionStatus !== null && (
         <div className="shrink-0 mx-2 mb-2">
-          <Link
-            href="/account"
-            className={cn(
-              'flex items-center gap-2 rounded-xl bg-red-500/15 border border-red-500/30 px-3 py-2.5 text-red-400 hover:bg-red-500/20 transition-colors',
-              collapsed ? 'justify-center' : ''
-            )}
-          >
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            {!collapsed && (
-              <div className="min-w-0">
-                <p className="text-sm font-semibold truncate">Subscription expired</p>
-                <p className="text-[11px] text-red-400/70 truncate">Manage billing →</p>
-              </div>
-            )}
-          </Link>
+          {subscriptionStatus.status === 'past_due' ? (
+            <Link
+              href="/account"
+              className={cn(
+                'flex items-center gap-2 rounded-xl bg-amber-500/15 border border-amber-500/30 px-3 py-2.5 text-amber-400 hover:bg-amber-500/20 transition-colors',
+                collapsed ? 'justify-center' : ''
+              )}
+            >
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {!collapsed && (
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">Payment failed</p>
+                  <p className="text-[11px] text-amber-400/70 truncate">Update card to restore access →</p>
+                </div>
+              )}
+            </Link>
+          ) : (
+            <Link
+              href="/account"
+              className={cn(
+                'flex items-center gap-2 rounded-xl bg-red-500/15 border border-red-500/30 px-3 py-2.5 text-red-400 hover:bg-red-500/20 transition-colors',
+                collapsed ? 'justify-center' : ''
+              )}
+            >
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {!collapsed && (
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">Subscription expired</p>
+                  <p className="text-[11px] text-red-400/70 truncate">Resubscribe to restore access →</p>
+                </div>
+              )}
+            </Link>
+          )}
         </div>
       )}
 

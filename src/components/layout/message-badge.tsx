@@ -40,6 +40,8 @@ export function MessageBadge() {
   // Stable refs for closures that must not be stale inside intervals / events
   const branchRef           = useRef(activeBranch)
   const unreadMessagesRef   = useRef(useMessageStore.getState().unreadMessages)
+  /** true while the Supabase Realtime WS is SUBSCRIBED — polling skips when healthy */
+  const realtimeHealthyRef  = useRef(false)
   useEffect(() => { branchRef.current = activeBranch }, [activeBranch])
   useEffect(() => {
     return useMessageStore.subscribe((s) => { unreadMessagesRef.current = s.unreadMessages })
@@ -91,12 +93,20 @@ export function MessageBadge() {
   }, [activeBranch, fetchUnread])
 
   // ── 3. Polling fallback + Page Visibility reconciliation ────────────────────
+  // The interval is skipped when realtimeHealthyRef is true (WS is SUBSCRIBED).
+  // Page-visibility always fires so the badge is corrected after a tab sleep.
   useEffect(() => {
     if (!activeBranch) return
 
-    const interval = setInterval(() => fetchUnread(false), POLL_MS)
+    const interval = setInterval(() => {
+      // Skip when Realtime is delivering events — avoids ~3,600 redundant
+      // HTTP requests per 8-hour shift while keeping polling as a fallback.
+      if (realtimeHealthyRef.current) return
+      fetchUnread(false)
+    }, POLL_MS)
 
     const onVisibility = () => {
+      // Always reconcile on tab focus regardless of WS state
       if (document.visibilityState === 'visible') fetchUnread(false)
     }
     document.addEventListener('visibilitychange', onVisibility)
@@ -203,7 +213,10 @@ export function MessageBadge() {
       )
 
       .subscribe((status) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        if (status === 'SUBSCRIBED') {
+          realtimeHealthyRef.current = true
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          realtimeHealthyRef.current = false
           // Realtime unavailable — polling fallback will keep badge accurate
           console.warn('[MessageBadge] Realtime subscription:', status, '— polling active as fallback')
         }

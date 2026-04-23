@@ -27,7 +27,7 @@ export function SignOutButton({
     setLoading(true)
     const supabase = createClient()
     // Signs out from Supabase AND clears the SSR cookie via the browser client
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
     // Clear Zustand persisted state so stale profile doesn't flash on next login
     clear()
     router.push(redirectTo)

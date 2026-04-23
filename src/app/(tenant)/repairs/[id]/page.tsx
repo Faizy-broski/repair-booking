@@ -3,13 +3,11 @@ import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Edit, Clock, ClipboardList, Receipt, BookOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge, REPAIR_STATUS_VARIANTS } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Modal } from '@/components/ui/modal'
 import { Select } from '@/components/ui/select'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
-import { REPAIR_STATUSES } from '@/backend/config/constants'
 import { RepairEmailPrompt } from '@/components/repairs/email-prompt-modal'
 import { ConditionChecklist } from '@/components/repairs/condition-checklist'
 import { LabelPicker } from '@/components/repairs/label-picker'
@@ -17,7 +15,6 @@ import { EstimatesPanel } from '@/components/repairs/estimates-panel'
 import { CustomFieldRenderer, useCustomFieldDefs } from '@/components/shared/custom-field-renderer'
 import { PatternLock } from '@/components/ui/pattern-lock'
 
-const STATUS_OPTIONS = REPAIR_STATUSES.map((s) => ({ value: s, label: s.replace('_', ' ') }))
 
 interface Technician {
   id: string
@@ -86,10 +83,17 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
   const [technicians, setTechnicians] = useState<Technician[]>([])
   const [assigningTech, setAssigningTech] = useState(false)
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({})
+  const [customStatuses, setCustomStatuses] = useState<{ name: string; color: string }[]>([])
 
   // Custom fields: load defs scoped to the repair's device_type as category
   const repairCategory = repair?.device_type ?? undefined
   const { defs: customFieldDefs } = useCustomFieldDefs('repairs', repairCategory)
+
+  useEffect(() => {
+    fetch('/api/repairs/custom-statuses')
+      .then((r) => r.json())
+      .then((j) => { if (j.data) setCustomStatuses(j.data) })
+  }, [])
 
   useEffect(() => {
     async function fetchRepair() {
@@ -197,9 +201,17 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
             <LabelPicker repairId={repair.id} selectedIds={labelIds} onChange={setLabelIds} />
           </div>
         </div>
-        <Badge variant={REPAIR_STATUS_VARIANTS[repair.status]}>
-          {repair.status.replace('_', ' ')}
-        </Badge>
+        {(() => {
+          const sc = customStatuses.find((cs) => cs.name === repair.status)
+          return (
+            <span
+              className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold text-white"
+              style={{ backgroundColor: sc?.color ?? '#9ca3af' }}
+            >
+              {repair.status}
+            </span>
+          )
+        })()}
         <Button onClick={() => setStatusModalOpen(true)}>
           <Edit className="h-4 w-4" />
           Update Status
@@ -327,9 +339,17 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
                 <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <Badge variant={REPAIR_STATUS_VARIANTS[h.new_status]} className="text-xs">
-                      {h.new_status.replace('_', ' ')}
-                    </Badge>
+                    {(() => {
+                      const sc = customStatuses.find((cs) => cs.name === h.new_status)
+                      return (
+                        <span
+                          className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold text-white"
+                          style={{ backgroundColor: sc?.color ?? '#9ca3af' }}
+                        >
+                          {h.new_status}
+                        </span>
+                      )
+                    })()}
                     {h.email_sent && <span className="text-xs text-green-600">Email sent</span>}
                   </div>
                   {h.note && <p className="mt-0.5 text-gray-500">{h.note}</p>}
@@ -417,7 +437,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
       <Modal open={statusModalOpen} onClose={() => setStatusModalOpen(false)} title="Update Status" size="sm">
         <div className="space-y-4">
           <Select
-            options={STATUS_OPTIONS}
+            options={customStatuses.map((cs) => ({ value: cs.name, label: cs.name }))}
             value={newStatus}
             onValueChange={setNewStatus}
             placeholder="Select status"

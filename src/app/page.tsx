@@ -205,7 +205,7 @@ export default function HomePage() {
             </Link>
             <button className="md:hidden p-2 rounded-md text-white/80 hover:text-white" aria-label="Open menu">
               <Menu className="h-5 w-5" />
-            </button>
+            </button> 
           </div>
         </nav>
       </header>

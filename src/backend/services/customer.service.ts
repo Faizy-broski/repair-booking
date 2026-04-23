@@ -95,4 +95,13 @@ export const CustomerService = {
     if (error) throw error
     return data
   },
+
+  async remove(id: string, businessId: string) {
+    const { error } = await adminSupabase
+      .from('customers')
+      .delete()
+      .eq('id', id)
+      .eq('business_id', businessId)
+    if (error) throw error
+  },
 }

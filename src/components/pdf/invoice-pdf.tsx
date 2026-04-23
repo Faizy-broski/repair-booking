@@ -95,7 +95,12 @@ export function InvoicePdf(props: InvoicePdfProps) {
   const tc = settings.text_color
 
   // Social links array (non-empty values only)
-  const socialEntries = Object.entries(settings.social_links ?? {}).filter(([, v]) => v) as [keyof SocialLinks, string][]
+  const socialEntries = Object.entries(settings.social_links ?? {})
+    .filter(([, v]) => v)
+    .map(([k, v]) => {
+      const display = String(v).replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')
+      return [k, display]
+    }) as [keyof SocialLinks, string][]
 
   const paperSizeKey = settings.paper_size in PAPER_SIZES ? settings.paper_size : 'A4'
 
