@@ -310,12 +310,14 @@ export default function RepairsPage() {
 
   useEffect(() => { fetchRepairs() }, [fetchRepairs])
 
-  // Fetch supporting data
+  // Fetch supporting data - reactive to activeBranch
   useEffect(() => {
-    fetch('/api/repairs/custom-statuses').then((r) => r.json()).then((j) => { if (j.data) setCustomStatuses(j.data) })
-    fetch('/api/repairs/faults').then((r) => r.json()).then((j) => { if (j.data) setFaults(j.data) })
-    fetch('/api/repairs/devices').then((r) => r.json()).then((j) => { if (j.data) setDeviceData(j.data) })
-  }, [])
+    if (!activeBranch) return
+    const bid = activeBranch.id
+    fetch(`/api/repairs/custom-statuses?branch_id=${bid}`).then((r) => r.json()).then((j) => { if (j.data) setCustomStatuses(j.data) })
+    fetch(`/api/repairs/faults?branch_id=${bid}`).then((r) => r.json()).then((j) => { if (j.data) setFaults(j.data) })
+    fetch(`/api/repairs/devices?branch_id=${bid}`).then((r) => r.json()).then((j) => { if (j.data) setDeviceData(j.data) })
+  }, [activeBranch])
 
   useEffect(() => {
     if (!activeBranch) return
@@ -1007,11 +1009,21 @@ export default function RepairsPage() {
                   </div>
                   <div>
                     <label className={lbl}>Brand</label>
-                    <ComboInput value={jobData.device_brand} onChange={(v) => setJobData((p) => ({ ...p, device_brand: v, device_model: '' }))} options={filteredBrands} placeholder="Apple…" />
+                    <ComboInput 
+                      value={jobData.device_brand} 
+                      onChange={(v) => setJobData((p) => ({ ...p, device_brand: v, device_model: '' }))} 
+                      options={jobData.device_type ? [...new Set(deviceData.raw.filter(d => d.device_type === jobData.device_type).map(d => d.device_brand).filter(Boolean) as string[])] : []} 
+                      placeholder="Apple…" 
+                    />
                   </div>
                   <div>
                     <label className={lbl}>Model</label>
-                    <ComboInput value={jobData.device_model} onChange={(v) => setJobData((p) => ({ ...p, device_model: v }))} options={filteredModels} placeholder="iPhone 15…" />
+                    <ComboInput 
+                      value={jobData.device_model} 
+                      onChange={(v) => setJobData((p) => ({ ...p, device_model: v }))} 
+                      options={jobData.device_brand ? [...new Set(deviceData.raw.filter(d => d.device_brand === jobData.device_brand && (!jobData.device_type || d.device_type === jobData.device_type)).map(d => d.device_model).filter(Boolean) as string[])] : []} 
+                      placeholder="iPhone 15…" 
+                    />
                   </div>
                   <div>
                     <label className={lbl}>IMEI / Serial</label>

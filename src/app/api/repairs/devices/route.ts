@@ -4,24 +4,41 @@ import { ok, serverError } from '@/backend/utils/api-response'
 
 export const GET = withMiddleware(async (_req, ctx) => {
   try {
-    const { data: branches } = await adminSupabase
-      .from('branches')
-      .select('id')
+    // 1. Fetch Categories (Device Types)
+    const { data: cats } = await adminSupabase
+      .from('service_categories')
+      .select('id, name')
       .eq('business_id', ctx.businessId)
+      .order('display_order', { ascending: true })
 
-    const branchIds = (branches ?? []).map((b) => b.id)
+    // 2. Fetch Manufacturers (Brands)
+    const { data: mans } = await adminSupabase
+      .from('service_manufacturers')
+      .select('id, name, category_id')
+      .eq('business_id', ctx.businessId)
+      .order('name', { ascending: true })
 
-    const { data, error } = await adminSupabase
-      .from('repairs')
-      .select('device_type, device_brand, device_model')
-      .in('branch_id', branchIds)
+    // 3. Fetch Devices (Models)
+    const { data: devs } = await adminSupabase
+      .from('service_devices')
+      .select('id, name, manufacturer_id, category_id')
+      .eq('business_id', ctx.businessId)
+      .order('name', { ascending: true })
 
-    if (error) throw error
+    const types  = (cats ?? []).map(c => c.name)
+    const brands = (mans ?? []).map(m => m.name)
+    const models = (devs ?? []).map(d => d.name)
 
-    const raw = (data ?? []).filter((d) => d.device_type || d.device_brand || d.device_model)
-    const types  = [...new Set(raw.map((d) => d.device_type).filter(Boolean)  as string[])]
-    const brands = [...new Set(raw.map((d) => d.device_brand).filter(Boolean) as string[])]
-    const models = [...new Set(raw.map((d) => d.device_model).filter(Boolean) as string[])]
+    // Construct the "raw" list that the frontend expects for filtering
+    const raw = (devs ?? []).map(d => {
+      const brand = mans?.find(m => m.id === d.manufacturer_id)
+      const type  = cats?.find(c => c.id === d.category_id)
+      return {
+        device_type: type?.name ?? null,
+        device_brand: brand?.name ?? null,
+        device_model: d.name
+      }
+    })
 
     return ok({ types, brands, models, raw })
   } catch (err) {
