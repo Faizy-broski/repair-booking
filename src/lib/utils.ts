@@ -108,3 +108,12 @@ export async function signOutWrongTenant(): Promise<void> {
 
   window.location.replace('/login?error=wrong_tenant')
 }
+
+export function formatStatus(status: string): string {
+  if (!status) return '—'
+  return status
+    .replace(/_/g, ' ')
+    .split(' ')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+}

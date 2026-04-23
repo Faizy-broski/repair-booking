@@ -140,7 +140,8 @@ export const RepairController = {
     if (error) return error
     const branchId = ctx.auth.branchId ?? undefined
     try {
-      const repair = await RepairService.update(id, branchId, data)
+      const { parts, ...repairPayload } = data
+      const repair = await RepairService.update(id, branchId, repairPayload)
       return ok(repair)
     } catch (err) {
       return serverError('Failed to update repair', err)

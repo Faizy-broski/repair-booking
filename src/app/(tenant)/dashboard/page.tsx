@@ -86,32 +86,41 @@ function RepairStatusBadge({ status }: { status: string }) {
   )
 }
 
+import { useDashboardStore } from '@/store/dashboard.store'
+
 /* ── Page ──────────────────────────────────────────────────── */
 export default function DashboardPage() {
   const { activeBranch, isOwner } = useAuthStore()
-  const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [branchRevenue, setBranchRevenue] = useState<BranchRevenue[]>([])
-  const [recentRepairs, setRecentRepairs] = useState<RecentRepair[]>([])
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
-  const [loading, setLoading] = useState(true)
+  const { 
+    stats, branchRevenue, recentRepairs, recentActivity, 
+    setDashboardData, lastFetched 
+  } = useDashboardStore()
+  
+  const [loading, setLoading] = useState(!lastFetched)
 
   useEffect(() => {
     if (!activeBranch) return
     async function load() {
-      setLoading(true)
+      // If we have cached data, don't show the initial loading skeletons
+      // so the UI feels instant.
+      if (!lastFetched) setLoading(true)
+      
       const params = new URLSearchParams({ branch_id: activeBranch!.id })
       const res = await fetch(`/api/dashboard?${params}`)
       const json = await res.json()
+      
       if (json.data) {
-        setStats(json.data.stats ?? null)
-        setBranchRevenue(json.data.branchRevenue ?? [])
-        setRecentRepairs(json.data.recentRepairs ?? [])
-        setRecentActivity(json.data.recentActivity ?? [])
+        setDashboardData({
+          stats: json.data.stats ?? null,
+          branchRevenue: json.data.branchRevenue ?? [],
+          recentRepairs: json.data.recentRepairs ?? [],
+          recentActivity: json.data.recentActivity ?? [],
+        })
       }
       setLoading(false)
     }
     load()
-  }, [activeBranch])
+  }, [activeBranch, setDashboardData, lastFetched])
 
   return (
     <div className="space-y-6">

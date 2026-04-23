@@ -34,9 +34,27 @@ export function CustomerSearch({ value, onChange }: CustomerSearchProps) {
     if (!q.trim()) { setResults([]); return }
     setIsSearching(true)
     try {
-      const res = await fetch(`/api/customers?search=${encodeURIComponent(q)}&limit=8`)
+      const res = await fetch(`/api/customers?search=${encodeURIComponent(q)}&limit=50`)
       const json = await res.json()
-      setResults(json.data ?? [])
+      const data = (json.data ?? []) as Customer[]
+      
+      // Sort by relevance: prefix matches first
+      const sorted = [...data].sort((a, b) => {
+        const qLow = q.toLowerCase()
+        const aFirst = a.first_name.toLowerCase().startsWith(qLow)
+        const bFirst = b.first_name.toLowerCase().startsWith(qLow)
+        if (aFirst && !bFirst) return -1
+        if (!aFirst && bFirst) return 1
+        
+        const aLast = (a.last_name ?? '').toLowerCase().startsWith(qLow)
+        const bLast = (b.last_name ?? '').toLowerCase().startsWith(qLow)
+        if (aLast && !bLast) return -1
+        if (!aLast && bLast) return 1
+        
+        return a.first_name.localeCompare(b.first_name)
+      })
+
+      setResults(sorted.slice(0, 8))
     } finally {
       setIsSearching(false)
     }
@@ -152,6 +170,11 @@ export function CustomerSearch({ value, onChange }: CustomerSearchProps) {
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">
                         {c.first_name} {c.last_name ?? ''}
+                        {c.business_name && (
+                          <span className="ml-1.5 inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+                            {c.business_name}
+                          </span>
+                        )}
                       </p>
                       <p className="text-xs text-gray-500 truncate">{c.phone ?? c.email ?? ''}</p>
                     </div>

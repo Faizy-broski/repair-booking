@@ -12,8 +12,9 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
 import type { ColumnDef, VisibilityState } from '@tanstack/react-table'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
 
 interface CustomerRow {
   id: string
@@ -92,11 +93,22 @@ function exportPDF(customers: CustomerRow[]) {
 export default function CustomersPage() {
   const { activeBranch } = useAuthStore()
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
   const [customers, setCustomers] = useState<CustomerRow[]>([])
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(0)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+
+  // URL-based page state
+  const page = parseInt(searchParams.get('page') || '0', 10)
+
+  const setPage = useCallback((newPage: number) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('page', String(newPage))
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [searchParams, pathname, router])
 
   // Create sheet
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -108,6 +120,8 @@ export default function CustomersPage() {
   const [editSheetOpen, setEditSheetOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<CustomerRow | null>(null)
   const [editError, setEditError] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<CustomerRow | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Column visibility
   const [colVisibility, setColVisibility] = useState<VisibilityState>({})
@@ -184,23 +198,24 @@ export default function CustomersPage() {
     else { const j = await res.json(); setEditError(j?.error?.message ?? 'Failed to update customer.') }
   }
 
-  async function onDelete(customer: CustomerRow) {
-    const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ')
-    toast.warning(`Delete customer "${name}"?`, {
-      description: 'This action cannot be undone and will affect related repairs.',
-      action: {
-        label: 'Delete',
-        onClick: async () => {
-          const res = await fetch(`/api/customers/${customer.id}`, { method: 'DELETE' })
-          if (res.ok) {
-            toast.success(`Customer "${name}" deleted.`)
-            fetchCustomers()
-          } else {
-            toast.error('Failed to delete customer.')
-          }
-        },
-      },
-    })
+  function onDelete(customer: CustomerRow) {
+    setConfirmDelete(customer)
+  }
+
+  async function handleConfirmDelete() {
+    if (!confirmDelete) return
+    setIsDeleting(true)
+    const name = [confirmDelete.first_name, confirmDelete.last_name].filter(Boolean).join(' ')
+    
+    const res = await fetch(`/api/customers/${confirmDelete.id}`, { method: 'DELETE' })
+    if (res.ok) {
+      toast.success(`Customer "${name}" deleted.`)
+      fetchCustomers()
+      setConfirmDelete(null)
+    } else {
+      toast.error('Failed to delete customer.')
+    }
+    setIsDeleting(false)
   }
 
   const TOGGLEABLE_COLS = ['email', 'address', 'phone', 'created_at']
@@ -354,7 +369,7 @@ export default function CustomersPage() {
             type="search"
             placeholder="Search customers..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(0) }}
             className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
           />
         </div>
@@ -428,6 +443,15 @@ export default function CustomersPage() {
           <Button type="submit" className="w-full" loading={editForm.formState.isSubmitting}>Save Changes</Button>
         </form>
       </InlineFormSheet>
+      <ConfirmModal
+        open={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Customer?"
+        description={confirmDelete ? `Are you sure you want to delete "${[confirmDelete.first_name, confirmDelete.last_name].filter(Boolean).join(' ')}"? This action cannot be undone.` : ''}
+        confirmLabel="Delete"
+        loading={isDeleting}
+      />
     </div>
   )
 }

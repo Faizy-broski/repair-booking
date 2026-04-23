@@ -114,7 +114,7 @@ export function InvoicePdf(props: InvoicePdfProps) {
     page: {
       fontFamily: family,
       backgroundColor: '#ffffff',
-      paddingBottom: 120,
+      paddingBottom: 60,
     },
 
     // ── Header band ──

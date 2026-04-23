@@ -20,12 +20,11 @@ export const DashboardController = {
           .eq('branch_id', branchId)
           .gte('created_at', monthStart),
 
-        // Open repairs
+        // All repairs for total count + open/urgent calculation
         adminSupabase
           .from('repairs')
           .select('id, status, created_at, is_rush')
-          .eq('branch_id', branchId)
-          .not('status', 'in', '("collected","unrepairable")'),
+          .eq('branch_id', branchId),
 
         // This month's expenses
         adminSupabase
@@ -96,16 +95,20 @@ export const DashboardController = {
 
       // Urgent = active rush jobs OR active repairs sitting for more than 3 days
       const urgentCutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+      const TERMINAL = ['repaired', 'collected', 'unrepairable']
+      const isTerminal = (s: string) => TERMINAL.includes(s?.toLowerCase())
+      const isRepaired = (s: string) => s?.toLowerCase() === 'repaired'
       const repairsUrgent = repairs.filter(
-        (r) => !['repaired', 'collected', 'unrepairable'].includes(r.status) &&
+        (r) => !isTerminal(r.status) &&
           ((r as any).is_rush || (r.created_at ?? '') < urgentCutoff)
       ).length
 
       const stats = {
         total_sales: sales.reduce((s, r) => s + (r.total ?? 0), 0),
         sales_count: sales.length,
-        repairs_open: repairs.filter((r) => !['repaired', 'collected', 'unrepairable'].includes(r.status)).length,
-        repairs_completed: repairs.filter((r) => r.status === 'repaired').length,
+        repairs_total: repairs.length,
+        repairs_open: repairs.filter((r) => !isTerminal(r.status)).length,
+        repairs_completed: repairs.filter((r) => isRepaired(r.status)).length,
         repairs_urgent: repairsUrgent,
         total_expenses: expenses.reduce((s, r) => s + (r.amount ?? 0), 0),
         low_stock_count: lowStockCount,

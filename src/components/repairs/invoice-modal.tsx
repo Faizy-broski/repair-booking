@@ -81,7 +81,7 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
 
   return (
     <Modal open={open} onClose={onClose} title={`Invoice - ${repair.job_number}`} size="xl">
-      <div className="flex flex-col h-[80vh]">
+      <div className="flex flex-col h-[75vh]">
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-500">
             <Loader2 className="h-8 w-8 animate-spin text-teal-600" />

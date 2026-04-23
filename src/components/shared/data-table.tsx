@@ -48,7 +48,7 @@ export function DataTable<T>({
                 {hg.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-white/80"
+                    className="px-4 py-3 text-left text-[13px] font-bold uppercase tracking-wider text-white"
                     style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}
                   >
                     {header.isPlaceholder ? null : header.column.getCanSort() ? (
@@ -78,7 +78,7 @@ export function DataTable<T>({
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className={`border-t border-outline-variant/30 ${i % 2 === 0 ? 'bg-white' : 'bg-surface-container-low'}`}>
                   {columns.map((_, j) => (
-                    <td key={j} className="px-4 py-3">
+                    <td key={j} className="px-4 py-4">
                       <div className="h-4 w-full animate-pulse rounded bg-surface-container" />
                     </td>
                   ))}
@@ -99,7 +99,7 @@ export function DataTable<T>({
                   }`}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-3 text-on-surface">
+                    <td key={cell.id} className="px-4 py-4 text-on-surface align-middle">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
@@ -112,25 +112,37 @@ export function DataTable<T>({
 
       {/* Pagination */}
       {(totalCount ?? 0) > pageSize && (
-        <div className="mt-3 flex items-center justify-between text-sm text-gray-500">
-          <span>
-            Showing {pageIndex * pageSize + 1}–{Math.min((pageIndex + 1) * pageSize, totalCount ?? 0)} of {totalCount}
-          </span>
-          <div className="flex gap-1">
+        <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 px-1">
+          <div className="text-sm font-medium text-outline">
+            Showing <span className="text-on-surface">{pageIndex * pageSize + 1}</span>–
+            <span className="text-on-surface">{Math.min((pageIndex + 1) * pageSize, totalCount ?? 0)}</span> of 
+            <span className="text-on-surface"> {totalCount}</span>
+          </div>
+          
+          <div className="flex items-center gap-2">
             <Button
-              variant="outline"
+              variant="default"
               size="sm"
               onClick={() => onPageChange?.(pageIndex - 1)}
               disabled={pageIndex === 0}
+              className="h-9 px-4 flex items-center gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm transition-all disabled:bg-gray-200 disabled:text-gray-400 disabled:opacity-100"
             >
               <ChevronLeft className="h-4 w-4" />
+              <span className="font-medium">Previous</span>
             </Button>
+            
+            <div className="flex items-center justify-center min-w-[2.5rem] h-9 rounded-lg border border-outline-variant bg-surface-container-lowest text-sm font-bold text-primary shadow-sm">
+              {pageIndex + 1}
+            </div>
+            
             <Button
-              variant="outline"
+              variant="default"
               size="sm"
               onClick={() => onPageChange?.(pageIndex + 1)}
               disabled={pageIndex + 1 >= totalPages}
+              className="h-9 px-4 flex items-center gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm transition-all disabled:bg-gray-200 disabled:text-gray-400 disabled:opacity-100"
             >
+              <span className="font-medium">Next</span>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>

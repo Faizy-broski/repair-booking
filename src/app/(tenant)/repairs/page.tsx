@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Plus, Search, LayoutGrid, List, Wrench, DollarSign, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns } from 'lucide-react'
+import { Plus, Search, LayoutGrid, List, Wrench, DollarSign, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
 import { Modal } from '@/components/ui/modal'
@@ -11,16 +11,18 @@ import { useAuthStore } from '@/store/auth.store'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { formatCurrency, formatCurrencyCompact, formatDateTime, formatDate } from '@/lib/utils'
+import { formatCurrency, formatCurrencyCompact, formatDateTime, formatDate, formatStatus } from '@/lib/utils'
 import { Select } from '@/components/ui/select'
 import type { ColumnDef, VisibilityState } from '@tanstack/react-table'
 import type { Repair } from '@/types/database'
 import { RepairEmailPrompt } from '@/components/repairs/email-prompt-modal'
 import { RepairSlipModal } from '@/components/repairs/slip-modal'
+import { toast } from 'sonner'
 import { RepairInvoiceModal } from '@/components/repairs/invoice-modal'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
-import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
+import { PatternLock } from '@/components/ui/pattern-lock'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 interface SelectedCustomer {
   id: string
@@ -40,10 +42,12 @@ interface RepairRow extends Repair {
 const EMPTY_NEW_CUST = { first_name: '', last_name: '', business_name: '', email: '', phone: '', address: '' }
 const EMPTY_JOB = {
   device_name: '', device_type: '', device_brand: '', device_model: '',
-  imei: '', fault: '', fault_custom: '',
+  imei: '', faults: [] as string[],
   estimated_cost: '', deposit_paid: '',
   due_date: '', customer_note: '', staff_note: '',
   status: '', assigned_to: '',
+  lock_type: '' as '' | 'passcode' | 'pattern',
+  passcode: '',
 }
 
 function ActionsMenu({ onEdit, onSlip, onInvoice, onDelete }: {
@@ -58,7 +62,7 @@ function ActionsMenu({ onEdit, onSlip, onInvoice, onDelete }: {
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
         <button
-          className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors focus:outline-none"
+          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors focus:outline-none"
         >
           Actions <ChevronDown className="h-3 w-3" />
         </button>
@@ -142,6 +146,84 @@ function ComboInput({ value, onChange, options, placeholder }: {
   )
 }
 
+function MultiComboInput({ values, onAdd, onRemove, options, placeholder }: {
+  values: string[]
+  onAdd: (v: string) => void
+  onRemove: (v: string) => void
+  options: string[]
+  placeholder?: string
+}) {
+  const [value, setValue] = useState('')
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const filtered = options.filter((o) => o.toLowerCase().includes(value.toLowerCase()) && !values.includes(o))
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="mb-1.5 flex flex-wrap gap-1.5">
+        {values.map((v) => (
+          <span key={v} className="inline-flex items-center gap-1 rounded bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+            {v}
+            <button type="button" onClick={() => onRemove(v)} className="hover:text-indigo-900 transition-colors">
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="relative">
+        <input
+          value={value}
+          onChange={(e) => { setValue(e.target.value); setOpen(true) }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && value.trim()) {
+              e.preventDefault()
+              if (!values.includes(value.trim())) onAdd(value.trim())
+              setValue('')
+            }
+          }}
+          placeholder={placeholder}
+          className="h-8 w-full rounded-md border border-indigo-200 bg-white px-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400/20"
+        />
+        {open && (value || filtered.length > 0) && (
+          <ul className="absolute z-50 mt-1 max-h-44 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+            {filtered.map((o) => (
+              <li key={o}>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
+                  onMouseDown={(e) => { e.preventDefault(); onAdd(o); setValue(''); setOpen(false) }}
+                >
+                  <span className="text-gray-700">{o}</span>
+                </button>
+              </li>
+            ))}
+            {value.trim() && !options.some(o => o.toLowerCase() === value.trim().toLowerCase()) && (
+              <li>
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 border-t border-gray-100 transition-colors"
+                  onMouseDown={(e) => { e.preventDefault(); onAdd(value.trim()); setValue(''); setOpen(false) }}
+                >
+                  <span className="text-gray-500 italic">Add "{value.trim()}"...</span>
+                </button>
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
+
 const EXPORTABLE_COLUMNS = ['Job #', 'Customer', 'Type', 'Brand', 'Model', 'Status', 'Cost', 'Created']
 
 function exportCSV(repairs: RepairRow[]) {
@@ -155,7 +237,7 @@ function exportCSV(repairs: RepairRow[]) {
       `"${r.device_model ?? 'N/A'}"`,
       r.status,
       r.actual_cost ?? r.estimated_cost ?? 0,
-      formatDate(r.created_at)
+      r.created_at ? formatDate(r.created_at) : 'N/A'
     ].join(','))
   ]
   const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
@@ -176,7 +258,7 @@ function exportExcel(repairs: RepairRow[]) {
       r.device_model ?? 'N/A',
       r.status,
       r.actual_cost ?? r.estimated_cost ?? 0,
-      formatDate(r.created_at)
+      r.created_at ? formatDate(r.created_at) : 'N/A'
     ])
   ]
   const xml = `<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Repairs"><Table>${rows.map((r) => `<Row>${r.map((v) => `<Cell><Data ss:Type="String">${String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;')}</Data></Cell>`).join('')}</Row>`).join('')}</Table></Worksheet></Workbook>`
@@ -188,7 +270,7 @@ function exportExcel(repairs: RepairRow[]) {
 }
 
 function exportPDF(repairs: RepairRow[]) {
-  const html = `<html><head><title>Repairs Export</title><style>body{font-family:sans-serif;font-size:12px;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background:#0d7070;color:#fff}</style></head><body><h2>Repair Jobs Report</h2><p>Generated on: ${new Date().toLocaleString()}</p><table><thead><tr>${EXPORTABLE_COLUMNS.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${repairs.map(r => `<tr><td>${r.job_number}</td><td>${r.customers ? `${r.customers.first_name} ${r.customers.last_name ?? ''}`.trim() : 'N/A'}</td><td>${r.device_type ?? 'N/A'}</td><td>${r.device_brand ?? 'N/A'}</td><td>${r.device_model ?? 'N/A'}</td><td>${r.status}</td><td>$${r.actual_cost ?? r.estimated_cost ?? 0}</td><td>${formatDate(r.created_at)}</td></tr>`).join('')}</tbody></table></body></html>`
+  const html = `<html><head><title>Repairs Export</title><style>body{font-family:sans-serif;font-size:12px;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background:#0d7070;color:#fff}</style></head><body><h2>Repair Jobs Report</h2><p>Generated on: ${new Date().toLocaleString()}</p><table><thead><tr>${EXPORTABLE_COLUMNS.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${repairs.map(r => `<tr><td>${r.job_number}</td><td>${r.customers ? `${r.customers.first_name} ${r.customers.last_name ?? ''}`.trim() : 'N/A'}</td><td>${r.device_type ?? 'N/A'}</td><td>${r.device_brand ?? 'N/A'}</td><td>${r.device_model ?? 'N/A'}</td><td>${r.status}</td><td>$${r.actual_cost ?? r.estimated_cost ?? 0}</td><td>${r.created_at ? formatDate(r.created_at) : 'N/A'}</td></tr>`).join('')}</tbody></table></body></html>`
   const w = window.open('', '_blank')
   if (!w) return
   w.document.write(html)
@@ -199,12 +281,28 @@ function exportPDF(repairs: RepairRow[]) {
 export default function RepairsPage() {
   const { activeBranch } = useAuthStore()
   const router = useRouter()
-  const [repairs, setRepairs] = useState<RepairRow[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(0)
-  const [loading, setLoading] = useState(true)
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+
+  // URL-based state
+  const page = parseInt(searchParams.get('page') || '0', 10)
+  const view = (searchParams.get('view') as 'list' | 'kanban') || 'list'
+
+  const setPage = useCallback((newPage: number) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('page', String(newPage))
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [searchParams, pathname, router])
+
+  const setView = useCallback((newView: 'list' | 'kanban') => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('view', newView)
+    params.set('page', '0')
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [searchParams, pathname, router])
   // Modal state
   const [modalOpen, setModalOpen] = useState(false)
   const [modalStep, setModalStep] = useState<1 | 2>(1)
@@ -219,7 +317,6 @@ export default function RepairsPage() {
   const [slipRepair, setSlipRepair] = useState<RepairRow | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, jobNumber: string } | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [view, setView] = useState<'list' | 'kanban'>('list')
   const [colVisibility, setColVisibility] = useState<VisibilityState>({})
   const [colMenuOpen, setColMenuOpen] = useState(false)
   const colMenuRef = useRef<HTMLDivElement>(null)
@@ -238,6 +335,7 @@ export default function RepairsPage() {
 
   // Dashboard stats
   const [repairStats, setRepairStats] = useState<{
+    total_repairs: number; repairs_open: number; repairs_completed: number;
     repairs_urgent: number; total_sales: number;
   } | null>(null)
   const [invoiceSettings, setInvoiceSettings] = useState<any>(null)
@@ -254,23 +352,33 @@ export default function RepairsPage() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const fetchRepairs = useCallback(async () => {
-    if (!activeBranch) return
-    setLoading(true)
-    const params = new URLSearchParams({
-      branch_id: activeBranch.id,
-      page: String(view === 'kanban' ? 1 : page + 1),
-      limit: view === 'kanban' ? '200' : '20',
-    })
-    if (search) params.set('search', search)
-    if (statusFilter && view === 'list') params.set('status', statusFilter)
+  const queryClient = useQueryClient()
 
-    const res = await fetch(`/api/repairs?${params}`)
-    const json = await res.json()
-    setRepairs(json.data ?? [])
-    setTotal(json.meta?.total ?? 0)
-    setLoading(false)
-  }, [activeBranch, page, search, statusFilter, view])
+  // ── Repairs Query ──
+  const { data: repairResponse, isLoading: repairsLoading, refetch: fetchRepairs } = useQuery({
+    queryKey: ['repairs', activeBranch?.id, page, search, statusFilter, view],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        branch_id: activeBranch!.id,
+        page: String(view === 'kanban' ? 1 : page + 1),
+        limit: view === 'kanban' ? '200' : '20',
+      })
+      if (search) params.set('search', search)
+      if (statusFilter && view === 'list') params.set('status', statusFilter)
+
+      const res = await fetch(`/api/repairs?${params}`)
+      if (!res.ok) throw new Error('Failed to fetch repairs')
+      return res.json()
+    },
+    enabled: !!activeBranch,
+  })
+
+  const repairs = repairResponse?.data ?? []
+  const total = repairResponse?.meta?.total ?? 0
+  const [loading, setLoading] = useState(false)
+  
+  // Use local loading only for actions, use repairsLoading for initial data
+  useEffect(() => { setLoading(repairsLoading) }, [repairsLoading])
 
   function deleteRepair(repairId: string, jobNumber: string) {
     setConfirmDelete({ id: repairId, jobNumber })
@@ -287,28 +395,37 @@ export default function RepairsPage() {
     const res = await fetch(`/api/repairs/${confirmDelete.id}`, { method: 'DELETE' })
     if (res.ok) {
       toast.success(`Repair ${confirmDelete.jobNumber} deleted.`)
-      fetchRepairs()
+      queryClient.invalidateQueries({ queryKey: ['repairs'] })
       setConfirmDelete(null)
     } else {
-      toast.error('Failed to delete repair.')
+      if (res.status === 403) {
+        toast.error("Permission Denied: You don't have permission to delete repair jobs.")
+      } else {
+        toast.error('Failed to delete repair. Please try again.')
+      }
     }
     setIsDeleting(false)
   }
 
   async function handleStatusChange(repairId: string, newStatus: string) {
-    const prev = repairs.find((r) => r.id === repairId)?.status
-    setRepairs((list) => list.map((r) => r.id === repairId ? { ...r, status: newStatus } : r))
     const res = await fetch(`/api/repairs/${repairId}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus, note: '', send_email: false }),
     })
-    if (!res.ok && prev !== undefined) {
-      setRepairs((list) => list.map((r) => r.id === repairId ? { ...r, status: prev } : r))
+    
+    if (res.ok) {
+      queryClient.invalidateQueries({ queryKey: ['repairs'] })
+    } else {
+      if (res.status === 403) {
+        toast.error("Permission Denied: You don't have permission to update repair status.")
+      } else {
+        toast.error('Failed to update status.')
+      }
+      // Re-fetch to sync state if failed
+      queryClient.invalidateQueries({ queryKey: ['repairs'] })
     }
   }
-
-  useEffect(() => { fetchRepairs() }, [fetchRepairs])
 
   // Fetch supporting data - reactive to activeBranch
   useEffect(() => {
@@ -334,7 +451,7 @@ export default function RepairsPage() {
         if (json.data?.stats) {
           const s = json.data.stats
           setRepairStats({
-            total_repairs: s.repairs_open + s.repairs_completed,
+            total_repairs: s.repairs_total ?? (s.repairs_open + s.repairs_completed),
             repairs_open: s.repairs_open,
             repairs_completed: s.repairs_completed,
             repairs_urgent: s.repairs_urgent,
@@ -367,20 +484,37 @@ export default function RepairsPage() {
   async function saveEdit() {
     if (!editRepair) return
     setEditSaving(true)
-    const cf = (editRepair.custom_fields as any) ?? {}
-    await fetch(`/api/repairs/${editRepair.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        estimated_cost: parseFloat(editData.estimated_cost) || null,
-        deposit_paid: parseFloat(editData.deposit_paid) || 0,
-        status: editData.status || undefined,
-        custom_fields: { ...cf, due_date: editData.due_date || null, payment_method: editData.payment_method || null },
-      }),
-    })
-    setEditSaving(false)
-    setEditOpen(false)
-    fetchRepairs()
+    try {
+      const cf = (editRepair.custom_fields as any) ?? {}
+      const res = await fetch(`/api/repairs/${editRepair.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          estimated_cost: editData.estimated_cost === '' ? null : parseFloat(editData.estimated_cost),
+          deposit_paid: editData.deposit_paid === '' ? 0 : parseFloat(editData.deposit_paid),
+          status: editData.status || undefined,
+          custom_fields: { 
+            ...cf, 
+            due_date: editData.due_date || null, 
+            payment_method: editData.payment_method || null 
+          },
+        }),
+      })
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.error?.message || 'Failed to update repair')
+      }
+
+      toast.success('Repair job updated successfully.')
+      setEditOpen(false)
+      fetchRepairs()
+    } catch (err: any) {
+      console.error('Save edit error:', err)
+      toast.error(err.message || 'An error occurred while saving.')
+    } finally {
+      setEditSaving(false)
+    }
   }
 
   function openModal() {
@@ -407,7 +541,7 @@ export default function RepairsPage() {
 
   async function createRepair() {
     if (!activeBranch) return
-    if (!jobData.fault.trim() && !jobData.fault_custom.trim()) return
+    if (jobData.faults.length === 0) return
     setSubmitting(true)
 
     let customerId = selectedCustomer?.id ?? null
@@ -428,12 +562,18 @@ export default function RepairsPage() {
         }),
       })
       const custJson = await custRes.json()
-      customerId = custJson.data?.id ?? null
+      if (!custRes.ok || !custJson.data?.id) {
+        const errMsg = typeof custJson.error === 'string' ? custJson.error : (custJson.error?.message ?? 'Failed to create customer. Please try again.')
+        toast.error(errMsg)
+        setSubmitting(false)
+        return
+      }
+      customerId = custJson.data.id
     }
 
     const total = parseFloat(jobData.estimated_cost) || 0
     const deposit = parseFloat(jobData.deposit_paid) || 0
-    const faultText = jobData.fault === '__other__' ? jobData.fault_custom : jobData.fault
+    const faultText = jobData.faults.join(', ')
 
     const res = await fetch('/api/repairs', {
       method: 'POST',
@@ -445,13 +585,13 @@ export default function RepairsPage() {
         device_type: jobData.device_type || null,
         device_brand: jobData.device_brand || null,
         device_model: jobData.device_model || jobData.device_name || null,
-        serial_number: null,
+        serial_number: jobData.imei || null,
         estimated_cost: total || null,
         deposit_paid: deposit,
         assigned_to: jobData.assigned_to || null,
         status: jobData.status || undefined,
-        lock_type: null,
-        passcode: null,
+        lock_type: jobData.lock_type || null,
+        passcode: jobData.passcode.trim() || null,
         custom_fields: {
           imei: jobData.imei || null,
           due_date: jobData.due_date || null,
@@ -464,15 +604,20 @@ export default function RepairsPage() {
     if (res.ok) {
       setModalOpen(false)
       fetchRepairs()
+      toast.success('Repair job created.')
+    } else {
+      const j = await res.json().catch(() => ({}))
+      const errMsg = typeof j.error === 'string' ? j.error : (j.error?.message ?? 'Failed to create repair. Please try again.')
+      toast.error(errMsg)
     }
     setSubmitting(false)
   }
 
   // All statuses come from DB — no hardcoded fallbacks
-  const allStatusOptions = customStatuses.map((cs) => ({ value: cs.name, label: cs.name, color: cs.color }))
+  const allStatusOptions = customStatuses.map((cs) => ({ value: cs.name, label: formatStatus(cs.name), color: cs.color }))
 
-  // Map status name → color for badge rendering
-  const statusColorMap = Object.fromEntries(customStatuses.map((cs) => [cs.name, cs.color]))
+  // Map status name → color for badge rendering (case-insensitive)
+  const statusColorMap = Object.fromEntries(customStatuses.map((cs) => [cs.name.toLowerCase(), cs.color]))
 
   const columns: ColumnDef<RepairRow>[] = [
     {
@@ -499,9 +644,21 @@ export default function RepairsPage() {
       accessorKey: 'device_model', header: 'Model', cell: ({ getValue }) => (getValue() as string) || '—'
     },
     {
-      accessorKey: 'status', header: 'Status', cell: ({ getValue, row }) => {
+      accessorKey: 'issue', header: 'Fault', size: 180,
+      cell: ({ getValue }) => {
+        const v = getValue() as string
+        if (!v || v.toLowerCase() === 'not specified') return <span className="text-gray-400">—</span>
+        return (
+          <span className="inline-block max-w-[170px] rounded-lg bg-violet-100 px-2.5 py-1 text-xs font-semibold leading-snug text-violet-800 break-words whitespace-normal">
+            {v}
+          </span>
+        )
+      }
+    },
+    {
+      accessorKey: 'status', header: 'Status', size: 140, cell: ({ getValue, row }) => {
         const s = getValue() as string
-        const customColor = statusColorMap[s]
+        const customColor = statusColorMap[s.toLowerCase()]
         return (
           <div className="relative group inline-block">
             <select
@@ -511,18 +668,34 @@ export default function RepairsPage() {
                 handleStatusChange(row.original.id, e.target.value)
               }}
               onClick={(e) => e.stopPropagation()}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
             >
               {allStatusOptions.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
             <span
-              className="inline-flex cursor-pointer items-center rounded-full px-2.5 py-1 text-xs font-semibold text-white group-hover:ring-2 group-hover:ring-offset-1 group-hover:ring-blue-400 transition-all"
-              style={{ backgroundColor: customColor ?? '#9ca3af' }}
+              className="inline-flex cursor-pointer items-center whitespace-nowrap rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm transition-all group-hover:ring-2 group-hover:ring-offset-2 group-hover:ring-blue-400"
+              style={{ backgroundColor: customColor ?? '#64748b' }}
             >
-              {s} ▾
+              {formatStatus(s)}
+              <ChevronDown className="ml-1.5 h-3 w-3 opacity-80" />
             </span>
+          </div>
+        )
+      }
+    },
+    {
+      id: 'due_date', header: 'Due Date', size: 120, cell: ({ row }) => {
+        const cf = (row.original.custom_fields as any) ?? {}
+        if (!cf.due_date) return '—'
+        const d = new Date(cf.due_date)
+        return (
+          <div className="text-[11px] leading-tight">
+            <div className="font-semibold text-gray-900">
+              {d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+            </div>
+            <div className="text-gray-500">{d.getFullYear()}</div>
           </div>
         )
       }
@@ -533,18 +706,32 @@ export default function RepairsPage() {
         return v ? formatCurrency(v) : row.original.estimated_cost ? `~${formatCurrency(row.original.estimated_cost)}` : '—'
       }
     },
-    { accessorKey: 'created_at', header: 'Created', cell: ({ getValue }) => formatDateTime(getValue() as string) },
+    { 
+      accessorKey: 'created_at', header: 'Created', size: 110, cell: ({ getValue }) => {
+        const d = new Date(getValue() as string)
+        return (
+          <div className="text-[11px] leading-tight">
+            <div className="font-semibold text-gray-900 whitespace-nowrap">
+              {d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+            </div>
+            <div className="text-gray-500">
+              {d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          </div>
+        )
+      }
+    },
     {
       id: 'actions', header: 'Action', size: 160,
       cell: ({ row }) => {
         const r = row.original
         return (
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-col gap-1.5">
             <button
               onClick={() => router.push(`/repairs/${r.id}`)}
-              className="flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-600 hover:bg-cyan-100 transition-colors"
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 py-1.5 text-xs font-bold text-cyan-700 hover:bg-cyan-100 transition-all shadow-sm active:scale-95"
             >
-              <Eye className="h-3 w-3" /> View
+              <Eye className="h-3.5 w-3.5" /> DETAILS
             </button>
             <ActionsMenu
               onEdit={() => openEdit(r)}
@@ -558,15 +745,16 @@ export default function RepairsPage() {
     },
   ]
 
-  const TOGGLEABLE_COLS = ['customers', 'device_type', 'device_brand', 'device_model', 'status', 'actual_cost', 'created_at']
-  const COL_LABELS: Record<string, string> = { 
-    customers: 'Customer', 
-    device_type: 'Type', 
-    device_brand: 'Brand', 
-    device_model: 'Model', 
-    status: 'Status', 
-    actual_cost: 'Cost', 
-    created_at: 'Created' 
+  const TOGGLEABLE_COLS = ['customers', 'device_type', 'device_brand', 'device_model', 'issue', 'status', 'actual_cost', 'created_at']
+  const COL_LABELS: Record<string, string> = {
+    customers: 'Customer',
+    device_type: 'Type',
+    device_brand: 'Brand',
+    device_model: 'Model',
+    issue: 'Fault',
+    status: 'Status',
+    actual_cost: 'Cost',
+    created_at: 'Created',
   }
 
   const visibleColumns = columns.filter((col) => {
@@ -747,7 +935,7 @@ export default function RepairsPage() {
               type="search"
               placeholder="Search by job # or device..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(0) }}
               className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
             />
           </div>
@@ -757,7 +945,7 @@ export default function RepairsPage() {
               ...allStatusOptions.map((o) => ({ value: o.value, label: o.label })),
             ]}
             value={statusFilter}
-            onValueChange={setStatusFilter}
+            onValueChange={(v) => { setStatusFilter(v); setPage(0) }}
             placeholder="All Statuses"
             className="w-40"
           />
@@ -787,30 +975,31 @@ export default function RepairsPage() {
               onClick={() => setColMenuOpen((v) => !v)}
               className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
             >
-              <Columns className="h-3.5 w-3.5" /> Column visibility
+              <Columns className="h-3.5 w-3.5" /> Columns
             </button>
             {colMenuOpen && (
-              <div className="absolute left-0 top-full z-20 mt-1 w-44 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
-                {TOGGLEABLE_COLS.map((key) => (
-                  <label key={key} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50">
-                    <input
-                      type="checkbox"
-                      className="h-3.5 w-3.5 rounded text-blue-600"
-                      checked={colVisibility[key] !== false}
-                      onChange={(e) => setColVisibility((v) => ({ ...v, [key]: e.target.checked }))}
-                    />
-                    {COL_LABELS[key]}
-                  </label>
-                ))}
+              <div className="absolute left-0 top-full z-20 mt-1 w-48 rounded-xl border border-gray-700 bg-gray-900 py-2 shadow-xl">
+                <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-500">Toggle columns</p>
+                {TOGGLEABLE_COLS.map((key) => {
+                  const checked = colVisibility[key] !== false
+                  return (
+                    <label key={key} className="flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-xs text-gray-200 hover:bg-gray-800 transition-colors">
+                      <span>{COL_LABELS[key]}</span>
+                      <span className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${checked ? 'bg-teal-500' : 'bg-gray-600'}`}>
+                        <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                        <input
+                          type="checkbox"
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          checked={checked}
+                          onChange={(e) => setColVisibility((v) => ({ ...v, [key]: e.target.checked }))}
+                        />
+                      </span>
+                    </label>
+                  )
+                })}
               </div>
             )}
           </div>
-          <button
-            onClick={() => exportPDF(repairs)}
-            className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
-          >
-            <FileText className="h-3.5 w-3.5" /> Export PDF
-          </button>
         </div>
       )}
 
@@ -1042,18 +1231,23 @@ export default function RepairsPage() {
                 <div className="grid grid-cols-4 gap-2">
                   <div className="col-span-2">
                     <label className={lbl}>Fault <span className="text-red-400">*</span></label>
-                    <select value={jobData.fault} onChange={(e) => setJobData((p) => ({ ...p, fault: e.target.value }))} className={sel}>
-                      <option value="">— Select Fault —</option>
-                      {faults.map((f) => <option key={f.id} value={f.name}>{f.name}</option>)}
-                      <option value="__other__">Other…</option>
-                    </select>
-                    {jobData.fault === '__other__' && (
-                      <input value={jobData.fault_custom} onChange={(e) => setJobData((p) => ({ ...p, fault_custom: e.target.value }))} placeholder="Describe fault…" className={`mt-1 ${inp}`} />
-                    )}
+                    <MultiComboInput
+                      values={jobData.faults}
+                      onAdd={(v) => setJobData((p) => ({ ...p, faults: [...p.faults, v] }))}
+                      onRemove={(v) => setJobData((p) => ({ ...p, faults: p.faults.filter((f) => f !== v) }))}
+                      options={faults.map((f) => f.name)}
+                      placeholder="Select or type fault…"
+                    />
                   </div>
                   <div>
                     <label className={lbl}>Due Date</label>
-                    <input type="date" value={jobData.due_date} onChange={(e) => setJobData((p) => ({ ...p, due_date: e.target.value }))} className={inp} />
+                    <input
+                      type="date"
+                      min={new Date().toISOString().split('T')[0]}
+                      value={jobData.due_date}
+                      onChange={(e) => setJobData((p) => ({ ...p, due_date: e.target.value }))}
+                      className={inp}
+                    />
                   </div>
                   <div>
                     <label className={lbl}>Status</label>
@@ -1105,7 +1299,59 @@ export default function RepairsPage() {
 
               <div className="h-px bg-gray-100" />
 
-              {/* Row D: Customer Note | Staff Note */}
+              {/* Row D: Lock / Passcode / Pattern */}
+              <div>
+                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-outline">
+                  <Lock className="h-2.5 w-2.5" /> Device Lock
+                </p>
+                <div className="flex items-center gap-2 mb-2">
+                  {(['', 'passcode', 'pattern'] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setJobData((p) => ({ ...p, lock_type: t, passcode: '' }))}
+                      className={`rounded-md border px-3 py-1 text-xs font-medium capitalize transition-colors ${jobData.lock_type === t ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
+                    >
+                      {t === '' ? 'None' : t}
+                    </button>
+                  ))}
+                </div>
+                {jobData.lock_type === 'passcode' && (
+                  <div className="max-w-[200px]">
+                    <label className={lbl}>Passcode / PIN</label>
+                    <input
+                      type="text"
+                      value={jobData.passcode}
+                      onChange={(e) => setJobData((p) => ({ ...p, passcode: e.target.value }))}
+                      placeholder="Enter passcode…"
+                      className={inp}
+                    />
+                  </div>
+                )}
+                {jobData.lock_type === 'pattern' && (
+                  <div className="flex flex-col items-start gap-1">
+                    <label className={lbl}>Draw Pattern</label>
+                    <PatternLock
+                      value={jobData.passcode}
+                      onChange={(v) => setJobData((p) => ({ ...p, passcode: v }))}
+                      size={180}
+                    />
+                    {jobData.passcode && (
+                      <button
+                        type="button"
+                        onClick={() => setJobData((p) => ({ ...p, passcode: '' }))}
+                        className="mt-1 text-xs text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                        Clear pattern
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="h-px bg-gray-100" />
+
+              {/* Row E: Customer Note | Staff Note */}
               <div>
                 <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-outline">
                   <StickyNote className="h-2.5 w-2.5" /> Notes
@@ -1129,7 +1375,7 @@ export default function RepairsPage() {
                 </button>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => setModalOpen(false)}>Cancel</Button>
-                  <Button onClick={createRepair} loading={submitting} disabled={!jobData.fault || (jobData.fault === '__other__' && !jobData.fault_custom.trim())}>
+                  <Button onClick={createRepair} loading={submitting} disabled={jobData.faults.length === 0}>
                     Create Job
                   </Button>
                 </div>

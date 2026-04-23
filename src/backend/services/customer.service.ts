@@ -12,7 +12,7 @@ export const CustomerService = {
       .range((page - 1) * limit, page * limit - 1)
 
     if (search) {
-      q = q.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%`)
+      q = q.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%,business_name.ilike.%${search}%`)
     }
 
     const { data, error, count } = await q

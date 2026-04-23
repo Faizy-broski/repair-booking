@@ -8,6 +8,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Modal } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
+import { toast } from 'sonner'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
 
 type Tab = 'overview' | 'repairs' | 'sales' | 'invoices' | 'assets' | 'credits'
 
@@ -91,6 +93,9 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   const [loyaltyBalance, setLoyaltyBalance] = useState(0)
   const [loyaltyTxns,    setLoyaltyTxns]    = useState<LoyaltyTxn[]>([])
 
+  const [confirmDeleteAsset, setConfirmDeleteAsset] = useState<string | null>(null)
+  const [isDeletingAsset, setIsDeletingAsset] = useState(false)
+
   const fetchCustomer = useCallback(() => {
     setLoading(true)
     return fetch(`/api/customers/${id}?detail=true`)
@@ -134,10 +139,18 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
     setSavingAsset(false)
   }
 
-  async function deleteAsset(assetId: string) {
-    if (!confirm('Delete this device?')) return
-    await fetch(`/api/customers/assets/${assetId}`, { method: 'DELETE' })
-    fetchAssets()
+  async function handleConfirmDeleteAsset() {
+    if (!confirmDeleteAsset) return
+    setIsDeletingAsset(true)
+    const res = await fetch(`/api/customers/assets/${confirmDeleteAsset}`, { method: 'DELETE' })
+    if (res.ok) {
+      toast.success('Device deleted successfully.')
+      fetchAssets()
+      setConfirmDeleteAsset(null)
+    } else {
+      toast.error('Failed to delete device.')
+    }
+    setIsDeletingAsset(false)
   }
 
   async function addCredit() {
@@ -390,7 +403,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => deleteAsset(a.id)}>
+                    <Button size="sm" variant="ghost" onClick={() => setConfirmDeleteAsset(a.id)}>
                       <Trash2 className="h-3.5 w-3.5 text-red-400" />
                     </Button>
                   </div>
@@ -515,6 +528,16 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           </Button>
         </div>
       </Modal>
+
+      <ConfirmModal
+        open={!!confirmDeleteAsset}
+        onClose={() => setConfirmDeleteAsset(null)}
+        onConfirm={handleConfirmDeleteAsset}
+        title="Delete Device?"
+        description="Are you sure you want to delete this device? This action cannot be undone."
+        confirmLabel="Delete"
+        loading={isDeletingAsset}
+      />
     </div>
   )
 }

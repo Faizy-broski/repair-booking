@@ -195,32 +195,40 @@ export default function ServiceCataloguePage() {
     else setServices([])
   }, [selectedDevId, loadServices])
 
-  // ── Device Types (was Categories) ───────────────────────────────────────
+  // ── Device Types ────────────────────────────────────────────────────────
 
   async function addTypeInline() {
     if (!newTypeName.trim()) return
-    setSaving(true)
     const slug = newTypeSlug.trim() || newTypeName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')
-    await fetch('/api/services/categories', {
+    const tmp: DeviceType = { id: `tmp-${Date.now()}`, name: newTypeName.trim(), slug, show_on_pos: true }
+    setDeviceTypes(p => [...p, tmp])
+    setNewTypeName(''); setNewTypeSlug('')
+    const res = await fetch('/api/services/categories', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newTypeName.trim(), slug, show_on_pos: true }),
+      body: JSON.stringify({ name: tmp.name, slug, show_on_pos: true }),
     })
-    setNewTypeName(''); setNewTypeSlug(''); await loadCategories(); setSaving(false)
+    const j = await res.json()
+    if (j.data?.id) setDeviceTypes(p => p.map(t => t.id === tmp.id ? { ...t, id: j.data.id } : t))
+    else setDeviceTypes(p => p.filter(t => t.id !== tmp.id))
   }
 
   async function renameType(id: string) {
     if (!editTypeName.trim()) return
     const t = deviceTypes.find(c => c.id === id)
+    const name = editTypeName.trim()
+    setDeviceTypes(p => p.map(t => t.id === id ? { ...t, name } : t))
+    setEditingTypeId(null)
     await fetch(`/api/services/categories/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: editTypeName.trim(), slug: t?.slug ?? editTypeName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'), show_on_pos: t?.show_on_pos ?? true }),
+      body: JSON.stringify({ name, slug: t?.slug ?? name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), show_on_pos: t?.show_on_pos ?? true }),
     })
-    setEditingTypeId(null); await loadCategories()
   }
 
   async function deleteType(id: string) {
     if (!confirm('Delete this device type?')) return
-    await fetch(`/api/services/categories/${id}`, { method: 'DELETE' }); await loadCategories()
+    setDeviceTypes(p => p.filter(t => t.id !== id))
+    if (selectedTypeId === id) { setSelectedTypeId(null); setSelectedBrandId(null); setSelectedDevId(null) }
+    fetch(`/api/services/categories/${id}`, { method: 'DELETE' })
   }
 
   function openTypeModal(editing: DeviceType | null = null) {
@@ -233,95 +241,131 @@ export default function ServiceCataloguePage() {
 
   async function saveTypeModal(data: TypeForm) {
     const { editing } = typeModal
-    const url    = editing ? `/api/services/categories/${editing.id}` : '/api/services/categories'
-    const method = editing ? 'PUT' : 'POST'
-    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
-    setTypeModal({ open: false, editing: null }); await loadCategories()
+    setTypeModal({ open: false, editing: null })
+    if (editing) {
+      setDeviceTypes(p => p.map(t => t.id === editing.id ? { ...t, ...data } : t))
+      await fetch(`/api/services/categories/${editing.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+    } else {
+      const tmp: DeviceType = { id: `tmp-${Date.now()}`, ...data }
+      setDeviceTypes(p => [...p, tmp])
+      const res = await fetch('/api/services/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+      const j = await res.json()
+      if (j.data?.id) setDeviceTypes(p => p.map(t => t.id === tmp.id ? { ...t, id: j.data.id } : t))
+      else setDeviceTypes(p => p.filter(t => t.id !== tmp.id))
+    }
   }
 
-  // ── Brands (was Manufacturers) ──────────────────────────────────────────
+  // ── Brands ───────────────────────────────────────────────────────────────
 
   async function addBrand() {
     if (!newBrandName.trim() || !selectedTypeId) return
-    setSaving(true)
-    await fetch('/api/services/manufacturers', {
+    const tmp: Brand = { id: `tmp-${Date.now()}`, name: newBrandName.trim(), category_id: selectedTypeId }
+    setBrands(p => [...p, tmp])
+    setNewBrandName('')
+    const res = await fetch('/api/services/manufacturers', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newBrandName.trim(), category_id: selectedTypeId }),
+      body: JSON.stringify({ name: tmp.name, category_id: selectedTypeId }),
     })
-    setNewBrandName(''); if (selectedTypeId) await loadBrands(selectedTypeId); setSaving(false)
+    const j = await res.json()
+    if (j.data?.id) setBrands(p => p.map(b => b.id === tmp.id ? { ...b, id: j.data.id } : b))
+    else setBrands(p => p.filter(b => b.id !== tmp.id))
   }
 
   async function renameBrand(id: string) {
     if (!editBrandName.trim()) return
+    const name = editBrandName.trim()
+    setBrands(p => p.map(b => b.id === id ? { ...b, name } : b))
+    setEditingBrandId(null)
     await fetch(`/api/services/manufacturers/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: editBrandName.trim() }),
+      body: JSON.stringify({ name }),
     })
-    setEditingBrandId(null); if (selectedTypeId) await loadBrands(selectedTypeId)
   }
 
   async function deleteBrand(id: string) {
     if (!confirm('Delete this brand? All its devices will also be removed.')) return
-    await fetch(`/api/services/manufacturers/${id}`, { method: 'DELETE' }); if (selectedTypeId) await loadBrands(selectedTypeId)
+    setBrands(p => p.filter(b => b.id !== id))
+    if (selectedBrandId === id) { setSelectedBrandId(null); setSelectedDevId(null) }
+    fetch(`/api/services/manufacturers/${id}`, { method: 'DELETE' })
   }
 
-  // ── Devices ─────────────────────────────────────────────────────────────
+  // ── Devices ──────────────────────────────────────────────────────────────
 
   async function addDevice() {
     if (!newDevName.trim() || !selectedBrandId || !selectedTypeId) return
-    setSaving(true)
-    await fetch('/api/services/devices', {
+    const tmp: Device = { id: `tmp-${Date.now()}`, name: newDevName.trim(), manufacturer_id: selectedBrandId, category_id: selectedTypeId }
+    setDevices(p => [...p, tmp])
+    setNewDevName('')
+    const res = await fetch('/api/services/devices', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: newDevName.trim(),
-        manufacturer_id: selectedBrandId,
-        category_id: selectedTypeId
-      }),
+      body: JSON.stringify({ name: tmp.name, manufacturer_id: selectedBrandId, category_id: selectedTypeId }),
     })
-    setNewDevName(''); if (selectedTypeId && selectedBrandId) await loadDevices(selectedTypeId, selectedBrandId); setSaving(false)
+    const j = await res.json()
+    if (j.data?.id) setDevices(p => p.map(d => d.id === tmp.id ? { ...d, id: j.data.id } : d))
+    else setDevices(p => p.filter(d => d.id !== tmp.id))
   }
 
   async function renameDevice(id: string) {
     if (!editDevName.trim()) return
+    const name = editDevName.trim()
+    setDevices(p => p.map(d => d.id === id ? { ...d, name } : d))
+    setEditingDevId(null)
     await fetch(`/api/services/devices/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: editDevName.trim() }),
+      body: JSON.stringify({ name }),
     })
-    setEditingDevId(null); if (selectedTypeId && selectedBrandId) await loadDevices(selectedTypeId, selectedBrandId)
   }
 
   async function deleteDevice(id: string) {
     if (!confirm('Delete this device? Its services will be unlinked.')) return
-    await fetch(`/api/services/devices/${id}`, { method: 'DELETE' }); if (selectedTypeId && selectedBrandId) await loadDevices(selectedTypeId, selectedBrandId)
+    setDevices(p => p.filter(d => d.id !== id))
+    if (selectedDevId === id) setSelectedDevId(null)
+    fetch(`/api/services/devices/${id}`, { method: 'DELETE' })
   }
 
   // ── Services ─────────────────────────────────────────────────────────────
 
   async function addServiceInline() {
     if (!newSvcName.trim() || !selectedDevId) return
-    setSaving(true)
     const price = parseFloat(newSvcPrice) || 0
-    await fetch('/api/services/problems', {
+    const tmp: Service = { id: `tmp-${Date.now()}`, name: newSvcName.trim(), price, cost: 0, warranty_days: 0, show_on_pos: true, device_id: selectedDevId, category_id: null }
+    setServices(p => [...p, tmp])
+    setNewSvcName(''); setNewSvcPrice('')
+    const res = await fetch('/api/services/problems', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newSvcName.trim(), price, cost: 0, warranty_days: 0, show_on_pos: true, device_id: selectedDevId }),
+      body: JSON.stringify({ name: tmp.name, price, cost: 0, warranty_days: 0, show_on_pos: true, device_id: selectedDevId }),
     })
-    setNewSvcName(''); setNewSvcPrice(''); if (selectedDevId) await loadServices(selectedDevId); setSaving(false)
+    const j = await res.json()
+    if (j.data?.id) setServices(p => p.map(s => s.id === tmp.id ? { ...s, id: j.data.id } : s))
+    else setServices(p => p.filter(s => s.id !== tmp.id))
   }
 
   async function saveServiceModal(data: ServiceForm) {
     const { editing, deviceId } = svcModal
-    const url    = editing ? `/api/services/problems/${editing.id}` : '/api/services/problems'
-    const method = editing ? 'PUT' : 'POST'
-    await fetch(url, {
-      method, headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, device_id: deviceId, category_id: data.category_id || null }),
-    })
-    setSvcModal({ open: false, editing: null, deviceId: null }); if (selectedDevId) await loadServices(selectedDevId)
+    setSvcModal({ open: false, editing: null, deviceId: null })
+    if (editing) {
+      setServices(p => p.map(s => s.id === editing.id ? { ...s, ...data } : s))
+      await fetch(`/api/services/problems/${editing.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, device_id: deviceId, category_id: data.category_id || null }),
+      })
+    } else {
+      const tmp: Service = { id: `tmp-${Date.now()}`, ...data, cost: data.cost ?? 0, warranty_days: data.warranty_days ?? 0, device_id: deviceId, category_id: data.category_id || null }
+      setServices(p => [...p, tmp])
+      const res = await fetch('/api/services/problems', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, device_id: deviceId, category_id: data.category_id || null }),
+      })
+      const j = await res.json()
+      if (j.data?.id) setServices(p => p.map(s => s.id === tmp.id ? { ...s, id: j.data.id } : s))
+      else setServices(p => p.filter(s => s.id !== tmp.id))
+    }
   }
 
   async function deleteService(id: string) {
     if (!confirm('Delete this service?')) return
-    await fetch(`/api/services/problems/${id}`, { method: 'DELETE' }); if (selectedDevId) await loadServices(selectedDevId)
+    setServices(p => p.filter(s => s.id !== id))
+    fetch(`/api/services/problems/${id}`, { method: 'DELETE' })
   }
 
   function openSvcModal(editing: Service | null = null) {
@@ -495,7 +539,7 @@ export default function ServiceCataloguePage() {
                           <p className={`text-[15px] truncate font-medium ${isSelected ? 'text-purple-700' : 'text-gray-800'}`}>{dt.name}</p>
                           {!dt.show_on_pos && <p className="text-[11px] font-medium text-gray-400 mt-0.5">Hidden on POS</p>}
                         </div>
-                        <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex gap-1 shrink-0 items-center" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => { setEditingTypeId(dt.id); setEditTypeName(dt.name) }}
                             className="p-1.5 rounded text-gray-400 hover:text-purple-600 hover:bg-purple-50"
@@ -504,6 +548,7 @@ export default function ServiceCataloguePage() {
                             onClick={() => deleteType(dt.id)}
                             className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"
                           ><Trash2 className="h-3.5 w-3.5" /></button>
+                          {isSelected && <ChevronRight className="h-4 w-4 text-purple-400 ml-1" />}
                         </div>
                       </>
                     )}
@@ -562,9 +607,10 @@ export default function ServiceCataloguePage() {
                           <>
                             <span className={`flex-1 text-[15px] truncate font-medium ${isSelected ? 'text-teal-700' : 'text-gray-800'}`}>{brand.name}</span>
                             <span className="text-xs font-semibold text-gray-400 shrink-0 mr-2">{devCount}</span>
-                            <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex gap-1 shrink-0 items-center" onClick={(e) => e.stopPropagation()}>
                               <button onClick={() => { setEditingBrandId(brand.id); setEditBrandName(brand.name) }} className="p-1.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"><Pencil className="h-3.5 w-3.5" /></button>
                               <button onClick={() => deleteBrand(brand.id)} className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                              {isSelected && <ChevronRight className="h-4 w-4 text-teal-400 ml-1" />}
                             </div>
                           </>
                         )}

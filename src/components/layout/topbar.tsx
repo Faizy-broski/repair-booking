@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
-import { Bell, Menu, Search, ChevronDown, MessageSquare, ArrowRight, User, Settings, LogOut } from 'lucide-react'
+import { Bell, Menu, Search, ChevronDown, MessageSquare, ArrowRight, User, Settings, LogOut, Wrench } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 import { useMessageStore } from '@/store/message.store'
 import { useRouter } from 'next/navigation'
@@ -59,17 +59,18 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         <Menu className="h-5 w-5" />
       </button>
 
-      {/* Search */}
-      {/* <div className="flex flex-1 items-center gap-2.5 rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 transition-colors focus-within:border-primary-fixed-dim focus-within:bg-surface-container-lowest focus-within:shadow-sm max-w-sm">
-        <Search className="h-4 w-4 shrink-0 text-outline" />
-        <input
-          type="search"
-          placeholder="Search tickets, customers, products..."
-          className="flex-1 bg-transparent text-sm text-on-surface outline-none placeholder:text-outline"
-        />
-      </div> */}
+      {/* Search placeholder */}
+      <div className="flex-1" />
 
-      <div className="flex items-center gap-1.5 ml-auto">
+      <div className="flex items-center gap-2 ml-auto">
+        <Link
+          href="/repairs"
+          className="hidden items-center gap-2 rounded-lg bg-primary px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-on-primary shadow-md shadow-primary/20 transition-all hover:bg-primary-dim hover:scale-105 active:scale-95 sm:flex"
+        >
+          <Wrench className="h-4 w-4" />
+          Repairs
+        </Link>
+
         {/* ── Bell / Messages dropdown ── */}
         <div ref={bellRef} className="relative">
           <button

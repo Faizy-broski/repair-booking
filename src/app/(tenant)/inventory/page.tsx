@@ -10,7 +10,8 @@ import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
 import type { ColumnDef } from '@tanstack/react-table'
 import Link from 'next/link'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 interface ProductRow {
   id: string
@@ -59,13 +60,20 @@ export default function InventoryPage() {
   const prevBranchIdRef = useRef<string | null>(null)
   const router = useRouter()
   const pathname = usePathname()
-  const [products, setProducts] = useState<ProductRow[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(0)
+  const searchParams = useSearchParams()
+
+
+  // URL-based page state
+  const page = parseInt(searchParams.get('page') || '0', 10)
+
+  const setPage = useCallback((newPage: number) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('page', String(newPage))
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [searchParams, pathname, router])
   // Start in loading state — stays true until branchId is known and first
   // fetch completes. Prevents the DataTable from briefly rendering products
   // with on_hand=0 before the branch-aware fetch returns.
-  const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<ProductStats | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ProductRow | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -97,66 +105,53 @@ export default function InventoryPage() {
   // so the DataTable never shows the previous branch's on_hand values.
   useEffect(() => {
     if (prevBranchIdRef.current !== null && prevBranchIdRef.current !== branchId) {
-      setProducts([])
-      setTotal(0)
       setStats(null)
       setPage(0)
     }
     prevBranchIdRef.current = branchId
-  }, [branchId])
+  }, [branchId, setPage])
 
-  // Stats fetch — direct branchId dependency with cancellation flag to
-  // prevent stale responses overwriting fresh ones on rapid branch switching.
-  useEffect(() => {
-    if (!branchId) return
-    let cancelled = false
-    fetch(`/api/products/stats?branch_id=${branchId}`)
-      .then(async res => {
-        const json = await res.json()
-        if (!cancelled && res.ok) setStats(json.data ?? json)
-      })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [branchId]) // eslint-disable-line
+  const queryClient = useQueryClient()
 
-  // Keep a callable version for manual refresh (e.g. after delete)
-  const fetchStats = useCallback(async () => {
-    if (!branchId) return
-    const res = await fetch(`/api/products/stats?branch_id=${branchId}`)
-    const json = await res.json()
-    if (res.ok) setStats(json.data ?? json)
-  }, [branchId])
+  // ── Stats Query ──
+  const { data: statsData, refetch: fetchStats } = useQuery({
+    queryKey: ['inventory-stats', branchId],
+    queryFn: async () => {
+      const res = await fetch(`/api/products/stats?branch_id=${branchId}`)
+      if (!res.ok) throw new Error('Failed to fetch stats')
+      return res.json().then(j => j.data ?? j)
+    },
+    enabled: !!branchId,
+  })
 
-  const fetchProducts = useCallback(async (signal?: AbortSignal) => {
-    if (!branchId) return
-    setLoading(true)
-    const params = new URLSearchParams({ page: String(page + 1), limit: '20', branch_id: branchId })
-    if (search) params.set('search', search)
-    if (categoryFilter) params.set('category_id', categoryFilter)
-    if (brandFilter) params.set('brand_id', brandFilter)
-    if (supplierFilter) params.set('supplier_id', supplierFilter)
-    if (valuationFilter) params.set('valuation', valuationFilter)
-    if (hideOutOfStock) params.set('hide_out_of_stock', 'true')
-    if (typeFilter === 'product') params.set('item_type', 'product')
-    else if (typeFilter === 'part') params.set('item_type', 'part')
-    try {
-      const res = await fetch(`/api/products?${params}`, { signal })
-      if (signal?.aborted) return
-      const json = await res.json()
-      setProducts(json.data ?? [])
-      setTotal(json.meta?.total ?? 0)
-    } catch (err: any) {
-      if (err?.name === 'AbortError') return // ignore aborted requests
-    } finally {
-      if (!signal?.aborted) setLoading(false)
-    }
-  }, [page, search, branchId, typeFilter, categoryFilter, brandFilter, supplierFilter, valuationFilter, hideOutOfStock])
+  useEffect(() => { if (statsData) setStats(statsData) }, [statsData])
 
-  useEffect(() => {
-    const controller = new AbortController()
-    fetchProducts(controller.signal)
-    return () => controller.abort()
-  }, [fetchProducts])
+  // ── Products Query ──
+  const { data: productResponse, isLoading: productsLoading, refetch: fetchProducts } = useQuery({
+    queryKey: ['inventory', branchId, page, search, categoryFilter, brandFilter, supplierFilter, valuationFilter, hideOutOfStock, typeFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: String(page + 1), limit: '20', branch_id: branchId! })
+      if (search) params.set('search', search)
+      if (categoryFilter) params.set('category_id', categoryFilter)
+      if (brandFilter) params.set('brand_id', brandFilter)
+      if (supplierFilter) params.set('supplier_id', supplierFilter)
+      if (valuationFilter) params.set('valuation', valuationFilter)
+      if (hideOutOfStock) params.set('hide_out_of_stock', 'true')
+      if (typeFilter === 'product') params.set('item_type', 'product')
+      if (typeFilter === 'part') params.set('item_type', 'part')
+
+      const res = await fetch(`/api/products?${params}`)
+      if (!res.ok) throw new Error('Failed to fetch products')
+      return res.json()
+    },
+    enabled: !!branchId,
+  })
+
+  const products = productResponse?.data ?? []
+  const total = productResponse?.meta?.total ?? 0
+  const [loading, setLoading] = useState(false)
+  useEffect(() => { setLoading(productsLoading) }, [productsLoading])
+
 
   useEffect(() => {
     fetch('/api/categories').then(r => r.json()).then(j => setCategories(j.data ?? [])).catch(() => {})

@@ -12,6 +12,7 @@ import { getSubdomain } from '@/lib/utils'
 import { Toaster } from 'sonner'
 import type { Profile, Branch } from '@/types/database'
 import type { SubscriptionStatus } from '@/store/auth.store'
+import Providers from '@/components/providers'
 
 export default function TenantLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -24,9 +25,6 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
   }, [sidebarOpen])
 
   // Gates the protected layout render.
-  // Set to true as soon as Supabase confirms a live session (~100ms JWT check).
-  // Everything else (profile, branches, configs, subscription) loads in background
-  // and populates the persisted stores — sidebar and pages update automatically.
   const [sessionVerified, setSessionVerified] = useState(false)
 
   const {
@@ -40,39 +38,19 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
     async function loadSession() {
       const supabase = createClient()
 
-      // ── Step 1: Verify live session ──────────────────────────────────────
-      // getUser() validates the JWT against Supabase Auth.
-      // For valid, non-expired tokens this is a local decode (~0ms).
-      // For expired tokens it refreshes via the network (~200ms).
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
-        // No session — wipe auth store data and redirect.
-        // This is the Back-after-logout guard: cached page renders → useEffect
-        // fires → getUser() returns null → immediate redirect to login.
-        // We intentionally do NOT call invalidateConfigs() here so that the
-        // persisted module config cache survives for the next login — avoiding
-        // sidebar skeletons when the same user (or any user) logs in again.
         clear()
         window.location.replace('/login')
         return
       }
 
-      // ── Session confirmed ────────────────────────────────────────────────
-      // Unlock the layout immediately so the user sees the UI with whatever
-      // is already in the persisted stores (profile, branches, configs).
-      // All remaining DB queries run in the background and update stores
-      // reactively — no additional loading states are imposed.
       setSessionVerified(true)
 
-      // ── Post-upgrade: verify Stripe session and update subscription ──────
-      // When Stripe redirects back with ?upgraded=1&session_id=cs_xxx, call
-      // the verify endpoint BEFORE fetching subscription/module configs so
-      // the DB is updated first and we get the fresh plan data immediately.
       const urlParams = new URLSearchParams(window.location.search)
       if (urlParams.get('upgraded') === '1') {
         const sessionId = urlParams.get('session_id')
-        // Clean URL immediately regardless of outcome
         window.history.replaceState({}, '', window.location.pathname)
         if (sessionId) {
           try {
@@ -81,16 +59,12 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ sessionId }),
             })
-          } catch { /* non-fatal — subscription data will just come from webhook later */ }
+          } catch { }
         }
-        // Always bust the module config cache so new modules show immediately
         invalidateConfigs()
       }
 
-      // ── Step 2: Load profile (background) ───────────────────────────────
       if (cachedProfile && cachedProfile.id !== user.id) {
-        // Different user logged in on same device — wipe auth store but keep
-        // the config cache (TTL + branchId check in fetchConfigs will refresh it)
         clear()
       }
 
@@ -103,7 +77,6 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
       const profile = profileData as Profile | null
       if (!profile) return
 
-      // ── Step 3: Cross-tenant guard (defence-in-depth) ───────────────────
       const subdomain = getSubdomain(window.location.hostname)
       if (subdomain && profile.business_id) {
         const { data: subBiz, error: bizError } = await supabase
@@ -122,7 +95,6 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
 
       setProfile(profile)
 
-      // ── Step 4: Business currency (fire-and-forget) ──────────────────────
       if (profile.business_id) {
         supabase
           .from('businesses')
@@ -132,7 +104,6 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
           .then(({ data }) => { if (data?.currency) setCurrency(data.currency) })
       }
 
-      // ── Step 5: Branches ─────────────────────────────────────────────────
       if (profile.business_id) {
         const { data: branchData } = await supabase
           .from('branches')
@@ -145,17 +116,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
 
         if (branches?.length) {
           setBranches(branches)
-
-          // Read activeBranch from the live store state here (NOT from the
-          // useEffect closure). The closure is created during React's SSR
-          // hydration reconciliation pass where localStorage hasn't applied yet,
-          // so the closed-over value would be null and always fall back to
-          // branches[0] (the main branch), silently reverting the user's
-          // branch selection on every reload.
-          // Reading via getState() happens AFTER Zustand's synchronous
-          // localStorage hydration, so it correctly reflects the persisted choice.
           const persistedActiveBranch = useAuthStore.getState().activeBranch
-
           let resolvedBranch: Branch | null = null
           if (profile.branch_id) {
             resolvedBranch = branches.find((b) => b.id === profile.branch_id) ?? null
@@ -171,15 +132,12 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
             }
           }
 
-          // fetchConfigs uses TTL-based cache: if the same branch's data is
-          // fresh (< 5 min) it returns immediately without hitting the network.
           if (resolvedBranch) {
             fetchConfigs(resolvedBranch.id)
           }
         }
       }
 
-      // ── Step 6: Subscription status (fire-and-forget) ────────────────────
       if (profile.business_id) {
         supabase
           .from('subscriptions')
@@ -213,10 +171,6 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ── Session gate ─────────────────────────────────────────────────────────────
-  // A minimal spinner shown only for the duration of the JWT check (~100ms for
-  // valid sessions, ~200ms if token needs refreshing). It prevents the Back-
-  // after-logout exploit while keeping the delay imperceptible for normal use.
   if (!sessionVerified) {
     return (
       <div className="flex h-screen items-center justify-center bg-surface-container-low">
@@ -226,43 +180,36 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-surface-container-low">
-      {/* Desktop sidebar */}
-      <div className="hidden lg:flex">
-        <Sidebar collapsed={collapsed} />
-      </div>
-
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-50 flex lg:hidden">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setSidebarOpen(false)}
-          />
-          {/* Slide-in panel */}
-          <div className="relative flex-shrink-0 animate-slide-in-left">
-            <Sidebar onClose={() => setSidebarOpen(false)} />
-          </div>
+    <Providers>
+      <div className="flex h-screen overflow-hidden bg-surface-container-low">
+        <div className="hidden lg:flex">
+          <Sidebar collapsed={collapsed} />
         </div>
-      )}
 
-      {/* Main area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Topbar onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
-        </main>
+        {sidebarOpen && (
+          <div className="fixed inset-0 z-50 flex lg:hidden">
+            <div
+              className="absolute inset-0 bg-black/40"
+              onClick={() => setSidebarOpen(false)}
+            />
+            <div className="relative flex-shrink-0 animate-slide-in-left">
+              <Sidebar onClose={() => setSidebarOpen(false)} />
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <Topbar onMenuClick={() => setSidebarOpen(true)} />
+          <main className="flex-1 overflow-y-auto p-6">
+            {children}
+          </main>
+        </div>
+
+        <NotificationToasts />
+        <MessageBadge />
+        <TourGuide />
+        <Toaster richColors position="top-center" />
       </div>
-
-      {/* Global in-app toast notifications */}
-      <NotificationToasts />
-      {/* Global unread message badge tracker (invisible component) */}
-      <MessageBadge />
-      {/* Step-by-step onboarding tour for new users */}
-      <TourGuide />
-      {/* Premium Toast Notifications */}
-      <Toaster richColors position="top-center" />
-    </div>
+    </Providers>
   )
 }

@@ -13,7 +13,7 @@ import {
 import { useDroppable } from '@dnd-kit/core'
 import { useDraggable } from '@dnd-kit/core'
 import { Badge, REPAIR_STATUS_VARIANTS } from '@/components/ui/badge'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import type { Repair } from '@/types/database'
 
 interface RepairRow extends Repair {
@@ -70,6 +70,12 @@ function RepairCard({ repair, isDragOverlay = false }: { repair: RepairRow; isDr
       )}
       {repair.issue && (
         <p className="mt-1 text-xs text-gray-400 line-clamp-2">{repair.issue}</p>
+      )}
+      {(repair.custom_fields as any)?.due_date && (
+        <div className="mt-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-orange-600/80">
+          <span className="h-1 w-1 rounded-full bg-orange-500" />
+          Due: {formatDate((repair.custom_fields as any).due_date)}
+        </div>
       )}
     </div>
   )

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Modal } from '@/components/ui/modal'
 import { Select } from '@/components/ui/select'
 import { useAuthStore } from '@/store/auth.store'
-import { formatCurrency, formatDateTime } from '@/lib/utils'
+import { formatCurrency, formatDateTime, formatDate } from '@/lib/utils'
 import { RepairEmailPrompt } from '@/components/repairs/email-prompt-modal'
 import { ConditionChecklist } from '@/components/repairs/condition-checklist'
 import { LabelPicker } from '@/components/repairs/label-picker'
@@ -64,6 +64,7 @@ interface RepairDetail {
     created_at: string
     profiles: { full_name: string | null } | null
   }[]
+  custom_fields: Record<string, any> | null
 }
 
 export default function RepairDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -99,23 +100,21 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
     async function fetchRepair() {
       if (!activeBranch?.id) return
       setLoading(true)
-      const [repairRes, cannedRes, staffRes] = await Promise.all([
-        fetch(`/api/repairs/${id}`),
-        fetch('/api/canned-responses?type=note'),
-        fetch(`/api/employees?branch_id=${activeBranch.id}&limit=100`),
-      ])
-      const [repairJson, cannedJson, staffJson] = await Promise.all([
-        repairRes.json(), cannedRes.json(), staffRes.json(),
-      ])
+      // Load repair data first — show page as soon as this resolves
+      const repairRes = await fetch(`/api/repairs/${id}`)
+      const repairJson = await repairRes.json()
       setRepair(repairJson.data)
       if (repairJson.data) {
         setNewStatus(repairJson.data.status)
         setLabelIds(repairJson.data.label_ids ?? [])
         setCustomFieldValues((repairJson.data.custom_fields as Record<string, unknown>) ?? {})
       }
-      setCannedResponses(cannedJson.data ?? [])
-      setTechnicians(staffJson.data ?? [])
       setLoading(false)
+      // Load secondary data in the background (non-blocking)
+      fetch('/api/canned-responses?type=note')
+        .then(r => r.json()).then(j => setCannedResponses(j.data ?? []))
+      fetch(`/api/employees?branch_id=${activeBranch.id}&limit=100`)
+        .then(r => r.json()).then(j => setTechnicians(j.data ?? []))
     }
     fetchRepair()
   }, [id, activeBranch?.id])
@@ -226,7 +225,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
             <InfoRow label="Type" value={repair.device_type} />
             <InfoRow label="Brand" value={repair.device_brand} />
             <InfoRow label="Model" value={repair.device_model} />
-            <InfoRow label="Serial" value={repair.serial_number} />
+            <InfoRow label="Serial / IMEI" value={repair.serial_number || (repair.custom_fields?.imei as string)} />
             <InfoRow label="Issue" value={repair.issue} />
             {repair.diagnosis && <InfoRow label="Diagnosis" value={repair.diagnosis} />}
             {repair.lock_type === 'passcode' && <InfoRow label="Passcode" value={repair.passcode} />}
@@ -256,6 +255,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
             <InfoRow label="Estimated" value={repair.estimated_cost ? formatCurrency(repair.estimated_cost) : null} />
             <InfoRow label="Actual cost" value={repair.actual_cost ? formatCurrency(repair.actual_cost) : null} />
             <InfoRow label="Deposit paid" value={formatCurrency(repair.deposit_paid)} />
+            <InfoRow label="Due Date" value={repair.custom_fields?.due_date ? formatDate(repair.custom_fields.due_date) : null} />
             <div className="flex items-center justify-between py-0.5">
               <span className="text-gray-500">Assigned Technician</span>
               <div className="flex items-center gap-2">
@@ -277,6 +277,27 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
             </div>
           </CardContent>
         </Card>
+
+        {/* Notes */}
+        {(repair.custom_fields?.customer_note || repair.custom_fields?.staff_note) && (
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Notes</CardTitle></CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              {repair.custom_fields?.customer_note && (
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Customer Note (Public)</label>
+                  <p className="mt-1 rounded-lg border border-blue-100 bg-blue-50/50 p-2 text-gray-900">{repair.custom_fields.customer_note}</p>
+                </div>
+              )}
+              {repair.custom_fields?.staff_note && (
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Staff Note (Internal)</label>
+                  <p className="mt-1 rounded-lg border border-amber-100 bg-amber-50/50 p-2 text-gray-900">{repair.custom_fields.staff_note}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Custom Fields */}
