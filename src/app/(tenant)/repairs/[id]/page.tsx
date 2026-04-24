@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Edit, Clock, ClipboardList, Receipt, BookOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -71,6 +72,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
   const { id } = use(params)
   const router = useRouter()
   const { activeBranch } = useAuthStore()
+  const queryClient = useQueryClient()
   const [repair, setRepair] = useState<RepairDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [statusModalOpen, setStatusModalOpen] = useState(false)
@@ -157,11 +159,12 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
     if (res.ok) {
       setStatusModalOpen(false)
       setStatusNote('')
-      // Reload repair
       const updated = await fetch(`/api/repairs/${id}`)
       const json = await updated.json()
       setRepair(json.data)
-      // Show email prompt if customer has email and notifications enabled
+      if (json.data?.status) setNewStatus(json.data.status)
+      // Sync the repairs list so status reflects immediately when navigating back
+      queryClient.invalidateQueries({ queryKey: ['repairs'] })
       if (repair.notify_customer && repair.customers?.email) {
         setEmailPrompt({ repairId: id, jobNumber: repair.job_number })
       }
@@ -172,7 +175,28 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
   if (loading) {
     return (
       <div className="space-y-4">
-        {[1, 2, 3].map((i) => <div key={i} className="h-32 animate-pulse rounded-xl bg-gray-100" />)}
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 animate-pulse rounded-lg bg-gray-100" />
+          <div className="flex-1 space-y-1.5">
+            <div className="h-5 w-40 animate-pulse rounded bg-gray-200" />
+            <div className="h-3.5 w-28 animate-pulse rounded bg-gray-100" />
+          </div>
+          <div className="h-7 w-24 animate-pulse rounded-full bg-gray-200" />
+          <div className="h-9 w-32 animate-pulse rounded-lg bg-gray-100" />
+        </div>
+        <div className="flex items-center justify-center py-8">
+          <div className="flex items-center gap-3 text-gray-400">
+            <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <span className="text-sm">Loading repair details…</span>
+          </div>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {[1, 2].map((i) => <div key={i} className="h-48 animate-pulse rounded-xl bg-gray-100" />)}
+        </div>
+        <div className="h-32 animate-pulse rounded-xl bg-gray-100" />
       </div>
     )
   }

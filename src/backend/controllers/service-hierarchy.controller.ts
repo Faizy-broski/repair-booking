@@ -8,6 +8,7 @@ import {
 } from '@/backend/services/service-hierarchy.service'
 import { ok, created, notFound, serverError } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
+import { getPagination } from '@/backend/utils/pagination'
 import { z } from 'zod'
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
@@ -107,10 +108,12 @@ export const ServiceCategoryController = {
 
 export const ServiceManufacturerController = {
   async list(req: NextRequest, ctx: RequestContext) {
-    const categoryId = req.nextUrl.searchParams.get('category_id') ?? undefined
+    const { searchParams } = req.nextUrl
+    const categoryId = searchParams.get('category_id') ?? undefined
+    const { page, limit, from: _f, to: _t } = getPagination(searchParams)
     try {
-      const data = await ServiceManufacturerService.list(ctx.businessId, categoryId)
-      return ok(data)
+      const result = await ServiceManufacturerService.list(ctx.businessId, categoryId, { page, limit })
+      return ok(result.data, { page, limit, total: result.total })
     } catch (err) {
       return serverError('Failed to fetch manufacturers', err)
     }
@@ -154,13 +157,14 @@ export const ServiceManufacturerController = {
 export const ServiceDeviceController = {
   async list(req: NextRequest, ctx: RequestContext) {
     const { searchParams } = req.nextUrl
+    const { page, limit } = getPagination(searchParams)
     try {
-      const data = await ServiceDeviceService.list(ctx.businessId, {
+      const result = await ServiceDeviceService.list(ctx.businessId, {
         manufacturerId: searchParams.get('manufacturer_id') ?? undefined,
         brandId:        searchParams.get('brand_id')        ?? undefined,
         categoryId:     searchParams.get('category_id')     ?? undefined,
-      })
-      return ok(data)
+      }, { page, limit })
+      return ok(result.data, { page, limit, total: result.total })
     } catch (err) {
       return serverError('Failed to fetch devices', err)
     }
@@ -170,7 +174,7 @@ export const ServiceDeviceController = {
     const { data, error } = await validateBody(req, deviceSchema)
     if (error) return error
     try {
-      const row = await ServiceDeviceService.create({ ...data, business_id: ctx.businessId })
+      const row = await ServiceDeviceService.create({ ...data, business_id: ctx.businessId } as any)
       return created(row)
     } catch (err) {
       return serverError('Failed to create device', err)
@@ -204,12 +208,13 @@ export const ServiceDeviceController = {
 export const ServiceProblemController = {
   async list(req: NextRequest, ctx: RequestContext) {
     const { searchParams } = req.nextUrl
+    const { page, limit } = getPagination(searchParams)
     try {
-      const data = await ServiceProblemService.list(ctx.businessId, {
+      const result = await ServiceProblemService.list(ctx.businessId, {
         deviceId:   searchParams.get('device_id')   ?? undefined,
         categoryId: searchParams.get('category_id') ?? undefined,
-      })
-      return ok(data)
+      }, { page, limit })
+      return ok(result.data, { page, limit, total: result.total })
     } catch (err) {
       return serverError('Failed to fetch service problems', err)
     }

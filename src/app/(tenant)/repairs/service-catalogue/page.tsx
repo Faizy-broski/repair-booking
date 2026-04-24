@@ -1,9 +1,11 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Plus, Pencil, Trash2, Check, X, ChevronRight,
-  Wrench, Cpu, Tag, Layers, Info,
+  Wrench, Cpu, Tag, Layers, Info, Loader2,
 } from 'lucide-react'
+
+const PAGE_SIZE = 50
 import { Modal } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -45,9 +47,9 @@ type TypeForm = z.infer<typeof typeSchema>
 // ── Reusable column header ──────────────────────────────────────────────────
 
 function ColHeader({
-  icon: Icon, iconColor, label, count,
+  icon: Icon, iconColor, label, count, loading,
 }: {
-  icon: React.ElementType; iconColor: string; label: string; count: number | null
+  icon: React.ElementType; iconColor: string; label: string; count: number | null; loading?: boolean
 }) {
   return (
     <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200 shrink-0">
@@ -55,12 +57,44 @@ function ColHeader({
         <Icon className={`h-3.5 w-3.5 ${iconColor}`} />
         <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">{label}</span>
       </div>
-      {count !== null && (
-        <span className="text-[11px] text-gray-400 bg-gray-100 rounded-full px-1.5 py-px font-medium">
-          {count}
-        </span>
-      )}
+      <div className="flex items-center gap-2">
+        {loading && <Loader2 className="h-3 w-3 animate-spin text-gray-400" />}
+        {count !== null && (
+          <span className="text-[11px] text-gray-400 bg-gray-100 rounded-full px-1.5 py-px font-medium">
+            {count}
+          </span>
+        )}
+      </div>
     </div>
+  )
+}
+
+// ── Column loading spinner ────────────────────────────────────────────────
+function ColSpinner() {
+  return (
+    <div className="flex items-center justify-center py-10">
+      <Loader2 className="h-5 w-5 animate-spin text-gray-300" />
+    </div>
+  )
+}
+
+// ── Paginated load-more button ────────────────────────────────────────────
+function LoadMoreBtn({ onClick, loading, shown, total }: {
+  onClick: () => void; loading: boolean; shown: number; total: number
+}) {
+  if (shown >= total) return null
+  return (
+    <button
+      onClick={onClick}
+      disabled={loading}
+      className="w-full py-2.5 text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-1.5 border-t border-gray-100 shrink-0 transition-colors disabled:opacity-60"
+    >
+      {loading
+        ? <Loader2 className="h-3 w-3 animate-spin" />
+        : <ChevronRight className="h-3 w-3 rotate-90" />
+      }
+      {loading ? 'Loading…' : `Load more (${total - shown} remaining)`}
+    </button>
   )
 }
 
@@ -123,6 +157,25 @@ export default function ServiceCataloguePage() {
   const [selectedDevId,   setSelectedDevId]   = useState<string | null>(null)
   const [mobileStep, setMobileStep]           = useState<0 | 1 | 2 | 3>(0)
 
+  // ── Loading states ───────────────────────────────────────────────────
+  const [loadingTypes,    setLoadingTypes]    = useState(false)
+  const [loadingBrands,   setLoadingBrands]   = useState(false)
+  const [loadingDevices,  setLoadingDevices]  = useState(false)
+  const [loadingServices, setLoadingServices] = useState(false)
+
+  // ── Pagination state ─────────────────────────────────────────────────
+  const [brandsPage,    setBrandsPage]    = useState(1)
+  const [devicesPage,   setDevicesPage]   = useState(1)
+  const [servicesPage,  setServicesPage]  = useState(1)
+  const [brandsTotal,   setBrandsTotal]   = useState(0)
+  const [devicesTotal,  setDevicesTotal]  = useState(0)
+  const [servicesTotal, setServicesTotal] = useState(0)
+
+  // ── AbortController refs (cancel stale in-flight requests) ───────────────────
+  const brandsAbortRef   = useRef<AbortController | null>(null)
+  const devicesAbortRef  = useRef<AbortController | null>(null)
+  const servicesAbortRef = useRef<AbortController | null>(null)
+
   // inline add
   const [newTypeName,  setNewTypeName]  = useState('')
   const [newTypeSlug,  setNewTypeSlug]  = useState('')
@@ -146,32 +199,73 @@ export default function ServiceCataloguePage() {
   const svcForm  = useForm<ServiceForm>({ resolver: zodResolver(serviceSchema) })
   const typeForm = useForm<TypeForm>({ resolver: zodResolver(typeSchema) })
 
-  // ── Data loading ────────────────────────────────────────────────────────
-
-  // ── Data loading ────────────────────────────────────────────────────────
+  // ── Data loading ───────────────────────────────────────────────────
 
   const loadCategories = useCallback(async () => {
-    const res = await fetch('/api/services/categories')
-    const j = await res.json()
-    setDeviceTypes(j.data ?? [])
+    setLoadingTypes(true)
+    try {
+      const res = await fetch('/api/services/categories')
+      const j   = await res.json()
+      setDeviceTypes(j.data ?? [])
+    } catch (e) { console.error(e) }
+    finally { setLoadingTypes(false) }
   }, [])
 
-  const loadBrands = useCallback(async (catId: string) => {
-    const res = await fetch(`/api/services/manufacturers?category_id=${catId}`)
-    const j = await res.json()
-    setBrands(j.data ?? [])
+  const loadBrands = useCallback(async (catId: string, page = 1, append = false) => {
+    brandsAbortRef.current?.abort()
+    const ctrl = new AbortController()
+    brandsAbortRef.current = ctrl
+    setLoadingBrands(true)
+    if (!append) setBrands([])
+    try {
+      const res = await fetch(
+        `/api/services/manufacturers?category_id=${catId}&page=${page}&limit=${PAGE_SIZE}`,
+        { signal: ctrl.signal },
+      )
+      const j = await res.json()
+      setBrands(prev => append ? [...prev, ...(j.data ?? [])] : (j.data ?? []))
+      setBrandsTotal(j.meta?.total ?? 0)
+      setBrandsPage(page)
+    } catch (e: any) { if (e.name !== 'AbortError') console.error(e) }
+    finally { setLoadingBrands(false) }
   }, [])
 
-  const loadDevices = useCallback(async (catId: string, brandId: string) => {
-    const res = await fetch(`/api/services/devices?category_id=${catId}&manufacturer_id=${brandId}`)
-    const j = await res.json()
-    setDevices(j.data ?? [])
+  const loadDevices = useCallback(async (catId: string, brandId: string, page = 1, append = false) => {
+    devicesAbortRef.current?.abort()
+    const ctrl = new AbortController()
+    devicesAbortRef.current = ctrl
+    setLoadingDevices(true)
+    if (!append) setDevices([])
+    try {
+      const res = await fetch(
+        `/api/services/devices?category_id=${catId}&manufacturer_id=${brandId}&page=${page}&limit=${PAGE_SIZE}`,
+        { signal: ctrl.signal },
+      )
+      const j = await res.json()
+      setDevices(prev => append ? [...prev, ...(j.data ?? [])] : (j.data ?? []))
+      setDevicesTotal(j.meta?.total ?? 0)
+      setDevicesPage(page)
+    } catch (e: any) { if (e.name !== 'AbortError') console.error(e) }
+    finally { setLoadingDevices(false) }
   }, [])
 
-  const loadServices = useCallback(async (devId: string) => {
-    const res = await fetch(`/api/services/problems?device_id=${devId}`)
-    const j = await res.json()
-    setServices(j.data ?? [])
+  const loadServices = useCallback(async (devId: string, page = 1, append = false) => {
+    servicesAbortRef.current?.abort()
+    const ctrl = new AbortController()
+    servicesAbortRef.current = ctrl
+    setLoadingServices(true)
+    if (!append) setServices([])
+    try {
+      const res = await fetch(
+        `/api/services/problems?device_id=${devId}&page=${page}&limit=${PAGE_SIZE}`,
+        { signal: ctrl.signal },
+      )
+      const j = await res.json()
+      setServices(prev => append ? [...prev, ...(j.data ?? [])] : (j.data ?? []))
+      setServicesTotal(j.meta?.total ?? 0)
+      setServicesPage(page)
+    } catch (e: any) { if (e.name !== 'AbortError') console.error(e) }
+    finally { setLoadingServices(false) }
   }, [])
 
   // Initial load
@@ -179,20 +273,32 @@ export default function ServiceCataloguePage() {
     loadCategories()
   }, [loadCategories])
 
-  // Cascade loading
+  // Cascade loading — reset pagination on each new selection
   useEffect(() => {
-    if (selectedTypeId) loadBrands(selectedTypeId)
-    else setBrands([])
+    if (selectedTypeId) {
+      setBrandsPage(1); setBrandsTotal(0)
+      loadBrands(selectedTypeId, 1, false)
+    } else {
+      setBrands([]); setBrandsTotal(0)
+    }
   }, [selectedTypeId, loadBrands])
 
   useEffect(() => {
-    if (selectedTypeId && selectedBrandId) loadDevices(selectedTypeId, selectedBrandId)
-    else setDevices([])
+    if (selectedTypeId && selectedBrandId) {
+      setDevicesPage(1); setDevicesTotal(0)
+      loadDevices(selectedTypeId, selectedBrandId, 1, false)
+    } else {
+      setDevices([]); setDevicesTotal(0)
+    }
   }, [selectedTypeId, selectedBrandId, loadDevices])
 
   useEffect(() => {
-    if (selectedDevId) loadServices(selectedDevId)
-    else setServices([])
+    if (selectedDevId) {
+      setServicesPage(1); setServicesTotal(0)
+      loadServices(selectedDevId, 1, false)
+    } else {
+      setServices([]); setServicesTotal(0)
+    }
   }, [selectedDevId, loadServices])
 
   // ── Device Types ────────────────────────────────────────────────────────
@@ -377,13 +483,9 @@ export default function ServiceCataloguePage() {
   }
 
   // ── Derived ──────────────────────────────────────────────────────────────
-  
-  const displayBrands   = brands
-  const filteredDevices = devices
-  const filteredServices = services
 
-  const selectedType  = deviceTypes.find(t => t.id === selectedTypeId)
-  const selectedBrand = brands.find(b => b.id === selectedBrandId)
+  const selectedType   = deviceTypes.find(t => t.id === selectedTypeId)
+  const selectedBrand  = brands.find(b => b.id === selectedBrandId)
   const selectedDevice = devices.find(d => d.id === selectedDevId)
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -462,7 +564,7 @@ export default function ServiceCataloguePage() {
 
           {/* ── Col 1: Device Types ── */}
           <div className={`flex flex-col border-b lg:border-b-0 border-gray-200 ${mobileStep !== 0 ? 'hidden lg:flex' : 'flex'}`}>
-            <ColHeader icon={Tag} iconColor="text-purple-500" label="Device Types" count={deviceTypes.length} />
+            <ColHeader icon={Tag} iconColor="text-purple-500" label="Device Types" count={deviceTypes.length} loading={loadingTypes} />
 
             {/* Quick add */}
             <div className="px-3 py-2 border-b border-gray-100 shrink-0">
@@ -560,7 +662,7 @@ export default function ServiceCataloguePage() {
 
           {/* ── Col 2: Brands (was Manufacturers) ── */}
           <div className={`flex flex-col border-b lg:border-b-0 border-gray-200 ${mobileStep !== 1 ? 'hidden lg:flex' : 'flex'}`}>
-            <ColHeader icon={Layers} iconColor="text-brand-teal" label="Brands" count={selectedTypeId ? displayBrands.length : null} />
+            <ColHeader icon={Layers} iconColor="text-brand-teal" label="Brands" count={selectedTypeId ? brandsTotal : null} loading={loadingBrands} />
 
             {!selectedTypeId ? (
               <EmptyPrompt icon={Layers} text="Select a device type first" />
@@ -574,57 +676,65 @@ export default function ServiceCataloguePage() {
                   disabled={saving}
                 />
                 <div className="flex-1 overflow-y-auto">
-                  {displayBrands.length === 0 && <p className="text-xs text-gray-400 text-center py-10">No brands yet</p>}
-                  {displayBrands.map(brand => {
-                    const isSelected = selectedBrandId === brand.id
-                    const isEditing  = editingBrandId === brand.id
-                    const devCount   = devices.filter(d => d.manufacturer_id === brand.id && (selectedTypeId ? d.category_id === selectedTypeId : true)).length
-                    return (
-                      <div
-                        key={brand.id}
-                        onClick={() => { if (!isEditing) { setSelectedBrandId(brand.id); setSelectedDevId(null); setMobileStep(2) } }}
-                        className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer border-b border-gray-50 last:border-b-0 transition-colors
-                          ${isSelected ? 'bg-teal-50 border-l-[3px] border-l-brand-teal' : 'hover:bg-gray-50 border-l-[3px] border-l-transparent'}`}
-                      >
-                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border ${isSelected ? 'bg-teal-100 border-teal-200' : 'bg-gray-50 border-gray-200'}`}>
-                          <Layers className={`h-4 w-4 shrink-0 ${isSelected ? 'text-brand-teal' : 'text-gray-400'}`} />
-                        </div>
-                        {isEditing ? (
-                          <>
-                            <input
-                              autoFocus value={editBrandName}
-                              onChange={(e) => setEditBrandName(e.target.value)}
-                              onKeyDown={(e) => { if (e.key === 'Enter') renameBrand(brand.id); if (e.key === 'Escape') setEditingBrandId(null) }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="flex-1 h-7 min-w-0 rounded border border-brand-teal px-2 text-sm focus:outline-none"
-                            />
-                            <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <button onClick={() => renameBrand(brand.id)} className="p-1 rounded text-green-600 hover:bg-green-50"><Check className="h-3.5 w-3.5" /></button>
-                              <button onClick={() => setEditingBrandId(null)} className="p-1 rounded text-gray-400 hover:bg-gray-100"><X className="h-3.5 w-3.5" /></button>
+                  {loadingBrands && brands.length === 0
+                    ? <ColSpinner />
+                    : brands.length === 0
+                      ? <p className="text-xs text-gray-400 text-center py-10">No brands yet</p>
+                      : brands.map((brand: Brand) => {
+                          const isSelected = selectedBrandId === brand.id
+                          const isEditing  = editingBrandId === brand.id
+                          return (
+                            <div
+                              key={brand.id}
+                              onClick={() => { if (!isEditing) { setSelectedBrandId(brand.id); setSelectedDevId(null); setMobileStep(2) } }}
+                              className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer border-b border-gray-50 last:border-b-0 transition-colors
+                                ${isSelected ? 'bg-teal-50 border-l-[3px] border-l-brand-teal' : 'hover:bg-gray-50 border-l-[3px] border-l-transparent'}`}
+                            >
+                              <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border ${isSelected ? 'bg-teal-100 border-teal-200' : 'bg-gray-50 border-gray-200'}`}>
+                                <Layers className={`h-4 w-4 shrink-0 ${isSelected ? 'text-brand-teal' : 'text-gray-400'}`} />
+                              </div>
+                              {isEditing ? (
+                                <>
+                                  <input
+                                    autoFocus value={editBrandName}
+                                    onChange={(e) => setEditBrandName(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') renameBrand(brand.id); if (e.key === 'Escape') setEditingBrandId(null) }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="flex-1 h-7 min-w-0 rounded border border-brand-teal px-2 text-sm focus:outline-none"
+                                  />
+                                  <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                    <button onClick={() => renameBrand(brand.id)} className="p-1 rounded text-green-600 hover:bg-green-50"><Check className="h-3.5 w-3.5" /></button>
+                                    <button onClick={() => setEditingBrandId(null)} className="p-1 rounded text-gray-400 hover:bg-gray-100"><X className="h-3.5 w-3.5" /></button>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <span className={`flex-1 text-[15px] truncate font-medium ${isSelected ? 'text-teal-700' : 'text-gray-800'}`}>{brand.name}</span>
+                                  <div className="flex gap-1 shrink-0 items-center" onClick={(e) => e.stopPropagation()}>
+                                    <button onClick={() => { setEditingBrandId(brand.id); setEditBrandName(brand.name) }} className="p-1.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"><Pencil className="h-3.5 w-3.5" /></button>
+                                    <button onClick={() => deleteBrand(brand.id)} className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                                    {isSelected && <ChevronRight className="h-4 w-4 text-teal-400 ml-1" />}
+                                  </div>
+                                </>
+                              )}
                             </div>
-                          </>
-                        ) : (
-                          <>
-                            <span className={`flex-1 text-[15px] truncate font-medium ${isSelected ? 'text-teal-700' : 'text-gray-800'}`}>{brand.name}</span>
-                            <span className="text-xs font-semibold text-gray-400 shrink-0 mr-2">{devCount}</span>
-                            <div className="flex gap-1 shrink-0 items-center" onClick={(e) => e.stopPropagation()}>
-                              <button onClick={() => { setEditingBrandId(brand.id); setEditBrandName(brand.name) }} className="p-1.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"><Pencil className="h-3.5 w-3.5" /></button>
-                              <button onClick={() => deleteBrand(brand.id)} className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
-                              {isSelected && <ChevronRight className="h-4 w-4 text-teal-400 ml-1" />}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )
-                  })}
+                          )
+                        })
+                  }
                 </div>
+                <LoadMoreBtn
+                  onClick={() => selectedTypeId && loadBrands(selectedTypeId, brandsPage + 1, true)}
+                  loading={loadingBrands}
+                  shown={brands.length}
+                  total={brandsTotal}
+                />
               </>
             )}
           </div>
 
           {/* ── Col 3: Devices ── */}
           <div className={`flex flex-col border-b lg:border-b-0 border-gray-200 ${mobileStep !== 2 ? 'hidden lg:flex' : 'flex'}`}>
-            <ColHeader icon={Cpu} iconColor="text-blue-500" label="Devices" count={selectedBrandId ? filteredDevices.length : null} />
+            <ColHeader icon={Cpu} iconColor="text-blue-500" label="Devices" count={selectedBrandId ? devicesTotal : null} loading={loadingDevices} />
 
             {!selectedBrandId ? (
               <EmptyPrompt icon={Cpu} text="Select a brand first" />
@@ -638,49 +748,57 @@ export default function ServiceCataloguePage() {
                   disabled={saving}
                 />
                 <div className="flex-1 overflow-y-auto">
-                  {filteredDevices.length === 0 && <p className="text-xs text-gray-400 text-center py-10">No devices yet</p>}
-                  {filteredDevices.map(dev => {
-                    const isSelected = selectedDevId === dev.id
-                    const isEditing  = editingDevId === dev.id
-                    const svcCount   = services.filter(s => s.device_id === dev.id).length
-                    return (
-                      <div
-                        key={dev.id}
-                        onClick={() => { if (!isEditing) { setSelectedDevId(dev.id); setMobileStep(3) } }}
-                        className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer border-b border-gray-50 last:border-b-0 transition-colors
-                          ${isSelected ? 'bg-blue-50 border-l-[3px] border-l-blue-500' : 'hover:bg-gray-50 border-l-[3px] border-l-transparent'}`}
-                      >
-                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border ${isSelected ? 'bg-blue-100 border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
-                          <Cpu className={`h-4 w-4 shrink-0 ${isSelected ? 'text-blue-600' : 'text-gray-400'}`} />
-                        </div>
-                        {isEditing ? (
-                          <>
-                            <input
-                              autoFocus value={editDevName}
-                              onChange={(e) => setEditDevName(e.target.value)}
-                              onKeyDown={(e) => { if (e.key === 'Enter') renameDevice(dev.id); if (e.key === 'Escape') setEditingDevId(null) }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="flex-1 h-7 min-w-0 rounded border border-blue-400 px-2 text-sm focus:outline-none"
-                            />
-                            <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <button onClick={() => renameDevice(dev.id)} className="p-1 rounded text-green-600 hover:bg-green-50"><Check className="h-3.5 w-3.5" /></button>
-                              <button onClick={() => setEditingDevId(null)} className="p-1 rounded text-gray-400 hover:bg-gray-100"><X className="h-3.5 w-3.5" /></button>
+                  {loadingDevices && devices.length === 0
+                    ? <ColSpinner />
+                    : devices.length === 0
+                      ? <p className="text-xs text-gray-400 text-center py-10">No devices yet</p>
+                      : devices.map((dev: Device) => {
+                          const isSelected = selectedDevId === dev.id
+                          const isEditing  = editingDevId === dev.id
+                          return (
+                            <div
+                              key={dev.id}
+                              onClick={() => { if (!isEditing) { setSelectedDevId(dev.id); setMobileStep(3) } }}
+                              className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer border-b border-gray-50 last:border-b-0 transition-colors
+                                ${isSelected ? 'bg-blue-50 border-l-[3px] border-l-blue-500' : 'hover:bg-gray-50 border-l-[3px] border-l-transparent'}`}
+                            >
+                              <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border ${isSelected ? 'bg-blue-100 border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
+                                <Cpu className={`h-4 w-4 shrink-0 ${isSelected ? 'text-blue-600' : 'text-gray-400'}`} />
+                              </div>
+                              {isEditing ? (
+                                <>
+                                  <input
+                                    autoFocus value={editDevName}
+                                    onChange={(e) => setEditDevName(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') renameDevice(dev.id); if (e.key === 'Escape') setEditingDevId(null) }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="flex-1 h-7 min-w-0 rounded border border-blue-400 px-2 text-sm focus:outline-none"
+                                  />
+                                  <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                    <button onClick={() => renameDevice(dev.id)} className="p-1 rounded text-green-600 hover:bg-green-50"><Check className="h-3.5 w-3.5" /></button>
+                                    <button onClick={() => setEditingDevId(null)} className="p-1 rounded text-gray-400 hover:bg-gray-100"><X className="h-3.5 w-3.5" /></button>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <span className={`flex-1 text-[15px] truncate font-medium ${isSelected ? 'text-blue-700' : 'text-gray-800'}`}>{dev.name}</span>
+                                  <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                    <button onClick={() => { setEditingDevId(dev.id); setEditDevName(dev.name) }} className="p-1.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"><Pencil className="h-3.5 w-3.5" /></button>
+                                    <button onClick={() => deleteDevice(dev.id)} className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                                  </div>
+                                </>
+                              )}
                             </div>
-                          </>
-                        ) : (
-                          <>
-                            <span className={`flex-1 text-[15px] truncate font-medium ${isSelected ? 'text-blue-700' : 'text-gray-800'}`}>{dev.name}</span>
-                            <span className="text-xs font-semibold text-gray-400 shrink-0 mr-2">{svcCount} svc</span>
-                            <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <button onClick={() => { setEditingDevId(dev.id); setEditDevName(dev.name) }} className="p-1.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"><Pencil className="h-3.5 w-3.5" /></button>
-                              <button onClick={() => deleteDevice(dev.id)} className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )
-                  })}
+                          )
+                        })
+                  }
                 </div>
+                <LoadMoreBtn
+                  onClick={() => selectedTypeId && selectedBrandId && loadDevices(selectedTypeId, selectedBrandId, devicesPage + 1, true)}
+                  loading={loadingDevices}
+                  shown={devices.length}
+                  total={devicesTotal}
+                />
                 {/* Context footer */}
                 <div className="px-4 py-2 border-t border-gray-100 bg-gray-50/60 shrink-0">
                   <p className="text-[11px] text-gray-400 truncate">
@@ -698,7 +816,8 @@ export default function ServiceCataloguePage() {
               icon={Wrench}
               iconColor="text-orange-400"
               label="Services"
-              count={selectedDevId ? filteredServices.length : null}
+              count={selectedDevId ? servicesTotal : null}
+              loading={loadingServices}
             />
 
             {!selectedDevId ? (
@@ -735,35 +854,43 @@ export default function ServiceCataloguePage() {
                   </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
-                  {filteredServices.length === 0 && (
-                    <p className="text-xs text-gray-400 text-center py-10">No services yet</p>
-                  )}
-                  {filteredServices.map(svc => (
-                    <div key={svc.id} className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-50 last:border-b-0 hover:bg-orange-50/30 transition-colors group">
-                      <div className="h-8 w-8 rounded-lg bg-orange-50 flex items-center justify-center shrink-0 border border-orange-100">
-                        <Wrench className="h-4 w-4 text-orange-500 shrink-0" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[15px] truncate font-medium text-gray-800">{svc.name}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          {svc.warranty_days > 0 && (
-                            <p className="text-[11px] font-medium text-gray-400">{svc.warranty_days}d warranty</p>
-                          )}
-                          {svc.category_id && (
-                            <p className="text-[11px] font-medium text-purple-500">
-                              {deviceTypes.find(t => t.id === svc.category_id)?.name}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <span className="text-[15px] font-semibold text-gray-700 shrink-0">{formatCurrency(svc.price)}</span>
-                      <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
-                        <button onClick={() => openSvcModal(svc)} className="p-1.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"><Pencil className="h-3.5 w-3.5" /></button>
-                        <button onClick={() => deleteService(svc.id)} className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
-                      </div>
-                    </div>
-                  ))}
+                  {loadingServices && services.length === 0
+                    ? <ColSpinner />
+                    : services.length === 0
+                      ? <p className="text-xs text-gray-400 text-center py-10">No services yet</p>
+                      : services.map((svc: Service) => (
+                          <div key={svc.id} className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-50 last:border-b-0 hover:bg-orange-50/30 transition-colors group">
+                            <div className="h-8 w-8 rounded-lg bg-orange-50 flex items-center justify-center shrink-0 border border-orange-100">
+                              <Wrench className="h-4 w-4 text-orange-500 shrink-0" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[15px] truncate font-medium text-gray-800">{svc.name}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                {svc.warranty_days > 0 && (
+                                  <p className="text-[11px] font-medium text-gray-400">{svc.warranty_days}d warranty</p>
+                                )}
+                                {svc.category_id && (
+                                  <p className="text-[11px] font-medium text-purple-500">
+                                    {deviceTypes.find(t => t.id === svc.category_id)?.name}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <span className="text-[15px] font-semibold text-gray-700 shrink-0">{formatCurrency(svc.price)}</span>
+                            <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                              <button onClick={() => openSvcModal(svc)} className="p-1.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"><Pencil className="h-3.5 w-3.5" /></button>
+                              <button onClick={() => deleteService(svc.id)} className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                            </div>
+                          </div>
+                        ))
+                  }
                 </div>
+                <LoadMoreBtn
+                  onClick={() => selectedDevId && loadServices(selectedDevId, servicesPage + 1, true)}
+                  loading={loadingServices}
+                  shown={services.length}
+                  total={servicesTotal}
+                />
                 {/* Breadcrumb context */}
                 <div className="px-4 py-2 border-t border-gray-100 bg-gray-50/60 shrink-0">
                   <p className="text-[11px] text-gray-400 truncate flex items-center gap-1">

@@ -3,6 +3,8 @@ import type { InsertTables, UpdateTables } from '@/types/database'
 
 const db = (table: string): any => (adminSupabase as any).from(table)
 
+const PAGE_SIZE = 50 // default page size for paginated catalogue endpoints
+
 // ── Categories ──────────────────────────────────────────────────────────────
 
 export const ServiceCategoryService = {
@@ -49,18 +51,24 @@ export const ServiceCategoryService = {
 // ── Manufacturers ────────────────────────────────────────────────────────────
 
 export const ServiceManufacturerService = {
-  async list(businessId: string, categoryId?: string) {
-    let q = adminSupabase
+  async list(businessId: string, categoryId?: string, opts?: { page?: number; limit?: number }) {
+    const page  = Math.max(1, opts?.page  ?? 1)
+    const limit = Math.min(100, opts?.limit ?? PAGE_SIZE)
+    const from  = (page - 1) * limit
+    const to    = from + limit - 1
+
+    let q = (adminSupabase as any)
       .from('service_manufacturers')
-      .select('*')
+      .select('id, name, category_id', { count: 'exact' })
       .eq('business_id', businessId)
       .order('name', { ascending: true })
+      .range(from, to)
 
     if (categoryId) q = q.eq('category_id', categoryId)
 
-    const { data, error } = await q
+    const { data, count, error } = await q
     if (error) throw error
-    return data
+    return { data: data ?? [], total: count ?? 0 }
   },
 
   async create(payload: InsertTables<'service_manufacturers'>) {
@@ -96,20 +104,30 @@ export const ServiceManufacturerService = {
 // ── Devices ──────────────────────────────────────────────────────────────────
 
 export const ServiceDeviceService = {
-  async list(businessId: string, params: { manufacturerId?: string; brandId?: string; categoryId?: string }) {
-    let q = adminSupabase
+  async list(
+    businessId: string,
+    params: { manufacturerId?: string; brandId?: string; categoryId?: string },
+    opts?: { page?: number; limit?: number },
+  ) {
+    const page  = Math.max(1, opts?.page  ?? 1)
+    const limit = Math.min(100, opts?.limit ?? PAGE_SIZE)
+    const from  = (page - 1) * limit
+    const to    = from + limit - 1
+
+    let q = (adminSupabase as any)
       .from('service_devices')
-      .select('*, service_manufacturers(name)')
+      .select('id, name, manufacturer_id, category_id', { count: 'exact' })
       .eq('business_id', businessId)
       .order('name', { ascending: true })
+      .range(from, to)
 
     if (params.manufacturerId) q = q.eq('manufacturer_id', params.manufacturerId)
     if (params.brandId)        q = q.eq('brand_id', params.brandId)
     if (params.categoryId)     q = q.eq('category_id', params.categoryId)
 
-    const { data, error } = await q
+    const { data, count, error } = await q
     if (error) throw error
-    return data
+    return { data: data ?? [], total: count ?? 0 }
   },
 
   async create(payload: InsertTables<'service_devices'>) {
@@ -145,19 +163,29 @@ export const ServiceDeviceService = {
 // ── Problems / Services ──────────────────────────────────────────────────────
 
 export const ServiceProblemService = {
-  async list(businessId: string, params: { deviceId?: string; categoryId?: string }) {
-    let q = adminSupabase
+  async list(
+    businessId: string,
+    params: { deviceId?: string; categoryId?: string },
+    opts?: { page?: number; limit?: number },
+  ) {
+    const page  = Math.max(1, opts?.page  ?? 1)
+    const limit = Math.min(100, opts?.limit ?? PAGE_SIZE)
+    const from  = (page - 1) * limit
+    const to    = from + limit - 1
+
+    let q = (adminSupabase as any)
       .from('service_problems')
-      .select('*, service_devices(name, service_manufacturers(name)), service_categories(name)')
+      .select('id, name, price, cost, warranty_days, show_on_pos, device_id, category_id', { count: 'exact' })
       .eq('business_id', businessId)
       .order('name', { ascending: true })
+      .range(from, to)
 
     if (params.deviceId)   q = q.eq('device_id', params.deviceId)
     if (params.categoryId) q = q.eq('category_id', params.categoryId)
 
-    const { data, error } = await q
+    const { data, count, error } = await q
     if (error) throw error
-    return data
+    return { data: data ?? [], total: count ?? 0 }
   },
 
   async getById(id: string, businessId: string) {

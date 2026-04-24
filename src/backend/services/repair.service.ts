@@ -39,7 +39,7 @@ export const RepairService = {
   async getById(id: string, branchId?: string) {
     let q = adminSupabase
       .from('repairs')
-      .select('*, customers(*), repair_items(*), repair_status_history(*), employees!assigned_to(id,first_name,last_name)')
+      .select('*, customers(*), repair_items(*), repair_status_history(*,profiles!changed_by(full_name)), employees!assigned_to(id,first_name,last_name)')
       .eq('id', id)
     // branchId is null/empty for business owners who have access to all branches
     if (branchId) q = q.eq('branch_id', branchId)
