@@ -85,6 +85,7 @@ export default function RepairSettingsPage() {
   // ── Confirmation ─────────────────────────────────────────────
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, name: string, type: 'status' | 'fault' } | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isSeeding, setIsSeeding] = useState(false)
 
   const fetchStatuses = useCallback(async () => {
     setStatusLoading(true)
@@ -158,6 +159,24 @@ export default function RepairSettingsPage() {
     setEditStatusName(s.name)
     setEditStatusColor(s.color)
     setAddingStatus(false)
+  }
+
+  async function seedDefaults() {
+    setIsSeeding(true)
+    try {
+      const res = await fetch('/api/repairs/seed-defaults', { method: 'POST' })
+      if (res.ok) {
+        toast.success('Default settings seeded successfully')
+        fetchStatuses()
+        fetchFaults()
+      } else {
+        toast.error('Failed to seed defaults')
+      }
+    } catch (err) {
+      toast.error('An error occurred while seeding defaults')
+    } finally {
+      setIsSeeding(false)
+    }
   }
 
   // ── Fault CRUD ────────────────────────────────────────────────
@@ -239,9 +258,16 @@ export default function RepairSettingsPage() {
         <div className="mt-4 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">Manage Statuses</h2>
-            <Button onClick={() => { setAddingStatus(true); setEditingStatus(null) }}>
-              <Plus className="h-4 w-4" /> Add Status
-            </Button>
+            <div className="flex gap-2">
+              {statuses.length === 0 && !statusLoading && (
+                <Button variant="outline" onClick={seedDefaults} loading={isSeeding}>
+                  Seed Default Statuses
+                </Button>
+              )}
+              <Button onClick={() => { setAddingStatus(true); setEditingStatus(null) }}>
+                <Plus className="h-4 w-4" /> Add Status
+              </Button>
+            </div>
           </div>
 
           {/* Add form */}
@@ -377,9 +403,16 @@ export default function RepairSettingsPage() {
         <div className="mt-4 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">Manage Faults</h2>
-            <Button onClick={() => { setAddingFault(true); setEditingFault(null) }}>
-              <Plus className="h-4 w-4" /> Add Fault
-            </Button>
+            <div className="flex gap-2">
+              {faults.length === 0 && !faultLoading && (
+                <Button variant="outline" onClick={seedDefaults} loading={isSeeding}>
+                  Seed Default Faults
+                </Button>
+              )}
+              <Button onClick={() => { setAddingFault(true); setEditingFault(null) }}>
+                <Plus className="h-4 w-4" /> Add Fault
+              </Button>
+            </div>
           </div>
 
           {/* Add form */}

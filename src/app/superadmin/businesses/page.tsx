@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye } from 'lucide-react'
+import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/data-table'
@@ -236,6 +236,8 @@ export default function BusinessesPage() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [modulesBusiness, setModulesBusiness] = useState<BusinessRow | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     async function fetch_() {
@@ -250,6 +252,18 @@ export default function BusinessesPage() {
     }
     fetch_()
   }, [page, search])
+
+  async function deleteBusiness(id: string) {
+    setDeleting(true)
+    try {
+      await fetch(`/api/businesses/${id}`, { method: 'DELETE' })
+      setBusinesses((b) => b.filter((x) => x.id !== id))
+      setTotal((t) => t - 1)
+    } finally {
+      setDeleting(false)
+      setConfirmDeleteId(null)
+    }
+  }
 
   async function toggleSuspend(biz: BusinessRow) {
     const suspending = biz.is_active
@@ -326,39 +340,73 @@ export default function BusinessesPage() {
     {
       id: 'actions',
       header: '',
-      cell: ({ row }) => (
-        <div className="flex gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => router.push(`/superadmin/businesses/${row.original.id}`)}
-            title="View full business details"
-            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-          >
-            <Eye className="h-3.5 w-3.5 mr-1" /> View Details
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setModulesBusiness(row.original)}
-            title="Manage module access"
-          >
-            <Settings2 className="h-3.5 w-3.5 mr-1" /> Modules
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => toggleSuspend(row.original)}
-            className={row.original.is_active ? 'text-red-500 hover:text-red-700' : 'text-green-600 hover:text-green-700'}
-          >
-            {row.original.is_active ? (
-              <><ShieldAlert className="h-3.5 w-3.5" /> Suspend</>
+      cell: ({ row }) => {
+        const biz = row.original
+        const isConfirming = confirmDeleteId === biz.id
+        return (
+          <div className="flex gap-1 items-center">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => router.push(`/superadmin/businesses/${biz.id}`)}
+              title="View full business details"
+              className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+            >
+              <Eye className="h-3.5 w-3.5 mr-1" /> View Details
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setModulesBusiness(biz)}
+              title="Manage module access"
+            >
+              <Settings2 className="h-3.5 w-3.5 mr-1" /> Modules
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => toggleSuspend(biz)}
+              className={biz.is_active ? 'text-red-500 hover:text-red-700' : 'text-green-600 hover:text-green-700'}
+            >
+              {biz.is_active ? (
+                <><ShieldAlert className="h-3.5 w-3.5" /> Suspend</>
+              ) : (
+                <><ShieldCheck className="h-3.5 w-3.5" /> Activate</>
+              )}
+            </Button>
+
+            {isConfirming ? (
+              <div className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1">
+                <span className="text-xs font-medium text-red-700 whitespace-nowrap">Delete?</span>
+                <button
+                  disabled={deleting}
+                  onClick={() => deleteBusiness(biz.id)}
+                  className="rounded px-2 py-0.5 text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  {deleting ? '…' : 'Yes'}
+                </button>
+                <button
+                  disabled={deleting}
+                  onClick={() => setConfirmDeleteId(null)}
+                  className="rounded px-2 py-0.5 text-xs font-semibold bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  No
+                </button>
+              </div>
             ) : (
-              <><ShieldCheck className="h-3.5 w-3.5" /> Activate</>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setConfirmDeleteId(biz.id)}
+                className="text-red-400 hover:text-red-600 hover:bg-red-50"
+                title="Permanently delete this business"
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+              </Button>
             )}
-          </Button>
-        </div>
-      ),
+          </div>
+        )
+      },
     },
   ]
 

@@ -31,7 +31,7 @@ export default function WidgetsPage() {
     ? window.location.hostname.split('.')[0]
     : 'your-subdomain'
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://repairpos.tech'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://repairbooking.co.uk'
 
   const trackerEmbed = `<!-- Repair Tracker Widget -->
 <div id="repair-tracker-widget"></div>

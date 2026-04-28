@@ -364,13 +364,13 @@ export default function PlansPage() {
                     label={lk.label}
                     type="number"
                     min="0"
-                    value={(limits[lk.key] as number) ?? ''}
+                    value={(limits[lk.key] as number | null) != null ? String(limits[lk.key]) : ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                      const val = e.target.value
-                      const num = Number(val)
+                      const val = e.target.value.trim()
                       setLimits((l) => ({
                         ...l,
-                        [lk.key]: val === '' ? undefined : num < 0 ? 0 : num,
+                        // null = unlimited; negative values clamped to 0
+                        [lk.key]: val === '' ? null : Math.max(0, Number(val)),
                       }))
                     }}
                     placeholder="Unlimited"

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { ProductService } from '@/backend/services/product.service'
-import { ok, created, notFound, forbidden, serverError } from '@/backend/utils/api-response'
+import { ok, created, notFound, forbidden, serverError, conflict } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
 import { PlanLimitService } from '@/backend/services/plan-limit.service'
@@ -120,30 +120,67 @@ export const ProductController = {
       // availability toggle — they do NOT get auto-seeded anymore.
       const needsStock = productData.item_type === 'part' || !productData.is_service
       const targetBranch = branch_id ?? ctx.auth.branchId
+      
       if (targetBranch) {
         const { adminSupabase } = await import('@/backend/config/supabase')
 
         // 1. Enable product in the creating branch's catalog
-        await adminSupabase
+        const { error: bpError } = await adminSupabase
           .from('branch_products')
           .upsert(
             { branch_id: targetBranch, product_id: product.id, is_enabled: true },
             { onConflict: 'branch_id,product_id' }
           )
+        if (bpError) {
+          console.error('[ProductController.create] Failed to seed branch_products:', bpError)
+        }
 
         // 2. Seed the inventory row with the specified initial_stock
         if (needsStock) {
-          await adminSupabase
+          const qty = initial_stock ?? 0
+          console.log(`[ProductController.create] Seeding inventory for product ${product.id} at branch ${targetBranch} with stock ${qty}`)
+          
+          const { data: invData, error: invError } = await adminSupabase
             .from('inventory')
-            .upsert(
-              { branch_id: targetBranch, product_id: product.id, quantity: initial_stock ?? 0, low_stock_alert: low_stock_alert ?? 5 },
-              { onConflict: 'branch_id,product_id' }
-            )
+            .insert({
+              branch_id: targetBranch,
+              product_id: product.id,
+              variant_id: null, // Explicitly null for base products
+              quantity: qty,
+              low_stock_alert: low_stock_alert ?? 5
+            })
+            .select()
+            .single()
+
+          if (invError) {
+            console.error('[ProductController.create] Failed to seed inventory:', invError)
+          } else if (qty > 0) {
+            // Also record a stock movement for the opening stock
+            const { error: moveError } = await adminSupabase
+              .from('stock_movements')
+              .insert({
+                branch_id: targetBranch,
+                product_id: product.id,
+                variant_id: null,
+                quantity: qty,
+                type: 'adjustment',
+                note: 'Opening stock',
+                created_by: ctx.auth.userId
+              })
+            if (moveError) {
+              console.error('[ProductController.create] Failed to record initial stock movement:', moveError)
+            }
+          }
         }
+      } else {
+        console.warn('[ProductController.create] No target branch identified for inventory seeding. (branch_id from body or session is missing)')
       }
 
       return created(product)
-    } catch (err) {
+    } catch (err: any) {
+      if (err.code === '23505') {
+        return conflict('A product with this SKU or Barcode already exists in your inventory.')
+      }
       return serverError('Failed to create product', err)
     }
   },
@@ -169,22 +206,27 @@ export const ProductController = {
         if (existing) {
           const updatePayload: Record<string, unknown> = { low_stock_alert: low_stock_alert ?? 5 }
           if (initial_stock !== undefined) updatePayload.quantity = initial_stock
-          await adminSupabase.from('inventory')
+          const { error: updErr } = await adminSupabase.from('inventory')
             .update(updatePayload)
             .eq('branch_id', targetBranch)
             .eq('product_id', id)
+          if (updErr) console.error('[ProductController.update] Update inventory error:', updErr)
         } else {
-          await adminSupabase.from('inventory').insert({
+          const { error: insErr } = await adminSupabase.from('inventory').insert({
             branch_id: targetBranch,
             product_id: id,
             quantity: initial_stock ?? 0,
             low_stock_alert: low_stock_alert ?? 5,
           })
+          if (insErr) console.error('[ProductController.update] Insert inventory error:', insErr)
         }
       }
 
       return ok(product)
-    } catch (err) {
+    } catch (err: any) {
+      if (err.code === '23505') {
+        return conflict('Another product with this SKU or Barcode already exists.')
+      }
       return serverError('Failed to update product', err)
     }
   },
@@ -322,6 +364,19 @@ export const ProductController = {
       return ok({ deleted: true })
     } catch (err) {
       return serverError('Failed to delete variant', err)
+    }
+  },
+  async checkAvailability(request: NextRequest, ctx: RequestContext) {
+    const { searchParams } = new URL(request.url)
+    const sku = searchParams.get('sku')
+    const barcode = searchParams.get('barcode')
+    const excludeId = searchParams.get('excludeId')
+
+    try {
+      const result = await ProductService.checkAvailability(ctx.businessId, { sku, barcode, excludeId })
+      return ok(result)
+    } catch (err) {
+      return serverError('Failed to check availability', err)
     }
   },
 }

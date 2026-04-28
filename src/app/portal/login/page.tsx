@@ -15,7 +15,7 @@ export default function PortalLoginPage() {
 
   useEffect(() => {
     const host = window.location.hostname
-    // Works as techfix.repairpos.tech/portal or via ?subdomain= query
+    // Works as techfix.repairbooking.co.uk/portal or via ?subdomain= query
     const sub = new URLSearchParams(window.location.search).get('subdomain')
       ?? host.split('.')[0]
     setSubdomain(sub)

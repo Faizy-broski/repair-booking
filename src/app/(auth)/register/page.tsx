@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
@@ -7,26 +7,27 @@ import { z } from 'zod'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PhoneInput } from '@/components/ui/phone-input'
 import { Card, CardContent } from '@/components/ui/card'
 import {
   CheckCircle, Building2, User, CreditCard, Check, Zap, Mail,
   ChevronRight, ArrowLeft, Sparkles, Store, Wrench, ShoppingBag,
-  Scissors, Coffee, Monitor, Package, Layers,
+  Scissors, Coffee, Monitor, Package, ShieldCheck, RotateCcw, Gift,
 } from 'lucide-react'
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
 const step1Schema = z.object({
-  businessName:   z.string().min(2, 'Business name is required'),
-  subdomain:      z.string().min(2).max(30).regex(/^[a-z0-9-]+$/, { message: 'Only lowercase letters, numbers, and hyphens' }),
-  email:          z.string().email('Invalid email'),
-  phone:          z.string().optional(),
+  businessName: z.string().min(2, 'Business name is required'),
+  subdomain: z.string().min(2).max(30).regex(/^[a-z0-9-]+$/, { message: 'Only lowercase letters, numbers, and hyphens' }),
+  email: z.string().email('Invalid email'),
+  phone: z.string().optional(),
 })
 
 const step2Schema = z.object({
-  fullName:       z.string().min(2, 'Full name is required'),
-  password:       z.string().min(8, 'Minimum 8 characters'),
-  confirmPassword:z.string(),
+  fullName: z.string().min(2, 'Full name is required'),
+  password: z.string().min(8, 'Minimum 8 characters'),
+  confirmPassword: z.string(),
   mainBranchName: z.string().min(2, 'Branch name is required'),
 }).refine(d => d.password === d.confirmPassword, {
   message: 'Passwords do not match', path: ['confirmPassword'],
@@ -38,7 +39,7 @@ type Step2Data = z.infer<typeof step2Schema>
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface DbPlan {
-  id: string; name: string; price_monthly: number
+  id: string; name: string; price_monthly: number; price_yearly: number
   max_branches: number; max_users: number; features: string[]
   stripe_price_id_monthly: string | null; plan_type: 'free' | 'paid' | 'enterprise'
 }
@@ -63,13 +64,13 @@ const ICON_MAP: Record<string, React.ElementType> = {
 }
 
 const ICON_COLORS: Record<string, { bg: string; text: string }> = {
-  wrench:         { bg: 'bg-blue-100',   text: 'text-blue-600' },
-  store:          { bg: 'bg-indigo-100', text: 'text-indigo-600' },
+  wrench: { bg: 'bg-blue-100', text: 'text-blue-600' },
+  store: { bg: 'bg-indigo-100', text: 'text-indigo-600' },
   'shopping-bag': { bg: 'bg-violet-100', text: 'text-violet-600' },
-  scissors:       { bg: 'bg-pink-100',   text: 'text-pink-600' },
-  coffee:         { bg: 'bg-amber-100',  text: 'text-amber-600' },
-  monitor:        { bg: 'bg-cyan-100',   text: 'text-cyan-600' },
-  package:        { bg: 'bg-green-100',  text: 'text-green-600' },
+  scissors: { bg: 'bg-pink-100', text: 'text-pink-600' },
+  coffee: { bg: 'bg-amber-100', text: 'text-amber-600' },
+  monitor: { bg: 'bg-cyan-100', text: 'text-cyan-600' },
+  package: { bg: 'bg-green-100', text: 'text-green-600' },
 }
 
 const FEATURE_LABELS: Record<string, string> = {
@@ -89,12 +90,12 @@ function isPlanHighlighted(plans: DbPlan[], index: number): boolean {
   return plans.length >= 2 && index === Math.floor(plans.length / 2)
 }
 
-// Step labels — template picker is index 0
+// step 1=Business, 2=VerifyEmail, 3=Account, 4=Plan
 const STEPS = [
-  // { label: 'Business Type', icon: Layers },
-  { label: 'Business',      icon: Building2 },
-  { label: 'Account',       icon: User },
-  { label: 'Plan',          icon: CreditCard },
+  { label: 'Business', icon: Building2 },
+  { label: 'Verify Email', icon: ShieldCheck },
+  { label: 'Account', icon: User },
+  { label: 'Plan', icon: CreditCard },
 ]
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -102,7 +103,7 @@ const STEPS = [
 export default function RegisterPage() {
   const router = useRouter()
 
-  // step 0 = template picker, 1 = business info, 2 = account, 3 = plan
+  // 1=Business 2=VerifyEmail 3=Account 4=Plan
   const [step, setStep] = useState(1)
 
   // Template picker state
@@ -114,6 +115,14 @@ export default function RegisterPage() {
   // Existing form state
   const [step1Data, setStep1Data] = useState<Step1Data | null>(null)
   const [step2Data, setStep2Data] = useState<Step2Data | null>(null)
+
+  // OTP verification state
+  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', ''])
+  const [otpError, setOtpError] = useState('')
+  const [otpVerifying, setOtpVerifying] = useState(false)
+  const [otpSending, setOtpSending] = useState(false)
+  const [resendCountdown, setResendCountdown] = useState(0)
+  const [resendCount, setResendCount] = useState(0)
   const [selectedPlan, setSelectedPlan] = useState<DbPlan | null>(null)
   const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null)
   const [checkingSubdomain, setCheckingSubdomain] = useState(false)
@@ -123,6 +132,7 @@ export default function RegisterPage() {
   const [proceeding, setProceeding] = useState(false)
   const [plans, setPlans] = useState<DbPlan[]>([])
   const [plansLoading, setPlansLoading] = useState(false)
+  const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly')
 
   const form1 = useForm<Step1Data>({ resolver: zodResolver(step1Schema) })
   const form2 = useForm<Step2Data>({ resolver: zodResolver(step2Schema) })
@@ -140,52 +150,189 @@ export default function RegisterPage() {
 
   // ── Fetch plans when reaching step 3 ──────────────────────────────────────
   useEffect(() => {
-    if (step === 3 && plans.length === 0) {
+    if (step === 4 && plans.length === 0) {
       setPlansLoading(true)
       fetch('/api/plans')
         .then(r => r.json())
         .then(j => { if (j.data) setPlans(j.data) })
-        .catch(() => {})
+        .catch(() => { })
         .finally(() => setPlansLoading(false))
     }
   }, [step, plans.length])
 
-  const isFreePlan = selectedPlan?.plan_type === 'free'
+  const isFreePlan = selectedPlan?.price_monthly === 0
   const isEnterprisePlan = selectedPlan?.plan_type === 'enterprise'
 
   // ── Validation helpers ────────────────────────────────────────────────────
+  const checkSubdomainTimeout = useRef<NodeJS.Timeout | null>(null)
+
   async function checkSubdomain(value: string) {
-    if (value.length < 2) return
+    if (value.length < 2) {
+      setSubdomainAvailable(null)
+      return
+    }
     setCheckingSubdomain(true)
-    const res = await fetch(`/api/auth/check-subdomain?subdomain=${encodeURIComponent(value)}`)
-    const json = await res.json()
-    setSubdomainAvailable(json.data?.available ?? false)
-    setCheckingSubdomain(false)
+    
+    if (checkSubdomainTimeout.current) {
+      clearTimeout(checkSubdomainTimeout.current)
+    }
+    
+    checkSubdomainTimeout.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/auth/check-subdomain?subdomain=${encodeURIComponent(value)}`)
+        const json = await res.json()
+        setSubdomainAvailable(json.data?.available ?? false)
+      } finally {
+        setCheckingSubdomain(false)
+      }
+    }, 500)
   }
 
   async function checkEmail(value: string) {
-    if (!value.includes('@')) return
+    if (!value.includes('@')) return false
     setCheckingEmail(true)
     setEmailAvailable(null)
     try {
       const res = await fetch(`/api/auth/check-email?email=${encodeURIComponent(value)}`)
       const json = await res.json()
-      setEmailAvailable(json.data?.available ?? false)
-    } catch { setEmailAvailable(null) }
-    setCheckingEmail(false)
+      const available = json.data?.available ?? false
+      setEmailAvailable(available)
+      setCheckingEmail(false)
+      return available
+    } catch {
+      setEmailAvailable(null)
+      setCheckingEmail(false)
+      return false
+    }
   }
 
   // ── Form handlers ─────────────────────────────────────────────────────────
-  function onStep1Submit(data: Step1Data) {
+  async function onStep1Submit(data: Step1Data) {
     if (!subdomainAvailable) return
-    if (emailAvailable === false) return
+
+    // Explicitly verify email before proceeding if we haven't already confirmed it's available
+    if (emailAvailable !== true) {
+      const isAvailable = await checkEmail(data.email)
+      if (!isAvailable) return
+    }
+
     setStep1Data(data)
+    await sendOtp(data.email)
     setStep(2)
   }
 
   function onStep2Submit(data: Step2Data) {
     setStep2Data(data)
-    setStep(3)
+    setStep(4)
+  }
+
+  async function sendOtp(email: string) {
+    setOtpSending(true)
+    setOtpError('')
+    try {
+      await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+    } catch { }
+    setOtpSending(false)
+    setResendCountdown(60)
+  }
+
+  // countdown tick for resend button
+  useEffect(() => {
+    if (resendCountdown <= 0) return
+    const t = setTimeout(() => setResendCountdown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [resendCountdown])
+
+  async function handleResendOtp() {
+    if (!step1Data || resendCountdown > 0 || resendCount >= 3) return
+    setResendCount(c => c + 1)
+    setOtpDigits(['', '', '', '', '', ''])
+    setOtpError('')
+    await sendOtp(step1Data.email)
+  }
+
+  async function handleVerifyOtp() {
+    const otp = otpDigits.join('')
+    if (otp.length < 6) { setOtpError('Enter all 6 digits'); return }
+    setOtpVerifying(true)
+    setOtpError('')
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: step1Data!.email, otp }),
+      })
+      const json = await res.json()
+      if (json.data?.verified) {
+        setStep(3)
+      } else {
+        setOtpError(json.error?.message ?? 'Incorrect code. Please try again.')
+      }
+    } catch {
+      setOtpError('Something went wrong. Please try again.')
+    }
+    setOtpVerifying(false)
+  }
+
+  function handleOtpInput(index: number, value: string) {
+    const digit = value.replace(/\D/g, '').slice(-1)
+    const next = [...otpDigits]
+    next[index] = digit
+    setOtpDigits(next)
+    setOtpError('')
+    if (digit && index < 5) {
+      document.getElementById(`otp-${index + 1}`)?.focus()
+    }
+    // Auto-submit when last digit filled
+    if (digit && index === 5) {
+      const full = next.join('')
+      if (full.length === 6) setTimeout(() => handleVerifyOtpWithDigits(next), 0)
+    }
+  }
+
+  function handleOtpKeyDown(index: number, e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      document.getElementById(`otp-${index - 1}`)?.focus()
+    }
+  }
+
+  function handleOtpPaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    e.preventDefault()
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+    if (!pasted) return
+    const next = [...otpDigits]
+    pasted.split('').forEach((d, i) => { next[i] = d })
+    setOtpDigits(next)
+    setOtpError('')
+    document.getElementById(`otp-${Math.min(pasted.length, 5)}`)?.focus()
+    if (pasted.length === 6) setTimeout(() => handleVerifyOtpWithDigits(next), 0)
+  }
+
+  async function handleVerifyOtpWithDigits(digits: string[]) {
+    const otp = digits.join('')
+    if (otp.length < 6) return
+    setOtpVerifying(true)
+    setOtpError('')
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: step1Data!.email, otp }),
+      })
+      const json = await res.json()
+      if (json.data?.verified) {
+        setStep(3)
+      } else {
+        setOtpError(json.error?.message ?? 'Incorrect code. Please try again.')
+      }
+    } catch {
+      setOtpError('Something went wrong. Please try again.')
+    }
+    setOtpVerifying(false)
   }
 
   async function handleProceedToPayment() {
@@ -199,38 +346,23 @@ export default function RegisterPage() {
       ...(selectedTemplate ? { verticalTemplateSlug: selectedTemplate.slug } : {}),
     }
     try {
-      if (isFreePlan) {
-        const regRes = await fetch('/api/auth/register', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
-        const regJson = await regRes.json()
-        if (!regRes.ok || regJson.error) {
-          setServerError(regJson.error?.message ?? 'Registration failed. Please try again.')
-          setProceeding(false)
-          return
-        }
-        const subdomain = step1Data.subdomain.toLowerCase()
-        const host = window.location.hostname
-        const port = window.location.port
-        const base = host === 'localhost'
-          ? `http://${subdomain}.localhost${port ? ':' + port : ''}`
-          : `https://${subdomain}.${host.split('.').slice(-2).join('.')}`
-        window.location.href = `${base}/dashboard`
-        return
-      }
-
-      const checkoutRes = await fetch('/api/stripe/checkout', {
+      // Send ALL plans to backend register to start their 30-day free trial.
+      // Card is not required upfront. Stripe setup will happen in the dashboard later.
+      const regRes = await fetch('/api/auth/register', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      const checkoutJson = await checkoutRes.json()
-      if (!checkoutRes.ok || checkoutJson.error) {
-        setServerError(checkoutJson.error?.message ?? 'Failed to start checkout. Please try again.')
+      const regJson = await regRes.json()
+      
+      if (!regRes.ok || regJson.error) {
+        setServerError(regJson.error?.message ?? 'Registration failed. Please try again.')
         setProceeding(false)
         return
       }
-      window.location.href = checkoutJson.data.url
+
+      // Redirect to the success screen so they see the instructions before logging in
+      const subdomain = step1Data.subdomain.toLowerCase()
+      window.location.href = `/register/success?subdomain=${encodeURIComponent(subdomain)}`
     } catch {
       setServerError('Something went wrong. Please try again.')
       setProceeding(false)
@@ -265,18 +397,18 @@ export default function RegisterPage() {
         {STEPS.map(({ label, icon: Icon }, i) => {
           const stepNumber = i + 1;
           return (
-          <div key={i} className="flex items-center gap-1">
-            <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
-              stepNumber < step   ? 'bg-primary-container text-on-primary-container' :
-              stepNumber === step ? 'bg-primary text-on-primary shadow-sm shadow-primary/30' :
-                           'bg-surface-container-high text-on-surface-variant'
-            }`}>
-              {stepNumber < step ? <CheckCircle className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
-              {label}
+            <div key={i} className="flex items-center gap-1">
+              <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${stepNumber < step ? 'bg-primary-container text-on-primary-container' :
+                stepNumber === step ? 'bg-primary text-on-primary shadow-sm shadow-primary/30' :
+                  'bg-surface-container-high text-on-surface-variant'
+                }`}>
+                {stepNumber < step ? <CheckCircle className="h-3.5 w-3.5" /> : <Icon className="h-3.5 w-3.5" />}
+                {label}
+              </div>
+              {i < STEPS.length - 1 && <div className="w-5 h-px bg-outline-variant" />}
             </div>
-            {i < STEPS.length - 1 && <div className="w-5 h-px bg-outline-variant" />}
-          </div>
-        )})}
+          )
+        })}
       </div>
 
       {/* ── Step 0: Business Type ─────────────────────────────────────────── */}
@@ -291,7 +423,7 @@ export default function RegisterPage() {
 
           {templatesLoading ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {[1,2,3,4,5,6].map(i => (
+              {[1, 2, 3, 4, 5, 6].map(i => (
                 <div key={i} className="h-36 animate-pulse rounded-2xl bg-surface-container" />
               ))}
             </div>
@@ -418,13 +550,18 @@ export default function RegisterPage() {
                     label="Your subdomain"
                     placeholder="techfix"
                     error={form1.formState.errors.subdomain?.message}
-                    {...form1.register('subdomain', { onChange: e => checkSubdomain(e.target.value) })}
+                    {...form1.register('subdomain', {
+                      onChange: e => {
+                        const sanitized = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
+                        form1.setValue('subdomain', sanitized, { shouldValidate: true })
+                        checkSubdomain(sanitized)
+                      }
+                    })}
                   />
                   {!form1.formState.errors.subdomain && (
-                    <p className={`mt-1 text-xs ${
-                      subdomainAvailable === true  ? 'text-primary' :
-                      subdomainAvailable === false ? 'text-error'   : 'text-on-surface-variant'
-                    }`}>
+                    <p className={`mt-1 text-xs ${subdomainAvailable === true ? 'text-primary' :
+                      subdomainAvailable === false ? 'text-error' : 'text-on-surface-variant'
+                      }`}>
                       {checkingSubdomain
                         ? 'Checking availability…'
                         : subdomainAvailable === true
@@ -456,11 +593,10 @@ export default function RegisterPage() {
                     </p>
                   )}
                 </div>
-                <Input
+                <PhoneInput
                   label="Phone number"
-                  type="tel"
-                  placeholder="+44 7700 900000"
-                  {...form1.register('phone')}
+                  value={form1.watch('phone') ?? ''}
+                  onChange={(val) => form1.setValue('phone', val, { shouldValidate: true })}
                 />
                 <div className="flex gap-2">
                   {/* <Button type="button" variant="outline" onClick={() => setStep(0)}>
@@ -480,8 +616,103 @@ export default function RegisterPage() {
         </div>
       )}
 
-      {/* ── Step 2: Account Setup ─────────────────────────────────────────── */}
+      {/* ── Step 2: Verify Email ──────────────────────────────────────────── */}
       {step === 2 && (
+        <div className="mx-auto max-w-md">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="space-y-6">
+                <div className="text-center">
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-teal-50">
+                    <ShieldCheck className="h-6 w-6 text-teal-600" />
+                  </div>
+                  <h2 className="text-lg font-bold text-on-surface">Check your email</h2>
+                  <p className="text-sm text-on-surface-variant mt-1">
+                    We sent a 6-digit code to<br />
+                    <strong className="text-on-surface">{step1Data?.email}</strong>
+                  </p>
+                </div>
+
+                {/* OTP boxes */}
+                <div className="flex justify-center gap-2">
+                  {otpDigits.map((digit, i) => (
+                    <input
+                      key={i}
+                      id={`otp-${i}`}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={digit}
+                      onChange={e => handleOtpInput(i, e.target.value)}
+                      onKeyDown={e => handleOtpKeyDown(i, e)}
+                      onPaste={i === 0 ? handleOtpPaste : undefined}
+                      disabled={otpVerifying}
+                      autoFocus={i === 0}
+                      className={`h-13 w-11 rounded-xl border-2 text-center text-xl font-bold transition-colors focus:outline-none ${otpError
+                        ? 'border-red-400 bg-red-50 text-red-700'
+                        : digit
+                          ? 'border-teal-500 bg-teal-50 text-teal-800'
+                          : 'border-gray-300 bg-white text-gray-900 focus:border-teal-500'
+                        }`}
+                      style={{ height: '3.25rem' }}
+                    />
+                  ))}
+                </div>
+
+                {otpError && (
+                  <p className="text-center text-sm text-red-600">{otpError}</p>
+                )}
+
+                {otpVerifying && (
+                  <p className="text-center text-sm text-teal-600 animate-pulse">Verifying…</p>
+                )}
+
+                <Button
+                  className="w-full"
+                  onClick={handleVerifyOtp}
+                  loading={otpVerifying}
+                  disabled={otpDigits.join('').length < 6}
+                >
+                  <ShieldCheck className="h-4 w-4" /> Verify Email
+                </Button>
+
+                {/* Resend */}
+                <div className="text-center space-y-1">
+                  {resendCountdown > 0 ? (
+                    <p className="text-sm text-on-surface-variant">
+                      Resend code in <strong className="text-on-surface">{resendCountdown}s</strong>
+                    </p>
+                  ) : resendCount >= 3 ? (
+                    <p className="text-sm text-on-surface-variant">Maximum resends reached. Please restart.</p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      disabled={otpSending}
+                      className="inline-flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-700 font-medium disabled:opacity-50"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      {otpSending ? 'Sending…' : "Didn't receive it? Resend code"}
+                    </button>
+                  )}
+                  <p className="text-xs text-on-surface-variant">Also check your spam folder</p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => { setStep(1); setOtpDigits(['', '', '', '', '', '']); setOtpError('') }}
+                  className="flex w-full items-center justify-center gap-1.5 text-sm text-on-surface-variant hover:text-on-surface"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" /> Back — change email
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ── Step 3: Account Setup ─────────────────────────────────────────── */}
+      {step === 3 && (
         <div className="mx-auto max-w-md">
           <Card>
             <CardContent className="pt-6">
@@ -517,7 +748,7 @@ export default function RegisterPage() {
                   {...form2.register('mainBranchName')}
                 />
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" className="flex-1" onClick={() => setStep(1)}>
+                  <Button type="button" variant="outline" className="flex-1" onClick={() => setStep(2)}>
                     <ArrowLeft className="h-4 w-4" /> Back
                   </Button>
                   <Button type="submit" className="flex-1" loading={form2.formState.isSubmitting}>
@@ -530,39 +761,62 @@ export default function RegisterPage() {
         </div>
       )}
 
-      {/* ── Step 3: Choose Plan ───────────────────────────────────────────── */}
-      {step === 3 && (
-        <div className="space-y-10">
+      {/* ── Step 4: Choose Plan ───────────────────────────────────────────── */}
+      {step === 4 && (
+        <div className="space-y-8">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-on-surface">Choose your plan</h2>
-            <p className="text-on-surface-variant mt-1">14-day free trial on all paid plans. Cancel anytime.</p>
+            <p className="text-on-surface-variant mt-1">30-day free trial on all plans. No credit card required.</p>
+
+            {/* Billing toggle */}
+            <div className="mt-5 inline-flex items-center gap-3 rounded-2xl border border-outline-variant bg-surface-container p-1.5">
+              <button
+                type="button"
+                onClick={() => setBilling('monthly')}
+                className={`rounded-xl px-5 py-2 text-sm font-semibold transition-all ${billing === 'monthly' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
+              >
+                Monthly
+              </button>
+              <button
+                type="button"
+                onClick={() => setBilling('yearly')}
+                className={`relative rounded-xl px-5 py-2 text-sm font-semibold transition-all ${billing === 'yearly' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
+              >
+                Annual
+                <span className="absolute -top-3 -right-3 rounded-full bg-brand-yellow px-1.5 py-0.5 text-[10px] font-black text-slate-900 shadow">
+                  -20%
+                </span>
+              </button>
+            </div>
           </div>
 
           {plansLoading ? (
             <div className="flex items-center justify-center py-20 text-on-surface-variant">Loading plans...</div>
           ) : (
-            <div className={`grid gap-8 items-stretch ${
-              plans.length === 3 ? 'grid-cols-1 md:grid-cols-3' :
+            <div className={`grid gap-8 items-stretch ${plans.length === 3 ? 'grid-cols-1 md:grid-cols-3' :
               plans.length === 2 ? 'grid-cols-1 md:grid-cols-2 max-w-3xl mx-auto' :
-              'max-w-sm mx-auto'
-            }`}>
+                'max-w-sm mx-auto'
+              }`}>
               {plans.map((plan, index) => {
                 const highlighted = isPlanHighlighted(plans, index)
                 const isSelected = selectedPlan?.id === plan.id
-                const isFree = plan.plan_type === 'free'
+                const isTrulyFree = plan.price_monthly === 0
                 const isEnterprise = plan.plan_type === 'enterprise'
+                const isYearly = billing === 'yearly' && !isTrulyFree && !isEnterprise
+                const yearlyTotal = plan.price_yearly > 0 ? plan.price_yearly : Math.round(plan.price_monthly * 12 * 0.8)
+                const fmtPrice = (n: number) => n % 1 === 0 ? String(Math.round(n)) : n.toFixed(2)
+
                 return (
                   <button
                     key={plan.id}
                     type="button"
                     onClick={() => setSelectedPlan(plan)}
-                    className={`relative flex flex-col rounded-3xl border-2 p-8 text-left transition-all duration-200 ${
-                      highlighted
-                        ? 'bg-primary text-on-primary border-transparent shadow-2xl shadow-primary/30 scale-[1.04]'
-                        : isSelected
-                          ? 'bg-surface-container-lowest border-primary shadow-xl shadow-primary/10'
-                          : 'bg-surface-container-lowest border-outline-variant/50 hover:border-primary/40 hover:shadow-lg'
-                    }`}
+                    className={`relative flex flex-col rounded-3xl border-2 p-8 text-left transition-all duration-200 ${highlighted
+                      ? 'bg-primary text-on-primary border-transparent shadow-2xl shadow-primary/30 scale-[1.04]'
+                      : isSelected
+                        ? 'bg-surface-container-lowest border-primary shadow-xl shadow-primary/10'
+                        : 'bg-surface-container-lowest border-outline-variant/50 hover:border-primary/40 hover:shadow-lg'
+                      }`}
                   >
                     {highlighted && (
                       <span className="absolute -top-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-brand-yellow px-4 py-1.5 text-xs font-black text-gray-900 whitespace-nowrap shadow-lg">
@@ -574,26 +828,50 @@ export default function RegisterPage() {
                         <CheckCircle className="h-5 w-5 text-brand-teal" />
                       </span>
                     )}
-                    <p className={`text-[11px] font-bold uppercase tracking-[0.15em] mb-4 ${highlighted ? 'text-on-primary/60' : 'text-on-surface-variant'}`}>
+
+                    <p className={`text-[11px] font-bold uppercase tracking-[0.15em] mb-3 ${highlighted ? 'text-on-primary/60' : 'text-on-surface-variant'}`}>
                       {plan.name}
                     </p>
-                    <div className="flex items-end gap-1 mb-2">
-                      {isFree ? (
-                        <span className={`text-5xl font-black leading-none ${highlighted ? 'text-on-primary' : 'text-on-surface'}`}>Free</span>
-                      ) : isEnterprise ? (
+
+                    {/* 30-day trial badge */}
+                    {!isEnterprise && (
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold mb-3 w-fit ${highlighted ? 'bg-on-primary/20 text-on-primary' : 'bg-primary/10 text-primary'}`}>
+                        <Gift className="h-3 w-3" /> 30 days free trial
+                      </span>
+                    )}
+
+                    <div className="flex items-end gap-1 mb-1">
+                      {isEnterprise ? (
                         <span className={`text-5xl font-black leading-none ${highlighted ? 'text-on-primary' : 'text-on-surface'}`}>Custom</span>
+                      ) : isYearly ? (
+                        <>
+                          <span className={`text-5xl font-black leading-none ${highlighted ? 'text-on-primary' : 'text-on-surface'}`}>£{yearlyTotal}</span>
+                          <span className={`text-base mb-1.5 ${highlighted ? 'text-on-primary/60' : 'text-on-surface-variant'}`}>/yr</span>
+                        </>
                       ) : (
                         <>
                           <span className={`text-5xl font-black leading-none ${highlighted ? 'text-on-primary' : 'text-on-surface'}`}>
-                            £{plan.price_monthly % 1 === 0 ? plan.price_monthly : plan.price_monthly.toFixed(2)}
+                            £{fmtPrice(plan.price_monthly)}
                           </span>
                           <span className={`text-base mb-1.5 ${highlighted ? 'text-on-primary/60' : 'text-on-surface-variant'}`}>/mo</span>
                         </>
                       )}
                     </div>
-                    {!isFree && !isEnterprise && <p className={`text-xs mb-6 ${highlighted ? 'text-on-primary/50' : 'text-on-surface-variant'}`}>Billed monthly, cancel anytime</p>}
-                    {isFree && <p className={`text-xs mb-6 font-medium ${highlighted ? 'text-on-primary/70' : 'text-primary'}`}>30-day free trial — no credit card needed</p>}
-                    {isEnterprise && <p className={`text-xs mb-6 ${highlighted ? 'text-on-primary/50' : 'text-on-surface-variant'}`}>Tailored quote for your business</p>}
+
+                    {/* Post-trial / billing note */}
+                    {!isEnterprise && (
+                      <p className={`text-xs mb-5 ${highlighted ? 'text-on-primary/50' : 'text-on-surface-variant'}`}>
+                        {isTrulyFree
+                          ? 'Free forever — no credit card required'
+                          : isYearly
+                            ? `Save £${Math.round(plan.price_monthly * 12) - yearlyTotal} vs monthly — after 30-day trial`
+                            : `Then £${fmtPrice(plan.price_monthly)}/mo after 30-day trial`}
+                      </p>
+                    )}
+                    {isEnterprise && (
+                      <p className={`text-xs mb-5 ${highlighted ? 'text-on-primary/50' : 'text-on-surface-variant'}`}>Tailored quote for your business</p>
+                    )}
+
                     <div className={`flex gap-3 mb-6 pb-6 border-b ${highlighted ? 'border-on-primary/20' : 'border-outline-variant/30'}`}>
                       <div className={`flex-1 text-center rounded-xl py-2.5 ${highlighted ? 'bg-on-primary/10' : 'bg-surface-container'}`}>
                         <p className={`text-xl font-bold ${highlighted ? 'text-on-primary' : 'text-on-surface'}`}>{plan.max_branches >= 50 ? '∞' : plan.max_branches}</p>
@@ -604,6 +882,7 @@ export default function RegisterPage() {
                         <p className={`text-[10px] uppercase tracking-wide mt-0.5 ${highlighted ? 'text-on-primary/50' : 'text-on-surface-variant'}`}>Staff</p>
                       </div>
                     </div>
+
                     <ul className="space-y-3 flex-1">
                       {(Array.isArray(plan.features) ? plan.features : []).map((f: string) => (
                         <li key={f} className="flex items-start gap-3 text-sm">
@@ -614,15 +893,15 @@ export default function RegisterPage() {
                         </li>
                       ))}
                     </ul>
+
                     <div className={`mt-8 pt-6 border-t ${highlighted ? 'border-on-primary/20' : 'border-outline-variant/30'}`}>
-                      <div className={`flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold transition-all ${
-                        isSelected
-                          ? highlighted ? 'bg-on-primary/25 text-on-primary' : 'bg-primary text-on-primary'
-                          : highlighted ? 'bg-on-primary/10 text-on-primary/80 hover:bg-on-primary/20' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-                      }`}>
+                      <div className={`flex items-center justify-center gap-2 rounded-2xl py-3 text-sm font-semibold transition-all ${isSelected
+                        ? highlighted ? 'bg-on-primary/25 text-on-primary' : 'bg-primary text-on-primary'
+                        : highlighted ? 'bg-on-primary/10 text-on-primary/80 hover:bg-on-primary/20' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                        }`}>
                         {isSelected
                           ? <><CheckCircle className="h-4 w-4" /> Selected</>
-                          : isFree ? 'Start free — no card needed' : isEnterprise ? 'Contact sales' : 'Select this plan'}
+                          : isEnterprise ? 'Contact sales' : 'Select this plan'}
                       </div>
                     </div>
                   </button>
@@ -636,7 +915,7 @@ export default function RegisterPage() {
           )}
 
           <div className="flex items-center gap-3 max-w-sm mx-auto">
-            <Button type="button" variant="outline" onClick={() => setStep(2)}>
+            <Button type="button" variant="outline" onClick={() => setStep(3)}>
               <ArrowLeft className="h-4 w-4" /> Back
             </Button>
             {isEnterprisePlan ? (
@@ -656,7 +935,7 @@ export default function RegisterPage() {
           </div>
 
           <p className="text-center text-xs text-on-surface-variant">
-            Secure payment via Stripe · No credit card charged until trial ends
+            No credit card charged until trial ends · Cancel anytime
           </p>
         </div>
       )}

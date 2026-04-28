@@ -13,6 +13,7 @@ const schema = z.object({
   max_users: z.coerce.number().int().positive().optional(),
   // DB column is JSONB array e.g. ["pos","repairs"]
   features: z.array(z.string()).optional(),
+  // null value = unlimited for that resource. undefined key = not included in this update.
   limits: z.record(z.string(), z.union([z.number(), z.boolean(), z.null()])).optional(),
   is_active: z.boolean().optional(),
   stripe_price_id_monthly: z.string().transform((v) => v || null).nullable().optional(),
@@ -29,8 +30,21 @@ async function patchHandler(
   if (error) return error
   const supabase = createAdminClient()
   try {
+    // Normalise limits: ensure every numeric key that was explicitly sent as null
+    // is stored as JSON null (= unlimited) in the JSONB column. Keys that are absent
+    // (not sent) are left unchanged by the update — only the keys present in the
+    // payload affect the stored JSONB object.
+    const payload = data.limits
+      ? {
+          ...data,
+          limits: Object.fromEntries(
+            Object.entries(data.limits).map(([k, v]) => [k, v ?? null])
+          ),
+        }
+      : data
+
     const { data: plan, error: err } = await (supabase.from('plans') as any)
-      .update(data)
+      .update(payload)
       .eq('id', id)
       .select()
       .single()

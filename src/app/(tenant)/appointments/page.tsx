@@ -1,16 +1,15 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
 import { useAuthStore } from '@/store/auth.store'
-import { formatDateTime } from '@/lib/utils'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
-import { addDays, format, startOfWeek, isSameDay, parseISO } from 'date-fns'
+import { addDays, format, startOfWeek, isSameDay } from 'date-fns'
 
 interface AppointmentRow {
   id: string
@@ -55,6 +54,11 @@ export default function AppointmentsPage() {
   const [loading, setLoading] = useState(true)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [editingAppointment, setEditingAppointment] = useState<AppointmentRow | null>(null)
+  const [editSheetOpen, setEditSheetOpen] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -62,6 +66,10 @@ export default function AppointmentsPage() {
       start_time: format(new Date(), "yyyy-MM-dd") + 'T09:00',
       end_time: format(new Date(), "yyyy-MM-dd") + 'T09:30',
     },
+  })
+
+  const { register: registerEdit, handleSubmit: handleSubmitEdit, reset: resetEdit, formState: { errors: editErrors, isSubmitting: isEditSubmitting } } = useForm<FormData>({
+    resolver: zodResolver(schema),
   })
 
   const fetchData = useCallback(async () => {
@@ -103,6 +111,49 @@ export default function AppointmentsPage() {
     }
   }
 
+  function openEdit(appt: AppointmentRow) {
+    setEditingAppointment(appt)
+    resetEdit({
+      title: appt.title,
+      customer_id: '',
+      employee_id: '',
+      start_time: appt.start_time.slice(0, 16),
+      end_time: appt.end_time.slice(0, 16),
+    })
+    setEditError(null)
+    setEditSheetOpen(true)
+  }
+
+  async function onEdit(data: FormData) {
+    if (!editingAppointment || !activeBranch) return
+    const res = await fetch(`/api/appointments/${editingAppointment.id}?branch_id=${activeBranch.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...data,
+        customer_id: data.customer_id || null,
+        employee_id: data.employee_id || null,
+      }),
+    })
+    if (res.ok) {
+      setEditSheetOpen(false)
+      setEditingAppointment(null)
+      fetchData()
+    } else {
+      const json = await res.json().catch(() => null)
+      setEditError(json?.error?.message ?? 'Failed to update appointment.')
+    }
+  }
+
+  async function onDelete(id: string) {
+    if (!activeBranch) return
+    setDeletingId(id)
+    const res = await fetch(`/api/appointments/${id}?branch_id=${activeBranch.id}`, { method: 'DELETE' })
+    setDeletingId(null)
+    setConfirmDeleteId(null)
+    if (res.ok) fetchData()
+  }
+
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
 
   // Build dynamic hour range: include default business hours plus any hours that have appointments
@@ -123,80 +174,164 @@ export default function AppointmentsPage() {
       return datePart === format(day, 'yyyy-MM-dd') && hourPart === hour
     })
 
+  const isWeekend = (day: Date) => { const d = day.getDay(); return d === 0 || d === 6 }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Appointments</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Appointments</h1>
+          <p className="mt-0.5 text-sm text-gray-400 font-medium">
             {format(weekStart, 'MMM d')} – {format(addDays(weekStart, 6), 'MMM d, yyyy')}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => setWeekStart((d) => addDays(d, -7))}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}>
-            Today
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setWeekStart((d) => addDays(d, 7))}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <Button onClick={() => setSheetOpen(true)}>
+          <div className="flex items-center rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <button
+              onClick={() => setWeekStart((d) => addDays(d, -7))}
+              className="px-3 py-2 hover:bg-gray-50 text-gray-500 hover:text-gray-700 border-r border-gray-200 transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
+              className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-r border-gray-200 transition-colors"
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setWeekStart((d) => addDays(d, 7))}
+              className="px-3 py-2 hover:bg-gray-50 text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+          <Button onClick={() => setSheetOpen(true)} className="shadow-sm">
             <Plus className="h-4 w-4" /> Add Appointment
           </Button>
         </div>
       </div>
 
-      {/* Calendar grid */}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      {/* Calendar */}
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         {/* Day headers */}
-        <div className="grid border-b border-gray-200" style={{ gridTemplateColumns: '4rem repeat(7, 1fr)' }}>
-          <div className="border-r border-gray-200 px-2 py-3" />
-          {weekDays.map((day) => (
-            <div key={day.toISOString()} className={`border-r border-gray-200 px-2 py-3 text-center last:border-r-0 ${
-              isSameDay(day, new Date()) ? 'bg-blue-50' : ''
-            }`}>
-              <p className="text-xs font-medium text-gray-500">{format(day, 'EEE')}</p>
-              <p className={`text-sm font-semibold ${isSameDay(day, new Date()) ? 'text-blue-600' : 'text-gray-900'}`}>
-                {format(day, 'd')}
-              </p>
-            </div>
-          ))}
+        <div className="grid bg-gray-50 border-b border-gray-200" style={{ gridTemplateColumns: '4.5rem repeat(7, 1fr)' }}>
+          <div className="border-r border-gray-200" />
+          {weekDays.map((day) => {
+            const isToday = isSameDay(day, new Date())
+            const weekend = isWeekend(day)
+            return (
+              <div
+                key={day.toISOString()}
+                className={`border-r border-gray-200 last:border-r-0 px-3 py-4 text-center ${weekend ? 'bg-gray-50/80' : ''}`}
+              >
+                <p className={`text-[11px] font-semibold uppercase tracking-widest ${isToday ? 'text-teal-600' : 'text-gray-400'}`}>
+                  {format(day, 'EEE')}
+                </p>
+                <div className={`mx-auto mt-1 flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold transition-colors ${
+                  isToday ? 'bg-teal-600 text-white shadow-md shadow-teal-200' : 'text-gray-700'
+                }`}>
+                  {format(day, 'd')}
+                </div>
+              </div>
+            )
+          })}
         </div>
 
         {/* Hour rows */}
-        <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 16rem)' }}>
+        <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 15rem)' }}>
           {loading ? (
-            <div className="flex h-64 items-center justify-center text-sm text-gray-400">Loading...</div>
+            <div className="flex h-64 items-center justify-center gap-2 text-sm text-gray-400">
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+              Loading…
+            </div>
           ) : (
-            hours.map((hour) => (
+            hours.map((hour, idx) => (
               <div
                 key={hour}
-                className="grid border-b border-gray-100 last:border-b-0"
-                style={{ gridTemplateColumns: '4rem repeat(7, 1fr)', minHeight: '4rem' }}
+                className={`grid border-b border-gray-100 last:border-b-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}
+                style={{ gridTemplateColumns: '4.5rem repeat(7, 1fr)', minHeight: '4.5rem' }}
               >
-                <div className="border-r border-gray-200 px-2 py-1 text-xs text-gray-400">
-                  {format(new Date().setHours(hour, 0, 0), 'h a')}
+                {/* Time label */}
+                <div className="border-r border-gray-200 flex items-start justify-end pr-3 pt-2">
+                  <span className="text-[11px] font-medium text-gray-400">
+                    {format(new Date().setHours(hour, 0, 0), 'h a')}
+                  </span>
                 </div>
+
                 {weekDays.map((day) => {
+                  const isToday = isSameDay(day, new Date())
+                  const weekend = isWeekend(day)
                   const dayAppts = getAppointmentsForDayHour(day, hour)
                   return (
-                    <div key={day.toISOString()} className="border-r border-gray-100 p-1 last:border-r-0">
+                    <div
+                      key={day.toISOString()}
+                      className={`border-r border-gray-100 last:border-r-0 p-1.5 ${
+                        isToday ? 'bg-teal-50/30' : weekend ? 'bg-gray-50/60' : ''
+                      }`}
+                    >
                       {dayAppts.map((a) => (
                         <div
                           key={a.id}
-                          className="mb-1 rounded bg-blue-100 px-1.5 py-1 text-xs"
+                          className="group relative mb-1.5 last:mb-0 rounded-lg border-l-[3px] border-teal-500 bg-teal-50 px-2 py-1.5 text-xs shadow-sm hover:shadow-md hover:bg-teal-100/80 transition-all cursor-default"
                         >
-                          <p className="font-medium text-blue-800 truncate">{a.title}</p>
+                          <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5 bg-white rounded-md shadow-sm border border-gray-100 p-0.5">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openEdit(a) }}
+                              className="rounded p-0.5 hover:bg-teal-50 text-teal-600"
+                              title="Edit"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(a.id) }}
+                              className="rounded p-0.5 hover:bg-red-50 text-red-500"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                          <p className="font-semibold text-teal-900 truncate pr-12 leading-tight">{a.title}</p>
                           {a.customers && (
-                            <p className="text-blue-600 truncate">
+                            <p className="text-teal-600 truncate text-[11px] mt-0.5">
                               {a.customers.first_name} {a.customers.last_name ?? ''}
                             </p>
                           )}
-                          <Badge variant={STATUS_VARIANTS[a.status] ?? 'default'} className="mt-0.5 text-[10px]">
-                            {a.status}
-                          </Badge>
+                          <div className="mt-1">
+                            <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                              a.status === 'confirmed' || a.status === 'completed'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : a.status === 'cancelled'
+                                ? 'bg-red-100 text-red-600'
+                                : a.status === 'no_show'
+                                ? 'bg-amber-100 text-amber-700'
+                                : 'bg-teal-100 text-teal-700'
+                            }`}>
+                              {a.status}
+                            </span>
+                          </div>
+                          {confirmDeleteId === a.id && (
+                            <div className="mt-1.5 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              <span className="text-red-500 text-[10px] font-medium">Delete?</span>
+                              <button
+                                onClick={() => onDelete(a.id)}
+                                disabled={deletingId === a.id}
+                                className="rounded-md bg-red-500 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-red-600 disabled:opacity-50"
+                              >
+                                {deletingId === a.id ? '…' : 'Yes'}
+                              </button>
+                              <button
+                                onClick={() => setConfirmDeleteId(null)}
+                                className="rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600 hover:bg-gray-200"
+                              >
+                                No
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -207,6 +342,48 @@ export default function AppointmentsPage() {
           )}
         </div>
       </div>
+
+      <InlineFormSheet open={editSheetOpen} onClose={() => { setEditSheetOpen(false); setEditError(null) }} title="Edit Appointment">
+        <form onSubmit={handleSubmitEdit(onEdit)} className="space-y-4">
+          {editError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{editError}</div>
+          )}
+          <Input label="Title" placeholder="Repair Consultation" required error={editErrors.title?.message} {...registerEdit('title')} />
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Customer (optional)</label>
+            <select
+              {...registerEdit('customer_id')}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            >
+              <option value="">No customer</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>{c.first_name} {c.last_name ?? ''}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Assigned To (optional)</label>
+            <select
+              {...registerEdit('employee_id')}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            >
+              <option value="">Unassigned</option>
+              {employees.map((e) => (
+                <option key={e.id} value={e.id}>{e.first_name} {e.last_name ?? ''}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Start Time" type="datetime-local" required error={editErrors.start_time?.message} {...registerEdit('start_time')} />
+            <Input label="End Time" type="datetime-local" required error={editErrors.end_time?.message} {...registerEdit('end_time')} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
+            <textarea rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" {...registerEdit('notes')} />
+          </div>
+          <Button type="submit" className="w-full" loading={isEditSubmitting}>Save Changes</Button>
+        </form>
+      </InlineFormSheet>
 
       <InlineFormSheet open={sheetOpen} onClose={() => { setSheetOpen(false); setCreateError(null) }} title="Add Appointment">
         <form onSubmit={handleSubmit(onCreate)} className="space-y-4">

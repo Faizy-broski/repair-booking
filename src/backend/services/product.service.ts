@@ -345,4 +345,25 @@ export const ProductService = {
       await adminSupabase.from('products').update({ has_variants: false }).eq('id', productId)
     }
   },
+
+  async checkAvailability(businessId: string, params: { sku?: string | null; barcode?: string | null; excludeId?: string | null }) {
+    const { sku, barcode, excludeId } = params
+    const result = { skuExists: false, barcodeExists: false }
+
+    if (sku) {
+      let q = adminSupabase.from('products').select('id', { count: 'exact', head: true }).eq('business_id', businessId).eq('sku', sku)
+      if (excludeId) q = q.neq('id', excludeId)
+      const { count } = await q
+      result.skuExists = (count ?? 0) > 0
+    }
+
+    if (barcode) {
+      let q = adminSupabase.from('products').select('id', { count: 'exact', head: true }).eq('business_id', businessId).eq('barcode', barcode)
+      if (excludeId) q = q.neq('id', excludeId)
+      const { count } = await q
+      result.barcodeExists = (count ?? 0) > 0
+    }
+
+    return result
+  },
 }

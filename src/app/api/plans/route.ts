@@ -13,6 +13,8 @@ const schema = z.object({
   max_users: z.coerce.number().int().positive(),
   // DB column is JSONB array e.g. ["pos","repairs"] — the DB function uses @> operator to check membership
   features: z.array(z.string()).default([]),
+  // null value for a limit key = unlimited (admin left the field blank).
+  // The check_plan_limit() RPC treats NULL as no restriction.
   limits: z.record(z.string(), z.union([z.number(), z.boolean(), z.null()])).default({}),
   stripe_price_id_monthly: z.string().transform((v) => v || null).nullable().optional(),
   stripe_price_id_yearly:  z.string().transform((v) => v || null).nullable().optional(),

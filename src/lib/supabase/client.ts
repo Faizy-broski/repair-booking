@@ -11,7 +11,7 @@ export function createClient() {
     isProd && rootDomain
       ? {
           cookieOptions: {
-            domain: `.${rootDomain}`,  // .repairpos.tech — shared across all subdomains
+            domain: `.${rootDomain}`,  // .repairbooking.co.uk — shared across all subdomains
             path: '/',
             sameSite: 'lax',
             secure: true,

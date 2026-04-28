@@ -252,13 +252,14 @@ export interface VerticalTemplateApplyLog {
 // ── Phase 10: Plan Limits ─────────────────────────────────────────────────────
 
 export interface PlanLimits {
-  max_custom_fields?: number
-  max_products?: number
-  max_services?: number
-  max_employees?: number
-  max_customers?: number
-  max_appointments_per_month?: number
-  storage_limit_mb?: number
+  // null = unlimited (admin left the field blank). undefined = not yet set.
+  max_custom_fields?: number | null
+  max_products?: number | null
+  max_services?: number | null
+  max_employees?: number | null
+  max_customers?: number | null
+  max_appointments_per_month?: number | null
+  storage_limit_mb?: number | null
   has_api_access?: boolean
   has_white_label?: boolean
   has_priority_support?: boolean

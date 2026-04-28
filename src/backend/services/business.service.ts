@@ -98,11 +98,11 @@ export const BusinessService = {
     // Per-branch stats — repairs, products, customers, staff, revenue
     const branchIds = (branches ?? []).map((b: any) => b.id)
     let totalRevenue = 0
-    const branchRevenueMap:   Record<string, number> = {}
-    const branchRepairMap:    Record<string, number> = {}
-    const branchProductMap:   Record<string, number> = {}
-    const branchCustomerMap:  Record<string, number> = {}
-    const branchStaffMap:     Record<string, number> = {}
+    const branchRevenueMap: Record<string, number> = {}
+    const branchRepairMap: Record<string, number> = {}
+    const branchProductMap: Record<string, number> = {}
+    const branchCustomerMap: Record<string, number> = {}
+    const branchStaffMap: Record<string, number> = {}
 
     if (branchIds.length > 0) {
       const [
@@ -124,8 +124,8 @@ export const BusinessService = {
         totalRevenue += rev
         branchRevenueMap[s.branch_id] = (branchRevenueMap[s.branch_id] ?? 0) + rev
       }
-      for (const r of repairsData ?? [])        branchRepairMap[r.branch_id]    = (branchRepairMap[r.branch_id]    ?? 0) + 1
-      for (const p of branchProductsData ?? []) branchProductMap[p.branch_id]   = (branchProductMap[p.branch_id]   ?? 0) + 1
+      for (const r of repairsData ?? []) branchRepairMap[r.branch_id] = (branchRepairMap[r.branch_id] ?? 0) + 1
+      for (const p of branchProductsData ?? []) branchProductMap[p.branch_id] = (branchProductMap[p.branch_id] ?? 0) + 1
       for (const c of customersData ?? []) {
         if (c.branch_id) branchCustomerMap[c.branch_id] = (branchCustomerMap[c.branch_id] ?? 0) + 1
       }
@@ -137,30 +137,30 @@ export const BusinessService = {
     const branchesWithStats = (branches ?? []).map((b: any) => ({
       ...b,
       stats: {
-        repairs:   branchRepairMap[b.id]   ?? 0,
-        products:  branchProductMap[b.id]  ?? 0,
+        repairs: branchRepairMap[b.id] ?? 0,
+        products: branchProductMap[b.id] ?? 0,
         customers: branchCustomerMap[b.id] ?? 0,
-        staff:     branchStaffMap[b.id]    ?? 0,
-        revenue:   branchRevenueMap[b.id]  ?? 0,
+        staff: branchStaffMap[b.id] ?? 0,
+        revenue: branchRevenueMap[b.id] ?? 0,
       },
     }))
 
     // Top-level stats = sum across all branches (consistent with per-branch cards below)
-    const sumRepairs   = Object.values(branchRepairMap).reduce((s, v) => s + v, 0)
-    const sumProducts  = Object.values(branchProductMap).reduce((s, v) => s + v, 0)
+    const sumRepairs = Object.values(branchRepairMap).reduce((s, v) => s + v, 0)
+    const sumProducts = Object.values(branchProductMap).reduce((s, v) => s + v, 0)
     const sumCustomers = Object.values(branchCustomerMap).reduce((s, v) => s + v, 0)
-    const sumStaff     = Object.values(branchStaffMap).reduce((s, v) => s + v, 0)
+    const sumStaff = Object.values(branchStaffMap).reduce((s, v) => s + v, 0)
 
     return {
       business: business ? { ...business, subscriptions: subscriptions ?? [] } : null,
       ownerProfile,
       branches: branchesWithStats,
       stats: {
-        repairs:   sumRepairs,
-        products:  sumProducts,
+        repairs: sumRepairs,
+        products: sumProducts,
         customers: sumCustomers,
         employees: sumStaff,
-        revenue:   totalRevenue,
+        revenue: totalRevenue,
       },
     }
   },
@@ -197,5 +197,29 @@ export const BusinessService = {
       adminSupabase.from('businesses').select('*', { count: 'exact', head: true }).eq('is_suspended', true),
     ])
     return { total: total ?? 0, active: active ?? 0, suspended: suspended ?? 0 }
+  },
+
+  async delete(id: string) {
+    // 1. Collect all auth user IDs for this business so we can remove them from
+    //    Supabase Auth after the DB rows are gone.
+    const { data: profiles } = await adminSupabase
+      .from('profiles')
+      .select('id')
+      .eq('business_id', id)
+    const authUserIds = (profiles ?? []).map((p: { id: string }) => p.id)
+
+    // 2. Delete the business row — DB-level CASCADE removes branches, profiles,
+    //    subscriptions, and all other child rows automatically.
+    const { error } = await adminSupabase
+      .from('businesses')
+      .delete()
+      .eq('id', id)
+    if (error) throw error
+
+    // 3. Remove the auth identities; fire-and-forget any individual failures so
+    //    a missing auth record doesn't abort the whole operation.
+    await Promise.allSettled(
+      authUserIds.map((uid: string) => adminSupabase.auth.admin.deleteUser(uid))
+    )
   },
 }

@@ -13,7 +13,7 @@ interface TopbarProps {
 }
 
 export function Topbar({ onMenuClick }: TopbarProps) {
-  const { profile, branches } = useAuthStore()
+  const { profile, branches, clear: clearAuthStore } = useAuthStore()
   const unreadCount = useMessageStore((s) => s.unreadCount)
   const unreadMessages = useMessageStore((s) => s.unreadMessages)
   const setPendingThreadId = useMessageStore((s) => s.setPendingThreadId)
@@ -27,9 +27,16 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   const userRef = useRef<HTMLDivElement>(null)
 
   async function handleSignOut() {
+    // Clear local store immediately so stale profile/branch don't flash
+    clearAuthStore()
     const supabase = createClient()
-    await supabase.auth.signOut({ scope: 'local' })
-    router.push('/login')
+    // scope: 'global' revokes the refresh token server-side, so the session can't
+    // be reused even if the shared .repairbooking.co.uk cookie isn't cleared by the browser
+    await supabase.auth.signOut({ scope: 'global' })
+    // Full-page navigation to the ROOT domain login — not router.push (which would
+    // stay on this subdomain and risk re-using the stale shared cookie)
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL
+    window.location.href = appUrl ? `${appUrl}/login` : '/login'
   }
 
   // Close dropdowns on outside click
@@ -65,10 +72,16 @@ export function Topbar({ onMenuClick }: TopbarProps) {
       <div className="flex items-center gap-2 ml-auto">
         <Link
           href="/repairs"
-          className="hidden items-center gap-2 rounded-lg bg-primary px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-on-primary shadow-md shadow-primary/20 transition-all hover:bg-primary-dim hover:scale-105 active:scale-95 sm:flex"
+          className="relative hidden items-center justify-center overflow-hidden rounded-xl p-[1.5px] transition-all hover:scale-[1.02] active:scale-95 sm:flex shadow-[0_0_20px_-5px_var(--primary)]"
         >
-          <Wrench className="h-4 w-4" />
-          Repairs
+          {/* Rotating gradient background using high-contrast brand colors */}
+          <span className="absolute inset-[-1000%] animate-[spin_4s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,var(--on-primary)_0%,var(--primary-fixed)_50%,var(--on-primary)_100%)]" />
+          
+          {/* Inner button content using brand teal instead of black */}
+          <span className="relative flex items-center gap-2 rounded-[11px] bg-primary px-6 py-2.5 text-[12px] font-extrabold uppercase tracking-widest text-on-primary backdrop-blur-3xl">
+            <Wrench className="h-4 w-4" />
+            Repairs
+          </span>
         </Link>
 
         {/* ── Bell / Messages dropdown ── */}

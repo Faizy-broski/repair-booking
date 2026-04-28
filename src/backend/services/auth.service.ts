@@ -115,6 +115,32 @@ export const AuthService = {
         is_active: true,
       })
 
+    // 5. Seed default repair statuses
+    const defaultStatuses = [
+      { name: 'Received', color: '#64748b', sort_order: 1 },
+      { name: 'In Progress', color: '#0ea5e9', sort_order: 2 },
+      { name: 'Waiting for Parts', color: '#f59e0b', sort_order: 3 },
+      { name: 'Ready for Collection', color: '#10b981', sort_order: 4 },
+      { name: 'Collected', color: '#6366f1', sort_order: 5 },
+      { name: 'Unrepairable', color: '#ef4444', sort_order: 6 },
+    ]
+    await supabase.from('repair_custom_statuses').insert(
+      defaultStatuses.map(s => ({ ...s, business_id: business.id }))
+    )
+
+    // 6. Seed common faults
+    const defaultFaults = [
+      { name: 'No Power', sort_order: 1 },
+      { name: 'Broken Screen', sort_order: 2 },
+      { name: 'Liquid Damage', sort_order: 3 },
+      { name: 'Software Issue', sort_order: 4 },
+      { name: 'Battery Issue', sort_order: 5 },
+      { name: 'Charging Port', sort_order: 6 },
+    ]
+    await supabase.from('repair_faults').insert(
+      defaultFaults.map(f => ({ ...f, business_id: business.id }))
+    )
+
     return { business, branch, userId }
   },
 }

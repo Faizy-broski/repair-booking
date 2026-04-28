@@ -65,19 +65,20 @@ export const AppointmentService = {
     return data
   },
 
-  async update(id: string, branchId: string, payload: Record<string, unknown>) {
-    const { data, error } = await db('appointments')
+  async update(id: string, branchId: string | null, payload: Record<string, unknown>) {
+    let q = db('appointments')
       .update({ ...payload, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .eq('branch_id', branchId)
-      .select()
-      .single()
+    if (branchId) q = q.eq('branch_id', branchId)
+    const { data, error } = await q.select().single()
     if (error) throw error
     return data
   },
 
-  async delete(id: string, branchId: string) {
-    await db('appointments').delete().eq('id', id).eq('branch_id', branchId)
+  async delete(id: string, branchId: string | null) {
+    let q = db('appointments').delete().eq('id', id)
+    if (branchId) q = q.eq('branch_id', branchId)
+    await q
   },
 
   async cancelByToken(token: string) {

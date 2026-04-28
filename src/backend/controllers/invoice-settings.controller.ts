@@ -46,7 +46,7 @@ const schema = z.object({
 
   // Social links
   social_links: socialLinksSchema,
-
+ 
   // Options
   show_tax_breakdown:    z.boolean().optional(),
   show_payment_method:   z.boolean().optional(),

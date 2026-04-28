@@ -7,6 +7,7 @@ import { DataTable } from '@/components/shared/data-table'
 import { Modal } from '@/components/ui/modal'
 import { KanbanBoard } from '@/components/repairs/kanban-board'
 import { CustomerSearch } from '@/components/repairs/customer-search'
+import { CreatableCombobox } from '@/components/ui/creatable-combobox'
 import { useAuthStore } from '@/store/auth.store'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -353,10 +354,11 @@ export default function RepairsPage() {
   }, [])
 
   const queryClient = useQueryClient()
+  const repairsQueryKey = ['repairs', activeBranch?.id, page, search, statusFilter, view] as const
 
   // ── Repairs Query ──
   const { data: repairResponse, isLoading: repairsLoading, refetch: fetchRepairs } = useQuery({
-    queryKey: ['repairs', activeBranch?.id, page, search, statusFilter, view],
+    queryKey: repairsQueryKey,
     queryFn: async () => {
       const params = new URLSearchParams({
         branch_id: activeBranch!.id,
@@ -408,15 +410,32 @@ export default function RepairsPage() {
   }
 
   async function handleStatusChange(repairId: string, newStatus: string) {
+    const previousData = queryClient.getQueryData<typeof repairResponse>(repairsQueryKey)
+
+    if (previousData?.data) {
+      queryClient.setQueryData<typeof repairResponse>(repairsQueryKey, (old) => {
+        if (!old?.data) return old
+        return {
+          ...old,
+          data: old.data.map((repair: RepairRow) =>
+            repair.id === repairId ? { ...repair, status: newStatus } : repair
+          ),
+        }
+      })
+    }
+
     const res = await fetch(`/api/repairs/${repairId}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: newStatus, note: '', send_email: false }),
     })
-    
+
     if (res.ok) {
       queryClient.invalidateQueries({ queryKey: ['repairs'] })
     } else {
+      if (previousData) {
+        queryClient.setQueryData(repairsQueryKey, previousData)
+      }
       if (res.status === 403) {
         toast.error("Permission Denied: You don't have permission to update repair status.")
       } else {
@@ -611,6 +630,66 @@ export default function RepairsPage() {
       toast.error(errMsg)
     }
     setSubmitting(false)
+  }
+
+  // ── Inline Creators for Device Catalogue ───────────────────────────────────
+  async function createDeviceType(name: string) {
+    if (!activeBranch) return
+    const res = await fetch('/api/categories', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    if (res.ok) {
+      toast.success(`Added "${name}" to device types`)
+      // Refresh device data
+      const bid = activeBranch.id
+      fetch(`/api/repairs/devices?branch_id=${bid}`).then(r => r.json()).then(j => { if (j.data) setDeviceData(j.data) })
+      setJobData(p => ({ ...p, device_type: name }))
+    }
+  }
+
+  async function createDeviceBrand(name: string) {
+    if (!activeBranch) return
+    // We need a category ID if one is selected, else null
+    // But manufacturers in our schema might need a category_id or not.
+    // Let's check what the manufacturers API expects.
+    const res = await fetch('/api/services/manufacturers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    if (res.ok) {
+      toast.success(`Added "${name}" to brands`)
+      const bid = activeBranch.id
+      fetch(`/api/repairs/devices?branch_id=${bid}`).then(r => r.json()).then(j => { if (j.data) setDeviceData(j.data) })
+      setJobData(p => ({ ...p, device_brand: name }))
+    }
+  }
+
+  async function createDeviceModel(name: string) {
+    if (!activeBranch) return
+    // Find selected brand ID
+    const mfRes = await fetch('/api/services/manufacturers')
+    const mfJson = await mfRes.json()
+    const manufacturer = (mfJson.data ?? []).find((m: any) => m.name.toLowerCase() === jobData.device_brand.toLowerCase())
+    
+    if (!manufacturer) {
+      toast.error('Please select an existing brand first or create it.')
+      return
+    }
+
+    const res = await fetch('/api/services/devices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, manufacturer_id: manufacturer.id }),
+    })
+    if (res.ok) {
+      toast.success(`Added "${name}" to models`)
+      const bid = activeBranch.id
+      fetch(`/api/repairs/devices?branch_id=${bid}`).then(r => r.json()).then(j => { if (j.data) setDeviceData(j.data) })
+      setJobData(p => ({ ...p, device_model: name }))
+    }
   }
 
   // All statuses come from DB — no hardcoded fallbacks
@@ -1194,24 +1273,35 @@ export default function RepairsPage() {
                 <div className="grid grid-cols-4 gap-2">
                   <div>
                     <label className={lbl}>Type</label>
-                    <ComboInput value={jobData.device_type} onChange={(v) => setJobData((p) => ({ ...p, device_type: v, device_brand: '', device_model: '' }))} options={deviceData.types} placeholder="Phone…" />
+                    <CreatableCombobox
+                      options={deviceData.types.map(t => ({ value: t, label: t }))}
+                      value={jobData.device_type}
+                      onChange={(v) => setJobData((p) => ({ ...p, device_type: v, device_brand: '', device_model: '' }))}
+                      onCreate={createDeviceType}
+                      placeholder="Phone…"
+                      createLabel="Add type"
+                    />
                   </div>
                   <div>
                     <label className={lbl}>Brand</label>
-                    <ComboInput 
-                      value={jobData.device_brand} 
-                      onChange={(v) => setJobData((p) => ({ ...p, device_brand: v, device_model: '' }))} 
-                      options={jobData.device_type ? [...new Set(deviceData.raw.filter(d => d.device_type === jobData.device_type).map(d => d.device_brand).filter(Boolean) as string[])] : []} 
-                      placeholder="Apple…" 
+                    <CreatableCombobox
+                      options={filteredBrands.map(b => ({ value: b, label: b }))}
+                      value={jobData.device_brand}
+                      onChange={(v) => setJobData((p) => ({ ...p, device_brand: v, device_model: '' }))}
+                      onCreate={createDeviceBrand}
+                      placeholder="Apple…"
+                      createLabel="Add brand"
                     />
                   </div>
                   <div>
                     <label className={lbl}>Model</label>
-                    <ComboInput 
-                      value={jobData.device_model} 
-                      onChange={(v) => setJobData((p) => ({ ...p, device_model: v }))} 
-                      options={jobData.device_brand ? [...new Set(deviceData.raw.filter(d => d.device_brand === jobData.device_brand && (!jobData.device_type || d.device_type === jobData.device_type)).map(d => d.device_model).filter(Boolean) as string[])] : []} 
-                      placeholder="iPhone 15…" 
+                    <CreatableCombobox
+                      options={filteredModels.map(m => ({ value: m, label: m }))}
+                      value={jobData.device_model}
+                      onChange={(v) => setJobData((p) => ({ ...p, device_model: v }))}
+                      onCreate={jobData.device_brand ? createDeviceModel : undefined}
+                      placeholder={jobData.device_brand ? 'iPhone 15…' : 'Select brand first'}
+                      createLabel="Add model"
                     />
                   </div>
                   <div>

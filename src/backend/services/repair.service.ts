@@ -9,7 +9,7 @@ export const RepairService = {
     const { page = 1, limit = 20, status, search, businessId, customerId } = params
     let q = adminSupabase
       .from('repairs')
-      .select('*, customers(first_name,last_name,phone,email), employees!assigned_to(id,first_name,last_name)', { count: 'exact' })
+      .select('*, customers(first_name,last_name,phone,email)', { count: 'exact' })
       .order('is_rush', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1)
@@ -39,7 +39,7 @@ export const RepairService = {
   async getById(id: string, branchId?: string) {
     let q = adminSupabase
       .from('repairs')
-      .select('*, customers(*), repair_items(*), repair_status_history(*,profiles!changed_by(full_name)), employees!assigned_to(id,first_name,last_name)')
+      .select('*, customers(*), repair_items(*), repair_status_history(*,profiles!changed_by(full_name))')
       .eq('id', id)
     // branchId is null/empty for business owners who have access to all branches
     if (branchId) q = q.eq('branch_id', branchId)

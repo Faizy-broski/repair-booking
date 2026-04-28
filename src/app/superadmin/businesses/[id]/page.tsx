@@ -182,12 +182,12 @@ export default function BusinessDetailPage({ params }: { params: Promise<{ id: s
               </Badge>
             </div>
             <a
-              href={`https://${business.subdomain}.repairbooking.co.uk`}
+              href={`https://${business.subdomain}.repairbooking.co.uk/login`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-0.5"
             >
-              {business.subdomain}.repairbooking.co.uk
+              {business.subdomain}.repairbooking.co.uk/login
               <ExternalLink className="h-3 w-3" />
             </a>
           </div>

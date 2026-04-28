@@ -4,8 +4,26 @@ import { AuthService } from '@/backend/services/auth.service'
 import { EmailService } from '@/backend/services/email.service'
 import { createAdminClient } from '@/backend/config/supabase'
 import { VerticalTemplateService } from '@/backend/services/vertical-template.service'
-import { created, conflict, serverError } from '@/backend/utils/api-response'
+import { created, conflict, serverError, badRequest } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
+
+async function isEmailVerified(email: string): Promise<boolean> {
+  try {
+    const supabase = createAdminClient()
+    const windowStart = new Date(Date.now() - 30 * 60 * 1000).toISOString() // 30-min window
+    const { data } = await (supabase as any)
+      .from('email_verifications')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .not('verified_at', 'is', null)
+      .gte('verified_at', windowStart)
+      .limit(1)
+      .maybeSingle()
+    return !!data
+  } catch {
+    return false
+  }
+}
 
 const schema = z.object({
   businessName:          z.string().min(2),
@@ -26,6 +44,12 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = createAdminClient()
 
+    // Guard: email must be verified via OTP before account creation
+    const verified = await isEmailVerified(data.email)
+    if (!verified) {
+      return badRequest('Email address has not been verified. Please complete email verification first.', 'EMAIL_NOT_VERIFIED')
+    }
+
     // Look up plan type
     let planType: string | null = null
     if (data.planId) {
@@ -39,15 +63,15 @@ export async function POST(request: NextRequest) {
 
     const trialEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
-    // Free plan: create account immediately, fully active
+    // Create account immediately, fully active for 30 days
     const result = await AuthService.register({
       ...data,
       activateNow: true,
-      ...(planType === 'free' ? { trialEndsAt } : {}),
+      trialEndsAt,
     })
 
-    // Create subscription row for free plan
-    if (planType === 'free' && data.planId) {
+    // Create subscription row for ALL plans with a 30-day trial
+    if (data.planId && planType !== 'enterprise') {
       await (supabase as any)
         .from('subscriptions')
         .insert({
@@ -65,6 +89,18 @@ export async function POST(request: NextRequest) {
         .eq('id', result.business.id)
     }
 
+    // Send welcome email for all non-enterprise plans
+    if (planType !== 'enterprise') {
+      EmailService.sendWelcome({
+        to:           data.email,
+        fullName:     data.fullName,
+        businessName: data.businessName,
+        subdomain:    data.subdomain,
+        password:     data.password,
+        planName:     'Starter',
+      }).catch((err) => console.error('[register] Welcome email failed:', err))
+    }
+
     // Enterprise: send enquiry emails immediately
     if (planType === 'enterprise') {
       EmailService.sendEnterpriseEnquiry({
@@ -72,7 +108,7 @@ export async function POST(request: NextRequest) {
         email:        data.email,
         fullName:     data.fullName,
         phone:        data.phone,
-      }).catch(() => {})
+      }).catch((err) => console.error('[register] Enterprise email failed:', err))
     }
 
     // Apply vertical template if one was chosen during onboarding (fire-and-forget)

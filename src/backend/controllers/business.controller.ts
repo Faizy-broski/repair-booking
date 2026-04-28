@@ -88,4 +88,13 @@ export const BusinessController = {
       return serverError('Failed to reset password', err)
     }
   },
+
+  async delete(_request: NextRequest, _ctx: RequestContext, id: string) {
+    try {
+      await BusinessService.delete(id)
+      return ok({ deleted: true })
+    } catch (err) {
+      return serverError('Failed to delete business', err)
+    }
+  },
 }

@@ -188,6 +188,11 @@ input, textarea, select {
   to   { transform: translateX(0); }
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 .animate-slide-in-left {
   animation: slide-in-left 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
 }

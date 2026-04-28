@@ -127,7 +127,7 @@ export const AppointmentController = {
   async update(request: NextRequest, ctx: RequestContext, id: string) {
     const { data, error } = await validateBody(request, updateSchema)
     if (error) return error
-    const branchId = ctx.auth.branchId ?? null
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     try {
       const appt = await AppointmentService.update(id, branchId, data)
       return ok(appt)
@@ -137,7 +137,7 @@ export const AppointmentController = {
   },
 
   async delete(request: NextRequest, ctx: RequestContext, id: string) {
-    const branchId = ctx.auth.branchId ?? null
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     try {
       await AppointmentService.delete(id, branchId)
       return ok({ deleted: true })

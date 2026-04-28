@@ -9,3 +9,7 @@ export const PATCH = withMiddleware(
   (req, ctx, { params }) => params.then((p) => BusinessController.update(req, ctx, p.id)),
   { requiredRole: 'super_admin', skipTenant: true }
 )
+export const DELETE = withMiddleware(
+  (req, ctx, { params }) => params.then((p) => BusinessController.delete(req, ctx, p.id)),
+  { requiredRole: 'super_admin', skipTenant: true }
+)

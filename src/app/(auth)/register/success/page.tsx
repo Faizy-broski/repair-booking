@@ -1,16 +1,21 @@
 'use client'
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { CheckCircle, Loader2, AlertTriangle, ArrowRight } from 'lucide-react'
+import { CheckCircle, Loader2, AlertTriangle, ArrowRight, Copy, Check } from 'lucide-react'
 
 function RegisterSuccessContent() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session_id')
+  const directSubdomain = searchParams.get('subdomain')
 
-  const [status, setStatus] = useState<'polling' | 'ready' | 'timeout'>('polling')
-  const [subdomain, setSubdomain] = useState<string | null>(null)
+  const [status, setStatus] = useState<'polling' | 'ready' | 'timeout'>(directSubdomain ? 'ready' : 'polling')
+  const [subdomain, setSubdomain] = useState<string | null>(directSubdomain)
+  const [copied, setCopied] = useState(false)
+  const [countdown, setCountdown] = useState(5)
+  const [redirecting, setRedirecting] = useState(false)
 
   const poll = useCallback(async (attempt: number) => {
+    if (directSubdomain) return // Skip polling if we came directly
     if (!sessionId || attempt > 30) {
       setStatus('timeout')
       return
@@ -30,22 +35,60 @@ function RegisterSuccessContent() {
       /* retry */
     }
     setTimeout(() => poll(attempt + 1), 2000)
-  }, [sessionId])
+  }, [sessionId, directSubdomain])
 
   useEffect(() => {
-    poll(0)
-  }, [poll])
+    if (!directSubdomain) {
+      poll(0)
+    }
+  }, [poll, directSubdomain])
 
-  /* Once ready, build the login URL for the subdomain */
-  const rootDomain =
-    typeof window !== 'undefined'
-      ? window.location.hostname.replace(/^www\./, '') // e.g. "localhost" or "repairpos.tech"
-      : ''
-  const port = typeof window !== 'undefined' ? window.location.port : ''
-  const protocol = typeof window !== 'undefined' ? window.location.protocol : 'https:'
-  const loginUrl = subdomain
-    ? `${protocol}//${subdomain}.${rootDomain}${port ? `:${port}` : ''}/login`
-    : null
+  // ── Build the login URL ──
+  const [loginUrl, setLoginUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!subdomain) return
+
+    // Default values
+    let protocol = 'https'
+    let root = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'repairbooking.co.uk'
+
+    // Localhost detection
+    if (typeof window !== 'undefined') {
+      const host = window.location.host
+      if (host.includes('localhost') || host.includes('127.0.0.1')) {
+        protocol = window.location.protocol.replace(':', '')
+        root = 'localhost:3000' // Ensure it points to the local port
+      }
+    }
+
+    setLoginUrl(`${protocol}://${subdomain}.${root}/login`)
+  }, [subdomain])
+
+  // ── Auto-redirect ──
+  useEffect(() => {
+    if (status === 'ready' && loginUrl && !redirecting) {
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer)
+            setRedirecting(true)
+            window.location.href = loginUrl
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+      return () => clearInterval(timer)
+    }
+  }, [status, loginUrl, redirecting])
+
+  function copyUrl() {
+    if (!loginUrl) return
+    navigator.clipboard.writeText(loginUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   return (
     <div className="mx-auto max-w-md text-center">
@@ -59,7 +102,7 @@ function RegisterSuccessContent() {
             Setting up your workspace&hellip;
           </h2>
           <p className="text-on-surface-variant text-sm leading-relaxed">
-            Payment received! We&rsquo;re creating your account now.
+            We&rsquo;re creating your account and configuring your modules.
             <br />
             This usually takes just a few seconds.
           </p>
@@ -80,18 +123,41 @@ function RegisterSuccessContent() {
       {/* ── Ready: redirect to subdomain login ─────────────────────────── */}
       {status === 'ready' && (
         <>
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary-container/30">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-container/30">
             <CheckCircle className="h-8 w-8 text-primary" />
           </div>
           <h2 className="text-2xl font-bold text-on-surface mb-2">
             You&rsquo;re all set!
           </h2>
           <p className="text-on-surface-variant text-sm mb-6 leading-relaxed">
-            Your workspace{' '}
-            <strong className="text-on-surface">{subdomain}</strong> is ready.
-            <br />
-            Log in with the email and password you chose during registration.
+            Your dedicated workspace is ready. Use your login URL below to access your dashboard.
           </p>
+
+          {/* Login URL box */}
+          {loginUrl && (
+            <div className="mb-6 rounded-xl border border-primary/30 bg-primary-container/10 p-4">
+              <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-widest mb-2">
+                Your Login URL
+              </p>
+              <div className="flex items-center gap-2 rounded-lg border border-outline-variant/40 bg-surface px-3 py-2.5">
+                <span className="flex-1 truncate text-sm font-semibold text-primary select-all text-left">
+                  {loginUrl}
+                </span>
+                <button
+                  onClick={copyUrl}
+                  className="shrink-0 flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-on-surface-variant hover:bg-surface-container transition-colors"
+                >
+                  {copied
+                    ? <><Check className="h-3.5 w-3.5 text-primary" /> Copied</>
+                    : <><Copy className="h-3.5 w-3.5" /> Copy</>
+                  }
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-on-surface-variant">
+                Log in with the email &amp; password you chose during registration.
+              </p>
+            </div>
+          )}
 
           {/* Steps reminder */}
           <div className="rounded-xl bg-surface-container border border-outline-variant/30 p-5 mb-6 text-left space-y-3">
@@ -99,9 +165,9 @@ function RegisterSuccessContent() {
               What&rsquo;s next
             </p>
             {[
-              'Log in with your email & password',
+              'Open your login URL and sign in',
               'Complete your business profile',
-              'Add staff, services and inventory',
+              'Add your staff and assign roles',
               'Start taking repairs and sales!',
             ].map((step, i) => (
               <div key={i} className="flex items-center gap-3">
@@ -113,14 +179,15 @@ function RegisterSuccessContent() {
             ))}
           </div>
 
-          {loginUrl && (
-            <a
-              href={loginUrl}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary hover:bg-primary-dim px-6 py-3 text-sm font-bold text-on-primary transition-colors"
-            >
-              Go to your login page <ArrowRight className="h-4 w-4" />
-            </a>
-          )}
+          <a
+            href={loginUrl ?? '#'}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary hover:bg-primary-dim px-6 py-3 text-sm font-bold text-on-primary transition-colors"
+          >
+            {redirecting ? 'Redirecting...' : `Go to your login page (${countdown}s)`} <ArrowRight className="h-4 w-4" />
+          </a>
+          <p className="mt-4 text-xs text-on-surface-variant italic">
+            You will be automatically redirected to your dashboard in {countdown} seconds.
+          </p>
         </>
       )}
 

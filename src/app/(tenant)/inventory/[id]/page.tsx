@@ -9,6 +9,7 @@ import { Modal } from '@/components/ui/modal'
 import { ImageUpload } from '@/components/ui/image-upload'
 import { formatCurrency } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
+import { useDashboardStore } from '@/store/dashboard.store'
 import Link from 'next/link'
 
 interface BranchAvailability {
@@ -74,14 +75,18 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [costPrice, setCostPrice] = useState('')
   const [sellingPrice, setSellingPrice] = useState('')
   const [supplierId, setSupplierId] = useState('')
-  const [onHand, setOnHand] = useState<number | null>(null)
-  const [lowStockAlert, setLowStockAlert] = useState(5)
+  const [onHand, setOnHand] = useState<string>('0')
+  const [lowStockAlert, setLowStockAlert] = useState<string>('5')
   const [physicalLocation, setPhysicalLocation] = useState('')
 
   const [commissionEnabled, setCommissionEnabled] = useState(false)
   const [commissionType, setCommissionType] = useState('percentage')
   const [commissionRate, setCommissionRate] = useState('')
   const [loyaltyEnabled, setLoyaltyEnabled] = useState(true)
+
+  const [skuConflict, setSkuConflict] = useState(false)
+  const [barcodeConflict, setBarcodeConflict] = useState(false)
+  const [checkingAvailability, setCheckingAvailability] = useState(false)
 
   const [branchAvailability, setBranchAvailability] = useState<BranchAvailability[]>([])
   const [togglingBranch, setTogglingBranch] = useState<string | null>(null)
@@ -93,7 +98,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     const json = await res.json()
     const p: Product & { on_hand?: number } = json.data ?? json
     setProduct(p)
-    if (p.on_hand !== undefined) setOnHand(p.on_hand)
+    if (p.on_hand !== undefined) setOnHand(String(p.on_hand))
 
     setItemType((p.item_type as ItemType) ?? (p.is_service ? 'part' : 'product'))
     setName(p.name ?? '')
@@ -104,19 +109,51 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     setBarcode(p.barcode ?? '')
     setImageUrl(p.image_url ?? '')
     setPartType(p.part_type ?? '')
-    setCostPrice(String(p.cost_price ?? ''))
-    setSellingPrice(String(p.selling_price ?? ''))
+    setCostPrice(p.cost_price != null ? String(p.cost_price) : '')
+    setSellingPrice(p.selling_price != null ? String(p.selling_price) : '')
     setSupplierId(p.supplier_id ?? p.suppliers?.id ?? '')
-    setLowStockAlert(p.low_stock_alert ?? 5)
+    setLowStockAlert(p.low_stock_alert != null ? String(p.low_stock_alert) : '5')
     setPhysicalLocation(p.physical_location ?? '')
     setCommissionEnabled(p.commission_enabled ?? false)
     setCommissionType(p.commission_type ?? 'percentage')
-    setCommissionRate(String(p.commission_rate ?? ''))
+    setCommissionRate(p.commission_rate != null ? String(p.commission_rate) : '')
     setLoyaltyEnabled(p.loyalty_enabled ?? true)
     setLoading(false)
   }, [id, activeBranch])
 
   useEffect(() => { fetchProduct() }, [fetchProduct])
+
+  // ── Uniqueness Check ───────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!sku && !barcode) {
+      setSkuConflict(false)
+      setBarcodeConflict(false)
+      return
+    }
+
+    const timer = setTimeout(async () => {
+      setCheckingAvailability(true)
+      try {
+        const params = new URLSearchParams()
+        if (sku) params.set('sku', sku)
+        if (barcode) params.set('barcode', barcode)
+        params.set('excludeId', id)
+        
+        const res = await fetch(`/api/products/check-availability?${params.toString()}`)
+        const json = await res.json()
+        if (json.data) {
+          setSkuConflict(json.data.skuExists)
+          setBarcodeConflict(json.data.barcodeExists)
+        }
+      } catch (err) {
+        console.error('Failed to check availability:', err)
+      } finally {
+        setCheckingAvailability(false)
+      }
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [sku, barcode, id])
 
   const fetchBranchAvailability = useCallback(async () => {
     const res = await fetch(`/api/products/${id}/branch-availability`)
@@ -146,11 +183,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     setTogglingBranch(null)
   }
   useEffect(() => {
-    fetch('/api/categories').then(r => r.json()).then(j => setCategories(j.data ?? [])).catch(() => {})
-    fetch('/api/brands').then(r => r.json()).then(j => setAllBrands(j.data ?? [])).catch(() => {})
-    fetch('/api/suppliers').then(r => r.json()).then(j => setSuppliers(j.data ?? [])).catch(() => {})
-    fetch('/api/services/devices').then(r => r.json()).then(j => setAllDevices(j.data ?? [])).catch(() => {})
-    fetch('/api/part-types').then(r => r.json()).then(j => setAllPartTypes(j.data ?? [])).catch(() => {})
+    fetch('/api/categories').then(r => r.json()).then(j => setCategories(j.data ?? [])).catch(() => { })
+    fetch('/api/brands').then(r => r.json()).then(j => setAllBrands(j.data ?? [])).catch(() => { })
+    fetch('/api/suppliers').then(r => r.json()).then(j => setSuppliers(j.data ?? [])).catch(() => { })
+    fetch('/api/services/devices').then(r => r.json()).then(j => setAllDevices(j.data ?? [])).catch(() => { })
+    fetch('/api/part-types').then(r => r.json()).then(j => setAllPartTypes(j.data ?? [])).catch(() => { })
   }, [])
 
   // Filtered lists based on hierarchy.
@@ -245,8 +282,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       cost_price: parseFloat(costPrice) || 0,
       selling_price: parseFloat(sellingPrice) || 0,
       supplier_id: itemType === 'part' ? (supplierId || null) : null,
-      low_stock_alert: lowStockAlert,
-      initial_stock: onHand ?? 0,
+      low_stock_alert: parseInt(lowStockAlert) || 0,
+      initial_stock: parseInt(onHand) || 0,
       physical_location: physicalLocation || null,
       branch_id: activeBranch?.id ?? null,
       commission_enabled: commissionEnabled,
@@ -254,17 +291,26 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       commission_rate: parseFloat(commissionRate) || 0,
       loyalty_enabled: loyaltyEnabled,
     }
-    await fetch(`/api/products/${id}`, {
+    const res = await fetch(`/api/products/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
+    if (!res.ok) {
+      const j = await res.json()
+      alert(j?.message || j?.error?.message || 'Failed to update product.')
+    } else {
+      useDashboardStore.getState().clearCache()
+    }
     await fetchProduct()
     setSaving(false)
   }
 
   async function handleDelete() {
-    await fetch(`/api/products/${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/products/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      useDashboardStore.getState().clearCache()
+    }
     router.push('/inventory')
   }
 
@@ -303,7 +349,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           <Button variant="outline" className="text-red-600 hover:bg-red-50" onClick={() => setDeleteModal(true)}>
             <Trash2 className="h-4 w-4" /> Delete
           </Button>
-          <Button onClick={handleSave} loading={saving}>
+          <Button onClick={handleSave} loading={saving} disabled={skuConflict || barcodeConflict}>
             <Save className="h-4 w-4" /> Save Changes
           </Button>
         </div>
@@ -377,8 +423,18 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <Input label="SKU" value={sku} onChange={e => setSku(e.target.value)} />
-                <Input label="Barcode / UPC" value={barcode} onChange={e => setBarcode(e.target.value)} />
+                <Input 
+                  label="SKU" 
+                  value={sku} 
+                  onChange={e => setSku(e.target.value)} 
+                  error={skuConflict ? 'This SKU is already in use' : undefined}
+                />
+                <Input 
+                  label="Barcode / UPC" 
+                  value={barcode} 
+                  onChange={e => setBarcode(e.target.value)} 
+                  error={barcodeConflict ? 'This Barcode is already in use' : undefined}
+                />
               </div>
             </div>
           </section>
@@ -410,8 +466,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Quantity" type="number" min="0" value={onHand ?? 0} onChange={e => setOnHand(parseInt(e.target.value) || 0)} />
-                <Input label="Low Stock Alert" type="number" min="0" value={lowStockAlert} onChange={e => setLowStockAlert(parseInt(e.target.value) || 0)} />
+                <Input label="Quantity" type="number" min="0" value={onHand} onChange={e => setOnHand(e.target.value)} />
+                <Input label="Low Stock Alert" type="number" min="0" value={lowStockAlert} onChange={e => setLowStockAlert(e.target.value)} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Stock Location</label>

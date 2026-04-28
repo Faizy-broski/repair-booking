@@ -122,7 +122,7 @@ export function MessageBadge() {
     if (!activeBranch) return
 
     // CRITICAL: use the shared createClient() — it carries cookieOptions with
-    // domain:.repairpos.tech so the session JWT is readable in production.
+    // domain:.repairbooking.co.uk so the session JWT is readable in production.
     // A raw createBrowserClient(url, key) without these options cannot read
     // the auth cookie on tenant subdomains → realtime connects anonymous →
     // RLS blocks all postgres_changes events silently.

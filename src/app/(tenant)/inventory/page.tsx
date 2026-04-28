@@ -372,7 +372,7 @@ export default function InventoryPage() {
   return (
     <div className="space-y-4">
       {/* Sub-navigation */}
-      <div className="flex flex-wrap gap-1 border-b border-gray-200 pb-3">
+      <div className="flex overflow-x-auto gap-1 border-b border-gray-200 pb-3 no-scrollbar">
         {[
           { label: 'Products',        href: '/inventory' },
           { label: 'Purchase Orders', href: '/inventory/purchase-orders' },
@@ -395,19 +395,19 @@ export default function InventoryPage() {
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Inventory</h1>
-          <p className="text-sm text-gray-500">{total} products</p>
+          <p className="text-sm text-gray-500">{total} products found</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => window.open(`/api/products/export`, '_blank')}>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={() => window.open(`/api/products/export`, '_blank')}>
             <Download className="h-4 w-4" /> Export
           </Button>
-          <Button variant="outline" size="sm" onClick={() => router.push('/inventory/bulk-upload')}>
+          <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={() => router.push('/inventory/bulk-upload')}>
             <Upload className="h-4 w-4" /> Import
           </Button>
-          <Button onClick={() => router.push('/inventory/new')}>
+          <Button size="sm" className="flex-1 sm:flex-none" onClick={() => router.push('/inventory/new')}>
             <Plus className="h-4 w-4" /> Add Item
           </Button>
         </div>
@@ -494,7 +494,7 @@ export default function InventoryPage() {
 
         {/* Row 2: advanced filters */}
         {showAdvancedFilters && (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 pt-2 border-t border-gray-100">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-gray-100">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
               <Select

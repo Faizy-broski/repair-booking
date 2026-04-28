@@ -120,7 +120,7 @@ export default function DashboardPage() {
       setLoading(false)
     }
     load()
-  }, [activeBranch, setDashboardData, lastFetched])
+  }, [activeBranch, setDashboardData])
 
   return (
     <div className="space-y-6">

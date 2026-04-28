@@ -31,19 +31,22 @@ export default function ForgotPasswordPage() {
     // cause getUser()/getSession() on the reset page to return a false positive.
     await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
 
-    // redirectTo: the callback URL on this exact origin (subdomain).
-    // Supabase will append ?code=... so exchangeCodeForSession works.
-    // next=/reset-password tells the callback where to send the user after
-    // the code exchange succeeds.
+    // Always redirect to the root domain callback — this URL must be registered
+    // in Supabase Dashboard → Authentication → URL Configuration → Redirect URLs.
     //
-    // IMPORTANT — Supabase Dashboard configuration required:
-    //   Authentication → URL Configuration
-    //   • Site URL      → https://yourdomain.co.uk  (your production root domain)
-    //   • Redirect URLs → https://*.yourdomain.co.uk/**
-    // Without the wildcard redirect rule, Supabase ignores the redirectTo below
-    // and falls back to the Site URL (which causes the localhost redirect bug).
-    const redirectTo =
-      `${window.location.origin}/api/auth/callback?next=/reset-password`
+    // Priority:
+    //  1. NEXT_PUBLIC_APP_URL  (set on Vercel as https://repairbooking.co.uk)
+    //  2. Derived from ROOT_DOMAIN env var
+    //  3. Hard-coded production fallback (safe — only used in production build)
+    //
+    // NEVER derive from window.location because the user may be visiting from a
+    // tenant subdomain (e.g. techfix.repairbooking.co.uk) which is NOT registered
+    // as a Supabase redirect URL, causing the code to land on /?code=... instead.
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      (process.env.NEXT_PUBLIC_ROOT_DOMAIN ? `https://${process.env.NEXT_PUBLIC_ROOT_DOMAIN}` : null) ||
+      'https://repairbooking.co.uk'
+    const redirectTo = `${appUrl}/api/auth/callback?next=/reset-password`
 
     const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
       redirectTo,

@@ -356,15 +356,16 @@ async function bulkImport(req: NextRequest, ctx: RequestContext) {
         .select('id, sku')
       if (insertSkuError) return NextResponse.json({ error: insertSkuError.message }, { status: 500 })
 
-      imported += insertedWithSku?.length ?? 0
+      const skuCount = insertedWithSku?.length ?? 0
+      imported += skuCount
 
       if (insertedWithSku && insertedWithSku.length > 0) {
         const skuToMeta = new Map(toInsertWithSku.map((x) => [x.record.sku as string, x]))
         // Seed a zero-quantity row for every active branch; the import branch
         // gets the actual quantity from the CSV row.
+        const branchesToSeed = allBranchIds.length > 0 ? allBranchIds : [branch_id]
         const inventoryRows = insertedWithSku.flatMap((p) => {
           const meta = skuToMeta.get(p.sku ?? '') ?? toInsertWithSku[0]
-          const branchesToSeed = allBranchIds.length > 0 ? allBranchIds : [branch_id]
           return branchesToSeed.map((bid) => ({
             branch_id:       bid,
             product_id:      p.id,
@@ -373,7 +374,22 @@ async function bulkImport(req: NextRequest, ctx: RequestContext) {
             low_stock_alert: meta.lowStockAlert ?? 5,
           }))
         })
-        await adminSupabase.from('inventory').insert(inventoryRows)
+        const { error: invError } = await adminSupabase.from('inventory').insert(inventoryRows)
+        if (invError) console.error('Bulk Import Inventory Error:', invError)
+
+        // Enable the product in each branch's catalog so the branch_products!inner
+        // join in ProductService.list returns them.
+        const branchProductRows = insertedWithSku.flatMap((p) =>
+          branchesToSeed.map((bid) => ({
+            branch_id:  bid,
+            product_id: p.id,
+            is_enabled: true,
+          }))
+        )
+        const { error: bpError } = await adminSupabase
+          .from('branch_products')
+          .upsert(branchProductRows, { onConflict: 'branch_id,product_id' })
+        if (bpError) console.error('Bulk Import BranchProducts Error:', bpError)
       }
     }
   }
@@ -386,7 +402,8 @@ async function bulkImport(req: NextRequest, ctx: RequestContext) {
       .select('id')
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    imported = data?.length ?? 0
+    const noSkuCount = data?.length ?? 0
+    imported += noSkuCount
 
     if (data && data.length > 0) {
       // Seed a zero-quantity inventory row for every active branch; the
@@ -401,9 +418,24 @@ async function bulkImport(req: NextRequest, ctx: RequestContext) {
           low_stock_alert: toInsert[idx].lowStockAlert ?? 5,
         }))
       )
-      await adminSupabase
+      const { error: invError } = await adminSupabase
         .from('inventory')
         .insert(inventoryRows)
+      if (invError) console.error('Bulk Import Inventory (No SKU) Error:', invError)
+
+      // Enable the product in each branch's catalog so the branch_products!inner
+      // join in ProductService.list returns them.
+      const branchProductRows = data.flatMap((p) =>
+        branchesToSeed.map((bid) => ({
+          branch_id:  bid,
+          product_id: p.id,
+          is_enabled: true,
+        }))
+      )
+      const { error: bpError } = await adminSupabase
+        .from('branch_products')
+        .upsert(branchProductRows, { onConflict: 'branch_id,product_id' })
+      if (bpError) console.error('Bulk Import BranchProducts (No SKU) Error:', bpError)
     }
   }
 
