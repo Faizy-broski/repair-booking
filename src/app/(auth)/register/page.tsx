@@ -21,7 +21,7 @@ const step1Schema = z.object({
   businessName: z.string().min(2, 'Business name is required'),
   subdomain: z.string().min(2).max(30).regex(/^[a-z0-9-]+$/, { message: 'Only lowercase letters, numbers, and hyphens' }),
   email: z.string().email('Invalid email'),
-  phone: z.string().optional(),
+  phone: z.string().min(5, 'Phone number is required'),
 })
 
 const step2Schema = z.object({
@@ -208,12 +208,33 @@ export default function RegisterPage() {
 
   // ── Form handlers ─────────────────────────────────────────────────────────
   async function onStep1Submit(data: Step1Data) {
-    if (!subdomainAvailable) return
+    // 1. Validate Subdomain availability
+    if (subdomainAvailable === false) {
+      form1.setError('subdomain', { message: 'This subdomain is already taken' })
+      return
+    }
+    if (!data.subdomain) {
+      form1.setError('subdomain', { message: 'Subdomain is required' })
+      return
+    }
+    if (subdomainAvailable === null) {
+      await checkSubdomain(data.subdomain)
+      // wait a bit for the state to update or just check the result directly if we refactored
+      // but for now, we'll just check if it's still null after the call
+      return 
+    }
 
-    // Explicitly verify email before proceeding if we haven't already confirmed it's available
-    if (emailAvailable !== true) {
+    // 2. Validate Email availability
+    if (emailAvailable === false) {
+      form1.setError('email', { message: 'Email already exists' })
+      return
+    }
+    if (emailAvailable === null) {
       const isAvailable = await checkEmail(data.email)
-      if (!isAvailable) return
+      if (!isAvailable) {
+        form1.setError('email', { message: 'An account with this email already exists' })
+        return
+      }
     }
 
     setStep1Data(data)
@@ -597,6 +618,7 @@ export default function RegisterPage() {
                   label="Phone number"
                   value={form1.watch('phone') ?? ''}
                   onChange={(val) => form1.setValue('phone', val, { shouldValidate: true })}
+                  error={form1.formState.errors.phone?.message}
                 />
                 <div className="flex gap-2">
                   {/* <Button type="button" variant="outline" onClick={() => setStep(0)}>
@@ -605,9 +627,11 @@ export default function RegisterPage() {
                   <Button
                     type="submit"
                     className="flex-1"
-                    disabled={subdomainAvailable !== true || checkingSubdomain || emailAvailable === false || checkingEmail}
+                    loading={otpSending}
+                    disabled={checkingSubdomain || checkingEmail}
                   >
-                    Continue <ChevronRight className="h-4 w-4" />
+                    {otpSending ? 'Sending OTP...' : 'Continue'}
+                    {!otpSending && <ChevronRight className="h-4 w-4" />}
                   </Button>
                 </div>
               </form>
@@ -928,7 +952,14 @@ export default function RegisterPage() {
                 {selectedPlan
                   ? isFreePlan
                     ? 'Start 30-day free trial'
-                    : `Start free trial — £${selectedPlan.price_monthly % 1 === 0 ? selectedPlan.price_monthly : selectedPlan.price_monthly.toFixed(2)}/mo`
+                    : (() => {
+                        const isYearly = billing === 'yearly'
+                        const price = isYearly 
+                          ? (selectedPlan.price_yearly > 0 ? selectedPlan.price_yearly : Math.round(selectedPlan.price_monthly * 12 * 0.8))
+                          : selectedPlan.price_monthly
+                        const fmt = (n: number) => n % 1 === 0 ? String(Math.round(n)) : n.toFixed(2)
+                        return `Start free trial — £${fmt(price)}${isYearly ? '/year' : '/mo'}`
+                      })()
                   : 'Select a plan to continue'}
               </Button>
             )}

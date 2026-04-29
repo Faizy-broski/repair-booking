@@ -29,11 +29,12 @@ const schema = z.object({
   businessName:          z.string().min(2),
   subdomain:             z.string().min(2).max(30).regex(/^[a-z0-9-]+$/),
   email:                 z.string().email(),
-  phone:                 z.string().optional(),
+  phone:                 z.string().min(5),
   fullName:              z.string().min(2),
   password:              z.string().min(8),
   mainBranchName:        z.string().min(2),
   planId:                z.string().optional(),  // UUID from plans table
+  billingCycle:          z.enum(['monthly', 'yearly']).optional().default('monthly'),
   verticalTemplateSlug:  z.string().optional(),  // slug chosen during onboarding
 })
 
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
           business_id:   result.business.id,
           plan_id:       data.planId,
           status:        'trialing',
-          billing_cycle: 'monthly',
+          billing_cycle: data.billingCycle,
           trial_ends_at: trialEndsAt,
         })
 

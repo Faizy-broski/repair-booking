@@ -1,11 +1,13 @@
 'use client'
 import { useState, useRef, useCallback, DragEvent } from 'react'
-import { UploadCloud, Download, CheckCircle2, AlertCircle, FileSpreadsheet, X, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
+import { UploadCloud, Download, CheckCircle2, AlertCircle, FileSpreadsheet, X, ChevronDown, ChevronUp, Loader2, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useAuthStore } from '@/store/auth.store'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { useQueryClient } from '@tanstack/react-query'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -203,6 +205,8 @@ const CHUNK_SIZE = 100
 
 export default function BulkUploadPage() {
   const { activeBranch } = useAuthStore()
+  const queryClient = useQueryClient()
+  const router = useRouter()
 
   const [itemType, setItemType]       = useState<ItemType>('product')
   const [rows, setRows]               = useState<ParsedRow[]>([])
@@ -338,6 +342,11 @@ export default function BulkUploadPage() {
 
     setResult(totals)
     setUploading(false)
+    
+    // Invalidate inventory queries so the user sees fresh data when they go back
+    queryClient.invalidateQueries({ queryKey: ['inventory'] })
+    queryClient.invalidateQueries({ queryKey: ['inventory-stats'] })
+
     // Keep result visible; clear only the file/rows so the banner stays shown
     clearFileKeepResult()
   }
@@ -589,7 +598,15 @@ export default function BulkUploadPage() {
             </div>
           )}
 
-          <div className="pt-1">
+          <div className="pt-2 flex items-center gap-3">
+            <Button 
+              size="sm" 
+              onClick={() => router.push('/inventory')}
+              className="bg-primary text-on-primary"
+            >
+              <Package className="h-4 w-4" />
+              View Updated Inventory
+            </Button>
             <button
               onClick={clearFile}
               className="text-xs font-medium text-on-surface-variant hover:text-on-surface underline underline-offset-2"

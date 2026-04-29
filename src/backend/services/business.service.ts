@@ -165,6 +165,98 @@ export const BusinessService = {
     }
   },
 
+  /** Creates (or repairs) the Supabase auth user for a business owner who was inserted
+   *  directly via SQL and therefore has no auth.users entry.
+   *  - If no auth user exists for the email: creates one with a generated temp password.
+   *  - Fixes the profiles row so its id matches the real auth UUID.
+   *  Returns the temp password so the superadmin can share it. */
+  async fixAuthUser(businessId: string) {
+    const { data: business } = await adminSupabase
+      .from('businesses')
+      .select('id, email, name')
+      .eq('id', businessId)
+      .single()
+
+    if (!business?.email) throw new Error('Business email not found')
+
+    const { data: existingProfile } = await adminSupabase
+      .from('profiles')
+      .select('id, full_name, email, branch_id')
+      .eq('business_id', businessId)
+      .eq('role', 'business_owner')
+      .maybeSingle()
+
+    // Generate a secure 16-char temp password
+    const tempPassword =
+      Math.random().toString(36).slice(2, 10) +
+      Math.random().toString(36).slice(2, 10).toUpperCase() +
+      '!1'
+
+    let authUserId: string
+
+    // Check if the profile UUID already maps to a real auth user
+    if (existingProfile?.id) {
+      const { error: notFound } = await adminSupabase.auth.admin.getUserById(existingProfile.id)
+      if (!notFound) {
+        // Auth user already exists with the same UUID — just reset the password
+        await adminSupabase.auth.admin.updateUserById(existingProfile.id, {
+          password: tempPassword,
+          email_confirm: true,
+        })
+        return { email: business.email, tempPassword, fixed: false }
+      }
+    }
+
+    // No auth user — create one
+    const { data: authData, error: authError } = await adminSupabase.auth.admin.createUser({
+      email: business.email,
+      password: tempPassword,
+      email_confirm: true,
+      user_metadata: {
+        full_name: existingProfile?.full_name ?? (business as any).name,
+        role: 'business_owner',
+      },
+    })
+
+    if (authError) {
+      // Edge case: email already in auth.users under a different UUID (e.g. prior partial setup)
+      if (authError.message?.toLowerCase().includes('already') || (authError as any).code === 'email_exists') {
+        // Fall back to password reset link
+        const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
+          type: 'recovery',
+          email: business.email,
+        })
+        if (linkError) throw linkError
+        return {
+          email: business.email,
+          tempPassword: null,
+          actionLink: (linkData as any)?.properties?.action_link ?? null,
+          fixed: false,
+        }
+      }
+      throw authError
+    }
+
+    authUserId = authData.user.id
+
+    // Fix the profile: delete the stale row (wrong UUID) then upsert with real UUID
+    if (existingProfile && existingProfile.id !== authUserId) {
+      await adminSupabase.from('profiles').delete().eq('id', existingProfile.id)
+    }
+
+    await adminSupabase.from('profiles').upsert({
+      id: authUserId,
+      business_id: businessId,
+      branch_id: (existingProfile as any)?.branch_id ?? null,
+      role: 'business_owner',
+      full_name: (existingProfile as any)?.full_name ?? (business as any).name,
+      email: business.email,
+      is_active: true,
+    })
+
+    return { email: business.email, tempPassword, fixed: true }
+  },
+
   /** Sends a password-reset link for the business owner via Supabase Auth admin API.
    *  Returns the action link so the superadmin can copy it if email is not configured. */
   async resetOwnerPassword(businessId: string) {

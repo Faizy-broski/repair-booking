@@ -346,6 +346,18 @@ async function bulkImport(req: NextRequest, ctx: RequestContext) {
         .in('product_id', updatedIds)
         .is('variant_id', null)
       await adminSupabase.from('inventory').insert(inventoryRows)
+
+      // ── NEW: Also ensure these products are enabled in the branch catalog ──
+      // Without this, soft-deleted products that are re-activated via "update" 
+      // stay hidden from the branch because the branch_products join fails.
+      const branchProductRows = updatedIds.map((id) => ({
+        branch_id:  branch_id,
+        product_id: id,
+        is_enabled: true,
+      }))
+      await adminSupabase
+        .from('branch_products')
+        .upsert(branchProductRows, { onConflict: 'branch_id,product_id' })
     }
 
     // ── Insert new products that have a SKU ────────────────────────────

@@ -4,7 +4,9 @@ import { Save, Store, ChevronRight, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/store/auth.store'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
+import { Select } from '@/components/ui/select'
+import { CURRENCIES } from '@/lib/currencies'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
 import Link from 'next/link'
@@ -64,25 +66,38 @@ export default function GeneralSettingsPage() {
             <Input label="Phone" {...businessForm.register('phone')} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Currency</label>
-              <select {...businessForm.register('currency')} className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm">
-                <option value="GBP">GBP (£)</option>
-                <option value="USD">USD ($)</option>
-                <option value="EUR">EUR (€)</option>
-                <option value="AED">AED (د.إ)</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Timezone</label>
-              <select {...businessForm.register('timezone')} className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm">
-                <option value="Europe/London">Europe/London</option>
-                <option value="America/New_York">America/New_York</option>
-                <option value="America/Los_Angeles">America/Los_Angeles</option>
-                <option value="Asia/Dubai">Asia/Dubai</option>
-                <option value="Asia/Karachi">Asia/Karachi</option>
-              </select>
-            </div>
+            <Controller
+              name="currency"
+              control={businessForm.control}
+              render={({ field }) => (
+                <Select
+                  label="Currency"
+                  options={CURRENCIES}
+                  value={field.value}
+                  onValueChange={field.onChange}
+                />
+              )}
+            />
+            <Controller
+              name="timezone"
+              control={businessForm.control}
+              render={({ field }) => (
+                <Select
+                  label="Timezone"
+                  options={[
+                    { value: 'Europe/London', label: 'Europe/London' },
+                    { value: 'America/New_York', label: 'America/New_York' },
+                    { value: 'America/Los_Angeles', label: 'America/Los_Angeles' },
+                    { value: 'Asia/Dubai', label: 'Asia/Dubai' },
+                    { value: 'Asia/Karachi', label: 'Asia/Karachi' },
+                    { value: 'Africa/Lagos', label: 'Africa/Lagos' },
+                    { value: 'Africa/Johannesburg', label: 'Africa/Johannesburg' },
+                  ]}
+                  value={field.value}
+                  onValueChange={field.onChange}
+                />
+              )}
+            />
           </div>
           <Button type="submit" loading={businessForm.formState.isSubmitting}>
             <Save className="h-4 w-4" />

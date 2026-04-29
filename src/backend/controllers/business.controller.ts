@@ -80,6 +80,15 @@ export const BusinessController = {
     }
   },
 
+  async fixAuthUser(_request: NextRequest, _ctx: RequestContext, id: string) {
+    try {
+      const result = await BusinessService.fixAuthUser(id)
+      return ok(result)
+    } catch (err) {
+      return serverError('Failed to fix auth user', err)
+    }
+  },
+
   async resetOwnerPassword(_request: NextRequest, _ctx: RequestContext, id: string) {
     try {
       const result = await BusinessService.resetOwnerPassword(id)

@@ -220,6 +220,12 @@ export const ProductController = {
           })
           if (insErr) console.error('[ProductController.update] Insert inventory error:', insErr)
         }
+        
+        // ── NEW: Ensure product is enabled in this branch's catalog ──
+        await adminSupabase.from('branch_products').upsert(
+          { branch_id: targetBranch, product_id: id, is_enabled: true },
+          { onConflict: 'branch_id,product_id' }
+        )
       }
 
       return ok(product)

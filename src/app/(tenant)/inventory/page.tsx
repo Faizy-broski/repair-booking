@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Search, AlertTriangle, Upload, Download, CheckCircle2, Package, Boxes, TrendingDown, ShoppingCart, Edit2, Trash2, Layers, X, ExternalLink, Filter, ChevronDown } from 'lucide-react'
+import { Plus, Search, AlertTriangle, Upload, Download, CheckCircle2, Package, Boxes, TrendingDown, ShoppingCart, Edit2, Trash2, Layers, X, ExternalLink, Filter, ChevronDown, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/ui/modal'
@@ -409,6 +409,9 @@ export default function InventoryPage() {
           </Button>
           <Button size="sm" className="flex-1 sm:flex-none" onClick={() => router.push('/inventory/new')}>
             <Plus className="h-4 w-4" /> Add Item
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => { fetchProducts(); fetchStats() }} title="Refresh data">
+            <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
       </div>
