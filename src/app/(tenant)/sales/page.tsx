@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Eye, Receipt, X, Download, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
@@ -66,11 +67,7 @@ function customerName(c: SaleRow['customers']) {
 
 export default function SalesPage() {
   const { activeBranch } = useAuthStore()
-  const [sales, setSales] = useState<SaleRow[]>([])
-  const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [invoiceSettings, setInvoiceSettings] = useState<any>(null)
 
   // Filters
   const [dateFrom, setDateFrom] = useState('')
@@ -78,66 +75,70 @@ export default function SalesPage() {
   const [statusFilter, setStatusFilter] = useState<string>('')
 
   // Detail modal
-  const [detail, setDetail] = useState<SaleDetail | null>(null)
-  const [detailLoading, setDetailLoading] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
+  const [detailId, setDetailId] = useState<string | null>(null)
 
-  // Summary
-  const [summary, setSummary] = useState({ totalSales: 0, totalRevenue: 0, totalRefunds: 0, refundCount: 0 })
-
-  const fetchSales = useCallback(async () => {
-    if (!activeBranch) return
-    setLoading(true)
-    const params = new URLSearchParams({
-      branch_id: activeBranch.id,
-      page: String(page + 1),
-      limit: '20',
-    })
-    if (dateFrom) params.set('from', dateFrom)
-    if (dateTo) params.set('to', dateTo)
-    const res = await fetch(`/api/pos/sales?${params}`)
-    const json = await res.json()
-    const rows: SaleRow[] = json.data ?? []
-    // Client-side status filter (API doesn't support it)
-    const filtered = statusFilter ? rows.filter(r => r.payment_status === statusFilter) : rows
-    setSales(filtered)
-    setTotal(json.meta?.total ?? 0)
-
-    // Compute summary from full page (unfiltered for totals)
-    const revenue = rows.filter(r => !r.is_refund).reduce((s, r) => s + Number(r.total), 0)
-    const refunds = rows.filter(r => r.is_refund)
-    setSummary({
-      totalSales: rows.filter(r => !r.is_refund).length,
-      totalRevenue: revenue,
-      totalRefunds: refunds.reduce((s, r) => s + Number(r.total), 0),
-      refundCount: refunds.length,
-    })
-    setLoading(false)
-  }, [activeBranch, page, dateFrom, dateTo, statusFilter])
-
-  useEffect(() => {
-    async function fetchSettings() {
-      if (!activeBranch) return
-      const res = await fetch(`/api/settings/invoice?branch_id=${activeBranch.id}`)
-      if (res.ok) {
-        const json = await res.json()
-        setInvoiceSettings(json.data)
-      }
-    }
-    fetchSettings()
-  }, [activeBranch])
-
-  useEffect(() => { fetchSales() }, [fetchSales])
-
-  async function viewDetail(id: string) {
-    setDetailOpen(true)
-    setDetailLoading(true)
-    const res = await fetch(`/api/pos/sales/${id}`)
-    if (res.ok) {
+  const { data: invoiceSettings = null } = useQuery({
+    queryKey: ['invoice-settings', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/settings/invoice?branch_id=${activeBranch!.id}`)
+      if (!res.ok) return null
       const json = await res.json()
-      setDetail(json.data ?? null)
-    }
-    setDetailLoading(false)
+      return json.data
+    },
+    enabled: !!activeBranch
+  })
+
+  const { data: salesData, isLoading: loading } = useQuery({
+    queryKey: ['sales', activeBranch?.id, page, dateFrom, dateTo],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        branch_id: activeBranch!.id,
+        page: String(page + 1),
+        limit: '20',
+      })
+      if (dateFrom) params.set('from', dateFrom)
+      if (dateTo) params.set('to', dateTo)
+      const res = await fetch(`/api/pos/sales?${params}`)
+      const json = await res.json()
+      const rows: SaleRow[] = json.data ?? []
+      const refunds = rows.filter(r => r.is_refund)
+      return {
+        rows,
+        total: json.meta?.total ?? 0,
+        revenue: rows.filter(r => !r.is_refund).reduce((s, r) => s + Number(r.total), 0),
+        refunds,
+        totalRefunds: refunds.reduce((s, r) => s + Number(r.total), 0),
+        refundCount: refunds.length
+      }
+    },
+    enabled: !!activeBranch
+  })
+
+  const { data: detail = null, isLoading: detailLoading } = useQuery<SaleDetail | null>({
+    queryKey: ['sale-detail', detailId],
+    queryFn: async () => {
+      if (!detailId) return null
+      const res = await fetch(`/api/pos/sales/${detailId}`)
+      if (!res.ok) return null
+      const json = await res.json()
+      return json.data ?? null
+    },
+    enabled: !!detailId && detailOpen
+  })
+
+  const sales = statusFilter && salesData ? salesData.rows.filter(r => r.payment_status === statusFilter) : (salesData?.rows ?? [])
+  const total = salesData?.total ?? 0
+  const summary = {
+    totalSales: salesData?.rows.filter(r => !r.is_refund).length ?? 0,
+    totalRevenue: salesData?.revenue ?? 0,
+    totalRefunds: salesData?.totalRefunds ?? 0,
+    refundCount: salesData?.refundCount ?? 0,
+  }
+
+  function viewDetail(id: string) {
+    setDetailId(id)
+    setDetailOpen(true)
   }
 
   async function downloadReceipt(sale: SaleDetail) {
@@ -321,7 +322,7 @@ export default function SalesPage() {
       />
 
       {/* Detail Modal */}
-      <Modal open={detailOpen} onClose={() => { setDetailOpen(false); setDetail(null) }} title="Sale Details" size="lg">
+      <Modal open={detailOpen} onClose={() => { setDetailOpen(false) }} title="Sale Details" size="lg">
         {detailLoading ? (
           <div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" /></div>
         ) : detail ? (

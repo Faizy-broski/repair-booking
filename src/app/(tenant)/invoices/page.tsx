@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { Plus, Download, CreditCard, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -62,15 +63,10 @@ type FormData = z.infer<typeof schema>
 export default function InvoicesPage() {
   const router = useRouter()
   const { activeBranch } = useAuthStore()
-  const [invoices, setInvoices] = useState<InvoiceRow[]>([])
-  const [customers, setCustomers] = useState<CustomerOption[]>([])
-  const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
-  const [loading, setLoading] = useState(true)
+  const [statusFilter, setStatusFilter] = useState('')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [lineItems, setLineItems] = useState([{ description: '', quantity: 1, unit_price: 0 }])
-  const [statusFilter, setStatusFilter] = useState('')
-  const [summary, setSummary] = useState<StatusSummary | null>(null)
   const [paymentModal, setPaymentModal] = useState<{ invoiceId: string; remaining: number } | null>(null)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [recordingPayment, setRecordingPayment] = useState(false)
@@ -80,25 +76,34 @@ export default function InvoicesPage() {
     defaultValues: { tax_rate: 0, items: [{ description: '', quantity: 1, unit_price: 0 }] },
   })
 
-  const fetchData = useCallback(async () => {
-    if (!activeBranch) return
-    setLoading(true)
-    const invParams = new URLSearchParams({ branch_id: activeBranch.id, page: String(page + 1) })
-    if (statusFilter) invParams.set('status', statusFilter)
-    const [invRes, custRes, sumRes] = await Promise.all([
-      fetch(`/api/invoices?${invParams}`),
-      fetch(`/api/customers?branch_id=${activeBranch.id}&limit=100`),
-      fetch(`/api/invoices/summary?branch_id=${activeBranch.id}`),
-    ])
-    const [invJson, custJson, sumJson] = await Promise.all([invRes.json(), custRes.json(), sumRes.json()])
-    setInvoices(invJson.data ?? [])
-    setTotal(invJson.meta?.total ?? 0)
-    setCustomers(custJson.data ?? [])
-    setSummary(sumJson.data ?? null)
-    setLoading(false)
-  }, [activeBranch, page, statusFilter])
+  const queryClient = useQueryClient()
+  const invoiceQueryKey = ['invoices', activeBranch?.id, page, statusFilter]
 
-  useEffect(() => { fetchData() }, [fetchData])
+  const { data: invoiceData, isLoading: loading } = useQuery({
+    queryKey: invoiceQueryKey,
+    queryFn: async () => {
+      const invParams = new URLSearchParams({ branch_id: activeBranch!.id, page: String(page + 1) })
+      if (statusFilter) invParams.set('status', statusFilter)
+      const [invRes, custRes, sumRes] = await Promise.all([
+        fetch(`/api/invoices?${invParams}`),
+        fetch(`/api/customers?branch_id=${activeBranch!.id}&limit=100`),
+        fetch(`/api/invoices/summary?branch_id=${activeBranch!.id}`),
+      ])
+      const [invJson, custJson, sumJson] = await Promise.all([invRes.json(), custRes.json(), sumRes.json()])
+      return {
+        invoices: (invJson.data ?? []) as InvoiceRow[],
+        total: invJson.meta?.total ?? 0,
+        customers: (custJson.data ?? []) as CustomerOption[],
+        summary: (sumJson.data ?? null) as StatusSummary | null,
+      }
+    },
+    enabled: !!activeBranch,
+  })
+
+  const invoices = invoiceData?.invoices ?? []
+  const total = invoiceData?.total ?? 0
+  const customers = invoiceData?.customers ?? []
+  const summary = invoiceData?.summary ?? null
 
   async function changeStatus(invoiceId: string, newStatus: string) {
     const res = await fetch(`/api/invoices/${invoiceId}`, {
@@ -108,7 +113,7 @@ export default function InvoicesPage() {
     })
     if (res.ok) {
       toast.success(`Invoice status updated to ${newStatus}`)
-      fetchData()
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
     } else {
       const err = await res.json()
       toast.error(err?.error?.message ?? 'Failed to update status')
@@ -148,7 +153,7 @@ export default function InvoicesPage() {
       reset()
       setLineItems([{ description: '', quantity: 1, unit_price: 0 }])
       setSheetOpen(false)
-      fetchData()
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
     }
   }
 
@@ -164,7 +169,7 @@ export default function InvoicesPage() {
       toast.success('Payment recorded successfully')
       setPaymentModal(null)
       setPaymentAmount('')
-      fetchData()
+      queryClient.invalidateQueries({ queryKey: ['invoices'] })
     } else {
       const err = await res.json()
       toast.error(err?.error?.message ?? 'Failed to record payment')

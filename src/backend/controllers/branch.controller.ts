@@ -14,7 +14,9 @@ const createSchema = z.object({
   logo_url: z.string().url().optional().nullable().or(z.literal('')),
 })
 
-const updateSchema = createSchema.partial()
+const updateSchema = createSchema.partial().extend({
+  pos_require_shift: z.boolean().nullable().optional(),
+})
 
 export const BranchController = {
   async list(request: NextRequest, ctx: RequestContext) {

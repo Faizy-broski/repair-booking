@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, Eye, Pencil, Trash2, FileDown, FileSpreadsheet, Printer, Columns, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -95,11 +96,9 @@ export default function CustomersPage() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const queryClient = useQueryClient()
 
-  const [customers, setCustomers] = useState<CustomerRow[]>([])
-  const [total, setTotal] = useState(0)
   const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
 
   // URL-based page state
   const page = parseInt(searchParams.get('page') || '0', 10)
@@ -131,23 +130,27 @@ export default function CustomersPage() {
   const createForm = useForm<FormData>({ resolver: zodResolver(schema) })
   const editForm = useForm<FormData>({ resolver: zodResolver(schema) })
 
-  const fetchCustomers = useCallback(async () => {
-    if (!activeBranch) return
-    setLoading(true)
-    const params = new URLSearchParams({
-      branch_id: activeBranch.id,
-      page: String(page + 1),
-      limit: '20',
-    })
-    if (search) params.set('search', search)
-    const res = await fetch(`/api/customers?${params}`)
-    const json = await res.json()
-    setCustomers(json.data ?? [])
-    setTotal(json.meta?.total ?? 0)
-    setLoading(false)
-  }, [activeBranch, page, search])
+  const { data: customerData, isLoading: loading } = useQuery({
+    queryKey: ['customers', activeBranch?.id, page, search],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        branch_id: activeBranch!.id,
+        page: String(page + 1),
+        limit: '20',
+      })
+      if (search) params.set('search', search)
+      const res = await fetch(`/api/customers?${params}`)
+      const json = await res.json()
+      return {
+        rows: json.data ?? [],
+        total: json.meta?.total ?? 0
+      }
+    },
+    enabled: !!activeBranch
+  })
 
-  useEffect(() => { fetchCustomers() }, [fetchCustomers])
+  const customers = customerData?.rows ?? []
+  const total = customerData?.total ?? 0
 
   // Close column menu on outside click
   useEffect(() => {
@@ -168,7 +171,7 @@ export default function CustomersPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, branch_id: activeBranch.id, custom_fields: customFields }),
     })
-    if (res.ok) { createForm.reset(); setSheetOpen(false); fetchCustomers() }
+    if (res.ok) { createForm.reset(); setSheetOpen(false); queryClient.invalidateQueries({ queryKey: ['customers'] }) }
     else { const j = await res.json(); setCreateError(j?.error?.message ?? 'Failed to create customer.') }
   }
 
@@ -194,7 +197,7 @@ export default function CustomersPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, email: data.email || null }),
     })
-    if (res.ok) { setEditSheetOpen(false); fetchCustomers() }
+    if (res.ok) { setEditSheetOpen(false); queryClient.invalidateQueries({ queryKey: ['customers'] }) }
     else { const j = await res.json(); setEditError(j?.error?.message ?? 'Failed to update customer.') }
   }
 
@@ -210,7 +213,7 @@ export default function CustomersPage() {
     const res = await fetch(`/api/customers/${confirmDelete.id}`, { method: 'DELETE' })
     if (res.ok) {
       toast.success(`Customer "${name}" deleted.`)
-      fetchCustomers()
+      queryClient.invalidateQueries({ queryKey: ['customers'] })
       setConfirmDelete(null)
     } else {
       toast.error('Failed to delete customer.')

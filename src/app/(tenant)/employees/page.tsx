@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Clock, LogIn, LogOut, DollarSign, CalendarDays, TrendingUp } from 'lucide-react'
 import * as Tabs from '@radix-ui/react-tabs'
 import { Button } from '@/components/ui/button'
@@ -62,12 +63,7 @@ type PayrollForm = z.infer<typeof payrollSchema>
 
 export default function EmployeesPage() {
   const { activeBranch } = useAuthStore()
-  const [employees, setEmployees] = useState<EmployeeRow[]>([])
-  const [timeLogs, setTimeLogs] = useState<TimeClockRow[]>([])
-  const [shifts, setShifts] = useState<ShiftRow[]>([])
-  const [payrolls, setPayrolls] = useState<PayrollRow[]>([])
-  const [commissions, setCommissions] = useState<CommissionRow[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [shiftSheetOpen, setShiftSheetOpen] = useState(false)
@@ -82,29 +78,36 @@ export default function EmployeesPage() {
   const shiftForm = useForm<ShiftForm>({ resolver: zodResolver(shiftSchema) })
   const payrollForm = useForm<PayrollForm>({ resolver: zodResolver(payrollSchema) })
 
-  const fetchData = useCallback(async () => {
-    if (!activeBranch) return
-    setLoading(true)
-    const today = new Date().toISOString().split('T')[0]
-    const [empRes, clockRes, shiftRes, payrollRes, commRes] = await Promise.all([
-      fetch(`/api/employees?branch_id=${activeBranch.id}`),
-      fetch(`/api/employees/clock?branch_id=${activeBranch.id}&date=${today}`),
-      fetch(`/api/employees/shifts?branch_id=${activeBranch.id}`),
-      fetch(`/api/employees/payroll?branch_id=${activeBranch.id}`),
-      fetch(`/api/employees/commissions?branch_id=${activeBranch.id}`),
-    ])
-    const [empJson, clockJson, shiftJson, payrollJson, commJson] = await Promise.all([
-      empRes.json(), clockRes.json(), shiftRes.json(), payrollRes.json(), commRes.json(),
-    ])
-    setEmployees(empJson.data ?? [])
-    setTimeLogs(clockJson.data ?? [])
-    setShifts(shiftJson.data ?? [])
-    setPayrolls(payrollJson.data ?? [])
-    setCommissions(commJson.data ?? [])
-    setLoading(false)
-  }, [activeBranch])
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ['employees-data', activeBranch?.id],
+    queryFn: async () => {
+      const today = new Date().toISOString().split('T')[0]
+      const [empRes, clockRes, shiftRes, payrollRes, commRes] = await Promise.all([
+        fetch(`/api/employees?branch_id=${activeBranch!.id}`),
+        fetch(`/api/employees/clock?branch_id=${activeBranch!.id}&date=${today}`),
+        fetch(`/api/employees/shifts?branch_id=${activeBranch!.id}`),
+        fetch(`/api/employees/payroll?branch_id=${activeBranch!.id}`),
+        fetch(`/api/employees/commissions?branch_id=${activeBranch!.id}`),
+      ])
+      const [empJson, clockJson, shiftJson, payrollJson, commJson] = await Promise.all([
+        empRes.json(), clockRes.json(), shiftRes.json(), payrollRes.json(), commRes.json(),
+      ])
+      return {
+        employees: empJson.data ?? [],
+        timeLogs: clockJson.data ?? [],
+        shifts: shiftJson.data ?? [],
+        payrolls: payrollJson.data ?? [],
+        commissions: commJson.data ?? []
+      }
+    },
+    enabled: !!activeBranch
+  })
 
-  useEffect(() => { fetchData() }, [fetchData])
+  const employees = data?.employees ?? []
+  const timeLogs = data?.timeLogs ?? []
+  const shifts = data?.shifts ?? []
+  const payrolls = data?.payrolls ?? []
+  const commissions = data?.commissions ?? []
 
   async function onCreate(data: FormData) {
     if (!activeBranch) return
@@ -114,7 +117,7 @@ export default function EmployeesPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, branch_id: activeBranch.id }),
     })
-    if (res.ok) { reset(); setSheetOpen(false); fetchData() }
+    if (res.ok) { reset(); setSheetOpen(false); queryClient.invalidateQueries({ queryKey: ['employees-data'] }) }
     else { const j = await res.json(); setCreateError(j?.error?.message ?? 'Failed to create employee.') }
   }
 
@@ -135,7 +138,7 @@ export default function EmployeesPage() {
       alert(json.error ?? 'Clock action failed')
     }
     setClockinEmployee(null)
-    fetchData()
+    queryClient.invalidateQueries({ queryKey: ['employees-data'] })
   }
 
   async function onCreateShift(data: ShiftForm) {
@@ -145,12 +148,12 @@ export default function EmployeesPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, branch_id: activeBranch.id, days_of_week: selectedDays }),
     })
-    if (res.ok) { shiftForm.reset(); setSelectedDays([]); setShiftSheetOpen(false); fetchData() }
+    if (res.ok) { shiftForm.reset(); setSelectedDays([]); setShiftSheetOpen(false); queryClient.invalidateQueries({ queryKey: ['employees-data'] }) }
   }
 
   async function deleteShift(id: string) {
     await fetch(`/api/employees/shifts/${id}`, { method: 'DELETE' })
-    fetchData()
+    queryClient.invalidateQueries({ queryKey: ['employees-data'] })
   }
 
   async function onCreatePayroll(data: PayrollForm) {
@@ -160,14 +163,14 @@ export default function EmployeesPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, branch_id: activeBranch.id }),
     })
-    if (res.ok) { payrollForm.reset(); setPayrollSheetOpen(false); fetchData() }
+    if (res.ok) { payrollForm.reset(); setPayrollSheetOpen(false); queryClient.invalidateQueries({ queryKey: ['employees-data'] }) }
   }
 
   async function handlePayrollAction(id: string, action: 'approve' | 'paid') {
     setPayrollAction(id)
     await fetch(`/api/employees/payroll/${id}/${action}`, { method: 'POST' })
     setPayrollAction(null)
-    fetchData()
+    queryClient.invalidateQueries({ queryKey: ['employees-data'] })
   }
 
   const empColumns: ColumnDef<EmployeeRow>[] = [

@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Building2, CreditCard, BarChart3, Layers, Store } from 'lucide-react'
+import { LayoutDashboard, Building2, CreditCard, BarChart3, Layers, Store, Megaphone } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV = [
@@ -10,6 +10,7 @@ const NAV = [
   { href: '/superadmin/plans',               label: 'Plans',         icon: CreditCard },
   { href: '/superadmin/templates',           label: 'Mod Templates', icon: Layers },
   { href: '/superadmin/vertical-templates',  label: 'Verticals',     icon: Store },
+  { href: '/superadmin/broadcasts',          label: 'Broadcasts',    icon: Megaphone },
   { href: '/superadmin/analytics',           label: 'Analytics',     icon: BarChart3 },
 ]
 

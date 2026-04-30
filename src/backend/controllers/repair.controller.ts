@@ -95,38 +95,36 @@ export const RepairController = {
         await adminSupabase.from('repair_items').insert(items)
       }
 
-      // Fire ticket_created notification if customer is attached and notify_customer is true
+      // Fire ticket_created notification in background
       if (data.notify_customer && data.customer_id && repair) {
-        const repairDetail = await RepairService.getById(repair.id, data.branch_id)
-        if (repairDetail?.customers) {
-          const { data: business } = await adminSupabase
-            .from('businesses')
-            .select('name, phone, email')
-            .eq('id', ctx.businessId)
-            .single()
+        Promise.all([
+          RepairService.getById(repair.id, data.branch_id),
+          adminSupabase.from('businesses').select('name, phone, email').eq('id', ctx.businessId).single()
+        ]).then(([repairDetail, { data: business }]) => {
+          if (repairDetail?.customers) {
+            const customerName = `${repairDetail.customers.first_name} ${repairDetail.customers.last_name ?? ''}`.trim()
+            const deviceInfo = [repairDetail.device_brand, repairDetail.device_model].filter(Boolean).join(' ') || 'Device'
 
-          const customerName = `${repairDetail.customers.first_name} ${repairDetail.customers.last_name ?? ''}`.trim()
-          const deviceInfo = [repairDetail.device_brand, repairDetail.device_model].filter(Boolean).join(' ') || 'Device'
-
-          NotificationEngine.fire('ticket_created', {
-            businessId: ctx.businessId,
-            branchId: data.branch_id,
-            relatedId: repair.id,
-            relatedType: 'repair',
-            variables: {
-              customer_name: customerName,
-              ticket_number: repair.job_number,
-              device_model:  deviceInfo,
-              store_name:    business?.name ?? 'RepairBooking',
-              store_phone:   business?.phone ?? '',
-              store_email:   business?.email ?? '',
-            },
-            recipient: {
-              email: repairDetail.customers.email ?? null,
-              phone: repairDetail.customers.phone ?? null,
-            },
-          }).catch(console.error)
-        }
+            NotificationEngine.fire('ticket_created', {
+              businessId: ctx.businessId,
+              branchId: data.branch_id,
+              relatedId: repair.id,
+              relatedType: 'repair',
+              variables: {
+                customer_name: customerName,
+                ticket_number: repair.job_number,
+                device_model:  deviceInfo,
+                store_name:    business?.name ?? 'RepairBooking',
+                store_phone:   business?.phone ?? '',
+                store_email:   business?.email ?? '',
+              },
+              recipient: {
+                email: repairDetail.customers.email ?? null,
+                phone: repairDetail.customers.phone ?? null,
+              },
+            }).catch(console.error)
+          }
+        }).catch(console.error)
       }
 
       return created(repair)
@@ -165,58 +163,57 @@ export const RepairController = {
         }).catch(() => {})
       }
 
-      // Non-blocking notification via NotificationEngine (email + SMS based on template)
+      // Non-blocking notification via NotificationEngine
       if (data.send_email) {
         const branchId = ctx.auth.branchId ?? null
-        const repair = await RepairService.getById(id, branchId)
-        if (repair?.customers) {
-          const { data: business } = await adminSupabase
-            .from('businesses')
-            .select('name, phone, email')
-            .eq('id', ctx.businessId)
-            .single()
+        Promise.all([
+          RepairService.getById(id, branchId),
+          adminSupabase.from('businesses').select('name, phone, email').eq('id', ctx.businessId).single()
+        ]).then(([repair, { data: business }]) => {
+          if (repair?.customers) {
+            const customerName = `${repair.customers.first_name} ${repair.customers.last_name ?? ''}`.trim()
+            const deviceInfo = [repair.device_brand, repair.device_model].filter(Boolean).join(' ') || 'Device'
+            const businessName = business?.name ?? 'RepairBooking'
 
-          const customerName = `${repair.customers.first_name} ${repair.customers.last_name ?? ''}`.trim()
-          const deviceInfo = [repair.device_brand, repair.device_model].filter(Boolean).join(' ') || 'Device'
-          const businessName = business?.name ?? 'RepairBooking'
+            // Determine trigger event
+            const STATUS_LABELS: Record<string, string> = {
+              received: 'Received', in_progress: 'In Progress', waiting_parts: 'Waiting for Parts',
+              repaired: 'Repaired & Ready', unrepairable: 'Unfortunately Unrepairable', collected: 'Collected',
+            }
+            const triggerEvent = data.status === 'repaired' ? 'repair_ready' : 'ticket_status_changed'
 
-          // Determine trigger event
-          const STATUS_LABELS: Record<string, string> = {
-            received: 'Received', in_progress: 'In Progress', waiting_parts: 'Waiting for Parts',
-            repaired: 'Repaired & Ready', unrepairable: 'Unfortunately Unrepairable', collected: 'Collected',
+            NotificationEngine.fire(triggerEvent as any, {
+              businessId: ctx.businessId,
+              branchId,
+              relatedId: id,
+              relatedType: 'repair',
+              variables: {
+                customer_name:  customerName,
+                ticket_number:  repair.job_number,
+                device_model:   deviceInfo,
+                status:         STATUS_LABELS[data.status] ?? data.status,
+                note:           data.note || '',
+                store_name:     businessName,
+                store_phone:    business?.phone ?? '',
+                store_email:    business?.email ?? '',
+              },
+              recipient: {
+                email: repair.customers.email ?? null,
+                phone: repair.customers.phone ?? null,
+              },
+            }).catch(console.error)
+
+            // Mark email sent in status history
+            adminSupabase
+              .from('repair_status_history')
+              .update({ email_sent: true })
+              .eq('repair_id', id)
+              .eq('new_status', data.status)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .then()
           }
-          const triggerEvent = data.status === 'repaired' ? 'repair_ready' : 'ticket_status_changed'
-
-          NotificationEngine.fire(triggerEvent as any, {
-            businessId: ctx.businessId,
-            branchId,
-            relatedId: id,
-            relatedType: 'repair',
-            variables: {
-              customer_name:  customerName,
-              ticket_number:  repair.job_number,
-              device_model:   deviceInfo,
-              status:         STATUS_LABELS[data.status] ?? data.status,
-              note:           data.note || '',
-              store_name:     businessName,
-              store_phone:    business?.phone ?? '',
-              store_email:    business?.email ?? '',
-            },
-            recipient: {
-              email: repair.customers.email ?? null,
-              phone: repair.customers.phone ?? null,
-            },
-          }).catch(console.error)
-
-          // Mark email sent in status history
-          await adminSupabase
-            .from('repair_status_history')
-            .update({ email_sent: true })
-            .eq('repair_id', id)
-            .eq('new_status', data.status)
-            .order('created_at', { ascending: false })
-            .limit(1)
-        }
+        }).catch(console.error)
       }
 
       return ok({ updated: true })

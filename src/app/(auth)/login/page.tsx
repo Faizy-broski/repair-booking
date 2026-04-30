@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { useAuthStore } from '@/store/auth.store'
 import { useModuleConfigStore } from '@/store/module-config.store'
+import { queryClient } from '@/lib/query-client'
 
 // Password is always optional at the schema level.
 // Manual validation in onSubmit handles the subdomain case.
@@ -223,6 +224,11 @@ function LoginForm() {
     if (profile) {
       setProfile(profile as Parameters<typeof setProfile>[0])
     }
+
+    // ── CACHE CLEARING ──────────────────────────────────────────────────
+    // Wipe any cached React Query data from a previous session before
+    // navigating to the dashboard.
+    queryClient.clear()
 
     // Full page navigation — NOT router.push — so the middleware rewrite fires
     // correctly with all auth cookies in the request. router.push after fresh

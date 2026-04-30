@@ -1,5 +1,5 @@
 'use client'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Plus, Minus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
 import { formatCurrency } from '@/lib/utils'
@@ -69,17 +69,39 @@ export function CloseRegisterModal({
             <p className="mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Count Denominations</p>
             <div className="grid grid-cols-4 gap-1.5">
               {DENOMINATIONS.map(d => (
-                <div key={d.value} className="flex items-center gap-1 rounded border border-gray-200 px-2 py-1.5">
-                  <span className="w-9 shrink-0 text-xs font-medium text-gray-600">{d.label}</span>
-                  <input
-                    type="number" min="0" step="1" placeholder="0"
-                    value={closingDenoms[String(d.value)] ?? ''}
-                    onChange={e => {
-                      const v = parseInt(e.target.value) || 0
-                      setClosingDenoms(prev => ({ ...prev, [String(d.value)]: v }))
-                    }}
-                    className="h-7 min-w-0 flex-1 rounded border border-gray-200 bg-gray-50 px-1.5 text-right text-sm focus:border-brand-teal focus:outline-none focus:bg-white"
-                  />
+                <div key={d.value} className="flex flex-col gap-1 rounded-lg border border-gray-200 bg-white p-1.5 shadow-sm">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase text-center">{d.label}</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const v = (closingDenoms[String(d.value)] ?? 0)
+                        if (v > 0) setClosingDenoms(prev => ({ ...prev, [String(d.value)]: v - 1 }))
+                      }}
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    >
+                      <Minus className="h-3 w-3" />
+                    </button>
+                    <input
+                      type="number" min="0" step="1" placeholder="0"
+                      value={closingDenoms[String(d.value)] ?? ''}
+                      onChange={e => {
+                        const v = parseInt(e.target.value) || 0
+                        setClosingDenoms(prev => ({ ...prev, [String(d.value)]: v }))
+                      }}
+                      className="h-6 w-full min-w-0 bg-transparent text-center text-sm font-bold text-gray-900 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const v = (closingDenoms[String(d.value)] ?? 0)
+                        setClosingDenoms(prev => ({ ...prev, [String(d.value)]: v + 1 }))
+                      }}
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-brand-teal/10 text-brand-teal hover:bg-brand-teal/20"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -102,8 +124,8 @@ export function CloseRegisterModal({
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-            <Button variant="destructive" className="flex-1" loading={sessionProcessing} onClick={handleCloseRegister}>
+            <Button variant="secondary" className="flex-1" onClick={onClose}>Cancel</Button>
+            <Button className="flex-1" loading={sessionProcessing} onClick={handleCloseRegister}>
               End Shift &amp; Z-Report
             </Button>
           </div>

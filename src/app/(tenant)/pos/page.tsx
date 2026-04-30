@@ -7,6 +7,7 @@ import { formatCurrency } from '@/lib/utils'
 import { usePinPrompt } from '@/components/ui/pin-prompt'
 import type { RegisterSession } from './_types'
 
+import { Button } from '@/components/ui/button'
 import { RegisterGate } from './_components/register-gate'
 import { CartPanel } from './_components/cart-panel'
 import { RepairsTab } from './_components/repairs-tab'
@@ -196,7 +197,10 @@ export default function PosPage() {
     )
   }
 
-  if (!pos.session) {
+  // null or true = shift required (default); false = shift disabled for this branch
+  const shiftRequired = activeBranch?.pos_require_shift !== false
+
+  if (!pos.session && shiftRequired) {
     return (
       <RegisterGate
         activeBranchName={activeBranch?.name}
@@ -229,25 +233,31 @@ export default function PosPage() {
             <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-green-500 animate-pulse" />
             Register Open · Float {formatCurrency(pos.session.opening_float)}
           </div>
-          <div className="flex items-center gap-3">
-            <button
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => { setCashMovementType('cash_in'); setCashMovementOpen(true) }}
-              className="text-xs font-semibold text-green-600 hover:text-green-800 sm:text-sm whitespace-nowrap"
+              className="text-green-600 hover:text-green-700 font-bold"
             >
               Cash In
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => { setCashMovementType('cash_out'); setCashMovementOpen(true) }}
-              className="text-xs font-semibold text-orange-500 hover:text-orange-700 sm:text-sm whitespace-nowrap"
+              className="text-orange-600 hover:text-orange-700 font-bold"
             >
               Cash Out
-            </button>
-            <button
+            </Button>
+            <Button 
+              variant="secondary"
+              size="sm"
               onClick={() => setCloseRegisterModal(true)}
-              className="text-xs font-semibold text-red-500 hover:text-red-700 sm:text-sm whitespace-nowrap"
+              className="text-red-600 hover:text-red-700 font-bold"
             >
               Close Register
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -261,7 +271,7 @@ export default function PosPage() {
         <div className={`flex-1 flex-col overflow-hidden ${mobileView === 'browse' ? 'flex' : 'hidden lg:flex'}`}>
 
           {/* Tab bar */}
-          <div className="flex shrink-0 bg-[#1a3c40]">
+          <div className="flex shrink-0 items-center bg-[#1a3c40]">
             {TABS.map(tab => (
               <button
                 key={tab.key}

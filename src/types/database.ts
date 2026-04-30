@@ -134,6 +134,59 @@ export type Database = {
           },
         ]
       }
+      system_broadcasts: {
+        Row: {
+          id: string
+          created_by: string
+          type: 'info' | 'warning' | 'downtime' | 'maintenance'
+          title: string
+          body: string
+          target_scope: 'all' | 'business'
+          target_business_id: string | null
+          status: 'draft' | 'active' | 'archived'
+          expires_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          created_by: string
+          type?: 'info' | 'warning' | 'downtime' | 'maintenance'
+          title: string
+          body: string
+          target_scope?: 'all' | 'business'
+          target_business_id?: string | null
+          status?: 'draft' | 'active' | 'archived'
+          expires_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          type?: 'info' | 'warning' | 'downtime' | 'maintenance'
+          title?: string
+          body?: string
+          target_scope?: 'all' | 'business'
+          target_business_id?: string | null
+          status?: 'draft' | 'active' | 'archived'
+          expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      broadcast_reads: {
+        Row: {
+          broadcast_id: string
+          profile_id: string
+          read_at: string
+        }
+        Insert: {
+          broadcast_id: string
+          profile_id: string
+          read_at?: string
+        }
+        Update: {}
+        Relationships: []
+      }
       blocked_dates: {
         Row: {
           blocked_date: string
@@ -269,6 +322,7 @@ export type Database = {
           logo_url: string | null
           name: string
           phone: string | null
+          pos_require_shift: boolean | null
           updated_at: string | null
         }
         Insert: {
@@ -282,6 +336,7 @@ export type Database = {
           logo_url?: string | null
           name: string
           phone?: string | null
+          pos_require_shift?: boolean | null
           updated_at?: string | null
         }
         Update: {
@@ -295,6 +350,7 @@ export type Database = {
           logo_url?: string | null
           name?: string
           phone?: string | null
+          pos_require_shift?: boolean | null
           updated_at?: string | null
         }
         Relationships: [

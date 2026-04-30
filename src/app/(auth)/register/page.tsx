@@ -15,6 +15,8 @@ import {
   Scissors, Coffee, Monitor, Package, ShieldCheck, RotateCcw, Gift,
 } from 'lucide-react'
 
+import validations from '@/components/layout/number-validations.json'
+
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
 const step1Schema = z.object({
@@ -22,6 +24,34 @@ const step1Schema = z.object({
   subdomain: z.string().min(2).max(30).regex(/^[a-z0-9-]+$/, { message: 'Only lowercase letters, numbers, and hyphens' }),
   email: z.string().email('Invalid email'),
   phone: z.string().min(5, 'Phone number is required'),
+}).refine((data) => {
+  if (!data.phone.startsWith('+')) return true // Basic validation already handled by min(5)
+
+  // Find the matching validation rule by checking which dial code the phone starts with.
+  // We sort by length descending to match +1-246 before +1.
+  const sortedValidations = [...validations].sort((a, b) => b.phone.length - a.phone.length)
+  const rule = sortedValidations.find(v => data.phone.startsWith('+' + v.phone.replace('-', '')))
+  
+  if (!rule) return true // No rule found, allow it (fallback to basic min(5))
+
+  const dialCode = rule.phone.replace('-', '')
+  const digitsOnly = data.phone.slice(dialCode.length + 1) // Remove + and dialCode
+  const length = digitsOnly.length
+
+  if (Array.isArray(rule.phoneLength)) {
+    return rule.phoneLength.includes(length)
+  }
+  if (rule.phoneLength) {
+    return length === rule.phoneLength
+  }
+  // Fallback to min/max if phoneLength is missing
+  if (rule.min && length < rule.min) return false
+  if (rule.max && length > rule.max) return false
+  
+  return true
+}, {
+  message: 'Invalid phone number length for the selected country',
+  path: ['phone'],
 })
 
 const step2Schema = z.object({

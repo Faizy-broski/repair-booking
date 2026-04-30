@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   TrendingUp, TrendingDown, DollarSign, ShoppingCart, Wrench, RefreshCw,
   Receipt, PieChart, Users, FileText, CreditCard, Package, BarChart2, Lock,
@@ -45,41 +46,37 @@ export default function ReportsOverviewPage() {
   const { activeBranch } = useAuthStore()
   const [dateFrom, setDateFrom] = useState(firstOfMonth)
   const [dateTo, setDateTo] = useState(today)
-  const [loading, setLoading] = useState(false)
-  const [stats, setStats] = useState<SummaryStats>({ total_revenue: 0, total_transactions: 0, total_repairs: 0, net_profit: 0 })
-  const [currentSession, setCurrentSession] = useState<RegisterSession | null>(null)
-
-  const fetchStats = useCallback(async () => {
-    if (!activeBranch) return
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({ type: 'dashboard', branch_id: activeBranch.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` })
+  const { data: statsData, isLoading: loading, refetch: fetchStats } = useQuery({
+    queryKey: ['reports-stats', activeBranch?.id, dateFrom, dateTo],
+    queryFn: async () => {
+      const params = new URLSearchParams({ type: 'dashboard', branch_id: activeBranch!.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` })
       const res = await fetch(`/api/reports?${params}`)
       const json = await res.json()
       const d = json.data ?? {}
       const salesArr: Array<{ total?: number }> = d.sales ?? []
       const repairsArr: unknown[] = d.repairs ?? []
       const pl = d.profitLoss ?? {}
-      setStats({
+      return {
         total_revenue: pl.total_revenue ?? salesArr.reduce((s: number, r) => s + (r.total ?? 0), 0),
         total_transactions: salesArr.length,
         total_repairs: repairsArr.length,
         net_profit: pl.net_profit ?? 0,
-      })
-    } finally { setLoading(false) }
-  }, [activeBranch, dateFrom, dateTo])
+      } as SummaryStats
+    },
+    enabled: !!activeBranch,
+  })
 
-  const fetchSession = useCallback(async () => {
-    if (!activeBranch) return
-    const res = await fetch(`/api/pos/session?branch_id=${activeBranch.id}`)
-    const json = await res.json()
-    setCurrentSession(json.data)
-  }, [activeBranch])
+  const stats = statsData ?? { total_revenue: 0, total_transactions: 0, total_repairs: 0, net_profit: 0 }
 
-  useEffect(() => {
-    fetchStats()
-    fetchSession()
-  }, [activeBranch]) // eslint-disable-line react-hooks/exhaustive-deps
+  const { data: currentSession } = useQuery({
+    queryKey: ['current-session', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/pos/session?branch_id=${activeBranch!.id}`)
+      const json = await res.json()
+      return (json.data ?? null) as RegisterSession | null
+    },
+    enabled: !!activeBranch,
+  })
 
   const statsCards = [
     { label: 'Total Revenue', value: formatCurrency(stats.total_revenue), icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },

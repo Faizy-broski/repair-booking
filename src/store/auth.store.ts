@@ -33,6 +33,25 @@ interface AuthState {
   canAccessAllBranches: () => boolean
 }
 
+/**
+ * Return a localStorage key that is scoped to the current subdomain.
+ * This prevents User A's cached profile/branches from leaking into
+ * User B's session when they log into a different business on the same browser.
+ * e.g. "auth-storage-techfix", "auth-storage-repairlab", "auth-storage-root"
+ */
+function getStorageKey(): string {
+  if (typeof window === 'undefined') return 'auth-storage'
+  const hostname = window.location.hostname
+  // Strip port from hostname
+  const cleanHost = hostname.split(':')[0]
+  // Extract subdomain
+  const rootDomain = (process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'repairbooking.co.uk').split(':')[0]
+  let sub: string | null = null
+  if (cleanHost.endsWith('.localhost')) sub = cleanHost.replace('.localhost', '')
+  else if (cleanHost.endsWith(`.${rootDomain}`)) sub = cleanHost.replace(`.${rootDomain}`, '')
+  return sub ? `auth-storage-${sub}` : 'auth-storage-root'
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -65,7 +84,8 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: 'auth-storage',
+      name: getStorageKey(),
+      skipHydration: true, // Prevent SSR hydration mismatch — layout calls rehydrate() after mount
       partialize: (state) => ({
         profile: state.profile,
         activeBranch: state.activeBranch,
@@ -75,3 +95,4 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 )
+

@@ -8,7 +8,7 @@ import {
   Phone, Settings, UserCheck, LogOut, Receipt, X, UploadCloud,
   CreditCard, AlertCircle, Smartphone, BookOpen, TrendingUp, PieChart,
   ChevronDown, Bell, Server, Clock, Activity, Mail, Users2,
-  Store, GitBranch, Sliders, Layers,
+  Store, GitBranch, Sliders, Layers, Settings2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
@@ -37,7 +37,8 @@ interface NavGroup {
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard',      href: '/dashboard',      icon: LayoutDashboard, requiredRole: 'cashier' },
   { label: 'POS',            href: '/pos',             icon: ShoppingCart,    requiredRole: 'cashier',        module: 'pos' },
-  { label: 'Sales',          href: '/sales',           icon: Receipt,         requiredRole: 'cashier',        module: 'pos' },
+  { label: 'Sales',          href: '/sales',           icon: Receipt,         requiredRole: 'cashier',        module: 'pos',  subItem: true },
+  { label: 'POS Settings',   href: '/pos/settings',    icon: Settings2,       requiredRole: 'business_owner', module: 'pos',  subItem: true },
   { label: 'Repairs',        href: '/repairs',         icon: Wrench,          requiredRole: 'staff',          module: 'repairs' },
   { label: 'Service Catalogue', href: '/repairs/service-catalogue', icon: BookOpen, requiredRole: 'branch_manager', module: 'repairs', subItem: true },
   { label: 'Repair Customers',  href: '/repairs/customers',         icon: Users2,   requiredRole: 'staff',          module: 'repairs', subItem: true },
@@ -168,33 +169,19 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
         collapsed ? 'w-[68px]' : 'w-[248px]'
       )}
     >
-      {/* Brand */}
-      <div className={cn(
-        'flex h-16 shrink-0 items-center gap-3 border-b border-white/10',
-        collapsed ? 'justify-center px-0' : 'px-5'
-      )}>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-teal shadow-lg shadow-brand-teal/30">
-          <Wrench className="h-4 w-4 text-white" />
-        </div>
-        {!collapsed && (
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-bold tracking-tight text-white">RepairBooking</p>
-            <p className="text-[10px] text-white/40 tracking-wide uppercase">POS Platform</p>
-          </div>
-        )}
+      {/* Branch switcher / logo — at the very top */}
+      <div className="relative">
+        <BranchSwitcher collapsed={collapsed} />
         {onClose && (
           <button
             onClick={onClose}
-            className="ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/40 hover:bg-white/10 hover:text-white transition-colors"
+            className="absolute right-3 top-1/2 -translate-y-1/2 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/40 hover:bg-white/10 hover:text-white transition-colors"
             aria-label="Close sidebar"
           >
             <X className="h-5 w-5" />
           </button>
         )}
       </div>
-
-      {/* Branch switcher */}
-      <BranchSwitcher collapsed={collapsed} />
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-2 px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

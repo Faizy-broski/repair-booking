@@ -1,5 +1,5 @@
 'use client'
-import { Store, GitBranch, Users, Sliders, Layers, ChevronDown } from 'lucide-react'
+import { Store, GitBranch, Users, Sliders, Layers, ChevronDown, ShoppingCart } from 'lucide-react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
@@ -8,6 +8,7 @@ const SETTINGS_MENU = [
   { id: 'general', label: 'Business Information', href: '/settings/general', icon: Store },
   { id: 'branches', label: 'Branches', href: '/settings/branches', icon: GitBranch, ownerOnly: true },
   { id: 'users', label: 'Users', href: '/settings/users', icon: Users, ownerOnly: true },
+  { id: 'pos', label: 'Point of Sale', href: '/settings/pos', icon: ShoppingCart, ownerOnly: true },
   { id: 'custom-fields', label: 'Custom Fields', href: '/settings/custom-fields', icon: Sliders },
   { id: 'invoice-design', label: 'Invoice Design', href: '/settings/invoice-design', icon: Layers },
 ]

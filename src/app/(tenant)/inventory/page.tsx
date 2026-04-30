@@ -74,12 +74,8 @@ export default function InventoryPage() {
   // Start in loading state — stays true until branchId is known and first
   // fetch completes. Prevents the DataTable from briefly rendering products
   // with on_hand=0 before the branch-aware fetch returns.
-  const [stats, setStats] = useState<ProductStats | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ProductRow | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const [categories, setCategories] = useState<Category[]>([])
-  const [brands, setBrands] = useState<Brand[]>([])
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
 
   // Filters
@@ -105,7 +101,6 @@ export default function InventoryPage() {
   // so the DataTable never shows the previous branch's on_hand values.
   useEffect(() => {
     if (prevBranchIdRef.current !== null && prevBranchIdRef.current !== branchId) {
-      setStats(null)
       setPage(0)
     }
     prevBranchIdRef.current = branchId
@@ -114,7 +109,7 @@ export default function InventoryPage() {
   const queryClient = useQueryClient()
 
   // ── Stats Query ──
-  const { data: statsData, refetch: fetchStats } = useQuery({
+  const { data: stats } = useQuery({
     queryKey: ['inventory-stats', branchId],
     queryFn: async () => {
       const res = await fetch(`/api/products/stats?branch_id=${branchId}`)
@@ -124,10 +119,8 @@ export default function InventoryPage() {
     enabled: !!branchId,
   })
 
-  useEffect(() => { if (statsData) setStats(statsData) }, [statsData])
-
   // ── Products Query ──
-  const { data: productResponse, isLoading: productsLoading, refetch: fetchProducts } = useQuery({
+  const { data: productResponse, isLoading: loading } = useQuery({
     queryKey: ['inventory', branchId, page, search, categoryFilter, brandFilter, supplierFilter, valuationFilter, hideOutOfStock, typeFilter],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page + 1), limit: '20', branch_id: branchId! })
@@ -149,15 +142,19 @@ export default function InventoryPage() {
 
   const products = productResponse?.data ?? []
   const total = productResponse?.meta?.total ?? 0
-  const [loading, setLoading] = useState(false)
-  useEffect(() => { setLoading(productsLoading) }, [productsLoading])
 
-
-  useEffect(() => {
-    fetch('/api/categories').then(r => r.json()).then(j => setCategories(j.data ?? [])).catch(() => {})
-    fetch('/api/brands').then(r => r.json()).then(j => setBrands(j.data ?? [])).catch(() => {})
-    fetch('/api/suppliers').then(r => r.json()).then(j => setSuppliers(j.data ?? [])).catch(() => {})
-  }, [])
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => fetch('/api/categories').then(r => r.json()).then(j => j.data ?? [])
+  })
+  const { data: brands = [] } = useQuery({
+    queryKey: ['brands'],
+    queryFn: async () => fetch('/api/brands').then(r => r.json()).then(j => j.data ?? [])
+  })
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ['suppliers'],
+    queryFn: async () => fetch('/api/suppliers').then(r => r.json()).then(j => j.data ?? [])
+  })
 
 
   async function openVariantDrawer(product: ProductRow) {
@@ -177,8 +174,8 @@ export default function InventoryPage() {
     await fetch(`/api/products/${deleteTarget.id}${qs}`, { method: 'DELETE' })
     setDeleting(false)
     setDeleteTarget(null)
-    fetchProducts()
-    fetchStats()
+    queryClient.invalidateQueries({ queryKey: ['inventory'] })
+    queryClient.invalidateQueries({ queryKey: ['inventory-stats'] })
   }
 
   async function handleBulkDelete() {
@@ -188,8 +185,8 @@ export default function InventoryPage() {
     setBulkDeleting(false)
     setShowBulkDeleteConfirm(false)
     setSelectedIds(new Set())
-    fetchProducts()
-    fetchStats()
+    queryClient.invalidateQueries({ queryKey: ['inventory'] })
+    queryClient.invalidateQueries({ queryKey: ['inventory-stats'] })
   }
 
   function clearFilters() {
@@ -410,48 +407,79 @@ export default function InventoryPage() {
           <Button size="sm" className="flex-1 sm:flex-none" onClick={() => router.push('/inventory/new')}>
             <Plus className="h-4 w-4" /> Add Item
           </Button>
-          <Button variant="outline" size="sm" onClick={() => { fetchProducts(); fetchStats() }} title="Refresh data">
+          <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['inventory'] }); queryClient.invalidateQueries({ queryKey: ['inventory-stats'] }) }} title="Refresh data">
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
       {/* Stats from API */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
           {
             label: 'Stock Retail Value',
-            value: stats ? formatCurrencyCompact(stats.stockRetailValue) : '…',
-            icon: <Boxes className="h-4 w-4 text-blue-600" />,
-            color: 'bg-blue-50',
+            value: stats ? formatCurrencyCompact(stats.stockRetailValue) : null,
+            icon: Boxes,
+            iconColor: 'text-blue-600',
+            iconBg: 'bg-blue-100',
+            borderColor: 'bg-blue-600',
+            subtitle: 'potential revenue',
           },
           {
             label: 'Stock Cost Value',
-            value: stats ? formatCurrencyCompact(stats.stockCostValue) : '…',
-            icon: <Package className="h-4 w-4 text-indigo-600" />,
-            color: 'bg-indigo-50',
+            value: stats ? formatCurrencyCompact(stats.stockCostValue) : null,
+            icon: Package,
+            iconColor: 'text-indigo-600',
+            iconBg: 'bg-indigo-100',
+            borderColor: 'bg-indigo-600',
+            subtitle: 'invested capital',
           },
           {
             label: 'Low Stock Items',
-            value: stats?.lowStockCount ?? '…',
-            icon: <AlertTriangle className="h-4 w-4 text-amber-600" />,
-            color: 'bg-amber-50',
+            value: stats?.lowStockCount ?? null,
+            icon: AlertTriangle,
+            iconColor: 'text-amber-600',
+            iconBg: 'bg-amber-100',
+            borderColor: 'bg-amber-500',
+            subtitle: 'needs reordering',
           },
           {
             label: 'In Purchase Order',
-            value: stats?.inPoCount ?? '…',
-            icon: <ShoppingCart className="h-4 w-4 text-green-600" />,
-            color: 'bg-green-50',
+            value: stats?.inPoCount ?? null,
+            icon: ShoppingCart,
+            iconColor: 'text-emerald-600',
+            iconBg: 'bg-emerald-100',
+            borderColor: 'bg-emerald-500',
+            subtitle: 'incoming stock',
           },
-        ].map((s) => (
-          <div key={s.label} className={`rounded-xl ${s.color} border border-gray-100 px-4 py-3 flex items-center gap-3`}>
-            {s.icon}
-            <div>
-              <p className="text-xs text-gray-500">{s.label}</p>
-              <p className="font-bold text-gray-900">{s.value}</p>
+        ].map((s) => {
+          const Icon = s.icon
+          return (
+            <div key={s.label} className="relative overflow-hidden rounded-xl border border-gray-200 bg-white pb-4 pt-5 px-5 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">{s.label}</p>
+                  {s.value !== null ? (
+                    <p className="mt-2 text-3xl font-bold text-gray-900">{s.value}</p>
+                  ) : (
+                    <div className="mt-2 h-8 w-24 rounded bg-gray-100 animate-pulse" />
+                  )}
+                </div>
+                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${s.iconBg}`}>
+                  <Icon className={`h-5 w-5 ${s.iconColor}`} />
+                </div>
+              </div>
+              {s.value !== null ? (
+                <p className={`mt-3 text-xs font-medium ${s.iconColor}`}>
+                  {s.subtitle}
+                </p>
+              ) : (
+                <div className="mt-3 h-4 w-24 rounded bg-gray-100 animate-pulse" />
+              )}
+              <div className={`absolute bottom-0 left-0 right-0 h-1 ${s.borderColor}`} />
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Filter Bar */}

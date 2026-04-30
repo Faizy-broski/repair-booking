@@ -6,6 +6,58 @@ import { useModuleConfigStore } from '@/store/module-config.store'
 import { cn } from '@/lib/utils'
 import type { Branch } from '@/types/database'
 
+function BranchCard({
+  logoUrl,
+  name,
+  role,
+  showChevron = false,
+}: {
+  logoUrl?: string | null
+  name: string
+  role?: string | null
+  showChevron?: boolean
+}) {
+  return (
+    <div className="relative w-full pb-3">
+      {/* ── Content ── */}
+      <div className="relative z-10 flex flex-col items-center pt-4 px-4">
+        {/* Cover Image / Logo - Wide Rectangle, no white padding */}
+        <div className="mb-2.5 flex h-20 w-full shrink-0 items-center justify-center overflow-hidden rounded-xl bg-sidebar-bg shadow-lg shadow-black/20 ring-1 ring-white/10">
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={name}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-white/5 to-transparent">
+              <Building2 className="h-6 w-6 text-white/30" />
+            </div>
+          )}
+        </div>
+
+        {/* Name & Role */}
+        <div className="flex w-full flex-col items-center">
+          <div className="flex items-center justify-center gap-1.5 w-full">
+            <p className="truncate text-[17px] font-bold text-white/95 leading-tight tracking-tight max-w-[160px]">
+              {name}
+            </p>
+            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+            {showChevron && (
+              <ChevronDown className="h-4 w-4 shrink-0 text-white/50 ml-0.5" />
+            )}
+          </div>
+          {role && (
+            <p className="mt-1 text-[11px] font-medium capitalize tracking-wider text-brand-teal/70">
+              {role.replace(/_/g, ' ')}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function BranchSwitcher({ collapsed = false }: { collapsed?: boolean }) {
   const { activeBranch, branches, setActiveBranch, canAccessAllBranches, profile } = useAuthStore()
   const { invalidate, fetchConfigs } = useModuleConfigStore()
@@ -16,80 +68,61 @@ export function BranchSwitcher({ collapsed = false }: { collapsed?: boolean }) {
     fetchConfigs(branch.id)
   }
 
-  // Staff: show static pill — their branch is fixed
-  if (!canAccessAllBranches()) {
-    if (!activeBranch) return null
+  /* ── Collapsed sidebar: small logo square ── */
+  if (collapsed) {
     return (
-      <div className={cn(
-        'mx-3 mt-3 rounded-xl bg-white/5 border border-white/10 px-3 py-2.5',
-        collapsed && 'mx-auto mt-3 flex items-center justify-center w-10 h-10 rounded-xl px-0 py-0'
-      )}>
-        {collapsed ? (
-          <Building2 className="h-4 w-4 text-emerald-400" />
+      <div className="mx-auto mt-3 flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/5">
+        {activeBranch?.logo_url ? (
+          <img
+            src={activeBranch.logo_url}
+            alt="Branch"
+            className="h-full w-full object-cover"
+          />
         ) : (
-          <div className="flex items-center gap-3">
-            {activeBranch.logo_url ? (
-              <img src={activeBranch.logo_url} alt="Branch Logo" className="h-10 w-12 rounded-md object-cover bg-white shadow-sm shrink-0" />
-            ) : null}
-            <div className="min-w-0 flex flex-col items-start justify-center">
-              <div className="flex items-center gap-1.5 w-full">
-                <p className="truncate text-base font-bold text-white/90">{activeBranch.name}</p>
-                <div className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
-              </div>
-              <p className="text-[11px] text-white/40 capitalize tracking-wide">
-                {profile?.role?.replace(/_/g, ' ')}
-              </p>
-            </div>
-          </div>
+          <Building2 className="h-4 w-4 text-emerald-400" />
         )}
       </div>
     )
   }
 
-  // Owners always get the switcher (even with 1 branch — they may add more)
+  /* ── Staff: static banner, no dropdown ── */
+  if (!canAccessAllBranches()) {
+    if (!activeBranch) return null
+    return (
+      <div className="w-full border-b border-white/8">
+        <BranchCard
+          logoUrl={activeBranch.logo_url}
+          name={activeBranch.name}
+          role={profile?.role}
+        />
+      </div>
+    )
+  }
+
+  /* ── Owners: full-width dropdown ── */
   return (
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger className={cn(
-        'mx-3 mt-3 flex w-[calc(100%-1.5rem)] items-center gap-2 rounded-xl bg-white/5 border border-white/10 px-3 py-2.5 text-left transition-colors hover:bg-white/10 focus:outline-none',
-        collapsed && 'mx-auto w-10 h-10 justify-center px-0 py-0'
-      )}>
-        {collapsed ? (
-          <Building2 className="h-4 w-4 text-emerald-400" />
-        ) : (
-          <>
-            <div className="min-w-0 flex-1 flex items-center gap-3">
-              {activeBranch?.logo_url ? (
-                <img src={activeBranch.logo_url} alt="Branch Logo" className="h-10 w-12 rounded-md object-cover bg-white shrink-0 shadow-sm" />
-              ) : null}
-              <div className="min-w-0 flex flex-col items-start justify-center">
-                <div className="flex items-center gap-1.5 w-full">
-                  <p className="truncate text-base font-bold text-white/90">{activeBranch?.name ?? 'Select Branch'}</p>
-                  <div className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
-                </div>
-                <p className="text-[11px] text-white/40 capitalize tracking-wide">
-                  {profile?.role?.replace(/_/g, ' ')}
-                </p>
-              </div>
-            </div>
-            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-white/40" />
-          </>
-        )}
+      <DropdownMenu.Trigger className="w-full border-b border-white/8 text-left transition-opacity hover:opacity-90 focus:outline-none">
+        <BranchCard
+          logoUrl={activeBranch?.logo_url}
+          name={activeBranch?.name ?? 'Select Branch'}
+          role={profile?.role}
+          showChevron
+        />
       </DropdownMenu.Trigger>
 
       <DropdownMenu.Portal>
         <DropdownMenu.Content
-          className="z-50 min-w-[180px] overflow-hidden rounded-xl border border-gray-700 bg-gray-900 shadow-xl p-1"
+          className="z-50 min-w-[200px] overflow-hidden rounded-xl border border-gray-700 bg-gray-900 shadow-2xl p-1"
           sideOffset={4}
           side="right"
           align="start"
+          alignOffset={96}
         >
-          {/* All Branches option for owners */}
           {branches.length > 1 && (
             <>
               <DropdownMenu.Item
-                onClick={() => {
-                  if (branches[0]) handleBranchSwitch(branches[0])
-                }}
+                onClick={() => { if (branches[0]) handleBranchSwitch(branches[0]) }}
                 className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-white/50 hover:bg-white/10 focus:outline-none"
               >
                 <Layers className="h-3.5 w-3.5" />
@@ -107,8 +140,7 @@ export function BranchSwitcher({ collapsed = false }: { collapsed?: boolean }) {
             >
               {activeBranch?.id === branch.id
                 ? <Check className="h-3.5 w-3.5 text-brand-teal shrink-0" />
-                : <span className="w-3.5 shrink-0" />
-              }
+                : <span className="w-3.5 shrink-0" />}
               <span className="truncate">{branch.name}</span>
               {(branch as any).is_main && (
                 <span className="ml-auto text-xs text-white/30">main</span>

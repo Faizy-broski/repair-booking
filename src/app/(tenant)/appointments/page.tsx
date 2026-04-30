@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -47,11 +48,7 @@ const DEFAULT_HOURS = Array.from({ length: 15 }, (_, i) => i + 7) // 7am - 9pm
 
 export default function AppointmentsPage() {
   const { activeBranch } = useAuthStore()
-  const [appointments, setAppointments] = useState<AppointmentRow[]>([])
-  const [customers, setCustomers] = useState<CustomerOption[]>([])
-  const [employees, setEmployees] = useState<EmployeeOption[]>([])
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }))
-  const [loading, setLoading] = useState(true)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [editingAppointment, setEditingAppointment] = useState<AppointmentRow | null>(null)
@@ -72,24 +69,31 @@ export default function AppointmentsPage() {
     resolver: zodResolver(schema),
   })
 
-  const fetchData = useCallback(async () => {
-    if (!activeBranch) return
-    setLoading(true)
-    const from = format(weekStart, 'yyyy-MM-dd')
-    const to = format(addDays(weekStart, 6), 'yyyy-MM-dd')
-    const [apptRes, custRes, empRes] = await Promise.all([
-      fetch(`/api/appointments?branch_id=${activeBranch.id}&from=${from}&to=${to}`),
-      fetch(`/api/customers?branch_id=${activeBranch.id}&limit=100`),
-      fetch(`/api/employees?branch_id=${activeBranch.id}&limit=200`),
-    ])
-    const [apptJson, custJson, empJson] = await Promise.all([apptRes.json(), custRes.json(), empRes.json()])
-    setAppointments(apptJson.data ?? [])
-    setCustomers(custJson.data ?? [])
-    setEmployees(empJson.data ?? [])
-    setLoading(false)
-  }, [activeBranch, weekStart])
+  const queryClient = useQueryClient()
 
-  useEffect(() => { fetchData() }, [fetchData])
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ['appointments-data', activeBranch?.id, format(weekStart, 'yyyy-MM-dd')],
+    queryFn: async () => {
+      const from = format(weekStart, 'yyyy-MM-dd')
+      const to = format(addDays(weekStart, 6), 'yyyy-MM-dd')
+      const [apptRes, custRes, empRes] = await Promise.all([
+        fetch(`/api/appointments?branch_id=${activeBranch!.id}&from=${from}&to=${to}`),
+        fetch(`/api/customers?branch_id=${activeBranch!.id}&limit=100`),
+        fetch(`/api/employees?branch_id=${activeBranch!.id}&limit=200`),
+      ])
+      const [apptJson, custJson, empJson] = await Promise.all([apptRes.json(), custRes.json(), empRes.json()])
+      return {
+        appointments: (apptJson.data ?? []) as AppointmentRow[],
+        customers: (custJson.data ?? []) as CustomerOption[],
+        employees: (empJson.data ?? []) as EmployeeOption[],
+      }
+    },
+    enabled: !!activeBranch,
+  })
+
+  const appointments = data?.appointments ?? []
+  const customers = data?.customers ?? []
+  const employees = data?.employees ?? []
 
   async function onCreate(data: FormData) {
     if (!activeBranch) return
@@ -104,7 +108,7 @@ export default function AppointmentsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    if (res.ok) { reset(); setSheetOpen(false); fetchData() }
+    if (res.ok) { reset(); setSheetOpen(false); queryClient.invalidateQueries({ queryKey: ['appointments-data'] }) }
     else {
       const json = await res.json().catch(() => null)
       setCreateError(json?.error?.message ?? 'Failed to create appointment.')
@@ -138,7 +142,7 @@ export default function AppointmentsPage() {
     if (res.ok) {
       setEditSheetOpen(false)
       setEditingAppointment(null)
-      fetchData()
+      queryClient.invalidateQueries({ queryKey: ['appointments-data'] })
     } else {
       const json = await res.json().catch(() => null)
       setEditError(json?.error?.message ?? 'Failed to update appointment.')
@@ -151,7 +155,7 @@ export default function AppointmentsPage() {
     const res = await fetch(`/api/appointments/${id}?branch_id=${activeBranch.id}`, { method: 'DELETE' })
     setDeletingId(null)
     setConfirmDeleteId(null)
-    if (res.ok) fetchData()
+    if (res.ok) queryClient.invalidateQueries({ queryKey: ['appointments-data'] })
   }
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))

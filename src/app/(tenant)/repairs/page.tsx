@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Plus, Search, LayoutGrid, List, Wrench, DollarSign, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X } from 'lucide-react'
+import { Plus, Search, LayoutGrid, List, Wrench, DollarSign, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
 import { Modal } from '@/components/ui/modal'
@@ -51,11 +51,12 @@ const EMPTY_JOB = {
   passcode: '',
 }
 
-function ActionsMenu({ onEdit, onSlip, onInvoice, onDelete }: {
+function ActionsMenu({ onEdit, onSlip, onInvoice, onDelete, onMessage }: {
   onEdit: () => void
   onSlip: () => void
   onInvoice: () => void
   onDelete: () => void
+  onMessage: () => void
 }) {
   const item = 'flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors'
 
@@ -83,6 +84,9 @@ function ActionsMenu({ onEdit, onSlip, onInvoice, onDelete }: {
           </DropdownMenu.Item>
           <DropdownMenu.Item className={item} onSelect={onInvoice}>
             <FileText className="h-3.5 w-3.5 text-violet-500" /> Invoice
+          </DropdownMenu.Item>
+          <DropdownMenu.Item className={item} onSelect={onMessage}>
+            <Mail className="h-3.5 w-3.5 text-blue-500" /> Message
           </DropdownMenu.Item>
           <DropdownMenu.Separator className="h-px bg-gray-100" />
           <DropdownMenu.Item className={`${item} text-red-600 hover:bg-red-50`} onSelect={onDelete}>
@@ -329,17 +333,77 @@ export default function RepairsPage() {
   const [editSaving, setEditSaving] = useState(false)
 
   // Custom statuses + faults + employees
-  const [customStatuses, setCustomStatuses] = useState<{ id: string; name: string; color: string }[]>([])
-  const [faults, setFaults] = useState<{ id: string; name: string }[]>([])
-  const [employees, setEmployees] = useState<{ id: string; first_name: string; last_name: string | null }[]>([])
-  const [deviceData, setDeviceData] = useState<DeviceData>({ types: [], brands: [], models: [], raw: [] })
+  const { data: customStatuses = [] } = useQuery({
+    queryKey: ['custom-statuses', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/repairs/custom-statuses?branch_id=${activeBranch!.id}`)
+      const json = await res.json()
+      return json.data || []
+    },
+    enabled: !!activeBranch,
+  })
+
+  const { data: faults = [] } = useQuery({
+    queryKey: ['faults', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/repairs/faults?branch_id=${activeBranch!.id}`)
+      const json = await res.json()
+      return json.data || []
+    },
+    enabled: !!activeBranch,
+  })
+
+  const { data: deviceData = { types: [], brands: [], models: [], raw: [] } } = useQuery<DeviceData>({
+    queryKey: ['device-data', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/repairs/devices?branch_id=${activeBranch!.id}`)
+      const json = await res.json()
+      return json.data || { types: [], brands: [], models: [], raw: [] }
+    },
+    enabled: !!activeBranch,
+  })
+
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/employees?branch_id=${activeBranch!.id}&limit=100`)
+      const json = await res.json()
+      return json.data || []
+    },
+    enabled: !!activeBranch,
+  })
 
   // Dashboard stats
-  const [repairStats, setRepairStats] = useState<{
-    total_repairs: number; repairs_open: number; repairs_completed: number;
-    repairs_urgent: number; total_sales: number;
-  } | null>(null)
-  const [invoiceSettings, setInvoiceSettings] = useState<any>(null)
+  const { data: repairStats = null } = useQuery({
+    queryKey: ['dashboard-stats', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/dashboard?branch_id=${activeBranch!.id}`)
+      const json = await res.json()
+      if (json.data?.stats) {
+        const s = json.data.stats
+        return {
+          total_repairs: s.repairs_total ?? (s.repairs_open + s.repairs_completed),
+          repairs_open: s.repairs_open,
+          repairs_completed: s.repairs_completed,
+          repairs_urgent: s.repairs_urgent,
+          total_sales: s.total_sales,
+        }
+      }
+      return null
+    },
+    enabled: !!activeBranch,
+  })
+
+  const { data: invoiceSettings = null } = useQuery({
+    queryKey: ['invoice-settings', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/settings/invoice?branch_id=${activeBranch!.id}`)
+      const json = await res.json()
+      return json.data || null
+    },
+    enabled: !!activeBranch,
+  })
+
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false)
   const [selectedInvoiceRepair, setSelectedInvoiceRepair] = useState<RepairRow | null>(null)
 
@@ -446,46 +510,7 @@ export default function RepairsPage() {
     }
   }
 
-  // Fetch supporting data - reactive to activeBranch
-  useEffect(() => {
-    if (!activeBranch) return
-    const bid = activeBranch.id
-    fetch(`/api/repairs/custom-statuses?branch_id=${bid}`).then((r) => r.json()).then((j) => { if (j.data) setCustomStatuses(j.data) })
-    fetch(`/api/repairs/faults?branch_id=${bid}`).then((r) => r.json()).then((j) => { if (j.data) setFaults(j.data) })
-    fetch(`/api/repairs/devices?branch_id=${bid}`).then((r) => r.json()).then((j) => { if (j.data) setDeviceData(j.data) })
-  }, [activeBranch])
-
-  useEffect(() => {
-    if (!activeBranch) return
-    fetch(`/api/employees?branch_id=${activeBranch.id}&limit=100`)
-      .then((r) => r.json()).then((j) => { if (j.data) setEmployees(j.data) })
-  }, [activeBranch])
-
-  // Fetch repair dashboard stats
-  useEffect(() => {
-    if (!activeBranch) return
-    fetch(`/api/dashboard?branch_id=${activeBranch.id}`)
-      .then((r) => r.json())
-      .then((json) => {
-        if (json.data?.stats) {
-          const s = json.data.stats
-          setRepairStats({
-            total_repairs: s.repairs_total ?? (s.repairs_open + s.repairs_completed),
-            repairs_open: s.repairs_open,
-            repairs_completed: s.repairs_completed,
-            repairs_urgent: s.repairs_urgent,
-            total_sales: s.total_sales,
-          })
-        }
-      })
-  }, [activeBranch])
-
-  useEffect(() => {
-    if (!activeBranch) return
-    fetch(`/api/settings/invoice?branch_id=${activeBranch.id}`)
-      .then(r => r.json())
-      .then(j => { if (j.data) setInvoiceSettings(j.data) })
-  }, [activeBranch])
+  // Fetch supporting data replaced by React Query above
 
   function openEdit(r: RepairRow) {
     setEditRepair(r)
@@ -545,6 +570,16 @@ export default function RepairsPage() {
     setStep1Error('')
     setModalOpen(true)
   }
+
+  // Open modal if ?new=true is in the URL
+  useEffect(() => {
+    if (searchParams.get('new') === 'true') {
+      openModal()
+      const newParams = new URLSearchParams(searchParams.toString())
+      newParams.delete('new')
+      router.replace(`${pathname}?${newParams.toString()}`)
+    }
+  }, [searchParams, pathname, router])
 
   async function goToStep2() {
     setStep1Error('')
@@ -642,10 +677,9 @@ export default function RepairsPage() {
     })
     if (res.ok) {
       toast.success(`Added "${name}" to device types`)
-      // Refresh device data
-      const bid = activeBranch.id
-      fetch(`/api/repairs/devices?branch_id=${bid}`).then(r => r.json()).then(j => { if (j.data) setDeviceData(j.data) })
-      setJobData(p => ({ ...p, device_type: name }))
+      // Refresh device data by invalidating its query
+      queryClient.invalidateQueries({ queryKey: ['device-data'] })
+      setJobData((p) => ({ ...p, device_type: name, device_brand: '', device_model: '' }))
     }
   }
 
@@ -661,9 +695,8 @@ export default function RepairsPage() {
     })
     if (res.ok) {
       toast.success(`Added "${name}" to brands`)
-      const bid = activeBranch.id
-      fetch(`/api/repairs/devices?branch_id=${bid}`).then(r => r.json()).then(j => { if (j.data) setDeviceData(j.data) })
-      setJobData(p => ({ ...p, device_brand: name }))
+      queryClient.invalidateQueries({ queryKey: ['device-data'] })
+      setJobData((p) => ({ ...p, device_brand: name, device_model: '' }))
     }
   }
 
@@ -686,9 +719,8 @@ export default function RepairsPage() {
     })
     if (res.ok) {
       toast.success(`Added "${name}" to models`)
-      const bid = activeBranch.id
-      fetch(`/api/repairs/devices?branch_id=${bid}`).then(r => r.json()).then(j => { if (j.data) setDeviceData(j.data) })
-      setJobData(p => ({ ...p, device_model: name }))
+      queryClient.invalidateQueries({ queryKey: ['device-data'] })
+      setJobData((p) => ({ ...p, device_model: name }))
     }
   }
 
@@ -817,6 +849,7 @@ export default function RepairsPage() {
               onSlip={() => setSlipRepair(r)}
               onInvoice={() => handleOpenInvoice(r)}
               onDelete={() => deleteRepair(r.id, r.job_number)}
+              onMessage={() => setEmailPrompt({ repairId: r.id, jobNumber: r.job_number })}
             />
           </div>
         )

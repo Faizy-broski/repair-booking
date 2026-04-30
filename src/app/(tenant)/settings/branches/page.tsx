@@ -25,7 +25,7 @@ const branchSchema = z.object({
 type BranchFormData = z.infer<typeof branchSchema>
 
 export default function BranchesSettingsPage() {
-  const { branches: storeBranches, setBranches: setStoreBranches } = useAuthStore()
+  const { branches: storeBranches, setBranches: setStoreBranches, activeBranch, setActiveBranch } = useAuthStore()
   const [branchList, setBranchList] = useState<Branch[]>(storeBranches as Branch[])
   const [editBranchId, setEditBranchId] = useState<string | null>(null)
   const [showNewBranchForm, setShowNewBranchForm] = useState(false)
@@ -40,6 +40,11 @@ export default function BranchesSettingsPage() {
     const updated = json.data ?? []
     setBranchList(updated)
     setStoreBranches(updated)
+    // Sync activeBranch so sidebar logo updates immediately without sign-out/sign-in
+    if (activeBranch) {
+      const refreshed = updated.find((b: Branch) => b.id === activeBranch.id)
+      if (refreshed) setActiveBranch(refreshed)
+    }
   }
 
   async function onSaveBranch(data: BranchFormData) {
