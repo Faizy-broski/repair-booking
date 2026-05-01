@@ -54,7 +54,8 @@ function noStore(res: NextResponse): NextResponse {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const host = request.headers.get('host') || ''
+  // Respect the original host passed by reverse proxies in production
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || ''
 
   // ── Skip static / public API paths ──────────────────────────────────────
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
@@ -90,7 +91,10 @@ export async function middleware(request: NextRequest) {
   function redirectToLogin(loginPath: string): NextResponse {
     const url = new URL(request.url)
     url.pathname = loginPath
-    url.searchParams.set('redirectTo', pathname)
+    // If the requested path is the root ('/'), redirect to /dashboard after login
+    // so users don't land on the marketing homepage instead of the app.
+    const redirectTarget = pathname === '/' ? '/dashboard' : pathname
+    url.searchParams.set('redirectTo', redirectTarget)
     return forwardAuthCookies(supabaseResponse, NextResponse.redirect(url))
   }
 
@@ -303,6 +307,15 @@ export async function middleware(request: NextRequest) {
       }
     }
 
+    // Redirect authenticated users who land on '/' to the dashboard so they
+    // never see the marketing homepage on a tenant subdomain.
+    if (pathname === '/') {
+      return forwardAuthCookies(
+        supabaseResponse,
+        NextResponse.redirect(new URL('/dashboard', request.url))
+      )
+    }
+
     // Inject tenant context into request headers.
     // Read by tenantMiddleware via request.headers.get('x-business-id').
     const requestHeaders = new Headers(request.headers)
@@ -359,11 +372,13 @@ export async function middleware(request: NextRequest) {
 
         if (biz?.subdomain) {
           const url = new URL(request.url)
-          const baseHost = url.hostname === 'localhost'
-            ? (url.port ? `localhost:${url.port}` : 'localhost')
-            : ROOT_DOMAIN.split(':')[0]
+          const isProd = process.env.NODE_ENV === 'production'
+          const baseHost = isProd
+            ? ROOT_DOMAIN.split(':')[0]
+            : (url.hostname === 'localhost' ? (url.port ? `localhost:${url.port}` : 'localhost') : ROOT_DOMAIN.split(':')[0])
+          const protocol = isProd ? 'https:' : url.protocol
           return NextResponse.redirect(
-            new URL(pathname, `${url.protocol}//${biz.subdomain}.${baseHost}`)
+            new URL(pathname, `${protocol}//${biz.subdomain}.${baseHost}`)
           )
         }
       }
@@ -407,12 +422,14 @@ export async function middleware(request: NextRequest) {
 
       if (biz?.subdomain) {
         const url = new URL(request.url)
-        const baseHost = url.hostname === 'localhost'
-          ? (url.port ? `localhost:${url.port}` : 'localhost')
-          : ROOT_DOMAIN
+        const isProd = process.env.NODE_ENV === 'production'
+        const baseHost = isProd
+          ? ROOT_DOMAIN
+          : (url.hostname === 'localhost' ? (url.port ? `localhost:${url.port}` : 'localhost') : ROOT_DOMAIN)
+        const protocol = isProd ? 'https:' : url.protocol
         return forwardAuthCookies(
           supabaseResponse,
-          NextResponse.redirect(new URL('/dashboard', `${url.protocol}//${biz.subdomain}.${baseHost}`))
+          NextResponse.redirect(new URL('/dashboard', `${protocol}//${biz.subdomain}.${baseHost}`))
         )
       }
     }

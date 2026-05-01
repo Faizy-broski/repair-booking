@@ -55,7 +55,10 @@ export default function LoginPage() {
 function LoginForm() {
   const searchParams = useSearchParams()
   const prefilledEmail = searchParams.get('email') ?? ''
-  const redirectTo = searchParams.get('redirectTo') || '/dashboard'
+  const _redirectParam = searchParams.get('redirectTo') || '/dashboard'
+  // Guard against being sent back to the root ('/') or non-app paths which would
+  // land users on the marketing homepage instead of the tenant dashboard.
+  const redirectTo = (_redirectParam === '/' || !_redirectParam.startsWith('/') || _redirectParam.startsWith('//')) ? '/dashboard' : _redirectParam
   const errorParam = searchParams.get('error')
   const messageParam = searchParams.get('message')
 
@@ -185,7 +188,7 @@ function LoginForm() {
       } else {
         // Fire-and-forget signOut so the error shows immediately without
         // waiting for the network round-trip.
-        supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+        supabase.auth.signOut().catch(() => {})
         clearAuthStore()
         invalidateModuleConfig()
         setServerError(
@@ -201,7 +204,7 @@ function LoginForm() {
     // invalid-credentials message. Fire-and-forget the signOut so the error
     // appears instantly without awaiting the network round-trip.
     if (isSuperAdmin) {
-      supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+      supabase.auth.signOut().catch(() => {})
       clearAuthStore()
       invalidateModuleConfig()
       setServerError('Invalid credentials. Please check your email and password.')
@@ -213,7 +216,7 @@ function LoginForm() {
     // business ID — this is a synchronous check, no DB query needed.
     if (subdomainBusinessId && profile) {
       if ((profile as { business_id: string }).business_id !== subdomainBusinessId) {
-        supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+        supabase.auth.signOut().catch(() => {})
         clearAuthStore()
         invalidateModuleConfig()
         setServerError('Invalid credentials. Please check your email and password.')
