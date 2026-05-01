@@ -6,7 +6,7 @@ const SUPERADMIN_SUBDOMAIN = 'admin'
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'repairbooking.co.uk'
 
 // In production, scope auth cookies to the root domain so they are shared
-// across all tenant subdomains (techfix.repairpos.tech, admin.repairpos.tech, etc.)
+// across all tenant subdomains (techfix.repairbooking.co.uk, admin.repairbooking.co.uk, etc.)
 const COOKIE_OPTIONS = process.env.NODE_ENV === 'production'
   ? { domain: `.${ROOT_DOMAIN}`, path: '/', sameSite: 'lax' as const, secure: true }
   : undefined
@@ -150,6 +150,18 @@ export async function middleware(request: NextRequest) {
 
   // ── Tenant portal (techfix.domain, etc.) ─────────────────────────────────
   if (subdomain) {
+    // Business existence check uses an anonymous (cookieless) client so that
+    // a logged-in user from a different tenant doesn't hit an RLS rejection
+    // on the businesses table, which would incorrectly return null and
+    // redirect to the marketing homepage.
+    const anonSupabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { cookies: { getAll: () => [], setAll: () => {} } }
+    )
+
+    // Authenticated client (no cookie setters) used later for subscription check.
+    // Only constructed after the user is verified to belong to this business.
     const tenantSupabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -159,7 +171,7 @@ export async function middleware(request: NextRequest) {
       }
     )
 
-    const { data: business } = await tenantSupabase
+    const { data: business } = await anonSupabase
       .from('businesses')
       .select('id, is_active, is_suspended')
       .eq('subdomain', subdomain)
@@ -214,17 +226,10 @@ export async function middleware(request: NextRequest) {
           .maybeSingle()
 
         if (loginProfile?.role === 'super_admin') {
-          // Super admin visiting a tenant login while already authenticated:
-          // redirect them straight to the admin portal — do NOT destroy their
-          // session, they simply ended up on the wrong subdomain.
-          const adminOrigin =
-            process.env.NODE_ENV === 'development'
-              ? `http://${SUPERADMIN_SUBDOMAIN}.localhost:${request.nextUrl.port || '3000'}`
-              : `https://${SUPERADMIN_SUBDOMAIN}.${ROOT_DOMAIN}`
-          return forwardAuthCookies(
-            supabaseResponse,
-            NextResponse.redirect(new URL('/superadmin/dashboard', adminOrigin))
-          )
+          // Super admin visiting a tenant login page: let them through so they
+          // can view or access the tenant portal. Do NOT redirect back to the
+          // admin portal — that prevents super admins from ever opening a tenant link.
+          return forwardAuthCookies(supabaseResponse, NextResponse.next({ request }))
         }
 
         if (loginProfile && loginProfile.business_id !== business.id) {
@@ -243,13 +248,20 @@ export async function middleware(request: NextRequest) {
     // calling signOut() actually clears the session cookies in the response.
     const { data: userProfile } = await supabase
       .from('profiles')
-      .select('business_id')
+      .select('business_id, role')
       .eq('id', user.id)
       .maybeSingle()
 
     if (!userProfile || userProfile.business_id !== business.id) {
+      // Super admins have no business_id — don't sign them out, just send them
+      // to the tenant login page so their admin session stays intact.
+      if (userProfile?.role === 'super_admin') {
+        return forwardAuthCookies(
+          supabaseResponse,
+          NextResponse.redirect(new URL('/login', request.url))
+        )
+      }
       // Sign the user OUT so the stale cross-tenant session is destroyed.
-      // forwardAuthCookies will carry the cleared session cookies to the browser.
       await supabase.auth.signOut()
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('error', 'wrong_tenant')
@@ -311,6 +323,19 @@ export async function middleware(request: NextRequest) {
   }
 
   // ── Root domain / marketing site ─────────────────────────────────────────
+  // Supabase sends password-reset (and other auth) codes to the Site URL when the
+  // redirectTo in the Dashboard allowlist isn't matched.  The Site URL has no path
+  // so the code lands on /?code=<pkce-code>.  Catch it here and forward to the
+  // dedicated callback handler so the code is exchanged and the user ends up on
+  // /reset-password rather than seeing the homepage with a ?code= in the URL.
+  const authCode = request.nextUrl.searchParams.get('code')
+  if (!subdomain && pathname === '/' && authCode) {
+    const callbackUrl = new URL('/api/auth/callback', request.url)
+    callbackUrl.searchParams.set('code', authCode)
+    callbackUrl.searchParams.set('next', '/reset-password')
+    return NextResponse.redirect(callbackUrl)
+  }
+
   // Block direct access to app routes on the root domain (no tenant context).
   const isTenantRoute = TENANT_ROUTES.some(
     (r) => pathname === r || pathname.startsWith(r + '/')
@@ -349,6 +374,48 @@ export async function middleware(request: NextRequest) {
 
   if (pathname.startsWith('/superadmin') && !user) {
     return redirectToLogin('/login')
+  }
+
+  // Root domain /login — if user already has an active session, redirect them to
+  // their tenant subdomain dashboard so they don't have to re-enter credentials.
+  // This catches the case where sign-out didn't fully clear the shared cookie and
+  // the user navigates to /login thinking they're logged out.
+  if ((pathname === '/login' || pathname.startsWith('/login')) && user) {
+    const { data: rootProfile } = await supabase
+      .from('profiles')
+      .select('business_id, role')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (rootProfile?.role === 'super_admin') {
+      const adminOrigin =
+        process.env.NODE_ENV === 'development'
+          ? `http://${SUPERADMIN_SUBDOMAIN}.localhost:${request.nextUrl.port || '3000'}`
+          : `https://${SUPERADMIN_SUBDOMAIN}.${ROOT_DOMAIN}`
+      return forwardAuthCookies(
+        supabaseResponse,
+        NextResponse.redirect(new URL('/superadmin/dashboard', adminOrigin))
+      )
+    }
+
+    if (rootProfile?.business_id) {
+      const { data: biz } = await supabase
+        .from('businesses')
+        .select('subdomain')
+        .eq('id', rootProfile.business_id)
+        .maybeSingle()
+
+      if (biz?.subdomain) {
+        const url = new URL(request.url)
+        const baseHost = url.hostname === 'localhost'
+          ? (url.port ? `localhost:${url.port}` : 'localhost')
+          : ROOT_DOMAIN
+        return forwardAuthCookies(
+          supabaseResponse,
+          NextResponse.redirect(new URL('/dashboard', `${url.protocol}//${biz.subdomain}.${baseHost}`))
+        )
+      }
+    }
   }
 
   return supabaseResponse
