@@ -88,10 +88,10 @@ function RepairStatusBadge({ status }: { status: string }) {
 
 /* ── Page ──────────────────────────────────────────────────── */
 export default function DashboardPage() {
-  const { activeBranch, isOwner } = useAuthStore()
+  const { activeBranch, isOwner, isLoading: authLoading } = useAuthStore()
   const branchId = activeBranch?.id ?? null
 
-  const { data, isLoading: loading } = useQuery({
+  const { data, isLoading: queryLoading } = useQuery({
     queryKey: ['dashboard', branchId],
     queryFn: async () => {
       const res = await fetch(`/api/dashboard?branch_id=${branchId}`)
@@ -103,6 +103,8 @@ export default function DashboardPage() {
     // means re-navigating to the dashboard within the same shift is instant.
     staleTime: 5 * 60 * 1000,
   })
+
+  const loading = authLoading || queryLoading || !branchId
 
   const stats          = (data?.stats          ?? null)  as DashboardStats | null
   const branchRevenue  = (data?.branchRevenue  ?? [])   as BranchRevenue[]

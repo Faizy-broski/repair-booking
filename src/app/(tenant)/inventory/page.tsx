@@ -53,7 +53,7 @@ interface ProductStats {
 }
 
 export default function InventoryPage() {
-  const { activeBranch } = useAuthStore()
+  const { activeBranch, isLoading: authLoading } = useAuthStore()
   // Use the branch ID as a stable primitive — avoids re-running effects when
   // the layout refreshes the activeBranch object reference but the ID is the same.
   const branchId = activeBranch?.id ?? null
@@ -133,42 +133,36 @@ export default function InventoryPage() {
   const products = productResponse?.data ?? []
   const total = productResponse?.meta?.total ?? 0
 
-  // ── Stats + reference data — deferred until products have loaded ──────────
-  // On first visit: fires after the table is already visible (~products RTT)
-  // On re-visits: products are cached so `loading` is false immediately,
-  // everything fires in parallel (same as before, fully cached).
-  const afterProducts = !!branchId && !loading
-
-  // ── Stats Query ──
-  // Longer staleTime for stats — they're expensive DB aggregations that don't
-  // need to be recalculated more than once per 15 min. They're invalidated
-  // explicitly after mutations (add/delete product, bulk delete).
+  // ── Stats Query — fires in parallel with products as soon as branchId is known ──
+  // Long staleTime means stats are NOT re-fetched on every filter/page change,
+  // only on branch change or after mutations (add/delete product).
   const { data: stats } = useQuery({
     queryKey: ['inventory-stats', branchId],
     queryFn: async () => {
       const res = await fetch(`/api/products/stats?branch_id=${branchId}`)
       if (!res.ok) throw new Error('Failed to fetch stats')
-      return res.json().then(j => j.data ?? j)
+      return res.json().then((j: any) => j.data ?? j)
     },
-    enabled: afterProducts,
+    enabled: !!branchId && !authLoading,
     staleTime: 15 * 60 * 1000,
   })
+  // Reference data — also fires in parallel; cached forever until page reload
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['categories'],
     queryFn: async () => fetch('/api/categories').then(r => r.json()).then(j => j.data ?? []),
-    enabled: afterProducts,
+    enabled: !!branchId && !authLoading,
     staleTime: Infinity,
   })
   const { data: brands = [] } = useQuery<Brand[]>({
     queryKey: ['brands'],
     queryFn: async () => fetch('/api/brands').then(r => r.json()).then(j => j.data ?? []),
-    enabled: afterProducts,
+    enabled: !!branchId && !authLoading,
     staleTime: Infinity,
   })
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ['suppliers'],
     queryFn: async () => fetch('/api/suppliers').then(r => r.json()).then(j => j.data ?? []),
-    enabled: afterProducts,
+    enabled: !!branchId && !authLoading,
     staleTime: Infinity,
   })
 

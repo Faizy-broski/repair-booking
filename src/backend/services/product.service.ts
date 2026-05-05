@@ -243,28 +243,31 @@ export const ProductService = {
   // ── Stats ────────────────────────────────────────────────────────────────
 
   async getStats(businessId: string, branchId?: string) {
-    // Total retail value and cost value
-    const { data: products } = await adminSupabase
-      .from('products')
-      .select('selling_price, cost_price')
-      .eq('business_id', businessId)
-      .eq('is_active', true)
-      .eq('is_service', false)
-
     let stockRetailValue = 0
     let stockCostValue   = 0
     let lowStockCount    = 0
 
-    if (branchId) {
+    // Run inventory and PO count queries in parallel
+    const [invResult, poResult] = await Promise.all([
+      branchId
+        ? adminSupabase
+            .from('inventory')
+            .select('quantity, low_stock_alert, product_id, products!inner(selling_price, cost_price, is_service, is_active)')
+            .eq('branch_id', branchId)
+            .is('variant_id', null)
+        : Promise.resolve({ data: null }),
+      adminSupabase
+        .from('purchase_order_items')
+        .select('*, purchase_orders!inner(business_id, status)', { count: 'exact', head: true })
+        .gt('quantity_ordered', 0)
+        .eq('purchase_orders.business_id', businessId)
+        .in('purchase_orders.status', ['pending', 'ordered', 'partial']),
+    ])
+
+    if (branchId && invResult.data) {
       // Only count base-product rows (variant_id IS NULL) to avoid double-counting
       // stock when a product has variant-level inventory rows alongside a base row.
-      const { data: inv } = await adminSupabase
-        .from('inventory')
-        .select('quantity, low_stock_alert, product_id, products!inner(selling_price, cost_price, is_service, is_active)')
-        .eq('branch_id', branchId)
-        .is('variant_id', null)
-
-      ;(inv ?? []).forEach((row: any) => {
+      ;(invResult.data as any[]).forEach((row: any) => {
         const p = row.products
         if (!p?.is_active || p?.is_service) return
         stockRetailValue += (p.selling_price ?? 0) * row.quantity
@@ -275,14 +278,7 @@ export const ProductService = {
     // When no branchId, return zeros — summing raw prices without quantities
     // would produce a meaningless number that looks like real stock value.
 
-    // In Purchase Order count
-    const { count: inPoCount } = await adminSupabase
-      .from('purchase_order_items')
-      .select('*', { count: 'exact', head: true })
-      .gt('quantity_ordered', 0)
-      .filter('purchase_orders.business_id', 'eq', businessId)
-
-    return { stockRetailValue, stockCostValue, lowStockCount, inPoCount: inPoCount ?? 0 }
+    return { stockRetailValue, stockCostValue, lowStockCount, inPoCount: poResult.count ?? 0 }
   },
 
   // ── Variants ──────────────────────────────────────────────────────────────
