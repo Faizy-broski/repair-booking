@@ -1,6 +1,7 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Plus, Send, CheckCircle2, XCircle, Clock, Trash2 } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
@@ -38,8 +39,17 @@ interface EstimatesPanelProps {
 }
 
 export function EstimatesPanel({ repairId, customerId, branchId }: EstimatesPanelProps) {
-  const [estimates, setEstimates] = useState<Estimate[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  const { data: estimates = [], isLoading: loading } = useQuery<Estimate[]>({
+    queryKey: ['estimates', repairId],
+    queryFn: async () => {
+      const res = await fetch(`/api/repairs/${repairId}/estimates`)
+      const json = await res.json()
+      return json.data ?? []
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+
   const [createOpen, setCreateOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -48,18 +58,6 @@ export function EstimatesPanel({ repairId, customerId, branchId }: EstimatesPane
   ])
 
   const estimateTotal = lineItems.reduce((s, i) => s + i.quantity * i.unit_price, 0)
-
-  useEffect(() => {
-    fetchEstimates()
-  }, [repairId])
-
-  async function fetchEstimates() {
-    setLoading(true)
-    const res = await fetch(`/api/repairs/${repairId}/estimates`)
-    const json = await res.json()
-    setEstimates(json.data ?? [])
-    setLoading(false)
-  }
 
   function updateLine(idx: number, patch: Partial<EstimateItem>) {
     setLineItems((prev) =>
@@ -97,7 +95,7 @@ export function EstimatesPanel({ repairId, customerId, branchId }: EstimatesPane
     if (res.ok) {
       setCreateOpen(false)
       setLineItems([{ name: '', quantity: 1, unit_price: 0, total: 0 }])
-      fetchEstimates()
+      queryClient.invalidateQueries({ queryKey: ['estimates', repairId] })
     }
     setSaving(false)
   }

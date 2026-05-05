@@ -11,7 +11,7 @@ const schema = z.object({
 
 export const GET = withMiddleware(async (_req, ctx) => {
   try {
-    const { data, error } = await adminSupabase
+    const { data, error } = await (adminSupabase as any)
       .from('repair_faults')
       .select('*')
       .eq('business_id', ctx.businessId)
@@ -28,7 +28,7 @@ export const POST = withMiddleware(async (req, ctx) => {
   const { data, error } = await validateBody(req, schema)
   if (error) return error
   try {
-    const { data: row, error: dbErr } = await adminSupabase
+    const { data: row, error: dbErr } = await (adminSupabase as any)
       .from('repair_faults')
       .insert({ ...data, business_id: ctx.businessId })
       .select()

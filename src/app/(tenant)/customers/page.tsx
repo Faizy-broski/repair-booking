@@ -12,6 +12,8 @@ import { formatDate } from '@/lib/utils'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
+import { PhoneInput } from '@/components/ui/phone-input'
+import validations from '@/components/layout/number-validations.json'
 import type { ColumnDef, VisibilityState } from '@tanstack/react-table'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
@@ -35,6 +37,22 @@ const schema = z.object({
   phone: z.string().optional(),
   address: z.string().optional(),
   business_name: z.string().optional(),
+}).refine((data) => {
+  if (!data.phone || !data.phone.startsWith('+')) return true
+  const sortedValidations = [...validations].sort((a, b) => b.phone.length - a.phone.length)
+  const rule = sortedValidations.find(v => data.phone!.startsWith('+' + v.phone.replace('-', '')))
+  if (!rule) return true
+  const dialCode = rule.phone.replace('-', '')
+  const digitsOnly = data.phone.slice(dialCode.length + 1)
+  const length = digitsOnly.length
+  if (Array.isArray(rule.phoneLength)) return rule.phoneLength.includes(length)
+  if (rule.phoneLength) return length === rule.phoneLength
+  if (rule.min && length < rule.min) return false
+  if (rule.max && length > rule.max) return false
+  return true
+}, {
+  message: 'Invalid phone number length for the selected country',
+  path: ['phone'],
 })
 
 type FormData = z.infer<typeof schema>
@@ -146,7 +164,8 @@ export default function CustomersPage() {
         total: json.meta?.total ?? 0
       }
     },
-    enabled: !!activeBranch
+    enabled: !!activeBranch,
+    staleTime: 30_000,
   })
 
   const customers = customerData?.rows ?? []
@@ -402,8 +421,13 @@ export default function CustomersPage() {
           <Input label="Business Name" {...createForm.register('business_name')} />
           <div className="grid grid-cols-2 gap-3">
             <Input label="Email" type="email" {...createForm.register('email')} />
-            <Input label="Phone" type="tel" {...createForm.register('phone')} />
           </div>
+          <PhoneInput
+            label="Phone"
+            value={createForm.watch('phone') ?? ''}
+            onChange={(val) => createForm.setValue('phone', val, { shouldValidate: true })}
+            error={createForm.formState.errors.phone?.message}
+          />
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Address</label>
             <textarea rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" {...createForm.register('address')} />
@@ -437,8 +461,13 @@ export default function CustomersPage() {
           <Input label="Business Name" {...editForm.register('business_name')} />
           <div className="grid grid-cols-2 gap-3">
             <Input label="Email" type="email" {...editForm.register('email')} />
-            <Input label="Phone" type="tel" {...editForm.register('phone')} />
           </div>
+          <PhoneInput
+            label="Phone"
+            value={editForm.watch('phone') ?? ''}
+            onChange={(val) => editForm.setValue('phone', val, { shouldValidate: true })}
+            error={editForm.formState.errors.phone?.message}
+          />
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Address</label>
             <textarea rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" {...editForm.register('address')} />

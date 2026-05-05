@@ -1,6 +1,7 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
-import { Download, ArrowLeft, RefreshCw } from 'lucide-react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Download, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
 import { useAuthStore } from '@/store/auth.store'
@@ -27,14 +28,10 @@ export default function SalesReportPage() {
   const { activeBranch } = useAuthStore()
   const [dateFrom, setDateFrom] = useState(firstOfMonth)
   const [dateTo, setDateTo] = useState(today)
-  const [loading, setLoading] = useState(false)
-  const [data, setData] = useState<SalesRow[]>([])
-
-  const fetchData = useCallback(async () => {
-    if (!activeBranch) return
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({ type: 'sales', branch_id: activeBranch.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` })
+  const { data = [], isLoading: loading, refetch } = useQuery<SalesRow[]>({
+    queryKey: ['report-sales', activeBranch?.id, dateFrom, dateTo],
+    queryFn: async () => {
+      const params = new URLSearchParams({ type: 'sales', branch_id: activeBranch!.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` })
       const res = await fetch(`/api/reports?${params}`)
       const json = await res.json()
       const grouped: Record<string, { total: number; count: number }> = {}
@@ -44,13 +41,13 @@ export default function SalesReportPage() {
         grouped[d].total += s.total ?? 0
         grouped[d].count += 1
       }
-      setData(Object.entries(grouped).map(([date, { total, count }]) => ({
+      return Object.entries(grouped).map(([date, { total, count }]) => ({
         date, total_sales: total, transaction_count: count, avg_order_value: count ? total / count : 0,
-      })))
-    } finally { setLoading(false) }
-  }, [activeBranch, dateFrom, dateTo])
-
-  useEffect(() => { fetchData() }, [fetchData])
+      }))
+    },
+    enabled: !!activeBranch,
+    staleTime: 60_000,
+  })
 
   const totalRevenue = data.reduce((s, r) => s + r.total_sales, 0)
   const totalTxns    = data.reduce((s, r) => s + r.transaction_count, 0)
@@ -82,7 +79,7 @@ export default function SalesReportPage() {
         </Button>
       </div>
 
-      <DateRangeBar dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} onApply={fetchData} />
+      <DateRangeBar dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} onApply={refetch} />
 
       {/* KPI row */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

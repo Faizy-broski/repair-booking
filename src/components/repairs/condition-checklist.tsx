@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, ChevronDown, ChevronRight, Save } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 
 interface ConditionItem {
@@ -30,28 +31,34 @@ interface ConditionChecklistProps {
 export function ConditionChecklist({ repairId, stage, title }: ConditionChecklistProps) {
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<ConditionItem[]>([])
-  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const queryClient = useQueryClient()
 
+  const { data: serverItems, isLoading: loading } = useQuery({
+    queryKey: ['conditions', repairId],
+    queryFn: async () => {
+      const res = await fetch(`/api/repairs/${repairId}/conditions`)
+      const json = await res.json()
+      return json.data ?? []
+    },
+    enabled: open,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // Sync server data to local mutable state when it arrives
   useEffect(() => {
-    if (!open) return
-    setLoading(true)
-    fetch(`/api/repairs/${repairId}/conditions`)
-      .then((r) => r.json())
-      .then((json) => {
-        const stageItems = (json.data ?? [])
-          .filter((i: ConditionItem & { stage: string }) => i.stage === stage)
-          .map((i: ConditionItem) => ({ id: i.id, label: i.label, status: i.status, notes: i.notes ?? '' }))
-        if (stageItems.length > 0) {
-          setItems(stageItems)
-        } else {
-          // Seed with defaults
-          setItems(DEFAULT_LABELS.map((label) => ({ label, status: 'ok' as const, notes: '' })))
-        }
-        setLoading(false)
-      })
-  }, [open, repairId, stage])
+    if (serverItems) {
+      const stageItems = serverItems
+        .filter((i: ConditionItem & { stage: string }) => i.stage === stage)
+        .map((i: any) => ({ id: i.id, label: i.label, status: i.status, notes: i.notes ?? '' }))
+      if (stageItems.length > 0) {
+        setItems(stageItems)
+      } else {
+        setItems(DEFAULT_LABELS.map((label) => ({ label, status: 'ok' as const, notes: '' })))
+      }
+    }
+  }, [serverItems, stage])
 
   function addItem() {
     setItems((prev) => [...prev, { label: '', status: 'ok', notes: '' }])
@@ -79,6 +86,7 @@ export function ConditionChecklist({ repairId, stage, title }: ConditionChecklis
         })),
       }),
     })
+    queryClient.invalidateQueries({ queryKey: ['conditions', repairId] })
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)

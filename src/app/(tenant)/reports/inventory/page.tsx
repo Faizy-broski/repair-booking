@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Download, ArrowLeft, AlertTriangle, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
@@ -32,41 +33,36 @@ export default function InventoryReportPage() {
   const { activeBranch } = useAuthStore()
   const [dateFrom, setDateFrom] = useState(firstOfMonth)
   const [dateTo, setDateTo] = useState(today)
-  const [loading, setLoading] = useState(false)
   const [subTab, setSubTab] = useState<SubTab>('summary')
-  const [overview, setOverview] = useState<InventoryOverview | null>(null)
-  const [summaryData, setSummaryData] = useState<InventorySummaryRow[]>([])
-  const [partData, setPartData] = useState<PartConsumptionRow[]>([])
-  const [adjData, setAdjData] = useState<AdjustmentRow[]>([])
 
-  const fetchOverview = useCallback(async () => {
-    if (!activeBranch) return
-    const params = new URLSearchParams({ type: 'inventory', branch_id: activeBranch.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` })
-    const res = await fetch(`/api/reports?${params}`)
-    const json = await res.json()
-    setOverview(json.data ?? null)
-  }, [activeBranch, dateFrom, dateTo])
+  const { data: overview = null, refetch: refetchOverview } = useQuery<InventoryOverview | null>({
+    queryKey: ['report-inventory-overview', activeBranch?.id, dateFrom, dateTo],
+    queryFn: async () => {
+      const params = new URLSearchParams({ type: 'inventory', branch_id: activeBranch!.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` })
+      const res = await fetch(`/api/reports?${params}`)
+      const json = await res.json()
+      return json.data ?? null
+    },
+    enabled: !!activeBranch,
+    staleTime: 60_000,
+  })
 
-  const fetchDetail = useCallback(async (st: SubTab) => {
-    if (!activeBranch || st === 'low_stock') return
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({ branch_id: activeBranch.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59`, subtype: st })
+  const { data: detailData = [], isLoading: loading, refetch: refetchDetail } = useQuery<unknown[]>({
+    queryKey: ['report-inventory-detail', activeBranch?.id, dateFrom, dateTo, subTab],
+    queryFn: async () => {
+      const params = new URLSearchParams({ branch_id: activeBranch!.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59`, subtype: subTab })
       const res = await fetch(`/api/reports/inventory-detail?${params}`)
       const json = await res.json()
-      if (st === 'summary')           setSummaryData(json.data ?? [])
-      if (st === 'parts_consumption') setPartData(json.data ?? [])
-      if (st === 'adjustments')       setAdjData(json.data ?? [])
-    } finally { setLoading(false) }
-  }, [activeBranch, dateFrom, dateTo])
+      return json.data ?? []
+    },
+    enabled: !!activeBranch && subTab !== 'low_stock',
+    staleTime: 60_000,
+  })
 
-  const handleApply = useCallback(() => {
-    fetchOverview()
-    fetchDetail(subTab)
-  }, [fetchOverview, fetchDetail, subTab])
-
-  useEffect(() => { fetchOverview(); fetchDetail('summary') }, [activeBranch]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchDetail(subTab) }, [subTab]) // eslint-disable-line react-hooks/exhaustive-deps
+  function handleApply() {
+    refetchOverview()
+    if (subTab !== 'low_stock') refetchDetail()
+  }
 
   const summaryColumns: ColumnDef<InventorySummaryRow>[] = [
     { accessorKey: 'product_name', header: 'Product' },
@@ -96,9 +92,9 @@ export default function InventoryReportPage() {
   ]
 
   const exportCurrentTab = () => {
-    if (subTab === 'summary')           exportCsv(summaryData as unknown as Record<string, unknown>[], `inventory-summary-${dateFrom}-${dateTo}.csv`)
-    if (subTab === 'parts_consumption') exportCsv(partData    as unknown as Record<string, unknown>[], `parts-usage-${dateFrom}-${dateTo}.csv`)
-    if (subTab === 'adjustments')       exportCsv(adjData     as unknown as Record<string, unknown>[], `adjustments-${dateFrom}-${dateTo}.csv`)
+    if (subTab === 'summary')           exportCsv(detailData as unknown as Record<string, unknown>[], `inventory-summary-${dateFrom}-${dateTo}.csv`)
+    if (subTab === 'parts_consumption') exportCsv(detailData as unknown as Record<string, unknown>[], `parts-usage-${dateFrom}-${dateTo}.csv`)
+    if (subTab === 'adjustments')       exportCsv(detailData as unknown as Record<string, unknown>[], `adjustments-${dateFrom}-${dateTo}.csv`)
     if (subTab === 'low_stock' && overview) exportCsv(overview.low_stock_items as unknown as Record<string, unknown>[], `low-stock-${dateFrom}-${dateTo}.csv`)
   }
 
@@ -179,7 +175,7 @@ export default function InventoryReportPage() {
 
       {/* Summary */}
       {subTab === 'summary' && (
-        <DataTable data={summaryData} columns={summaryColumns} isLoading={loading} emptyMessage="No inventory data." />
+        <DataTable data={detailData as InventorySummaryRow[]} columns={summaryColumns} isLoading={loading} emptyMessage="No inventory data." />
       )}
 
       {/* Low stock */}
@@ -224,12 +220,12 @@ export default function InventoryReportPage() {
 
       {/* Part usage */}
       {subTab === 'parts_consumption' && (
-        <DataTable data={partData} columns={partColumns} isLoading={loading} emptyMessage="No part consumption data for this period." />
+        <DataTable data={detailData as PartConsumptionRow[]} columns={partColumns} isLoading={loading} emptyMessage="No part consumption data for this period." />
       )}
 
       {/* Adjustments */}
       {subTab === 'adjustments' && (
-        <DataTable data={adjData} columns={adjColumns} isLoading={loading} emptyMessage="No inventory adjustments for this period." />
+        <DataTable data={detailData as AdjustmentRow[]} columns={adjColumns} isLoading={loading} emptyMessage="No inventory adjustments for this period." />
       )}
     </div>
   )

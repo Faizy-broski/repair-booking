@@ -2,16 +2,34 @@ import { adminSupabase } from '@/backend/config/supabase'
 import type { InsertTables, UpdateTables } from '@/types/database'
 
 export const EmployeeService = {
-  async list(branchId: string | null) {
-    if (!branchId) return []
-    const { data, error } = await adminSupabase
+  async list(branchId: string | null, page = 1, limit = 20) {
+    if (!branchId) return { data: [], count: 0 }
+    const { data, error, count } = await adminSupabase
       .from('employees')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('branch_id', branchId)
       .eq('is_active', true)
       .order('first_name')
+      .range((page - 1) * limit, page * limit - 1)
     if (error) throw error
-    return data
+    return { data, count }
+  },
+
+  async search(branchId: string, q: string, limit = 10) {
+    let query = adminSupabase
+      .from('employees')
+      .select('id, first_name, last_name, role')
+      .eq('branch_id', branchId)
+      .eq('is_active', true)
+      .order('first_name')
+      .limit(limit)
+    if (q.trim()) {
+      const term = `%${q.replace(/[%_]/g, '\\$&')}%`
+      query = query.or(`first_name.ilike.${term},last_name.ilike.${term}`) as typeof query
+    }
+    const { data, error } = await query
+    if (error) throw error
+    return data ?? []
   },
 
   async getById(id: string, branchId: string) {
@@ -25,6 +43,18 @@ export const EmployeeService = {
     return data
   },
 
+  async checkEmailUnique(email: string, branchId: string, excludeId?: string) {
+    let q = adminSupabase
+      .from('employees')
+      .select('id')
+      .eq('branch_id', branchId)
+      .eq('email', email)
+      .eq('is_active', true)
+    if (excludeId) q = q.neq('id', excludeId)
+    const { data } = await q.maybeSingle()
+    return !data
+  },
+
   async create(payload: InsertTables<'employees'>) {
     const { data, error } = await adminSupabase.from('employees').insert(payload).select().single()
     if (error) throw error
@@ -35,6 +65,18 @@ export const EmployeeService = {
     const { data, error } = await adminSupabase
       .from('employees')
       .update(payload)
+      .eq('id', id)
+      .eq('branch_id', branchId)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async delete(id: string, branchId: string) {
+    const { data, error } = await adminSupabase
+      .from('employees')
+      .update({ is_active: false })
       .eq('id', id)
       .eq('branch_id', branchId)
       .select()

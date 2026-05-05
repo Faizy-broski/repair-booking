@@ -60,11 +60,13 @@ function BranchCard({
 
 export function BranchSwitcher({ collapsed = false }: { collapsed?: boolean }) {
   const { activeBranch, branches, setActiveBranch, canAccessAllBranches, profile } = useAuthStore()
-  const { invalidate, fetchConfigs } = useModuleConfigStore()
+  const { fetchConfigs } = useModuleConfigStore()
 
   function handleBranchSwitch(branch: Branch) {
     setActiveBranch(branch)
-    invalidate()
+    // Do NOT invalidate() here — it sets configs=null which blanks the sidebar
+    // while the fetch runs. fetchConfigs detects the branch change (!isSameBranch)
+    // and fetches fresh data while keeping the old configs visible during the request.
     fetchConfigs(branch.id)
   }
 

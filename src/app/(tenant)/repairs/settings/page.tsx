@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Plus, Pencil, Trash2, Check, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -63,8 +64,9 @@ export default function RepairSettingsPage() {
   const [tab, setTab] = useState<Tab>('status')
 
   // ── Statuses ──────────────────────────────────────────────────
-  const [statuses, setStatuses] = useState<CustomStatus[]>([])
-  const [statusLoading, setStatusLoading] = useState(true)
+  const queryClient = useQueryClient()
+
+  // ── Statuses ──────────────────────────────────────────────────
   const [addingStatus, setAddingStatus] = useState(false)
   const [newStatusName, setNewStatusName] = useState('')
   const [newStatusColor, setNewStatusColor] = useState('#09d6f1')
@@ -74,8 +76,6 @@ export default function RepairSettingsPage() {
   const [statusSaving, setStatusSaving] = useState(false)
 
   // ── Faults ────────────────────────────────────────────────────
-  const [faults, setFaults] = useState<Fault[]>([])
-  const [faultLoading, setFaultLoading] = useState(true)
   const [addingFault, setAddingFault] = useState(false)
   const [newFaultName, setNewFaultName] = useState('')
   const [editingFault, setEditingFault] = useState<Fault | null>(null)
@@ -87,23 +87,26 @@ export default function RepairSettingsPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [isSeeding, setIsSeeding] = useState(false)
 
-  const fetchStatuses = useCallback(async () => {
-    setStatusLoading(true)
-    const res = await fetch('/api/repairs/custom-statuses')
-    const json = await res.json()
-    setStatuses(json.data ?? [])
-    setStatusLoading(false)
-  }, [])
+  const { data: statuses = [], isLoading: statusLoading } = useQuery<CustomStatus[]>({
+    queryKey: ['repair-custom-statuses'],
+    queryFn: async () => {
+      const res = await fetch('/api/repairs/custom-statuses')
+      const json = await res.json()
+      return json.data ?? []
+    },
+    staleTime: 60_000,
+  })
 
-  const fetchFaults = useCallback(async () => {
-    setFaultLoading(true)
-    const res = await fetch('/api/repairs/faults')
-    const json = await res.json()
-    setFaults(json.data ?? [])
-    setFaultLoading(false)
-  }, [])
-
-  useEffect(() => { fetchStatuses(); fetchFaults() }, [fetchStatuses, fetchFaults])
+  const { data: faults = [], isLoading: faultLoading } = useQuery<Fault[]>({
+    queryKey: ['repair-faults'],
+    queryFn: async () => {
+      const res = await fetch('/api/repairs/faults')
+      const json = await res.json()
+      return json.data ?? []
+    },
+    enabled: !statusLoading,
+    staleTime: 60_000,
+  })
 
   // ── Status CRUD ───────────────────────────────────────────────
   async function createStatus() {
@@ -118,7 +121,7 @@ export default function RepairSettingsPage() {
     setNewStatusColor('#09d6f1')
     setAddingStatus(false)
     setStatusSaving(false)
-    fetchStatuses()
+    queryClient.invalidateQueries({ queryKey: ['repair-custom-statuses'] })
   }
 
   async function updateStatus() {
@@ -131,7 +134,7 @@ export default function RepairSettingsPage() {
     })
     setEditingStatus(null)
     setStatusSaving(false)
-    fetchStatuses()
+    queryClient.invalidateQueries({ queryKey: ['repair-custom-statuses'] })
   }
 
   async function deleteStatus(id: string, name: string) {
@@ -145,8 +148,8 @@ export default function RepairSettingsPage() {
     const res = await fetch(`/api/repairs/${endpoint}/${confirmDelete.id}`, { method: 'DELETE' })
     if (res.ok) {
       toast.success(`${confirmDelete.type === 'status' ? 'Status' : 'Fault'} "${confirmDelete.name}" deleted.`)
-      if (confirmDelete.type === 'status') fetchStatuses()
-      else fetchFaults()
+      if (confirmDelete.type === 'status') queryClient.invalidateQueries({ queryKey: ['repair-custom-statuses'] })
+      else queryClient.invalidateQueries({ queryKey: ['repair-faults'] })
       setConfirmDelete(null)
     } else {
       toast.error(`Failed to delete ${confirmDelete.type}.`)
@@ -167,8 +170,8 @@ export default function RepairSettingsPage() {
       const res = await fetch('/api/repairs/seed-defaults', { method: 'POST' })
       if (res.ok) {
         toast.success('Default settings seeded successfully')
-        fetchStatuses()
-        fetchFaults()
+        queryClient.invalidateQueries({ queryKey: ['repair-custom-statuses'] })
+        queryClient.invalidateQueries({ queryKey: ['repair-faults'] })
       } else {
         toast.error('Failed to seed defaults')
       }
@@ -191,7 +194,7 @@ export default function RepairSettingsPage() {
     setNewFaultName('')
     setAddingFault(false)
     setFaultSaving(false)
-    fetchFaults()
+    queryClient.invalidateQueries({ queryKey: ['repair-faults'] })
   }
 
   async function updateFault() {
@@ -204,7 +207,7 @@ export default function RepairSettingsPage() {
     })
     setEditingFault(null)
     setFaultSaving(false)
-    fetchFaults()
+    queryClient.invalidateQueries({ queryKey: ['repair-faults'] })
   }
 
   async function deleteFault(id: string, name: string) {

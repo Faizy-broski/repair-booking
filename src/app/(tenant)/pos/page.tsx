@@ -18,8 +18,8 @@ import { CashMovementModal } from './_components/modals/cash-movement-modal'
 type PosTab = 'repairs' | 'products'
 
 const TABS: { key: PosTab; label: string; icon: React.ReactNode }[] = [
-  { key: 'repairs',  label: 'Repairs',  icon: <Wrench className="h-4 w-4" /> },
   { key: 'products', label: 'Products', icon: <ShoppingBag className="h-4 w-4" /> },
+  { key: 'repairs',  label: 'Repairs',  icon: <Wrench className="h-4 w-4" /> },
 ]
 
 export default function PosPage() {
@@ -28,11 +28,13 @@ export default function PosPage() {
   const { PinModal } = usePinPrompt()
 
   // ── Tab ───────────────────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<PosTab>('repairs')
+  const [activeTab, setActiveTab] = useState<PosTab>('products')
   const [mobileView, setMobileView] = useState<'browse' | 'cart'>('browse')
 
   // ── Register session ──────────────────────────────────────────────────────────
-  const [sessionLoading, setSessionLoading] = useState(!pos.sessionLoaded)
+  // Skip session loading when POS shift management is disabled for this branch
+  const shiftRequired = activeBranch?.pos_require_shift !== false
+  const [sessionLoading, setSessionLoading] = useState(shiftRequired && !pos.sessionLoaded)
   const [sessionProcessing, setSessionProcessing] = useState(false)
   const [joinShiftOpen, setJoinShiftOpen] = useState(false)
   const [prevClosingBalance, setPrevClosingBalance] = useState<number | null>(null)
@@ -89,8 +91,8 @@ export default function PosPage() {
   }, [activeBranch, profile, pos])
 
   useEffect(() => { 
-    if (!pos.sessionLoaded) fetchSession() 
-  }, [fetchSession, pos.sessionLoaded])
+    if (shiftRequired && !pos.sessionLoaded) fetchSession() 
+  }, [fetchSession, pos.sessionLoaded, shiftRequired])
 
   // ── Register handlers ─────────────────────────────────────────────────────────
 
@@ -196,9 +198,6 @@ export default function PosPage() {
       </div>
     )
   }
-
-  // null or true = shift required (default); false = shift disabled for this branch
-  const shiftRequired = activeBranch?.pos_require_shift !== false
 
   if (!pos.session && shiftRequired) {
     return (

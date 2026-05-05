@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Bell, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -30,24 +31,20 @@ const TRIGGER_LABELS: Record<string, string> = {
 }
 
 export default function DeliveryLogsPage() {
-  const [logEntries, setLogEntries] = useState<NotificationLogEntry[]>([])
-  const [logTotal, setLogTotal] = useState(0)
   const [logPage, setLogPage] = useState(1)
-  const [loading, setLoading] = useState(false)
 
-  const fetchLog = useCallback(async (page = 1) => {
-    setLoading(true)
-    const res = await fetch(`/api/settings/notification-log?page=${page}&limit=20`)
-    const json = await res.json()
-    setLogEntries(json.data ?? [])
-    setLogTotal(json.meta?.total ?? 0)
-    setLogPage(page)
-    setLoading(false)
-  }, [])
+  const { data, isLoading: loading, refetch } = useQuery({
+    queryKey: ['notification-log', logPage],
+    queryFn: async () => {
+      const res = await fetch(`/api/settings/notification-log?page=${logPage}&limit=20`)
+      const json = await res.json()
+      return { entries: (json.data ?? []) as NotificationLogEntry[], total: json.meta?.total ?? 0 }
+    },
+    staleTime: 30_000,
+  })
 
-  useEffect(() => {
-    fetchLog(1)
-  }, [fetchLog])
+  const logEntries = data?.entries ?? []
+  const logTotal = data?.total ?? 0
 
   return (
     <div className="space-y-6">
@@ -62,7 +59,7 @@ export default function DeliveryLogsPage() {
             <p className="text-sm text-gray-500">History of all notifications sent to customers</p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={() => fetchLog(1)} loading={loading}>
+        <Button variant="outline" size="sm" onClick={() => refetch()} loading={loading}>
           <RefreshCw className="h-4 w-4" /> Refresh
         </Button>
       </div>
@@ -136,10 +133,10 @@ export default function DeliveryLogsPage() {
                 Showing {(logPage - 1) * 20 + 1}–{Math.min(logPage * 20, logTotal)} of {logTotal}
               </p>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled={logPage <= 1} onClick={() => fetchLog(logPage - 1)}>
+                <Button variant="outline" size="sm" disabled={logPage <= 1} onClick={() => setLogPage(logPage - 1)}>
                   Previous
                 </Button>
-                <Button variant="outline" size="sm" disabled={logPage * 20 >= logTotal} onClick={() => fetchLog(logPage + 1)}>
+                <Button variant="outline" size="sm" disabled={logPage * 20 >= logTotal} onClick={() => setLogPage(logPage + 1)}>
                   Next
                 </Button>
               </div>

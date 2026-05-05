@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Download, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
@@ -31,21 +32,17 @@ export default function EmployeesReportPage() {
   const { activeBranch } = useAuthStore()
   const [dateFrom, setDateFrom] = useState(firstOfMonth)
   const [dateTo, setDateTo] = useState(today)
-  const [loading, setLoading] = useState(false)
-  const [data, setData] = useState<EmployeeRow[]>([])
-
-  const fetchData = useCallback(async () => {
-    if (!activeBranch) return
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({ branch_id: activeBranch.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59`, subtype: 'productivity' })
+  const { data = [], isLoading: loading, refetch } = useQuery<EmployeeRow[]>({
+    queryKey: ['report-employees', activeBranch?.id, dateFrom, dateTo],
+    queryFn: async () => {
+      const params = new URLSearchParams({ branch_id: activeBranch!.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59`, subtype: 'productivity' })
       const res = await fetch(`/api/reports/employees?${params}`)
       const json = await res.json()
-      setData(json.data ?? [])
-    } finally { setLoading(false) }
-  }, [activeBranch, dateFrom, dateTo])
-
-  useEffect(() => { fetchData() }, [fetchData])
+      return json.data ?? []
+    },
+    enabled: !!activeBranch,
+    staleTime: 60_000,
+  })
 
   const totalCommission = data.reduce((s, r) => s + r.commission_total, 0)
   const totalRevenue    = data.reduce((s, r) => s + r.repair_revenue + r.sales_revenue, 0)
@@ -78,7 +75,7 @@ export default function EmployeesReportPage() {
         </Button>
       </div>
 
-      <DateRangeBar dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} onApply={fetchData} />
+      <DateRangeBar dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} onApply={refetch} />
 
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-xl border border-outline-variant bg-surface p-4">

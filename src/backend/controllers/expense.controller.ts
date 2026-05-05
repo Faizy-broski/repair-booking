@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { ExpenseService } from '@/backend/services/expense.service'
-import { ok, created, serverError } from '@/backend/utils/api-response'
+import { ok, created, badRequest, serverError } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
 import { z } from 'zod'
@@ -93,6 +93,18 @@ export const ExpenseController = {
       return ok(data)
     } catch (err) {
       return serverError('Failed to fetch expense categories', err)
+    }
+  },
+
+  async createCategory(request: NextRequest, ctx: RequestContext) {
+    const categorySchema = z.object({ name: z.string().min(1), business_id: z.string().uuid() })
+    const { data, error } = await validateBody(request, categorySchema)
+    if (error) return error
+    try {
+      const category = await ExpenseService.createCategory(data.business_id, data.name)
+      return created(category)
+    } catch (err) {
+      return serverError('Failed to create expense category', err)
     }
   },
 }

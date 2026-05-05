@@ -1,12 +1,12 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { DollarSign, Wrench, ShoppingCart, TrendingUp, AlertTriangle, Clock, Package } from 'lucide-react'
+import { DollarSign, Wrench, ArrowLeftRight, TrendingUp, AlertTriangle, Clock, Package } from 'lucide-react'
 import { StatsCard } from '@/components/dashboard/stats-card'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
+import { useQuery } from '@tanstack/react-query'
 
 interface DashboardStats {
   total_sales: number
@@ -86,41 +86,28 @@ function RepairStatusBadge({ status }: { status: string }) {
   )
 }
 
-import { useDashboardStore } from '@/store/dashboard.store'
-
 /* ── Page ──────────────────────────────────────────────────── */
 export default function DashboardPage() {
   const { activeBranch, isOwner } = useAuthStore()
-  const { 
-    stats, branchRevenue, recentRepairs, recentActivity, 
-    setDashboardData, lastFetched 
-  } = useDashboardStore()
-  
-  const [loading, setLoading] = useState(!lastFetched)
+  const branchId = activeBranch?.id ?? null
 
-  useEffect(() => {
-    if (!activeBranch) return
-    async function load() {
-      // If we have cached data, don't show the initial loading skeletons
-      // so the UI feels instant.
-      if (!lastFetched) setLoading(true)
-      
-      const params = new URLSearchParams({ branch_id: activeBranch!.id })
-      const res = await fetch(`/api/dashboard?${params}`)
+  const { data, isLoading: loading } = useQuery({
+    queryKey: ['dashboard', branchId],
+    queryFn: async () => {
+      const res = await fetch(`/api/dashboard?branch_id=${branchId}`)
       const json = await res.json()
-      
-      if (json.data) {
-        setDashboardData({
-          stats: json.data.stats ?? null,
-          branchRevenue: json.data.branchRevenue ?? [],
-          recentRepairs: json.data.recentRepairs ?? [],
-          recentActivity: json.data.recentActivity ?? [],
-        })
-      }
-      setLoading(false)
-    }
-    load()
-  }, [activeBranch, setDashboardData])
+      return json.data ?? {}
+    },
+    enabled: !!branchId,
+    // Dashboard stats refresh every 5 min; the 60 min gcTime (global default)
+    // means re-navigating to the dashboard within the same shift is instant.
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const stats          = (data?.stats          ?? null)  as DashboardStats | null
+  const branchRevenue  = (data?.branchRevenue  ?? [])   as BranchRevenue[]
+  const recentRepairs  = (data?.recentRepairs  ?? [])   as RecentRepair[]
+  const recentActivity = (data?.recentActivity ?? [])   as RecentActivity[]
 
   return (
     <div className="space-y-6">
@@ -134,87 +121,54 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Stats Grid (6 cards) ── */}
-      {loading && (
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
-          {Array.from({ length: 6 }).map((_, i) => (
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
+        {loading ? (
+          Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="h-28 sm:h-32 animate-pulse rounded-xl bg-surface-container" />
-          ))}
-        </div>
-      )}
-
-      {stats && (
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
-          <StatsCard
-            title="Total Sales"
-            value={formatCurrencyCompact(stats.total_sales)}
-            subtitle="this month"
-            icon={<DollarSign className="h-5 w-5" />}
-            color="green"
-          />
-          <StatsCard
-            title="Transactions"
-            value={stats.sales_count}
-            subtitle="this month"
-            icon={<ShoppingCart className="h-5 w-5" />}
-            color="blue"
-          />
-          <StatsCard
-            title="Open Repairs"
-            value={stats.repairs_open}
-            icon={<Wrench className="h-5 w-5" />}
-            color="yellow"
-          />
-          <StatsCard
-            title="Completed Repairs"
-            value={stats.repairs_completed}
-            subtitle="this month"
-            icon={<Wrench className="h-5 w-5" />}
-            color="green"
-          />
-          <StatsCard
-            title="Total Expenses"
-            value={formatCurrencyCompact(stats.total_expenses)}
-            subtitle="this month"
-            icon={<TrendingUp className="h-5 w-5" />}
-            color="red"
-          />
-          <StatsCard
-            title="Low Stock"
-            value={stats.low_stock_count}
-            subtitle="items"
-            icon={<AlertTriangle className="h-5 w-5" />}
-            color={stats.low_stock_count > 0 ? 'red' : 'green'}
-          />
-        </div>
-      )}
+          ))
+        ) : (
+          <>
+            <StatsCard title="Total Sales" value={formatCurrencyCompact(stats?.total_sales ?? 0)} subtitle="this month" icon={<DollarSign className="h-5 w-5" />} color="green" />
+            <StatsCard title="Transactions" value={stats?.sales_count ?? 0} subtitle="this month" icon={<ArrowLeftRight className="h-5 w-5" />} color="blue" />
+            <StatsCard title="Open Repairs" value={stats?.repairs_open ?? 0} icon={<Wrench className="h-5 w-5" />} color="yellow" />
+            <StatsCard title="Completed Repairs" value={stats?.repairs_completed ?? 0} subtitle="this month" icon={<Wrench className="h-5 w-5" />} color="green" />
+            <StatsCard title="Total Expenses" value={formatCurrencyCompact(stats?.total_expenses ?? 0)} subtitle="this month" icon={<TrendingUp className="h-5 w-5" />} color="red" />
+            <StatsCard title="Low Stock" value={stats?.low_stock_count ?? 0} subtitle="items" icon={<AlertTriangle className="h-5 w-5" />} color={(stats?.low_stock_count ?? 0) > 0 ? 'red' : 'green'} />
+          </>
+        )}
+      </div>
 
       {/* ── Revenue by Branch (owner only) ── */}
-      {isOwner() && branchRevenue.length > 0 && !loading && (
+      {isOwner() && (
         <Card>
           <CardHeader>
             <CardTitle>Revenue by Branch</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={branchRevenue.map((b) => ({ name: b.branchName, revenue: b.total }))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-container)" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `£${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(v) => formatCurrency(v as number)} />
-                  <Bar dataKey="revenue" fill="var(--primary)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {loading ? (
+              <div className="h-64 animate-pulse rounded-lg bg-surface-container" />
+            ) : branchRevenue.length > 0 ? (
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={branchRevenue.map((b) => ({ name: b.branchName, revenue: b.total }))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-container)" />
+                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `£${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip formatter={(v) => formatCurrency(v as number)} />
+                    <Bar dataKey="revenue" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <p className="py-8 text-center text-sm text-on-surface-variant">No sales data yet.</p>
+            )}
           </CardContent>
         </Card>
       )}
 
       {/* ── Recent Repairs + Activity Log (side by side) ── */}
-      {!loading && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
 
-          {/* Recent Repair Tickets — 2/3 width */}
           <Card className="lg:col-span-2">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
@@ -226,7 +180,20 @@ export default function DashboardPage() {
               </Link>
             </CardHeader>
             <CardContent className="p-0">
-              {recentRepairs.length === 0 ? (
+              {loading ? (
+                <div className="divide-y divide-outline-variant">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-4 px-6 py-3">
+                      <div className="h-9 w-9 shrink-0 animate-pulse rounded-lg bg-surface-container" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3 w-2/3 animate-pulse rounded bg-surface-container" />
+                        <div className="h-2.5 w-1/2 animate-pulse rounded bg-surface-container" />
+                      </div>
+                      <div className="h-5 w-16 animate-pulse rounded-full bg-surface-container" />
+                    </div>
+                  ))}
+                </div>
+              ) : recentRepairs.length === 0 ? (
                 <p className="px-6 py-8 text-center text-sm text-on-surface-variant">No repair tickets yet.</p>
               ) : (
                 <div className="h-[500px] overflow-y-auto divide-y divide-outline-variant">
@@ -274,7 +241,20 @@ export default function DashboardPage() {
               </Link>
             </CardHeader>
             <CardContent className="p-0">
-              {recentActivity.length === 0 ? (
+              {loading ? (
+                <div className="space-y-0">
+                  {Array.from({ length: 7 }).map((_, i) => (
+                    <div key={i} className="flex items-start gap-3 px-4 py-2.5">
+                      <div className="mt-1 h-4 w-4 shrink-0 animate-pulse rounded-full bg-surface-container" />
+                      <div className="flex-1 space-y-1.5">
+                        <div className="h-2 w-16 animate-pulse rounded bg-surface-container" />
+                        <div className="h-3 w-3/4 animate-pulse rounded bg-surface-container" />
+                        <div className="h-2.5 w-1/2 animate-pulse rounded bg-surface-container" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : recentActivity.length === 0 ? (
                 <p className="px-4 py-6 text-center text-sm text-on-surface-variant">No activity yet.</p>
               ) : (
                 <div className="relative h-[500px] overflow-y-auto">
@@ -314,7 +294,6 @@ export default function DashboardPage() {
           </Card>
 
         </div>
-      )}
 
     </div>
   )

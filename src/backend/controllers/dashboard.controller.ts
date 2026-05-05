@@ -11,20 +11,26 @@ export const DashboardController = {
 
     try {
       const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
+      const urgentCutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+      const TERMINAL_IN = '(repaired,collected,unrepairable)'
 
-      const [salesRes, repairsRes, expensesRes, inventoryRes, recentRepairsRes, activityRes] = await Promise.all([
+      const [
+        salesRes,
+        expensesRes,
+        repairsTotalRes,
+        repairsOpenRes,
+        repairsCompletedRes,
+        repairsUrgentRes,
+        inventoryRes,
+        recentRepairsRes,
+        activityRes,
+      ] = await Promise.all([
         // Total sales this month
         adminSupabase
           .from('sales')
           .select('total, created_at')
           .eq('branch_id', branchId)
           .gte('created_at', monthStart),
-
-        // All repairs for total count + open/urgent calculation
-        adminSupabase
-          .from('repairs')
-          .select('id, status, created_at, is_rush')
-          .eq('branch_id', branchId),
 
         // This month's expenses
         adminSupabase
@@ -33,7 +39,35 @@ export const DashboardController = {
           .eq('branch_id', branchId)
           .gte('expense_date', monthStart),
 
-        // Low stock alerts
+        // COUNT: total repairs (HEAD — no row data transferred)
+        (adminSupabase as any)
+          .from('repairs')
+          .select('*', { count: 'exact', head: true })
+          .eq('branch_id', branchId) as Promise<{ count: number | null; error: unknown }>,
+
+        // COUNT: open repairs
+        (adminSupabase as any)
+          .from('repairs')
+          .select('*', { count: 'exact', head: true })
+          .eq('branch_id', branchId)
+          .not('status', 'in', TERMINAL_IN) as Promise<{ count: number | null; error: unknown }>,
+
+        // COUNT: completed repairs
+        (adminSupabase as any)
+          .from('repairs')
+          .select('*', { count: 'exact', head: true })
+          .eq('branch_id', branchId)
+          .eq('status', 'repaired') as Promise<{ count: number | null; error: unknown }>,
+
+        // COUNT: urgent repairs (rush OR sitting > 3 days, still open)
+        (adminSupabase as any)
+          .from('repairs')
+          .select('*', { count: 'exact', head: true })
+          .eq('branch_id', branchId)
+          .not('status', 'in', TERMINAL_IN)
+          .or(`is_rush.eq.true,created_at.lt.${urgentCutoff}`) as Promise<{ count: number | null; error: unknown }>,
+
+        // Low stock alerts — inventory is typically small per branch
         adminSupabase
           .from('inventory')
           .select('id, quantity, low_stock_alert')
@@ -57,7 +91,6 @@ export const DashboardController = {
       ])
 
       const sales = salesRes.data ?? []
-      const repairs = repairsRes.data ?? []
       const expenses = expensesRes.data ?? []
       const inventory = inventoryRes.data ?? []
       const recentRepairs = (recentRepairsRes.data ?? []).map((r) => {
@@ -93,23 +126,13 @@ export const DashboardController = {
         (i) => i.quantity <= (i.low_stock_alert ?? 5)
       ).length
 
-      // Urgent = active rush jobs OR active repairs sitting for more than 3 days
-      const urgentCutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-      const TERMINAL = ['repaired', 'collected', 'unrepairable']
-      const isTerminal = (s: string) => TERMINAL.includes(s?.toLowerCase())
-      const isRepaired = (s: string) => s?.toLowerCase() === 'repaired'
-      const repairsUrgent = repairs.filter(
-        (r) => !isTerminal(r.status) &&
-          ((r as any).is_rush || (r.created_at ?? '') < urgentCutoff)
-      ).length
-
       const stats = {
         total_sales: sales.reduce((s, r) => s + (r.total ?? 0), 0),
         sales_count: sales.length,
-        repairs_total: repairs.length,
-        repairs_open: repairs.filter((r) => !isTerminal(r.status)).length,
-        repairs_completed: repairs.filter((r) => isRepaired(r.status)).length,
-        repairs_urgent: repairsUrgent,
+        repairs_total:     repairsTotalRes.count     ?? 0,
+        repairs_open:      repairsOpenRes.count      ?? 0,
+        repairs_completed: repairsCompletedRes.count ?? 0,
+        repairs_urgent:    repairsUrgentRes.count    ?? 0,
         total_expenses: expenses.reduce((s, r) => s + (r.amount ?? 0), 0),
         low_stock_count: lowStockCount,
       }

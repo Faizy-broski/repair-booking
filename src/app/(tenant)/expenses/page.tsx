@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import * as Tabs from '@radix-ui/react-tabs'
 import { Button } from '@/components/ui/button'
@@ -11,6 +12,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
+import { toast } from 'sonner'
 import type { ColumnDef } from '@tanstack/react-table'
 
 interface ExpenseRow {
@@ -35,45 +37,56 @@ type ExpenseFormData = z.infer<typeof expenseSchema>
 
 export default function ExpensesPage() {
   const { activeBranch } = useAuthStore()
-  const [expenses, setExpenses] = useState<ExpenseRow[]>([])
-  const [salaries, setSalaries] = useState<SalaryRow[]>([])
-  const [categories, setCategories] = useState<CategoryOption[]>([])
-  const [totalExp, setTotalExp] = useState(0)
+  const queryClient = useQueryClient()
   const [page, setPage] = useState(0)
-  const [loading, setLoading] = useState(true)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('expenses')
+  const [creatingCategory, setCreatingCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [savingCategory, setSavingCategory] = useState(false)
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ExpenseFormData>({
+  const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
     defaultValues: { expense_date: new Date().toISOString().split('T')[0] },
   })
 
-  const fetchExpenses = useCallback(async () => {
-    if (!activeBranch) return
-    setLoading(true)
-    const res = await fetch(`/api/expenses?branch_id=${activeBranch.id}&page=${page + 1}`)
-    const json = await res.json()
-    setExpenses(json.data ?? [])
-    setTotalExp(json.meta?.total ?? 0)
-    setLoading(false)
-  }, [activeBranch, page])
+  const { data: expensesData, isLoading: loadingExpenses } = useQuery({
+    queryKey: ['expenses', activeBranch?.id, page],
+    queryFn: async () => {
+      const res = await fetch(`/api/expenses?branch_id=${activeBranch!.id}&page=${page + 1}`)
+      const json = await res.json()
+      return { expenses: (json.data ?? []) as ExpenseRow[], total: json.meta?.total ?? 0 }
+    },
+    enabled: !!activeBranch,
+    staleTime: 30_000,
+  })
 
-  const fetchSalaries = useCallback(async () => {
-    if (!activeBranch) return
-    const res = await fetch(`/api/expenses/salaries?branch_id=${activeBranch.id}`)
-    const json = await res.json()
-    setSalaries(json.data ?? [])
-  }, [activeBranch])
+  const { data: salariesData, isLoading: loadingSalaries } = useQuery({
+    queryKey: ['expenses-salaries', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/expenses/salaries?branch_id=${activeBranch!.id}`)
+      const json = await res.json()
+      return (json.data ?? []) as SalaryRow[]
+    },
+    enabled: !!activeBranch,
+    staleTime: 30_000,
+  })
 
-  const fetchCategories = useCallback(async () => {
-    if (!activeBranch) return
-    const res = await fetch(`/api/expenses/categories?business_id=${activeBranch.business_id}`)
-    const json = await res.json()
-    setCategories(json.data ?? [])
-  }, [activeBranch])
+  const { data: categoriesData } = useQuery({
+    queryKey: ['expenses-categories', activeBranch?.business_id],
+    queryFn: async () => {
+      const res = await fetch(`/api/expenses/categories?business_id=${activeBranch!.business_id}`)
+      const json = await res.json()
+      return (json.data ?? []) as CategoryOption[]
+    },
+    enabled: !!activeBranch,
+    staleTime: 5 * 60_000, // categories rarely change
+  })
 
-  useEffect(() => { fetchExpenses(); fetchSalaries(); fetchCategories() }, [fetchExpenses, fetchSalaries, fetchCategories])
+  const expenses = expensesData?.expenses ?? []
+  const totalExp = expensesData?.total ?? 0
+  const salaries = salariesData ?? []
+  const categories = categoriesData ?? []
 
   async function onCreateExpense(data: ExpenseFormData) {
     if (!activeBranch) return
@@ -82,7 +95,34 @@ export default function ExpensesPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, branch_id: activeBranch.id, category_id: data.category_id || null }),
     })
-    if (res.ok) { reset(); setSheetOpen(false); fetchExpenses() }
+    if (!res.ok) { const j = await res.json().catch(() => ({})); toast.error(j.error ?? 'Failed to add expense'); return }
+    toast.success('Expense added')
+    reset()
+    setSheetOpen(false)
+    setCreatingCategory(false)
+    setNewCategoryName('')
+    queryClient.invalidateQueries({ queryKey: ['expenses', activeBranch.id] })
+  }
+
+  async function handleCreateCategory() {
+    if (!activeBranch || !newCategoryName.trim()) return
+    setSavingCategory(true)
+    try {
+      const res = await fetch('/api/expenses/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ business_id: activeBranch.business_id, name: newCategoryName.trim() }),
+      })
+      if (res.ok) {
+        const json = await res.json()
+        queryClient.invalidateQueries({ queryKey: ['expenses-categories', activeBranch.business_id] })
+        if (json.data?.id) setValue('category_id', json.data.id)
+        setCreatingCategory(false)
+        setNewCategoryName('')
+      }
+    } finally {
+      setSavingCategory(false)
+    }
   }
 
   const expenseColumns: ColumnDef<ExpenseRow>[] = [
@@ -145,11 +185,11 @@ export default function ExpensesPage() {
         </Tabs.List>
 
         <Tabs.Content value="expenses" className="mt-4">
-          <DataTable data={expenses} columns={expenseColumns} isLoading={loading} totalCount={totalExp} pageIndex={page} pageSize={20} onPageChange={setPage} />
+          <DataTable data={expenses} columns={expenseColumns} isLoading={loadingExpenses} totalCount={totalExp} pageIndex={page} pageSize={20} onPageChange={setPage} />
         </Tabs.Content>
 
         <Tabs.Content value="salaries" className="mt-4">
-          <DataTable data={salaries} columns={salaryColumns} isLoading={loading} emptyMessage="No salary records yet." />
+          <DataTable data={salaries} columns={salaryColumns} isLoading={loadingSalaries} emptyMessage="No salary records yet." />
         </Tabs.Content>
       </Tabs.Root>
 
@@ -158,15 +198,54 @@ export default function ExpensesPage() {
           <Input label="Title" placeholder="Internet Bill" required error={errors.title?.message} {...register('title')} />
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Category</label>
-            <select
-              {...register('category_id')}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-            >
-              <option value="">No category</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+            <p className="mb-1.5 text-xs text-gray-400">Group expenses by type (e.g. Rent, Utilities, Supplies)</p>
+            {!creatingCategory ? (
+              <>
+                <select
+                  {...register('category_id')}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                >
+                  <option value="">No category</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setCreatingCategory(true)}
+                  className="mt-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                >
+                  + Create new category
+                </button>
+              </>
+            ) : (
+              <div className="flex gap-2 items-end">
+                <input
+                  placeholder="e.g. Rent, Marketing, Supplies"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  autoFocus
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!newCategoryName.trim()}
+                  loading={savingCategory}
+                  onClick={handleCreateCategory}
+                >
+                  Add
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { setCreatingCategory(false); setNewCategoryName('') }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            )}
           </div>
           <Input label="Amount (£)" type="number" step="0.01" required error={errors.amount?.message} {...register('amount')} />
           <Input label="Date" type="date" required {...register('expense_date')} />

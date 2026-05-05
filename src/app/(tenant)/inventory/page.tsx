@@ -108,18 +108,7 @@ export default function InventoryPage() {
 
   const queryClient = useQueryClient()
 
-  // ── Stats Query ──
-  const { data: stats } = useQuery({
-    queryKey: ['inventory-stats', branchId],
-    queryFn: async () => {
-      const res = await fetch(`/api/products/stats?branch_id=${branchId}`)
-      if (!res.ok) throw new Error('Failed to fetch stats')
-      return res.json().then(j => j.data ?? j)
-    },
-    enabled: !!branchId,
-  })
-
-  // ── Products Query ──
+  // ── Products Query — fires immediately, table shows as soon as this returns ──
   const { data: productResponse, isLoading: loading } = useQuery({
     queryKey: ['inventory', branchId, page, search, categoryFilter, brandFilter, supplierFilter, valuationFilter, hideOutOfStock, typeFilter],
     queryFn: async () => {
@@ -138,22 +127,49 @@ export default function InventoryPage() {
       return res.json()
     },
     enabled: !!branchId,
+    placeholderData: (prev) => prev, // keep table visible during filter/page changes
   })
 
   const products = productResponse?.data ?? []
   const total = productResponse?.meta?.total ?? 0
 
-  const { data: categories = [] } = useQuery({
+  // ── Stats + reference data — deferred until products have loaded ──────────
+  // On first visit: fires after the table is already visible (~products RTT)
+  // On re-visits: products are cached so `loading` is false immediately,
+  // everything fires in parallel (same as before, fully cached).
+  const afterProducts = !!branchId && !loading
+
+  // ── Stats Query ──
+  // Longer staleTime for stats — they're expensive DB aggregations that don't
+  // need to be recalculated more than once per 15 min. They're invalidated
+  // explicitly after mutations (add/delete product, bulk delete).
+  const { data: stats } = useQuery({
+    queryKey: ['inventory-stats', branchId],
+    queryFn: async () => {
+      const res = await fetch(`/api/products/stats?branch_id=${branchId}`)
+      if (!res.ok) throw new Error('Failed to fetch stats')
+      return res.json().then(j => j.data ?? j)
+    },
+    enabled: afterProducts,
+    staleTime: 15 * 60 * 1000,
+  })
+  const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['categories'],
-    queryFn: async () => fetch('/api/categories').then(r => r.json()).then(j => j.data ?? [])
+    queryFn: async () => fetch('/api/categories').then(r => r.json()).then(j => j.data ?? []),
+    enabled: afterProducts,
+    staleTime: Infinity,
   })
-  const { data: brands = [] } = useQuery({
+  const { data: brands = [] } = useQuery<Brand[]>({
     queryKey: ['brands'],
-    queryFn: async () => fetch('/api/brands').then(r => r.json()).then(j => j.data ?? [])
+    queryFn: async () => fetch('/api/brands').then(r => r.json()).then(j => j.data ?? []),
+    enabled: afterProducts,
+    staleTime: Infinity,
   })
-  const { data: suppliers = [] } = useQuery({
+  const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ['suppliers'],
-    queryFn: async () => fetch('/api/suppliers').then(r => r.json()).then(j => j.data ?? [])
+    queryFn: async () => fetch('/api/suppliers').then(r => r.json()).then(j => j.data ?? []),
+    enabled: afterProducts,
+    staleTime: Infinity,
   })
 
 
@@ -204,8 +220,8 @@ export default function InventoryPage() {
 
   const displayProducts = products
 
-  const allOnPageSelected = displayProducts.length > 0 && displayProducts.every((p) => selectedIds.has(p.id))
-  const someOnPageSelected = displayProducts.some((p) => selectedIds.has(p.id))
+  const allOnPageSelected = displayProducts.length > 0 && displayProducts.every((p: ProductRow) => selectedIds.has(p.id))
+  const someOnPageSelected = displayProducts.some((p: ProductRow) => selectedIds.has(p.id))
 
   const columns: ColumnDef<ProductRow>[] = [
     {
@@ -217,9 +233,9 @@ export default function InventoryPage() {
           ref={(el) => { if (el) el.indeterminate = someOnPageSelected && !allOnPageSelected }}
           onChange={() => {
             if (allOnPageSelected) {
-              setSelectedIds((prev) => { const n = new Set(prev); displayProducts.forEach((p) => n.delete(p.id)); return n })
+              setSelectedIds((prev) => { const n = new Set(prev); displayProducts.forEach((p: ProductRow) => n.delete(p.id)); return n })
             } else {
-              setSelectedIds((prev) => { const n = new Set(prev); displayProducts.forEach((p) => n.add(p.id)); return n })
+              setSelectedIds((prev) => { const n = new Set(prev); displayProducts.forEach((p: ProductRow) => n.add(p.id)); return n })
             }
           }}
           className="rounded border-gray-300 cursor-pointer"

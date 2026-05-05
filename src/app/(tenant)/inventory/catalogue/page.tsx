@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Pencil, Trash2, Tag, Package, Smartphone, Cpu, Check, X, ChevronRight } from 'lucide-react'
 import { ImageUpload } from '@/components/ui/image-upload'
 
@@ -9,11 +10,29 @@ interface CatModel    { id: string; name: string; brand_id: string | null; manuf
 interface CatPartType { id: string; name: string; device_id: string | null; image_url?: string | null }
 
 export default function CataloguePage() {
-  const [categories, setCategories] = useState<CatCategory[]>([])
-  const [brands,     setBrands]     = useState<CatBrand[]>([])
-  const [models,     setModels]     = useState<CatModel[]>([])
-  const [partTypes,  setPartTypes]  = useState<CatPartType[]>([])
-  const [saving,     setSaving]     = useState(false)
+  const queryClient = useQueryClient()
+  const [saving, setSaving] = useState(false)
+
+  const { data: categories = [] } = useQuery<CatCategory[]>({
+    queryKey: ['catalogue-categories'],
+    queryFn: async () => { const r = await fetch('/api/categories'); const j = await r.json(); return j.data ?? [] },
+    staleTime: 60_000,
+  })
+  const { data: brands = [] } = useQuery<CatBrand[]>({
+    queryKey: ['catalogue-brands'],
+    queryFn: async () => { const r = await fetch('/api/brands'); const j = await r.json(); return j.data ?? [] },
+    staleTime: 60_000,
+  })
+  const { data: models = [] } = useQuery<CatModel[]>({
+    queryKey: ['catalogue-models'],
+    queryFn: async () => { const r = await fetch('/api/services/devices'); const j = await r.json(); return j.data ?? [] },
+    staleTime: 60_000,
+  })
+  const { data: partTypes = [] } = useQuery<CatPartType[]>({
+    queryKey: ['catalogue-part-types'],
+    queryFn: async () => { const r = await fetch('/api/part-types'); const j = await r.json(); return j.data ?? [] },
+    staleTime: 60_000,
+  })
 
   // add inputs
   const [newTypeName,  setNewTypeName]  = useState('')
@@ -45,36 +64,24 @@ export default function CataloguePage() {
   const [editPartName,   setEditPartName]   = useState('')
   const [editPartImage,  setEditPartImage]  = useState('')
 
-  async function load() {
-    const [cRes, bRes, mRes, pRes] = await Promise.all([
-      fetch('/api/categories'), fetch('/api/brands'),
-      fetch('/api/services/devices'), fetch('/api/part-types'),
-    ])
-    const [cj, bj, mj, pj] = await Promise.all([cRes.json(), bRes.json(), mRes.json(), pRes.json()])
-    setCategories(cj.data ?? [])
-    setBrands(bj.data ?? [])
-    setModels(mj.data ?? [])
-    setPartTypes(pj.data ?? [])
-  }
-
-  useEffect(() => { load() }, [])
-
   async function addDeviceType() {
     if (!newTypeName.trim()) return
     setSaving(true)
     await fetch('/api/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newTypeName.trim(), image_url: newTypeImage || null }) })
     setNewTypeName(''); setNewTypeImage('')
-    await load(); setSaving(false)
+    queryClient.invalidateQueries({ queryKey: ['catalogue-categories'] }); setSaving(false)
   }
 
   async function deleteDeviceType(id: string) {
-    await fetch(`/api/categories/${id}`, { method: 'DELETE' }); await load()
+    await fetch(`/api/categories/${id}`, { method: 'DELETE' })
+    queryClient.invalidateQueries({ queryKey: ['catalogue-categories'] })
   }
 
   async function renameDeviceType(id: string) {
     if (!editTypeName.trim()) return
     await fetch(`/api/categories/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editTypeName.trim(), image_url: editTypeImage || null }) })
-    setEditingTypeId(null); await load()
+    setEditingTypeId(null)
+    queryClient.invalidateQueries({ queryKey: ['catalogue-categories'] })
   }
 
   async function addBrand(categoryId: string) {
@@ -82,17 +89,19 @@ export default function CataloguePage() {
     setSaving(true)
     await fetch('/api/brands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newBrandName.trim(), category_id: categoryId, image_url: newBrandImage || null }) })
     setNewBrandName(''); setNewBrandImage('')
-    await load(); setSaving(false)
+    queryClient.invalidateQueries({ queryKey: ['catalogue-brands'] }); setSaving(false)
   }
 
   async function deleteBrand(id: string) {
-    await fetch(`/api/brands/${id}`, { method: 'DELETE' }); await load()
+    await fetch(`/api/brands/${id}`, { method: 'DELETE' })
+    queryClient.invalidateQueries({ queryKey: ['catalogue-brands'] })
   }
 
   async function renameBrand(id: string) {
     if (!editBrandName.trim()) return
     await fetch(`/api/brands/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editBrandName.trim(), image_url: editBrandImage || null }) })
-    setEditingBrandId(null); await load()
+    setEditingBrandId(null)
+    queryClient.invalidateQueries({ queryKey: ['catalogue-brands'] })
   }
 
   async function addModel(brandId: string) {
@@ -112,17 +121,19 @@ export default function CataloguePage() {
     }
     await fetch('/api/services/devices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newModelName.trim(), brand_id: brandId, manufacturer_id: manufacturerId, image_url: newModelImage || null }) })
     setNewModelName(''); setNewModelImage('')
-    await load(); setSaving(false)
+    queryClient.invalidateQueries({ queryKey: ['catalogue-models'] }); setSaving(false)
   }
 
   async function deleteModel(id: string) {
-    await fetch(`/api/services/devices/${id}`, { method: 'DELETE' }); await load()
+    await fetch(`/api/services/devices/${id}`, { method: 'DELETE' })
+    queryClient.invalidateQueries({ queryKey: ['catalogue-models'] })
   }
 
   async function renameModel(id: string) {
     if (!editModelName.trim()) return
     await fetch(`/api/services/devices/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editModelName.trim(), image_url: editModelImage || null }) })
-    setEditingModelId(null); await load()
+    setEditingModelId(null)
+    queryClient.invalidateQueries({ queryKey: ['catalogue-models'] })
   }
 
   async function addPartType(deviceId: string) {
@@ -130,17 +141,19 @@ export default function CataloguePage() {
     setSaving(true)
     await fetch('/api/part-types', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newPartName.trim(), device_id: deviceId, image_url: newPartImage || null }) })
     setNewPartName(''); setNewPartImage('')
-    await load(); setSaving(false)
+    queryClient.invalidateQueries({ queryKey: ['catalogue-part-types'] }); setSaving(false)
   }
 
   async function deletePartType(id: string) {
-    await fetch(`/api/part-types/${id}`, { method: 'DELETE' }); await load()
+    await fetch(`/api/part-types/${id}`, { method: 'DELETE' })
+    queryClient.invalidateQueries({ queryKey: ['catalogue-part-types'] })
   }
 
   async function renamePartType(id: string) {
     if (!editPartName.trim()) return
     await fetch(`/api/part-types/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editPartName.trim(), image_url: editPartImage || null }) })
-    setEditingPartId(null); await load()
+    setEditingPartId(null)
+    queryClient.invalidateQueries({ queryKey: ['catalogue-part-types'] })
   }
 
   return (

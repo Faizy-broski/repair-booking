@@ -6,7 +6,7 @@ import { MODULES } from '@/backend/config/constants'
 import {
   LayoutDashboard, ShoppingCart, Wrench, Package, Users, Calendar,
   DollarSign, BarChart2, MessageSquare, FileText, Gift, Star,
-  Phone, UserCheck, Settings2, Check, X, ChevronRight, Layers,
+  Phone, UserCheck, Settings2, Check, X, ChevronRight, Layers, Bell,
 } from 'lucide-react'
 import Link from 'next/link'
 import type { ModuleName } from '@/types/module-config'
@@ -24,7 +24,8 @@ const MODULE_META: Record<ModuleName, { label: string; icon: React.ElementType; 
   reports:       { label: 'Reports',           icon: BarChart2,    description: 'Revenue, sales, and operational reports' },
   messages:      { label: 'Messages',          icon: MessageSquare,description: 'Internal team messaging' },
   phone:         { label: 'Phone',             icon: Phone,        description: 'WebRTC calling and voicemail' },
-  google_reviews:{ label: 'Google Reviews',   icon: Star,         description: 'Monitor and respond to Google reviews' },
+  google_reviews: { label: 'Google Reviews',   icon: Star,         description: 'Monitor and respond to Google reviews' },
+  notifications:  { label: 'Notifications',    icon: Bell,         description: 'Email and SMS notifications for customers' },
 }
 
 export default function ModuleSettingsPage() {

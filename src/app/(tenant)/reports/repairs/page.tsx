@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Download, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
@@ -33,14 +34,10 @@ export default function RepairsReportPage() {
   const { activeBranch } = useAuthStore()
   const [dateFrom, setDateFrom] = useState(firstOfMonth)
   const [dateTo, setDateTo] = useState(today)
-  const [loading, setLoading] = useState(false)
-  const [data, setData] = useState<RepairRow[]>([])
-
-  const fetchData = useCallback(async () => {
-    if (!activeBranch) return
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({ type: 'repairs', branch_id: activeBranch.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` })
+  const { data = [], isLoading: loading, refetch } = useQuery<RepairRow[]>({
+    queryKey: ['report-repairs', activeBranch?.id, dateFrom, dateTo],
+    queryFn: async () => {
+      const params = new URLSearchParams({ type: 'repairs', branch_id: activeBranch!.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` })
       const res = await fetch(`/api/reports?${params}`)
       const json = await res.json()
       const grouped: Record<string, { count: number; value: number }> = {}
@@ -49,11 +46,11 @@ export default function RepairsReportPage() {
         grouped[r.status].count += 1
         grouped[r.status].value += r.actual_cost ?? 0
       }
-      setData(Object.entries(grouped).map(([status, { count, value }]) => ({ status, count, total_value: value })))
-    } finally { setLoading(false) }
-  }, [activeBranch, dateFrom, dateTo])
-
-  useEffect(() => { fetchData() }, [fetchData])
+      return Object.entries(grouped).map(([status, { count, value }]) => ({ status, count, total_value: value }))
+    },
+    enabled: !!activeBranch,
+    staleTime: 60_000,
+  })
 
   const totalRepairs = data.reduce((s, r) => s + r.count, 0)
   const totalValue   = data.reduce((s, r) => s + r.total_value, 0)
@@ -83,7 +80,7 @@ export default function RepairsReportPage() {
         </Button>
       </div>
 
-      <DateRangeBar dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} onApply={fetchData} />
+      <DateRangeBar dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} onApply={refetch} />
 
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-xl border border-outline-variant bg-surface p-4">
@@ -102,7 +99,7 @@ export default function RepairsReportPage() {
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie data={data} dataKey="count" nameKey="status" cx="50%" cy="50%" outerRadius={80}
-                label={({ status, percent }) => `${status.replace(/_/g, ' ')} ${((percent ?? 0) * 100).toFixed(0)}%`}>
+                label={({ name, percent }: { name?: string; percent?: number }) => `${(name ?? '').replace(/_/g, ' ')} ${((percent ?? 0) * 100).toFixed(0)}%`}>
                 {data.map((row, i) => (
                   <Cell key={i} fill={STATUS_COLORS[row.status] ?? '#94a3b8'} />
                 ))}

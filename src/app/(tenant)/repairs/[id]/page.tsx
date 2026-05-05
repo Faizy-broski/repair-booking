@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Edit, Clock, ClipboardList, Receipt, BookOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -73,54 +73,83 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
   const router = useRouter()
   const { activeBranch } = useAuthStore()
   const queryClient = useQueryClient()
-  const [repair, setRepair] = useState<RepairDetail | null>(null)
-  const [loading, setLoading] = useState(true)
+
+  // ── UI-only state ─────────────────────────────────────────────────────────────
   const [statusModalOpen, setStatusModalOpen] = useState(false)
   const [newStatus, setNewStatus] = useState('')
   const [statusNote, setStatusNote] = useState('')
   const [updating, setUpdating] = useState(false)
   const [emailPrompt, setEmailPrompt] = useState<{ repairId: string; jobNumber: string } | null>(null)
   const [labelIds, setLabelIds] = useState<string[]>([])
-  const [cannedResponses, setCannedResponses] = useState<Array<{ id: string; title: string; body: string }>>([])
   const [showCannedPicker, setShowCannedPicker] = useState(false)
-  const [technicians, setTechnicians] = useState<Technician[]>([])
   const [assigningTech, setAssigningTech] = useState(false)
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({})
-  const [customStatuses, setCustomStatuses] = useState<{ name: string; color: string }[]>([])
 
-  // Custom fields: load defs scoped to the repair's device_type as category
-  const repairCategory = repair?.device_type ?? undefined
-  const { defs: customFieldDefs } = useCustomFieldDefs('repairs', repairCategory)
+  // ── Main repair data ──────────────────────────────────────────────────────────
+  const { data: repair, isLoading: loading } = useQuery<RepairDetail | null>({
+    queryKey: ['repair-detail', id],
+    queryFn: async () => {
+      const res = await fetch(`/api/repairs/${id}`)
+      const j = await res.json()
+      return j.data ?? null
+    },
+    enabled: !!id,
+  })
 
+  // Sync derived local state once when this repair first loads
   useEffect(() => {
-    fetch('/api/repairs/custom-statuses')
-      .then((r) => r.json())
-      .then((j) => { if (j.data) setCustomStatuses(j.data) })
-  }, [])
-
-  useEffect(() => {
-    async function fetchRepair() {
-      if (!activeBranch?.id) return
-      setLoading(true)
-      // Load repair data first — show page as soon as this resolves
-      const repairRes = await fetch(`/api/repairs/${id}`)
-      const repairJson = await repairRes.json()
-      setRepair(repairJson.data)
-      if (repairJson.data) {
-        setNewStatus(repairJson.data.status)
-        setLabelIds(repairJson.data.label_ids ?? [])
-        setCustomFieldValues((repairJson.data.custom_fields as Record<string, unknown>) ?? {})
-      }
-      setLoading(false)
-      // Load secondary data in the background (non-blocking)
-      fetch('/api/canned-responses?type=note')
-        .then(r => r.json()).then(j => setCannedResponses(j.data ?? []))
-      fetch(`/api/employees?branch_id=${activeBranch.id}&limit=100`)
-        .then(r => r.json()).then(j => setTechnicians(j.data ?? []))
+    if (repair) {
+      setNewStatus(repair.status)
+      setLabelIds(repair.label_ids ?? [])
+      setCustomFieldValues((repair.custom_fields as Record<string, unknown>) ?? {})
     }
-    fetchRepair()
-  }, [id, activeBranch?.id])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repair?.id])
 
+  // ── Custom statuses — reuses the same cache as the repairs list page ──────────
+  // If the user navigated here from the list, this is already populated (0 requests).
+  const { data: metaData } = useQuery({
+    queryKey: ['repairs-meta', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/repairs/meta?branch_id=${activeBranch!.id}`)
+      const j = await res.json()
+      return j.data || { customStatuses: [], faults: [], employees: [] }
+    },
+    enabled: !!activeBranch,
+    staleTime: Infinity,
+  })
+  const customStatuses = (metaData?.customStatuses ?? []) as { name: string; color: string }[]
+
+  // ── Employees — shared cache key with the repairs list page ──────────────────
+  const { data: technicians = [] } = useQuery<Technician[]>({
+    queryKey: ['employees', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/employees?branch_id=${activeBranch!.id}&limit=100`)
+      const j = await res.json()
+      return j.data ?? []
+    },
+    enabled: !!activeBranch,
+    staleTime: Infinity,
+  })
+
+  // ── Canned responses — warm cache, shared across pages ───────────────────────
+  const { data: cannedResponses = [] } = useQuery<{ id: string; title: string; body: string }[]>({
+    queryKey: ['canned-responses', 'note'],
+    queryFn: async () => {
+      const res = await fetch('/api/canned-responses?type=note')
+      const j = await res.json()
+      return j.data ?? []
+    },
+    staleTime: Infinity,
+  })
+
+  // ── Custom field defs — deferred until repair loads so device_type is known ──
+  // Passing enabled=!!repair prevents the initial "no category" fetch that fires
+  // before the repair data arrives, which was causing a double request.
+  const repairCategory = repair?.device_type ?? null
+  const { defs: customFieldDefs } = useCustomFieldDefs('repairs', repairCategory, !!repair)
+
+  // ── Mutations ─────────────────────────────────────────────────────────────────
   async function saveCustomFields(values: Record<string, unknown>) {
     await fetch(`/api/repairs/${id}`, {
       method: 'PATCH',
@@ -138,12 +167,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
       body: JSON.stringify({ assigned_to: employeeId }),
     })
     if (res.ok) {
-      const matched = technicians.find((t) => t.id === employeeId) ?? null
-      setRepair((prev) => prev ? {
-        ...prev,
-        assigned_to: employeeId,
-        employees: matched ? { id: matched.id, first_name: matched.first_name, last_name: matched.last_name ?? null } : null,
-      } : prev)
+      queryClient.invalidateQueries({ queryKey: ['repair-detail', id] })
     }
     setAssigningTech(false)
   }
@@ -159,11 +183,8 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
     if (res.ok) {
       setStatusModalOpen(false)
       setStatusNote('')
-      const updated = await fetch(`/api/repairs/${id}`)
-      const json = await updated.json()
-      setRepair(json.data)
-      if (json.data?.status) setNewStatus(json.data.status)
-      // Sync the repairs list so status reflects immediately when navigating back
+      // Invalidate cache — React Query refetches automatically, no manual re-fetch needed
+      queryClient.invalidateQueries({ queryKey: ['repair-detail', id] })
       queryClient.invalidateQueries({ queryKey: ['repairs'] })
       if (repair.notify_customer && repair.customers?.email) {
         setEmailPrompt({ repairId: id, jobNumber: repair.job_number })

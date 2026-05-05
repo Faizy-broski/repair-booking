@@ -4,6 +4,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Plus, Search, LayoutGrid, List, Wrench, DollarSign, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
+import { AsyncEmployeeSelect } from '@/components/shared/async-employee-select'
 import { Modal } from '@/components/ui/modal'
 import { KanbanBoard } from '@/components/repairs/kanban-board'
 import { CustomerSearch } from '@/components/repairs/customer-search'
@@ -38,6 +39,17 @@ interface SelectedCustomer {
 interface RepairRow extends Repair {
   customers?: { first_name: string; last_name: string | null; phone: string | null; email: string | null } | null
   is_rush?: boolean
+}
+
+interface RepairCustomStatus { id: string; name: string; color: string; sort_order: number; created_at: string; business_id: string }
+interface RepairFault        { id: string; name: string; sort_order: number; created_at: string; business_id: string }
+interface RepairMeta {
+  customStatuses: RepairCustomStatus[]
+  faults:         RepairFault[]
+}
+interface RepairListResponse {
+  data: RepairRow[]
+  meta: { total: number; page: number; limit: number }
 }
 
 const EMPTY_NEW_CUST = { first_name: '', last_name: '', business_name: '', email: '', phone: '', address: '' }
@@ -103,6 +115,8 @@ type DeviceData = {
   brands: string[]
   models: string[]
   raw: { device_type: string | null; device_brand: string | null; device_model: string | null }[]
+  brandIdMap: Record<string, string>
+  typeIdMap:  Record<string, string>
 }
 
 function ComboInput({ value, onChange, options, placeholder }: {
@@ -332,79 +346,9 @@ export default function RepairsPage() {
   const [editData, setEditData] = useState({ due_date: '', estimated_cost: '', deposit_paid: '', payment_method: '' as '' | 'cash' | 'card', status: '' })
   const [editSaving, setEditSaving] = useState(false)
 
-  // Custom statuses + faults + employees
-  const { data: customStatuses = [] } = useQuery({
-    queryKey: ['custom-statuses', activeBranch?.id],
-    queryFn: async () => {
-      const res = await fetch(`/api/repairs/custom-statuses?branch_id=${activeBranch!.id}`)
-      const json = await res.json()
-      return json.data || []
-    },
-    enabled: !!activeBranch,
-  })
-
-  const { data: faults = [] } = useQuery({
-    queryKey: ['faults', activeBranch?.id],
-    queryFn: async () => {
-      const res = await fetch(`/api/repairs/faults?branch_id=${activeBranch!.id}`)
-      const json = await res.json()
-      return json.data || []
-    },
-    enabled: !!activeBranch,
-  })
-
-  const { data: deviceData = { types: [], brands: [], models: [], raw: [] } } = useQuery<DeviceData>({
-    queryKey: ['device-data', activeBranch?.id],
-    queryFn: async () => {
-      const res = await fetch(`/api/repairs/devices?branch_id=${activeBranch!.id}`)
-      const json = await res.json()
-      return json.data || { types: [], brands: [], models: [], raw: [] }
-    },
-    enabled: !!activeBranch,
-  })
-
-  const { data: employees = [] } = useQuery({
-    queryKey: ['employees', activeBranch?.id],
-    queryFn: async () => {
-      const res = await fetch(`/api/employees?branch_id=${activeBranch!.id}&limit=100`)
-      const json = await res.json()
-      return json.data || []
-    },
-    enabled: !!activeBranch,
-  })
-
-  // Dashboard stats
-  const { data: repairStats = null } = useQuery({
-    queryKey: ['dashboard-stats', activeBranch?.id],
-    queryFn: async () => {
-      const res = await fetch(`/api/dashboard?branch_id=${activeBranch!.id}`)
-      const json = await res.json()
-      if (json.data?.stats) {
-        const s = json.data.stats
-        return {
-          total_repairs: s.repairs_total ?? (s.repairs_open + s.repairs_completed),
-          repairs_open: s.repairs_open,
-          repairs_completed: s.repairs_completed,
-          repairs_urgent: s.repairs_urgent,
-          total_sales: s.total_sales,
-        }
-      }
-      return null
-    },
-    enabled: !!activeBranch,
-  })
-
-  const { data: invoiceSettings = null } = useQuery({
-    queryKey: ['invoice-settings', activeBranch?.id],
-    queryFn: async () => {
-      const res = await fetch(`/api/settings/invoice?branch_id=${activeBranch!.id}`)
-      const json = await res.json()
-      return json.data || null
-    },
-    enabled: !!activeBranch,
-  })
-
+  // Declare before the lazy queries that use them as enabled guards
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false)
+
   const [selectedInvoiceRepair, setSelectedInvoiceRepair] = useState<RepairRow | null>(null)
 
   useEffect(() => {
@@ -420,8 +364,8 @@ export default function RepairsPage() {
   const queryClient = useQueryClient()
   const repairsQueryKey = ['repairs', activeBranch?.id, page, search, statusFilter, view] as const
 
-  // ── Repairs Query ──
-  const { data: repairResponse, isLoading: repairsLoading, refetch: fetchRepairs } = useQuery({
+  // ── Repairs Query — fires immediately, table shows as soon as this returns ──
+  const { data: repairResponse, isLoading: repairsLoading, refetch: fetchRepairs } = useQuery<RepairListResponse>({
     queryKey: repairsQueryKey,
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -437,14 +381,84 @@ export default function RepairsPage() {
       return res.json()
     },
     enabled: !!activeBranch,
+    placeholderData: (prev) => prev,
+    staleTime: 30_000,
   })
 
   const repairs = repairResponse?.data ?? []
   const total = repairResponse?.meta?.total ?? 0
   const [loading, setLoading] = useState(false)
-  
+
   // Use local loading only for actions, use repairsLoading for initial data
   useEffect(() => { setLoading(repairsLoading) }, [repairsLoading])
+
+  // Gate for secondary queries: deferred until the repairs list is visible.
+  // On re-visits, repairs are cached so repairsLoading is immediately false
+  // and all secondary queries fire in parallel (fully cached).
+  const afterRepairs = !!activeBranch && !repairsLoading
+
+  // ── Single meta call: custom-statuses + faults ─────────────────────────────
+  // Deferred until repairs are shown. staleTime: Infinity — fetched once per
+  // session, only invalidated after settings mutations.
+  const { data: metaData } = useQuery<RepairMeta>({
+    queryKey: ['repairs-meta', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/repairs/meta?branch_id=${activeBranch!.id}`)
+      const json = await res.json()
+      return json.data || { customStatuses: [], faults: [] }
+    },
+    enabled: afterRepairs,
+    staleTime: Infinity,
+  })
+  const customStatuses = metaData?.customStatuses ?? []
+  const faults         = metaData?.faults         ?? []
+
+  // ── Device catalogue — deferred so modal data loads silently after list ──
+  const { data: deviceData = { types: [], brands: [], models: [], raw: [], brandIdMap: {}, typeIdMap: {} } } = useQuery<DeviceData>({
+    queryKey: ['device-data', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/repairs/devices?branch_id=${activeBranch!.id}`)
+      const json = await res.json()
+      return json.data || { types: [], brands: [], models: [], raw: [], brandIdMap: {}, typeIdMap: {} }
+    },
+    enabled: afterRepairs,
+    staleTime: Infinity,
+  })
+
+  // ── Repair stats — deferred; reuses ['dashboard', branchId] cache ──
+  const { data: repairStats = null } = useQuery({
+    queryKey: ['dashboard', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/dashboard?branch_id=${activeBranch!.id}`)
+      const json = await res.json()
+      return json.data ?? {}
+    },
+    enabled: afterRepairs,
+    staleTime: 5 * 60 * 1000,
+    select: (d: any) => {
+      const s = d?.stats
+      if (!s) return null
+      return {
+        total_repairs: s.repairs_total ?? (s.repairs_open + s.repairs_completed),
+        repairs_open: s.repairs_open,
+        repairs_completed: s.repairs_completed,
+        repairs_urgent: s.repairs_urgent,
+        total_sales: s.total_sales,
+      }
+    },
+  })
+
+  // ── Invoice settings — lazy: only fetched when the invoice modal opens ──
+  const { data: invoiceSettings = null } = useQuery({
+    queryKey: ['invoice-settings', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/settings/invoice?branch_id=${activeBranch!.id}`)
+      const json = await res.json()
+      return json.data || null
+    },
+    enabled: !!activeBranch && invoiceModalOpen,
+    staleTime: Infinity,
+  })
 
   function deleteRepair(repairId: string, jobNumber: string) {
     setConfirmDelete({ id: repairId, jobNumber })
@@ -474,10 +488,10 @@ export default function RepairsPage() {
   }
 
   async function handleStatusChange(repairId: string, newStatus: string) {
-    const previousData = queryClient.getQueryData<typeof repairResponse>(repairsQueryKey)
+    const previousData = queryClient.getQueryData<RepairListResponse>(repairsQueryKey)
 
     if (previousData?.data) {
-      queryClient.setQueryData<typeof repairResponse>(repairsQueryKey, (old) => {
+      queryClient.setQueryData<RepairListResponse>(repairsQueryKey, (old) => {
         if (!old?.data) return old
         return {
           ...old,
@@ -667,60 +681,101 @@ export default function RepairsPage() {
     setSubmitting(false)
   }
 
-  // ── Inline Creators for Device Catalogue ───────────────────────────────────
+  // ── Inline Creators for Device Catalogue (Optimistic / Fire-and-forget) ──
   async function createDeviceType(name: string) {
     if (!activeBranch) return
-    const res = await fetch('/api/categories', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+    setJobData((p) => ({ ...p, device_type: name, device_brand: '', device_model: '' }))
+    // Optimistically add to types list (id unknown until API responds)
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
+      if (!old || old.types.includes(name)) return old
+      return { ...old, types: [...old.types, name] }
     })
-    if (res.ok) {
-      toast.success(`Added "${name}" to device types`)
-      // Refresh device data by invalidating its query
-      queryClient.invalidateQueries({ queryKey: ['device-data'] })
-      setJobData((p) => ({ ...p, device_type: name, device_brand: '', device_model: '' }))
-    }
+    const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+    try {
+      const res = await fetch('/api/services/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, slug, display_order: 0, show_on_pos: true, retail_margin: 0 }),
+      })
+      if (res.ok) {
+        const json = await res.json()
+        const newId = json.data?.id
+        if (newId) {
+          // Persist the real DB id into typeIdMap so brand creation can link to it
+          queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
+            if (!old) return old
+            return { ...old, typeIdMap: { ...old.typeIdMap, [name]: newId } }
+          })
+        } else {
+          queryClient.invalidateQueries({ queryKey: ['device-data'] })
+        }
+      }
+    } catch { /* fire-and-forget */ }
   }
 
   async function createDeviceBrand(name: string) {
     if (!activeBranch) return
-    // We need a category ID if one is selected, else null
-    // But manufacturers in our schema might need a category_id or not.
-    // Let's check what the manufacturers API expects.
-    const res = await fetch('/api/services/manufacturers', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+    // Capture current type before any async gap
+    const deviceType = jobData.device_type
+    setJobData((p) => ({ ...p, device_brand: name, device_model: '' }))
+    // Optimistically add brand + raw type→brand association
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
+      if (!old || old.brands.includes(name)) return old
+      const newRaw = deviceType
+        ? [...old.raw, { device_type: deviceType, device_brand: name, device_model: null }]
+        : old.raw
+      return { ...old, brands: [...old.brands, name], raw: newRaw }
     })
-    if (res.ok) {
-      toast.success(`Added "${name}" to brands`)
-      queryClient.invalidateQueries({ queryKey: ['device-data'] })
-      setJobData((p) => ({ ...p, device_brand: name, device_model: '' }))
-    }
+    const categoryId = deviceType ? (deviceData.typeIdMap ?? {})[deviceType] : undefined
+    try {
+      const res = await fetch('/api/services/manufacturers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, ...(categoryId ? { category_id: categoryId } : {}) }),
+      })
+      if (res.ok) {
+        const json = await res.json()
+        const newId = json.data?.id
+        if (newId) {
+          // Persist the real DB id into brandIdMap so model creation can link to it
+          queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
+            if (!old) return old
+            return { ...old, brandIdMap: { ...old.brandIdMap, [name]: newId } }
+          })
+        } else {
+          queryClient.invalidateQueries({ queryKey: ['device-data'] })
+        }
+      }
+    } catch { /* fire-and-forget */ }
   }
 
-  async function createDeviceModel(name: string) {
+  function createDeviceModel(name: string) {
     if (!activeBranch) return
-    // Find selected brand ID
-    const mfRes = await fetch('/api/services/manufacturers')
-    const mfJson = await mfRes.json()
-    const manufacturer = (mfJson.data ?? []).find((m: any) => m.name.toLowerCase() === jobData.device_brand.toLowerCase())
-    
-    if (!manufacturer) {
-      toast.error('Please select an existing brand first or create it.')
-      return
-    }
-
-    const res = await fetch('/api/services/devices', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, manufacturer_id: manufacturer.id }),
+    const deviceBrand = jobData.device_brand
+    const deviceType  = jobData.device_type
+    setJobData((p) => ({ ...p, device_model: name }))
+    // Optimistically add model + raw brand→model association
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
+      if (!old || old.models.includes(name)) return old
+      const newRaw = [...old.raw, { device_type: deviceType || null, device_brand: deviceBrand || null, device_model: name }]
+      return { ...old, models: [...old.models, name], raw: newRaw }
     })
-    if (res.ok) {
-      toast.success(`Added "${name}" to models`)
-      queryClient.invalidateQueries({ queryKey: ['device-data'] })
-      setJobData((p) => ({ ...p, device_model: name }))
+    if (deviceBrand) {
+      const manufacturerId = (deviceData.brandIdMap ?? {})[deviceBrand]
+      const categoryId     = deviceType ? (deviceData.typeIdMap ?? {})[deviceType] : undefined
+      if (manufacturerId) {
+        fetch('/api/services/devices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            manufacturer_id: manufacturerId,
+            ...(categoryId ? { category_id: categoryId } : {}),
+          }),
+        }).then(res => {
+          if (res.ok) queryClient.invalidateQueries({ queryKey: ['device-data'] })
+        }).catch(() => {})
+      }
     }
   }
 
@@ -1282,14 +1337,34 @@ export default function RepairsPage() {
 
         {/* ── STEP 2: Job Details ── */}
         {modalStep === 2 && (() => {
+          // STRICT cascade: Type → Brand → Model
+          // Each level only shows items associated with the parent selection.
+          // No fallbacks to "all" — if a brand has no models yet, the dropdown
+          // is empty and the user creates a new one via the combobox.
           const filteredBrands = jobData.device_type
-            ? [...new Set(deviceData.raw.filter((d) => d.device_type === jobData.device_type).map((d) => d.device_brand).filter(Boolean) as string[])]
+            ? [...new Set(
+                deviceData.raw
+                  .filter((d) => d.device_type === jobData.device_type)
+                  .map((d) => d.device_brand)
+                  .filter(Boolean) as string[]
+              )]
             : deviceData.brands
-          const filteredModels = [...new Set(
-            deviceData.raw
-              .filter((d) => (!jobData.device_type || d.device_type === jobData.device_type) && (!jobData.device_brand || d.device_brand === jobData.device_brand))
-              .map((d) => d.device_model).filter(Boolean) as string[]
-          )]
+
+          const filteredModels = jobData.device_brand
+            ? [...new Set(
+                deviceData.raw
+                  .filter((d) => d.device_brand === jobData.device_brand)
+                  .map((d) => d.device_model)
+                  .filter(Boolean) as string[]
+              )]
+            : jobData.device_type
+            ? [...new Set(
+                deviceData.raw
+                  .filter((d) => d.device_type === jobData.device_type)
+                  .map((d) => d.device_model)
+                  .filter(Boolean) as string[]
+              )]
+            : deviceData.models
           const remaining = (parseFloat(jobData.estimated_cost) || 0) - (parseFloat(jobData.deposit_paid) || 0)
           const inp = 'h-8 w-full rounded-md border border-indigo-200 bg-white px-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400/20'
           const sel = `${inp} appearance-none`
@@ -1304,6 +1379,7 @@ export default function RepairsPage() {
                   <Smartphone className="h-2.5 w-2.5" /> Device
                 </p>
                 <div className="grid grid-cols-4 gap-2">
+                  {/* TYPE */}
                   <div>
                     <label className={lbl}>Type</label>
                     <CreatableCombobox
@@ -1315,28 +1391,54 @@ export default function RepairsPage() {
                       createLabel="Add type"
                     />
                   </div>
+
+                  {/* BRAND — locked until type chosen */}
                   <div>
-                    <label className={lbl}>Brand</label>
-                    <CreatableCombobox
-                      options={filteredBrands.map(b => ({ value: b, label: b }))}
-                      value={jobData.device_brand}
-                      onChange={(v) => setJobData((p) => ({ ...p, device_brand: v, device_model: '' }))}
-                      onCreate={createDeviceBrand}
-                      placeholder="Apple…"
-                      createLabel="Add brand"
-                    />
+                    <label className={`${lbl} flex items-center gap-1`}>
+                      Brand
+                      {!jobData.device_type && <Lock className="h-2.5 w-2.5 text-gray-300" />}
+                    </label>
+                    {jobData.device_type ? (
+                      <CreatableCombobox
+                        options={filteredBrands.map(b => ({ value: b, label: b }))}
+                        value={jobData.device_brand}
+                        onChange={(v) => setJobData((p) => ({ ...p, device_brand: v, device_model: '' }))}
+                        onCreate={createDeviceBrand}
+                        placeholder="Apple…"
+                        createLabel="Add brand"
+                      />
+                    ) : (
+                      <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                        <Lock className="h-3.5 w-3.5 shrink-0" />
+                        Select type first
+                      </div>
+                    )}
                   </div>
+
+                  {/* MODEL — locked until brand chosen */}
                   <div>
-                    <label className={lbl}>Model</label>
-                    <CreatableCombobox
-                      options={filteredModels.map(m => ({ value: m, label: m }))}
-                      value={jobData.device_model}
-                      onChange={(v) => setJobData((p) => ({ ...p, device_model: v }))}
-                      onCreate={jobData.device_brand ? createDeviceModel : undefined}
-                      placeholder={jobData.device_brand ? 'iPhone 15…' : 'Select brand first'}
-                      createLabel="Add model"
-                    />
+                    <label className={`${lbl} flex items-center gap-1`}>
+                      Model
+                      {!jobData.device_brand && <Lock className="h-2.5 w-2.5 text-gray-300" />}
+                    </label>
+                    {jobData.device_brand ? (
+                      <CreatableCombobox
+                        options={filteredModels.map(m => ({ value: m, label: m }))}
+                        value={jobData.device_model}
+                        onChange={(v) => setJobData((p) => ({ ...p, device_model: v }))}
+                        onCreate={createDeviceModel}
+                        placeholder="iPhone 15…"
+                        createLabel="Add model"
+                      />
+                    ) : (
+                      <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                        <Lock className="h-3.5 w-3.5 shrink-0" />
+                        Select brand first
+                      </div>
+                    )}
                   </div>
+
+                  {/* IMEI */}
                   <div>
                     <label className={lbl}>IMEI / Serial</label>
                     <input value={jobData.imei} onChange={(e) => setJobData((p) => ({ ...p, imei: e.target.value }))} placeholder="Enter IMEI…" className={inp} />
@@ -1412,10 +1514,15 @@ export default function RepairsPage() {
                   </div>
                   <div>
                     <label className={lbl}>Assigned To <span className="font-normal normal-case text-gray-300">(opt)</span></label>
-                    <select value={jobData.assigned_to} onChange={(e) => setJobData((p) => ({ ...p, assigned_to: e.target.value }))} className={sel}>
-                      <option value="">— Employee —</option>
-                      {employees.map((emp) => <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name ?? ''}</option>)}
-                    </select>
+                    {activeBranch && (
+                      <AsyncEmployeeSelect
+                        branchId={activeBranch.id}
+                        value={jobData.assigned_to ?? ''}
+                        onChange={(id) => setJobData((p) => ({ ...p, assigned_to: id }))}
+                        label=""
+                        placeholder="— Search employee —"
+                      />
+                    )}
                   </div>
                 </div>
               </div>

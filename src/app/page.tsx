@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   Wrench, Package, Users, BarChart3, CreditCard, Calendar,
   Bell, FileText, MessageSquare, Star, Gift, Settings2,
-  Building2, Clock, Shield, Zap, ChevronRight, Check, Menu,
+  Building2, Clock, Shield, Zap, ChevronRight, Check, Menu, X,
   Phone, DollarSign, UserCheck, ShoppingCart, Quote
 } from 'lucide-react'
 
@@ -198,6 +198,7 @@ import { FeatureTabs } from '@/components/shared/feature-tabs'
 // ─── Page ─────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const [activeTestimonial, setActiveTestimonial] = useState(0)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [plans, setPlans] = useState<PricingPlan[]>([])
   const [plansLoading, setPlansLoading] = useState(true)
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly')
@@ -255,12 +256,82 @@ export default function HomePage() {
               Get started free
               <ChevronRight className="h-3.5 w-3.5" />
             </Link>
-            <button className="md:hidden p-2 rounded-md text-white/80 hover:text-white" aria-label="Open menu">
+            <button
+              className="md:hidden p-2 rounded-md text-white/80 hover:text-white"
+              aria-label="Open menu"
+              onClick={() => setMobileNavOpen(true)}
+            >
               <Menu className="h-5 w-5" />
             </button>
           </div>
         </nav>
       </header>
+
+      {/* Mobile nav — full-height left slide-in overlay */}
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-[100] flex md:hidden">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setMobileNavOpen(false)}
+          />
+          {/* Panel */}
+          <div className="relative flex h-full w-72 flex-col bg-brand-teal animate-slide-in-left shadow-2xl">
+            {/* Header row */}
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+              <Image
+                src="/images/tsn_logo.png"
+                alt="The Social Nexus"
+                width={140}
+                height={36}
+                className="h-9 w-auto"
+              />
+              <button
+                onClick={() => setMobileNavOpen(false)}
+                className="rounded-lg p-1.5 text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+                aria-label="Close menu"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {/* Nav links */}
+            <nav className="flex flex-col gap-1 px-4 py-5">
+              {[
+                { label: 'Features',     href: '#features' },
+                { label: 'Modules',      href: '#modules' },
+                { label: 'Pricing',      href: '#pricing' },
+                { label: 'Reviews',      href: '#testimonials' },
+              ].map(({ label, href }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="rounded-lg px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                  onClick={() => setMobileNavOpen(false)}
+                >
+                  {label}
+                </Link>
+              ))}
+            </nav>
+            {/* CTA buttons */}
+            <div className="mt-auto border-t border-white/10 px-4 py-5 flex flex-col gap-3">
+              <Link
+                href="/login"
+                className="inline-flex items-center justify-center rounded-xl border border-white/40 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
+                onClick={() => setMobileNavOpen(false)}
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/register"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-brand-teal transition-colors shadow-sm"
+                onClick={() => setMobileNavOpen(false)}
+              >
+                Get started free <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main>
         {/* ── Hero ───────────────────────────────────────────────────────── */}

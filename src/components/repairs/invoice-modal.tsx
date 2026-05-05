@@ -6,7 +6,6 @@ import { Printer, Download, Loader2, X } from 'lucide-react'
 import { PDFViewer, blobStream, pdf } from '@react-pdf/renderer'
 import { InvoicePdf } from '@/components/pdf/invoice-pdf'
 import type { InvoiceSettings } from '@/types/invoice-settings'
-import type { RepairRow } from '@/app/(tenant)/repairs/page'
 
 interface Props {
   open: boolean

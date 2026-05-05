@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Download, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/store/auth.store'
@@ -25,21 +26,17 @@ export default function ProfitLossReportPage() {
   const { activeBranch } = useAuthStore()
   const [dateFrom, setDateFrom] = useState(firstOfMonth)
   const [dateTo, setDateTo] = useState(today)
-  const [loading, setLoading] = useState(false)
-  const [data, setData] = useState<ProfitLossData | null>(null)
-
-  const fetchData = useCallback(async () => {
-    if (!activeBranch) return
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({ type: 'profit_loss', branch_id: activeBranch.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` })
+  const { data = null, isLoading: loading, refetch } = useQuery<ProfitLossData | null>({
+    queryKey: ['report-profit-loss', activeBranch?.id, dateFrom, dateTo],
+    queryFn: async () => {
+      const params = new URLSearchParams({ type: 'profit_loss', branch_id: activeBranch!.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` })
       const res = await fetch(`/api/reports?${params}`)
       const json = await res.json()
-      setData(json.data ?? null)
-    } finally { setLoading(false) }
-  }, [activeBranch, dateFrom, dateTo])
-
-  useEffect(() => { fetchData() }, [fetchData])
+      return json.data ?? null
+    },
+    enabled: !!activeBranch,
+    staleTime: 60_000,
+  })
 
   return (
     <div className="p-6 space-y-5">
@@ -60,7 +57,7 @@ export default function ProfitLossReportPage() {
         </Button>
       </div>
 
-      <DateRangeBar dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} onApply={fetchData} />
+      <DateRangeBar dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} onApply={refetch} />
 
       {loading && (
         <div className="rounded-xl border border-outline-variant bg-surface p-8 text-center text-sm text-on-surface-variant">Loading…</div>

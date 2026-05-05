@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/store/auth.store'
 import { useMessageStore } from '@/store/message.store'
@@ -27,32 +28,64 @@ import { playMessageReceived } from '@/lib/message-sounds'
  *     The poll does NOT play sounds (avoids re-alerting for already-known msgs).
  *     Page Visibility API triggers an immediate reconciliation when the tab
  *     comes back into focus.
+ *
+ * Owner / super_admin roles have no branch_id in their profile — they oversee
+ * ALL branches. Their realtime filter checks any of their branches (not just
+ * activeBranch), and fetchUnread omits branch_id so the API returns all
+ * unread across the business.
  */
 
 const POLL_MS = 8_000 // 8 s — feels near-realtime, low server cost
 
 export function MessageBadge() {
+  const router       = useRouter()
   const activeBranch = useAuthStore((s) => s.activeBranch)
-  const { setUnreadCount, setUnreadMessages, addUnreadMessage, removeUnreadMessage, increment } =
+  const branches     = useAuthStore((s) => s.branches)
+  const allBranches  = useAuthStore((s) => s.canAccessAllBranches)()
+  const { setUnreadCount, setUnreadMessages, addUnreadMessage, removeUnreadMessage, increment, setPendingThreadId } =
     useMessageStore()
   const notify = useNotificationStore((s) => s.add)
 
   // Stable refs for closures that must not be stale inside intervals / events
   const branchRef           = useRef(activeBranch)
+  const branchesRef         = useRef(branches)
+  const allBranchesRef      = useRef(allBranches)
   const unreadMessagesRef   = useRef(useMessageStore.getState().unreadMessages)
   /** true while the Supabase Realtime WS is SUBSCRIBED — polling skips when healthy */
   const realtimeHealthyRef  = useRef(false)
   useEffect(() => { branchRef.current = activeBranch }, [activeBranch])
+  useEffect(() => { branchesRef.current = branches }, [branches])
+  useEffect(() => { allBranchesRef.current = allBranches }, [allBranches])
   useEffect(() => {
     return useMessageStore.subscribe((s) => { unreadMessagesRef.current = s.unreadMessages })
   }, [])
+
+  // Stable ref so realtime closures always call the latest version without
+  // being re-created. Uses the Zustand store + router.push for smooth SPA
+  // navigation — no hard reload, no full re-mount of the messages module.
+  const goToThreadRef = useRef<(threadId: string) => void>(() => {})
+  useEffect(() => {
+    goToThreadRef.current = (threadId: string) => {
+      setPendingThreadId(threadId)
+      // Already on messages page → the page's pendingThreadId useEffect will
+      // open the conversation without any navigation at all.
+      if (!window.location.pathname.endsWith('/messages')) {
+        router.push('/messages')
+      }
+    }
+  }, [router, setPendingThreadId])
 
   // ── Core fetch function — replaces the whole badge state with server truth ──
   const fetchUnread = useCallback(async (silent = false) => {
     const branch = branchRef.current
     if (!branch) return
     try {
-      const res  = await fetch(`/api/messages/unread?branch_id=${branch.id}`)
+      // Always scope by active branch — this ensures the badge only shows messages
+      // addressed TO this branch, preventing outgoing messages (from=active_branch)
+      // from appearing as self-notifications. Owners see their active branch's
+      // incoming messages; switching activeBranch shows another branch's badge.
+      const url = `/api/messages/unread?branch_id=${branch.id}&active_branch_id=${branch.id}`
+      const res  = await fetch(url)
       const json = await res.json()
       if (!res.ok) return
       const result = json.data ?? {}
@@ -73,7 +106,7 @@ export function MessageBadge() {
               duration: 6000,
               action: {
                 label:   'View',
-                onClick: () => { window.location.href = `/messages?thread=${m.id}` },
+                onClick: () => goToThreadRef.current(m.id),
               },
             })
           })
@@ -86,11 +119,15 @@ export function MessageBadge() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ── 1. Initial load whenever branch changes ─────────────────────────────────
+  // ── 1. Initial load whenever branch or role scope changes ──────────────────
+  // allBranches re-triggers this when the profile loads after mount and the
+  // owner scope switches from false→true. Re-fetching silently ensures the
+  // unreadMessagesRef baseline covers all branches before the first poll fires,
+  // preventing false-positive toasts for pre-existing messages on page refresh.
   useEffect(() => {
     if (!activeBranch) return
-    fetchUnread(true) // silent=true on initial load (no sound for pre-existing msgs)
-  }, [activeBranch, fetchUnread])
+    fetchUnread(true) // silent=true — no sound/toast for pre-existing messages
+  }, [activeBranch, allBranches, fetchUnread])
 
   // ── 3. Polling fallback + Page Visibility reconciliation ────────────────────
   // The interval is skipped when realtimeHealthyRef is true (WS is SUBSCRIBED).
@@ -115,7 +152,7 @@ export function MessageBadge() {
       clearInterval(interval)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [activeBranch, fetchUnread])
+  }, [activeBranch, allBranches, fetchUnread])
 
   // ── 2. Supabase realtime — instant updates for zero-latency feel ────────────
   useEffect(() => {
@@ -148,8 +185,9 @@ export function MessageBadge() {
             body: string; is_read: boolean; created_at: string
           }
           const branch = branchRef.current
-          // Only process inbound messages (addressed to this branch)
-          if (!branch || msg.to_branch_id !== branch.id) return
+          if (!branch) return
+          // Only process messages addressed TO the active branch — never outgoing ones.
+          if (msg.to_branch_id !== branch.id) return
           // Only unread messages matter
           if (msg.is_read) return
 
@@ -177,7 +215,7 @@ export function MessageBadge() {
               ? (msg.parent_id ? `New reply in "${msg.subject}"` : `"${msg.subject}"`)
               : 'You have a new message',
             duration: 6000,
-            action: { label: 'View', onClick: () => { window.location.href = `/messages?thread=${previewId}` } },
+            action: { label: 'View', onClick: () => goToThreadRef.current(previewId) },
           })
         }
       )
@@ -190,7 +228,9 @@ export function MessageBadge() {
           const prev = payload.old as { id: string; parent_id: string | null; is_read: boolean; to_branch_id: string | null }
           const next = payload.new as { id: string; parent_id: string | null; is_read: boolean; to_branch_id: string | null; from_branch_id: string | null; subject: string | null; body: string; created_at: string }
           const branch = branchRef.current
-          if (!branch || next.parent_id !== null || next.to_branch_id !== branch.id) return
+          if (!branch || next.parent_id !== null) return
+          // Only root messages addressed TO the active branch trigger badge updates.
+          if (next.to_branch_id !== branch.id) return
 
           if (prev.is_read === true && next.is_read === false) {
             if (unreadMessagesRef.current.some((m) => m.id === next.id)) return
@@ -206,7 +246,7 @@ export function MessageBadge() {
               type: 'info', title: 'New Reply',
               message: next.subject ? `New reply in "${next.subject}"` : 'You have a new reply',
               duration: 6000,
-              action: { label: 'View', onClick: () => { window.location.href = `/messages?thread=${next.id}` } },
+              action: { label: 'View', onClick: () => goToThreadRef.current(next.id) },
             })
           }
         }

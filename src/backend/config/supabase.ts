@@ -9,28 +9,29 @@ import type { Database } from '@/types/database'
 
 type AdminClient = ReturnType<typeof createClient<Database>>
 
-/**
- * Creates a fresh service-role client, reading env vars at call time.
- * Use SUPABASE_URL (server-only) first to avoid Next.js NEXT_PUBLIC_ compile-
- * time inlining that can bake in stale placeholder values.
- */
+// Singleton instance — created once per Node.js process and reused across all
+// requests. Creating a new client on every property access (the old Proxy
+// behaviour) caused a fresh TLS/HTTP connection per query, which is why all
+// employee endpoints were taking 13+ seconds.
+let _adminClient: AdminClient | null = null
+
 export function getAdminSupabase(): AdminClient {
+  if (_adminClient) return _adminClient
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) {
     throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars')
   }
-  return createClient<Database>(url, key, {
+  _adminClient = createClient<Database>(url, key, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
+  return _adminClient
 }
 
 export const createAdminClient = getAdminSupabase
 
-/**
- * Drop-in proxy — existing code using `adminSupabase.from(...)` continues to
- * work while env vars are read fresh on every property access.
- */
+// Proxy kept for backward compatibility — all existing `adminSupabase.from(...)`
+// calls continue to work, but now delegate to the singleton client.
 export const adminSupabase = new Proxy({} as AdminClient, {
   get(_target, prop) {
     const client = getAdminSupabase()

@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Download, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
@@ -30,21 +31,17 @@ export default function PaymentsReportPage() {
   const { activeBranch } = useAuthStore()
   const [dateFrom, setDateFrom] = useState(firstOfMonth)
   const [dateTo, setDateTo] = useState(today)
-  const [loading, setLoading] = useState(false)
-  const [data, setData] = useState<PaymentRow[]>([])
-
-  const fetchData = useCallback(async () => {
-    if (!activeBranch) return
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({ type: 'payment_methods', branch_id: activeBranch.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` })
+  const { data = [], isLoading: loading, refetch } = useQuery<PaymentRow[]>({
+    queryKey: ['report-payments', activeBranch?.id, dateFrom, dateTo],
+    queryFn: async () => {
+      const params = new URLSearchParams({ type: 'payment_methods', branch_id: activeBranch!.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` })
       const res = await fetch(`/api/reports?${params}`)
       const json = await res.json()
-      setData(json.data ?? [])
-    } finally { setLoading(false) }
-  }, [activeBranch, dateFrom, dateTo])
-
-  useEffect(() => { fetchData() }, [fetchData])
+      return json.data ?? []
+    },
+    enabled: !!activeBranch,
+    staleTime: 60_000,
+  })
 
   const totalRevenue = data.reduce((s, r) => s + r.total, 0)
   const totalTxns    = data.reduce((s, r) => s + r.count, 0)
@@ -74,7 +71,7 @@ export default function PaymentsReportPage() {
         </Button>
       </div>
 
-      <DateRangeBar dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} onApply={fetchData} />
+      <DateRangeBar dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} onApply={refetch} />
 
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-xl border border-outline-variant bg-surface p-4">

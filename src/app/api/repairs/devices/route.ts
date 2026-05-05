@@ -4,30 +4,40 @@ import { ok, serverError } from '@/backend/utils/api-response'
 
 export const GET = withMiddleware(async (_req, ctx) => {
   try {
-    // 1. Fetch Categories (Device Types)
-    const { data: cats } = await adminSupabase
-      .from('service_categories')
-      .select('id, name')
-      .eq('business_id', ctx.businessId)
-      .order('display_order', { ascending: true })
+    // All three queries run in parallel — previously sequential (each awaited),
+    // which caused cumulative latency of 3× the per-query time.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [{ data: cats }, { data: mans }, { data: devs }] = await Promise.all([
+      adminSupabase
+        .from('service_categories')
+        .select('id, name')
+        .eq('business_id', ctx.businessId)
+        .order('display_order', { ascending: true }),
 
-    // 2. Fetch Manufacturers (Brands)
-    const { data: mans } = await adminSupabase
-      .from('service_manufacturers')
-      .select('id, name, category_id')
-      .eq('business_id', ctx.businessId)
-      .order('name', { ascending: true })
+      (adminSupabase as any)
+        .from('service_manufacturers')
+        .select('id, name, category_id')
+        .eq('business_id', ctx.businessId)
+        .order('name', { ascending: true }),
 
-    // 3. Fetch Devices (Models)
-    const { data: devs } = await adminSupabase
-      .from('service_devices')
-      .select('id, name, manufacturer_id, category_id')
-      .eq('business_id', ctx.businessId)
-      .order('name', { ascending: true })
+      (adminSupabase as any)
+        .from('service_devices')
+        .select('id, name, manufacturer_id, category_id')
+        .eq('business_id', ctx.businessId)
+        .order('name', { ascending: true }),
+    ]) as [
+      { data: { id: string; name: string }[] | null },
+      { data: { id: string; name: string; category_id: string }[] | null },
+      { data: { id: string; name: string; manufacturer_id: string; category_id: string }[] | null },
+    ]
 
     const types  = (cats ?? []).map(c => c.name)
     const brands = (mans ?? []).map(m => m.name)
     const models = (devs ?? []).map(d => d.name)
+
+    // ID maps — used by the frontend for inline creation without extra API calls
+    const brandIdMap: Record<string, string> = Object.fromEntries((mans ?? []).map(m => [m.name, m.id]))
+    const typeIdMap:  Record<string, string> = Object.fromEntries((cats ?? []).map(c => [c.name, c.id]))
 
     // Construct the "raw" list that the frontend expects for filtering
     const raw = (devs ?? []).map(d => {
@@ -40,7 +50,7 @@ export const GET = withMiddleware(async (_req, ctx) => {
       }
     })
 
-    return ok({ types, brands, models, raw })
+    return ok({ types, brands, models, raw, brandIdMap, typeIdMap })
   } catch (err) {
     return serverError('Failed to fetch device catalogue', err)
   }

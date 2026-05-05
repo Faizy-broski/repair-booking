@@ -1,6 +1,7 @@
 'use client'
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { Send, Plus, MessageSquare } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Send, Plus, MessageSquare, Trash2, Pencil, Check, X, Paperclip, FileText, Download, ImageIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
@@ -14,6 +15,13 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
 
+interface MessageAttachment {
+  url:  string
+  name: string
+  type: string
+  size: number
+}
+
 interface MessageRow {
   id: string
   subject: string | null
@@ -24,6 +32,7 @@ interface MessageRow {
   parent_id: string | null
   from_branch_id: string | null
   to_branch_id: string | null
+  attachments?: MessageAttachment[] | null
   from_branch?: { name: string } | null
   to_branch?: { name: string } | null
   profiles?: { full_name: string | null } | null
@@ -68,13 +77,23 @@ export default function MessagesPage() {
     return branches.find((b) => b.id === id)?.name ?? 'Unknown'
   }
 
-  const [messages, setMessages] = useState<MessageRow[]>([])
+  const queryClient = useQueryClient()
   const [selected, setSelected] = useState<MessageRow | null>(null)
   const [thread, setThread] = useState<MessageRow[]>([])
-  const [loading, setLoading] = useState(true)
   const [replyBody, setReplyBody] = useState('')
   const [sending, setSending] = useState(false)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [deleteThreadConfirm, setDeleteThreadConfirm] = useState(false)
+  const [deletingThread, setDeletingThread] = useState(false)
+  const [deleteMessageId, setDeleteMessageId] = useState<string | null>(null)
+  const [deletingMessage, setDeletingMessage] = useState(false)
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
+  const [editingBody, setEditingBody] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([])
+  const [uploadingFiles, setUploadingFiles] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Refs so the Supabase subscription never captures stale state
   const selectedRef = useRef<MessageRow | null>(null)
@@ -117,25 +136,34 @@ export default function MessagesPage() {
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
-  const fetchMessages = useCallback(async () => {
-    if (!activeBranch) return
-    const res = await fetch(`/api/messages?branch_id=${activeBranch.id}`)
-    const json = await res.json()
-    setMessages(json.data ?? [])
-    setLoading(false)
-  }, [activeBranch])
+  const { data: messages = [], isLoading: loading, refetch: refetchMessages } = useQuery<MessageRow[]>({
+    queryKey: ['messages', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/messages?branch_id=${activeBranch!.id}`)
+      const json = await res.json()
+      return json.data ?? []
+    },
+    enabled: !!activeBranch,
+    staleTime: 0,
+  })
 
-  const fetchThread = useCallback(async (rootId: string) => {
+  const fetchThread = async (rootId: string) => {
     const res = await fetch(`/api/messages/${rootId}`)
     const json = await res.json()
     setThread(json.data ?? [])
     setTimeout(() => threadEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 80)
-  }, [])
+  }
 
   // Keep callback refs always pointing to the latest version
-  useEffect(() => { fetchMessagesRef.current = fetchMessages }, [fetchMessages])
-  useEffect(() => { fetchThreadRef.current = fetchThread }, [fetchThread])
+  useEffect(() => { fetchMessagesRef.current = refetchMessages }, [refetchMessages])
+  useEffect(() => { fetchThreadRef.current = fetchThread })
   useEffect(() => { onSelectMessageRef.current = onSelectMessage }, )
+
+  // Reset selected/thread when the active branch changes (query key change handles re-fetch)
+  useEffect(() => {
+    setSelected(null)
+    setThread([])
+  }, [activeBranch?.id])
 
   // Auto-open thread when ?thread param was in the URL (handles initial page load)
   useEffect(() => {
@@ -150,7 +178,6 @@ export default function MessagesPage() {
   }, [messages])
 
   // Auto-open thread when the bell dropdown sets pendingThreadId in the store.
-  // This fires whether or not the user is already on the messages page.
   useEffect(() => {
     if (!pendingThreadId) return
     if (messages.length === 0) return // wait for messages to load
@@ -159,21 +186,11 @@ export default function MessagesPage() {
       setPendingThreadId(null)
       onSelectMessageRef.current(msg)
     } else {
-      // Thread not in current list (maybe from a different branch or not loaded yet);
-      // fall back to URL-based navigation which will load the page fresh.
       setPendingThreadId(null)
       window.location.href = `/messages?thread=${pendingThreadId}`
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingThreadId, messages])
-
-  // Reset + reload when the active branch changes
-  useEffect(() => {
-    setSelected(null)
-    setThread([])
-    setLoading(true)
-    fetchMessages()
-  }, [fetchMessages])
 
   // ── Polling fallback + Page Visibility reconciliation ──────────────────────
   // Both intervals are skipped when realtimeHealthyRef is true (WS is SUBSCRIBED).
@@ -332,22 +349,45 @@ export default function MessagesPage() {
     const rootId = msg.parent_id ?? msg.id
     await fetchThread(rootId)
 
-    if (!msg.is_read) {
-      fetch(`/api/messages/${msg.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_read: true }),
-      }).then(() => {
+    // Always mark the whole thread as read when opening it — even if the root
+    // msg.is_read is already true, there may be unread REPLIES addressed to
+    // this branch that would keep the badge alive indefinitely.
+    const hadUnread = useMessageStore.getState().unreadMessages.some((m) => m.id === rootId)
+    fetch(`/api/messages/${rootId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_read: true }),
+    }).then(() => {
+      if (hadUnread) {
         decrement()
-        removeUnreadMessage(msg.id)
-        fetchMessages()
-      })
-    }
+        removeUnreadMessage(rootId)
+      }
+      queryClient.invalidateQueries({ queryKey: ['messages', activeBranch?.id] })
+    })
     setTimeout(() => replyInputRef.current?.focus(), 150)
   }
 
+  async function uploadFiles(files: FileList) {
+    setUploadingFiles(true)
+    const uploaded: MessageAttachment[] = []
+    for (const file of Array.from(files)) {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch('/api/upload/file', { method: 'POST', body: form })
+      const json = await res.json()
+      if (res.ok) {
+        uploaded.push({ url: json.url, name: json.name, type: json.type, size: json.size })
+      } else {
+        notify({ type: 'error', title: 'Upload failed', message: json.error ?? file.name })
+      }
+    }
+    setPendingAttachments((prev) => [...prev, ...uploaded])
+    setUploadingFiles(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
   async function onReply() {
-    if (!replyBody.trim() || !selected || !activeBranch) return
+    if ((!replyBody.trim() && pendingAttachments.length === 0) || !selected || !activeBranch) return
     setSending(true)
     const rootId = selected.parent_id ?? selected.id
     const isFromMe = selected.from_branch_id === activeBranch.id
@@ -362,10 +402,12 @@ export default function MessagesPage() {
           subject: selected.subject,
           body: replyBody,
           parent_id: rootId,
+          attachments: pendingAttachments,
         }),
       })
       playMessageSent()
       setReplyBody('')
+      setPendingAttachments([])
       await fetchThread(rootId)
     } finally {
       setSending(false)
@@ -383,7 +425,62 @@ export default function MessagesPage() {
       playMessageSent()
       reset()
       setSheetOpen(false)
-      fetchMessages()
+      queryClient.invalidateQueries({ queryKey: ['messages', activeBranch?.id] })
+    }
+  }
+
+  async function onDeleteThread() {
+    if (!selected) return
+    const rootId = selected.parent_id ?? selected.id
+    setDeletingThread(true)
+    try {
+      await fetch(`/api/messages/${rootId}`, { method: 'DELETE' })
+      setSelected(null)
+      setThread([])
+      setDeleteThreadConfirm(false)
+      await queryClient.invalidateQueries({ queryKey: ['messages', activeBranch?.id] })
+    } finally {
+      setDeletingThread(false)
+    }
+  }
+
+  async function onDeleteMessage(messageId: string) {
+    setDeletingMessage(true)
+    try {
+      await fetch(`/api/messages/${messageId}?message=true`, { method: 'DELETE' })
+      setDeleteMessageId(null)
+      if (selected) {
+        const rootId = selected.parent_id ?? selected.id
+        await fetchThread(rootId)
+      }
+    } finally {
+      setDeletingMessage(false)
+    }
+  }
+
+  function startEdit(msg: MessageRow) {
+    setEditingMessageId(msg.id)
+    setEditingBody(msg.body)
+    // Focus textarea on next tick
+    setTimeout(() => {
+      editTextareaRef.current?.focus()
+      editTextareaRef.current?.select()
+    }, 30)
+  }
+
+  async function onSaveEdit() {
+    if (!editingMessageId || !editingBody.trim()) return
+    setSavingEdit(true)
+    try {
+      await fetch(`/api/messages/${editingMessageId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: editingBody.trim() }),
+      })
+      setEditingMessageId(null)
+      if (selected) await fetchThread(selected.parent_id ?? selected.id)
+    } finally {
+      setSavingEdit(false)
     }
   }
 
@@ -441,7 +538,7 @@ export default function MessagesPage() {
                     <p className={`truncate text-sm leading-snug ${
                       unread > 0 ? 'font-semibold text-on-surface' : 'font-normal text-on-surface-variant'
                     }`}>
-                      {msg.subject || '(no subject)'}
+                      {msg.subject || msg.body?.slice(0, 40) || 'New message'}
                     </p>
                     {unread > 0 && (
                       <span className="mt-0.5 flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none text-on-primary">
@@ -468,12 +565,25 @@ export default function MessagesPage() {
           <>
             {/* Header */}
             <div className="shrink-0 border-b border-outline-variant bg-surface-container-lowest px-6 py-3">
-              <h2 className="font-semibold text-on-surface truncate">
-                {selected.subject || '(no subject)'}
-              </h2>
-              <p className="text-xs text-outline">
-                {getBranchName(selected, 'from')} → {getBranchName(selected, 'to')}
-              </p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  {selected.subject && (
+                    <h2 className="font-semibold text-on-surface truncate">
+                      {selected.subject}
+                    </h2>
+                  )}
+                  <p className="text-xs text-outline">
+                    {getBranchName(selected, 'from')} → {getBranchName(selected, 'to')}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setDeleteThreadConfirm(true)}
+                  title="Delete conversation"
+                  className="mt-0.5 shrink-0 rounded-lg p-1.5 text-error transition-colors hover:bg-error-container/20"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             {/* Messages scroll area */}
@@ -488,7 +598,7 @@ export default function MessagesPage() {
                   const senderName = msg.profiles?.full_name ?? getBranchName(msg, 'from')
                   const initials = senderName.charAt(0).toUpperCase()
                   return (
-                    <div key={msg.id} className={`flex items-end gap-2 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <div key={msg.id} className={`group flex items-end gap-2 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
                       {/* Avatar */}
                       <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                         isMine
@@ -502,16 +612,109 @@ export default function MessagesPage() {
                         {!isMine && (
                           <p className="px-1 text-[11px] font-medium text-outline">{senderName}</p>
                         )}
-                        <div className={`rounded-2xl px-4 py-2.5 shadow-sm ${
-                          isMine
-                            ? 'rounded-tr-sm bg-primary text-on-primary'
-                            : 'rounded-tl-sm bg-surface-container text-on-surface'
-                        }`}>
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.body}</p>
+
+                        {editingMessageId === msg.id ? (
+                          /* ── Inline edit mode ── */
+                          <div className="flex flex-col gap-1.5 w-full">
+                            <textarea
+                              ref={editTextareaRef}
+                              value={editingBody}
+                              onChange={(e) => setEditingBody(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSaveEdit() }
+                                if (e.key === 'Escape') setEditingMessageId(null)
+                              }}
+                              rows={2}
+                              className="resize-none rounded-2xl rounded-tr-sm border border-primary bg-surface-container-low px-4 py-2.5 text-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary/40"
+                            />
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <button
+                                onClick={() => setEditingMessageId(null)}
+                                title="Cancel"
+                                className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-container text-outline hover:text-on-surface transition-colors"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={onSaveEdit}
+                                disabled={savingEdit || !editingBody.trim()}
+                                title="Save"
+                                className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-on-primary transition-opacity disabled:opacity-40 hover:opacity-90"
+                              >
+                                {savingEdit
+                                  ? <div className="h-3 w-3 animate-spin rounded-full border border-on-primary border-t-transparent" />
+                                  : <Check className="h-3.5 w-3.5" />}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className={`rounded-2xl px-4 py-2.5 shadow-sm ${
+                            isMine
+                              ? 'rounded-tr-sm bg-primary text-on-primary'
+                              : 'rounded-tl-sm bg-surface-container text-on-surface'
+                          }`}>
+                            {msg.body && (
+                              <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.body}</p>
+                            )}
+                            {/* Attachments */}
+                            {(msg.attachments ?? []).length > 0 && (
+                              <div className={`flex flex-col gap-1.5 ${msg.body ? 'mt-2' : ''}`}>
+                                {(msg.attachments ?? []).map((att, i) => {
+                                  const isImage = att.type.startsWith('image/')
+                                  return isImage ? (
+                                    <a key={i} href={att.url} target="_blank" rel="noopener noreferrer" className="block">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img
+                                        src={att.url}
+                                        alt={att.name}
+                                        className="max-h-48 max-w-full rounded-xl object-cover"
+                                      />
+                                    </a>
+                                  ) : (
+                                    <a
+                                      key={i}
+                                      href={att.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      download={att.name}
+                                      className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-opacity hover:opacity-80 ${
+                                        isMine
+                                          ? 'bg-white/15 text-on-primary'
+                                          : 'bg-surface-container-high text-on-surface'
+                                      }`}
+                                    >
+                                      <FileText className="h-4 w-4 shrink-0" />
+                                      <span className="flex-1 truncate max-w-[180px]">{att.name}</span>
+                                      <Download className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                                    </a>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className={`flex items-center gap-1 px-1 ${isMine ? 'flex-row-reverse' : ''}`}>
+                          <p className="text-[10px] text-outline">
+                            {formatDateTime(msg.created_at)}
+                          </p>
+                          {isMine && editingMessageId !== msg.id && (
+                            <button
+                              onClick={() => startEdit(msg)}
+                              title="Edit message"
+                              className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-primary transition-opacity"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setDeleteMessageId(msg.id)}
+                            title="Delete message"
+                            className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-error transition-opacity"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
                         </div>
-                        <p className={`px-1 text-[10px] text-outline ${isMine ? 'text-right' : ''}`}>
-                          {formatDateTime(msg.created_at)}
-                        </p>
                       </div>
                     </div>
                   )
@@ -522,7 +725,52 @@ export default function MessagesPage() {
 
             {/* Reply bar — always visible at the bottom */}
             <div className="shrink-0 border-t border-outline-variant bg-surface-container-lowest px-4 py-3">
+              {/* Pending attachment previews */}
+              {pendingAttachments.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {pendingAttachments.map((att, i) => {
+                    const isImage = att.type.startsWith('image/')
+                    return (
+                      <div key={i} className="group relative flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface-container-low px-2.5 py-1.5 text-xs text-on-surface max-w-[180px]">
+                        {isImage
+                          ? <ImageIcon className="h-3.5 w-3.5 shrink-0 text-primary" />
+                          : <FileText className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                        <span className="truncate flex-1">{att.name}</span>
+                        <button
+                          onClick={() => setPendingAttachments((prev) => prev.filter((_, j) => j !== i))}
+                          className="ml-1 rounded-full p-0.5 text-outline hover:text-error transition-colors"
+                          title="Remove"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
               <div className="flex items-end gap-2">
+                {/* Hidden file input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+                  className="hidden"
+                  onChange={(e) => { if (e.target.files?.length) uploadFiles(e.target.files) }}
+                />
+                {/* Attach button */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingFiles}
+                  title="Attach files"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant text-outline transition-colors hover:border-primary hover:text-primary disabled:opacity-40"
+                >
+                  {uploadingFiles
+                    ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    : <Paperclip className="h-4 w-4" />}
+                </button>
+
                 <textarea
                   ref={replyInputRef}
                   value={replyBody}
@@ -544,7 +792,7 @@ export default function MessagesPage() {
                 />
                 <button
                   onClick={onReply}
-                  disabled={!replyBody.trim() || sending}
+                  disabled={(!replyBody.trim() && pendingAttachments.length === 0) || sending || uploadingFiles}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-on-primary shadow-sm transition-opacity hover:opacity-90 disabled:opacity-40"
                 >
                   {sending ? (
@@ -596,6 +844,46 @@ export default function MessagesPage() {
           <Button type="submit" className="w-full" loading={isSubmitting}>Send Message</Button>
         </form>
       </InlineFormSheet>
+
+      {/* ── Delete conversation confirmation ───────────────── */}
+      {deleteThreadConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="mx-4 w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl">
+            <h3 className="text-base font-semibold text-on-surface">Delete conversation?</h3>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              This will permanently delete this conversation and all its replies. This cannot be undone.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <Button variant="ghost" onClick={() => setDeleteThreadConfirm(false)} disabled={deletingThread}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={onDeleteThread} loading={deletingThread}>
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete single message confirmation ─────────────── */}
+      {deleteMessageId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="mx-4 w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl">
+            <h3 className="text-base font-semibold text-on-surface">Delete message?</h3>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              This will permanently remove this message. This cannot be undone.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <Button variant="ghost" onClick={() => setDeleteMessageId(null)} disabled={deletingMessage}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={() => onDeleteMessage(deleteMessageId)} loading={deletingMessage}>
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

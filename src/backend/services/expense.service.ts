@@ -71,4 +71,14 @@ export const ExpenseService = {
     if (error) throw error
     return data
   },
+
+  async createCategory(businessId: string, name: string) {
+    const { data, error } = await adminSupabase
+      .from('expense_categories')
+      .insert({ business_id: businessId, name })
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
 }

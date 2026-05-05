@@ -1,23 +1,28 @@
 'use client'
 import { useState, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Clock, LogIn, LogOut, DollarSign, CalendarDays, TrendingUp } from 'lucide-react'
+import { Plus, Clock, LogIn, LogOut, DollarSign, CalendarDays, TrendingUp, Pencil, Trash2 } from 'lucide-react'
 import * as Tabs from '@radix-ui/react-tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Select } from '@/components/ui/select'
 import { DataTable } from '@/components/shared/data-table'
+import { AsyncEmployeeSelect } from '@/components/shared/async-employee-select'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
+import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { PhoneInput } from '@/components/ui/phone-input'
+import validations from '@/components/layout/number-validations.json'
 import { useAuthStore } from '@/store/auth.store'
 import { formatDateTime, formatDate, formatCurrency } from '@/lib/utils'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
+import { toast } from 'sonner'
 import type { ColumnDef } from '@tanstack/react-table'
 
 interface EmployeeRow {
   id: string; first_name: string; last_name: string | null; email: string | null; role: string | null; is_active: boolean
+  phone?: string | null; hourly_rate?: number | null
 }
 interface TimeClockRow {
   id: string; employee_id: string; clock_in: string; clock_out: string | null
@@ -44,6 +49,22 @@ const schema = z.object({
   phone: z.string().optional(),
   role: z.string().optional(),
   hourly_rate: z.coerce.number().optional(),
+}).refine((data) => {
+  if (!data.phone || !data.phone.startsWith('+')) return true
+  const sortedValidations = [...validations].sort((a, b) => b.phone.length - a.phone.length)
+  const rule = sortedValidations.find(v => data.phone!.startsWith('+' + v.phone.replace('-', '')))
+  if (!rule) return true
+  const dialCode = rule.phone.replace('-', '')
+  const digitsOnly = data.phone.slice(dialCode.length + 1)
+  const length = digitsOnly.length
+  if (Array.isArray(rule.phoneLength)) return rule.phoneLength.includes(length)
+  if (rule.phoneLength) return length === rule.phoneLength
+  if (rule.min && length < rule.min) return false
+  if (rule.max && length > rule.max) return false
+  return true
+}, {
+  message: 'Invalid phone number length for the selected country',
+  path: ['phone'],
 })
 type FormData = z.infer<typeof schema>
 
@@ -61,6 +82,8 @@ const payrollSchema = z.object({
 })
 type PayrollForm = z.infer<typeof payrollSchema>
 
+
+
 export default function EmployeesPage() {
   const { activeBranch } = useAuthStore()
   const queryClient = useQueryClient()
@@ -71,54 +94,162 @@ export default function EmployeesPage() {
   const [clockingEmployee, setClockinEmployee] = useState<string | null>(null)
   const [selectedDays, setSelectedDays] = useState<number[]>([])
   const [payrollAction, setPayrollAction] = useState<string | null>(null)
+  const [editingEmployee, setEditingEmployee] = useState<EmployeeRow | null>(null)
+  const [deletingEmployee, setDeletingEmployee] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [editingShift, setEditingShift] = useState<ShiftRow | null>(null)
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
   })
   const shiftForm = useForm<ShiftForm>({ resolver: zodResolver(shiftSchema) })
   const payrollForm = useForm<PayrollForm>({ resolver: zodResolver(payrollSchema) })
 
-  const { data, isLoading: loading } = useQuery({
-    queryKey: ['employees-data', activeBranch?.id],
+  const today = new Date().toISOString().split('T')[0]
+
+  // ── Step 1: employees first — show this tab instantly ─────────────────────
+  const [empPage, setEmpPage] = useState(0)
+
+  const { data: employeesData, isLoading: loadingEmployees, isSuccess: employeesLoaded } = useQuery({
+    queryKey: ['employees-list', activeBranch?.id, empPage],
     queryFn: async () => {
-      const today = new Date().toISOString().split('T')[0]
-      const [empRes, clockRes, shiftRes, payrollRes, commRes] = await Promise.all([
-        fetch(`/api/employees?branch_id=${activeBranch!.id}`),
-        fetch(`/api/employees/clock?branch_id=${activeBranch!.id}&date=${today}`),
-        fetch(`/api/employees/shifts?branch_id=${activeBranch!.id}`),
-        fetch(`/api/employees/payroll?branch_id=${activeBranch!.id}`),
-        fetch(`/api/employees/commissions?branch_id=${activeBranch!.id}`),
-      ])
-      const [empJson, clockJson, shiftJson, payrollJson, commJson] = await Promise.all([
-        empRes.json(), clockRes.json(), shiftRes.json(), payrollRes.json(), commRes.json(),
-      ])
-      return {
-        employees: empJson.data ?? [],
-        timeLogs: clockJson.data ?? [],
-        shifts: shiftJson.data ?? [],
-        payrolls: payrollJson.data ?? [],
-        commissions: commJson.data ?? []
-      }
+      const params = new URLSearchParams({ branch_id: activeBranch!.id, page: String(empPage + 1), limit: '20' })
+      const res = await fetch(`/api/employees?${params}`)
+      const json = await res.json()
+      return { data: (json.data ?? []) as EmployeeRow[], total: json.meta?.total ?? 0 }
     },
-    enabled: !!activeBranch
+    enabled: !!activeBranch,
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
   })
 
-  const employees = data?.employees ?? []
-  const timeLogs = data?.timeLogs ?? []
-  const shifts = data?.shifts ?? []
-  const payrolls = data?.payrolls ?? []
-  const commissions = data?.commissions ?? []
+  const employees = employeesData?.data ?? []
+  const totalEmployees = employeesData?.total ?? 0
 
-  async function onCreate(data: FormData) {
+  // ── Step 2: all tab data in parallel, silently, after employees arrive ────
+  // They won't block the employee tab — by the time user clicks any other tab
+  // the data will already be loaded in the React Query cache.
+  const bgEnabled = !!activeBranch && employeesLoaded
+
+  const { data: timeLogs = [], isLoading: loadingClock } = useQuery({
+    queryKey: ['employees-clock', activeBranch?.id, today],
+    queryFn: async () => {
+      const res = await fetch(`/api/employees/clock?branch_id=${activeBranch!.id}&date=${today}`)
+      const json = await res.json(); return (json.data ?? []) as TimeClockRow[]
+    },
+    enabled: bgEnabled,
+    staleTime: 15_000,
+  })
+
+  const { data: shifts = [], isLoading: loadingShifts } = useQuery({
+    queryKey: ['employees-shifts', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/employees/shifts?branch_id=${activeBranch!.id}`)
+      const json = await res.json(); return (json.data ?? []) as ShiftRow[]
+    },
+    enabled: bgEnabled,
+    staleTime: 60_000,
+  })
+
+  const { data: payrolls = [], isLoading: loadingPayroll } = useQuery({
+    queryKey: ['employees-payroll', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/employees/payroll?branch_id=${activeBranch!.id}`)
+      const json = await res.json(); return (json.data ?? []) as PayrollRow[]
+    },
+    enabled: bgEnabled,
+    staleTime: 30_000,
+  })
+
+  const { data: commissions = [], isLoading: loadingCommissions } = useQuery({
+    queryKey: ['employees-commissions', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/employees/commissions?branch_id=${activeBranch!.id}`)
+      const json = await res.json(); return (json.data ?? []) as CommissionRow[]
+    },
+    enabled: bgEnabled,
+    staleTime: 30_000,
+  })
+
+  function openCreateSheet() {
+    setEditingEmployee(null)
+    reset({ first_name: '', last_name: '', email: '', phone: '', role: '', hourly_rate: undefined })
+    setCreateError(null)
+    setSheetOpen(true)
+  }
+
+  function openEditSheet(employee: EmployeeRow) {
+    setEditingEmployee(employee)
+    reset({
+      first_name: employee.first_name,
+      last_name: employee.last_name ?? '',
+      email: employee.email ?? '',
+      phone: employee.phone ?? '',
+      role: employee.role ?? '',
+      hourly_rate: employee.hourly_rate ?? undefined,
+    })
+    setCreateError(null)
+    setSheetOpen(true)
+  }
+
+  async function onSubmit(data: FormData) {
     if (!activeBranch) return
     setCreateError(null)
-    const res = await fetch('/api/employees', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, branch_id: activeBranch.id }),
-    })
-    if (res.ok) { reset(); setSheetOpen(false); queryClient.invalidateQueries({ queryKey: ['employees-data'] }) }
-    else { const j = await res.json(); setCreateError(j?.error?.message ?? 'Failed to create employee.') }
+
+    if (editingEmployee) {
+      // Update existing employee
+      const res = await fetch(`/api/employees/${editingEmployee.id}?branch_id=${activeBranch.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      if (res.ok) {
+        reset()
+        setEditingEmployee(null)
+        setSheetOpen(false)
+        queryClient.invalidateQueries({ queryKey: ['employees-list', activeBranch.id] })
+      } else {
+        const j = await res.json()
+        setCreateError(j?.error?.message ?? 'Failed to update employee.')
+      }
+    } else {
+      // Create new employee
+      const res = await fetch('/api/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, branch_id: activeBranch.id }),
+      })
+      if (res.ok) {
+        reset()
+        setSheetOpen(false)
+        queryClient.invalidateQueries({ queryKey: ['employees-list', activeBranch.id] })
+      } else {
+        const j = await res.json()
+        setCreateError(j?.error?.message ?? 'Failed to create employee.')
+      }
+    }
+  }
+
+  async function handleDelete(employeeId: string) {
+    setConfirmDeleteId(employeeId)
+  }
+
+  async function confirmDelete() {
+    if (!confirmDeleteId) return
+    setDeletingEmployee(confirmDeleteId)
+    setConfirmDeleteId(null)
+    try {
+      const res = await fetch(`/api/employees/${confirmDeleteId}?branch_id=${activeBranch?.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        toast.success('Employee deactivated successfully.')
+      } else {
+        const j = await res.json().catch(() => ({}))
+        toast.error(j?.error?.message ?? 'Failed to delete employee.')
+      }
+      queryClient.invalidateQueries({ queryKey: ['employees-list', activeBranch?.id] })
+    } finally {
+      setDeletingEmployee(null)
+    }
   }
 
   async function handleClock(employeeId: string, action: 'in' | 'out') {
@@ -135,25 +266,51 @@ export default function EmployeesPage() {
     })
     if (!res.ok) {
       const json = await res.json().catch(() => ({}))
-      alert(json.error ?? 'Clock action failed')
+      toast.error(json.error ?? 'Clock action failed')
     }
     setClockinEmployee(null)
-    queryClient.invalidateQueries({ queryKey: ['employees-data'] })
+    queryClient.invalidateQueries({ queryKey: ['employees-clock', activeBranch.id, today] })
   }
 
   async function onCreateShift(data: ShiftForm) {
     if (!activeBranch) return
-    const res = await fetch('/api/employees/shifts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, branch_id: activeBranch.id, days_of_week: selectedDays }),
-    })
-    if (res.ok) { shiftForm.reset(); setSelectedDays([]); setShiftSheetOpen(false); queryClient.invalidateQueries({ queryKey: ['employees-data'] }) }
+    if (editingShift) {
+      // Edit mode — PUT
+      const res = await fetch(`/api/employees/shifts/${editingShift.id}?branch_id=${activeBranch.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, days_of_week: selectedDays }),
+      })
+      if (!res.ok) { const j = await res.json().catch(() => ({})); toast.error(j.error ?? 'Failed to update shift'); return }
+      toast.success('Shift updated')
+    } else {
+      // Create mode — POST
+      const res = await fetch('/api/employees/shifts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, branch_id: activeBranch.id, days_of_week: selectedDays }),
+      })
+      if (!res.ok) { const j = await res.json().catch(() => ({})); toast.error(j.error ?? 'Failed to create shift'); return }
+      toast.success('Shift created')
+    }
+    shiftForm.reset()
+    setSelectedDays([])
+    setEditingShift(null)
+    setShiftSheetOpen(false)
+    queryClient.invalidateQueries({ queryKey: ['employees-shifts', activeBranch.id] })
+  }
+
+  function openEditShift(shift: ShiftRow) {
+    setEditingShift(shift)
+    shiftForm.reset({ name: shift.name, start_time: shift.start_time, end_time: shift.end_time })
+    setSelectedDays(shift.days_of_week)
+    setShiftSheetOpen(true)
   }
 
   async function deleteShift(id: string) {
-    await fetch(`/api/employees/shifts/${id}`, { method: 'DELETE' })
-    queryClient.invalidateQueries({ queryKey: ['employees-data'] })
+    if (!activeBranch) return
+    await fetch(`/api/employees/shifts/${id}?branch_id=${activeBranch.id}`, { method: 'DELETE' })
+    queryClient.invalidateQueries({ queryKey: ['employees-shifts', activeBranch.id] })
   }
 
   async function onCreatePayroll(data: PayrollForm) {
@@ -163,14 +320,14 @@ export default function EmployeesPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, branch_id: activeBranch.id }),
     })
-    if (res.ok) { payrollForm.reset(); setPayrollSheetOpen(false); queryClient.invalidateQueries({ queryKey: ['employees-data'] }) }
+    if (res.ok) { payrollForm.reset(); setPayrollSheetOpen(false); queryClient.invalidateQueries({ queryKey: ['employees-payroll', activeBranch.id] }) }
   }
 
   async function handlePayrollAction(id: string, action: 'approve' | 'paid') {
     setPayrollAction(id)
     await fetch(`/api/employees/payroll/${id}/${action}`, { method: 'POST' })
     setPayrollAction(null)
-    queryClient.invalidateQueries({ queryKey: ['employees-data'] })
+    queryClient.invalidateQueries({ queryKey: ['employees-payroll', activeBranch?.id] })
   }
 
   const empColumns: ColumnDef<EmployeeRow>[] = [
@@ -197,6 +354,17 @@ export default function EmployeesPage() {
         </div>
       )
     }},
+    { id: 'actions', header: '', cell: ({ row }) => (
+      <div className="flex gap-1">
+        <Button size="sm" variant="ghost" onClick={() => openEditSheet(row.original)} title="Edit employee">
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+        <Button size="sm" variant="ghost" loading={deletingEmployee === row.original.id}
+          onClick={() => handleDelete(row.original.id)} title="Delete employee">
+          <Trash2 className="h-3.5 w-3.5 text-red-500" />
+        </Button>
+      </div>
+    )},
   ]
 
   const clockColumns: ColumnDef<TimeClockRow>[] = [
@@ -222,7 +390,12 @@ export default function EmployeesPage() {
       </div>
     )},
     { id: 'actions', header: '', cell: ({ row }) => (
-      <Button size="sm" variant="destructive" onClick={() => deleteShift(row.original.id)}>Delete</Button>
+      <div className="flex gap-1.5 justify-end">
+        <Button size="sm" variant="outline" onClick={() => openEditShift(row.original)}>
+          <Pencil className="h-3.5 w-3.5 mr-1" />Edit
+        </Button>
+        <Button size="sm" variant="destructive" onClick={() => deleteShift(row.original.id)}>Delete</Button>
+      </div>
     )},
   ]
 
@@ -282,9 +455,9 @@ export default function EmployeesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Employees</h1>
-          <p className="text-sm text-gray-500">{employees.length} employees</p>
+          <p className="text-sm text-gray-500">{totalEmployees} employees</p>
         </div>
-        <Button onClick={() => setSheetOpen(true)}>
+        <Button onClick={openCreateSheet}>
           <Plus className="h-4 w-4" /> Add Employee
         </Button>
       </div>
@@ -308,22 +481,22 @@ export default function EmployeesPage() {
 
         {/* ── Employees ── */}
         <Tabs.Content value="employees" className="mt-4">
-          <DataTable data={employees} columns={empColumns} isLoading={loading} emptyMessage="No employees yet." />
+          <DataTable data={employees} columns={empColumns} isLoading={loadingEmployees} totalCount={totalEmployees} pageIndex={empPage} pageSize={20} onPageChange={setEmpPage} emptyMessage="No employees yet." />
         </Tabs.Content>
 
         {/* ── Clock In/Out ── */}
         <Tabs.Content value="clock" className="mt-4">
-          <DataTable data={timeLogs} columns={clockColumns} isLoading={loading} emptyMessage="No clock records for today." />
+          <DataTable data={timeLogs} columns={clockColumns} isLoading={loadingClock} emptyMessage="No clock records for today." />
         </Tabs.Content>
 
         {/* ── Shifts ── */}
         <Tabs.Content value="shifts" className="mt-4">
           <div className="mb-3 flex justify-end">
-            <Button size="sm" onClick={() => setShiftSheetOpen(true)}>
+            <Button size="sm" onClick={() => { setEditingShift(null); shiftForm.reset(); setSelectedDays([]); setShiftSheetOpen(true) }}>
               <Plus className="h-4 w-4" /> Add Shift
             </Button>
           </div>
-          <DataTable data={shifts} columns={shiftColumns} isLoading={loading} emptyMessage="No shifts defined." />
+          <DataTable data={shifts} columns={shiftColumns} isLoading={loadingShifts} emptyMessage="No shifts defined." />
         </Tabs.Content>
 
         {/* ── Payroll ── */}
@@ -333,18 +506,22 @@ export default function EmployeesPage() {
               <Plus className="h-4 w-4" /> Create Period
             </Button>
           </div>
-          <DataTable data={payrolls} columns={payrollColumns} isLoading={loading} emptyMessage="No payroll periods." />
+          <DataTable data={payrolls} columns={payrollColumns} isLoading={loadingPayroll} emptyMessage="No payroll periods." />
         </Tabs.Content>
 
         {/* ── Commissions ── */}
         <Tabs.Content value="commissions" className="mt-4">
-          <DataTable data={commissions} columns={commColumns} isLoading={loading} emptyMessage="No commissions recorded." />
+          <DataTable data={commissions} columns={commColumns} isLoading={loadingCommissions} emptyMessage="No commissions recorded." />
         </Tabs.Content>
       </Tabs.Root>
 
-      {/* ── Add Employee Sheet ── */}
-      <InlineFormSheet open={sheetOpen} onClose={() => { setSheetOpen(false); setCreateError(null) }} title="Add Employee">
-        <form onSubmit={handleSubmit(onCreate)} className="space-y-4">
+      {/* ── Add / Edit Employee Sheet ── */}
+      <InlineFormSheet
+        open={sheetOpen}
+        onClose={() => { setSheetOpen(false); setEditingEmployee(null); setCreateError(null) }}
+        title={editingEmployee ? 'Edit Employee' : 'Add Employee'}
+      >
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {createError && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{createError}</div>
           )}
@@ -353,15 +530,26 @@ export default function EmployeesPage() {
             <Input label="Last Name" {...register('last_name')} />
           </div>
           <Input label="Email" type="email" {...register('email')} />
-          <Input label="Phone" type="tel" {...register('phone')} />
+          <PhoneInput
+            label="Phone"
+            value={watch('phone') ?? ''}
+            onChange={(val) => setValue('phone', val, { shouldValidate: true })}
+            error={errors.phone?.message}
+          />
           <Input label="Role/Position" placeholder="Technician, Cashier..." {...register('role')} />
           <Input label="Hourly Rate (£)" type="number" step="0.01" {...register('hourly_rate')} />
-          <Button type="submit" className="w-full" loading={isSubmitting}>Add Employee</Button>
+          <Button type="submit" className="w-full" loading={isSubmitting}>
+            {editingEmployee ? 'Save Changes' : 'Add Employee'}
+          </Button>
         </form>
       </InlineFormSheet>
 
-      {/* ── Add Shift Sheet ── */}
-      <InlineFormSheet open={shiftSheetOpen} onClose={() => setShiftSheetOpen(false)} title="Create Shift">
+      {/* ── Add / Edit Shift Sheet ── */}
+      <InlineFormSheet
+        open={shiftSheetOpen}
+        onClose={() => { setShiftSheetOpen(false); setEditingShift(null); shiftForm.reset(); setSelectedDays([]) }}
+        title={editingShift ? 'Edit Shift' : 'Create Shift'}
+      >
         <form onSubmit={shiftForm.handleSubmit(onCreateShift)} className="space-y-4">
           <Input label="Shift Name" required error={shiftForm.formState.errors.name?.message}
             {...shiftForm.register('name')} placeholder="Morning, Evening..." />
@@ -386,20 +574,23 @@ export default function EmployeesPage() {
               ))}
             </div>
           </div>
-          <Button type="submit" className="w-full" loading={shiftForm.formState.isSubmitting}>Create Shift</Button>
+          <Button type="submit" className="w-full" loading={shiftForm.formState.isSubmitting}>
+            {editingShift ? 'Save Changes' : 'Create Shift'}
+          </Button>
         </form>
       </InlineFormSheet>
 
       {/* ── Create Payroll Period Sheet ── */}
       <InlineFormSheet open={payrollSheetOpen} onClose={() => setPayrollSheetOpen(false)} title="Create Payroll Period">
         <form onSubmit={payrollForm.handleSubmit(onCreatePayroll)} className="space-y-4">
-          <Select
-            label="Employee"
-            required
-            options={employees.map((e) => ({ value: e.id, label: `${e.first_name} ${e.last_name ?? ''}` }))}
-            onValueChange={(v) => payrollForm.setValue('employee_id', v)}
-            error={payrollForm.formState.errors.employee_id?.message}
-          />
+          {activeBranch && (
+            <AsyncEmployeeSelect
+              branchId={activeBranch.id}
+              value={payrollForm.watch('employee_id') ?? ''}
+              onChange={(id) => payrollForm.setValue('employee_id', id, { shouldValidate: true })}
+              error={payrollForm.formState.errors.employee_id?.message}
+            />
+          )}
           <div className="grid grid-cols-2 gap-3">
             <Input label="Start Date" type="date" required error={payrollForm.formState.errors.start_date?.message}
               {...payrollForm.register('start_date')} />
@@ -409,7 +600,16 @@ export default function EmployeesPage() {
           <Button type="submit" className="w-full" loading={payrollForm.formState.isSubmitting}>Create Period</Button>
         </form>
       </InlineFormSheet>
+
+      <ConfirmModal
+        open={!!confirmDeleteId}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={confirmDelete}
+        title="Remove Employee?"
+        description="This will deactivate the employee record. They will no longer appear in active lists or be assignable to jobs."
+        confirmLabel="Remove"
+        loading={!!deletingEmployee}
+      />
     </div>
   )
 }
-

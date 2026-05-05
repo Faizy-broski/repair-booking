@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Gift, Printer, X, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,11 +29,10 @@ interface CustomerOption { id: string; first_name: string; last_name: string | n
 
 export default function GiftCardsPage() {
   const { activeBranch } = useAuthStore()
-  const [giftCards, setGiftCards] = useState<GiftCardRow[]>([])
-  const [customers, setCustomers] = useState<CustomerOption[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [qrCard, setQrCard] = useState<GiftCardRow | null>(null)
+  const [page, setPage] = useState(0)
 
   // Form state
   const [formValue, setFormValue] = useState('')
@@ -43,20 +43,32 @@ export default function GiftCardsPage() {
   const [custDropdownOpen, setCustDropdownOpen] = useState(false)
   const [custSearch, setCustSearch] = useState('')
 
-  const fetchData = useCallback(async () => {
-    if (!activeBranch) return
-    setLoading(true)
-    const [gcRes, custRes] = await Promise.all([
-      fetch(`/api/gift-cards?branch_id=${activeBranch.id}`),
-      fetch(`/api/customers?branch_id=${activeBranch.id}&limit=100`),
-    ])
-    const [gcJson, custJson] = await Promise.all([gcRes.json(), custRes.json()])
-    setGiftCards(gcJson.data ?? [])
-    setCustomers(custJson.data ?? [])
-    setLoading(false)
-  }, [activeBranch])
+  const { data: giftCardsData, isLoading } = useQuery({
+    queryKey: ['gift-cards', activeBranch?.id, page],
+    queryFn: async () => {
+      const params = new URLSearchParams({ branch_id: activeBranch!.id, page: String(page + 1), limit: '20' })
+      const res = await fetch(`/api/gift-cards?${params}`)
+      const json = await res.json()
+      return { rows: (json.data ?? []) as GiftCardRow[], total: json.meta?.total ?? 0 }
+    },
+    enabled: !!activeBranch,
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
+  })
 
-  useEffect(() => { fetchData() }, [fetchData])
+  const giftCards = giftCardsData?.rows ?? []
+  const totalCards = giftCardsData?.total ?? 0
+
+  const { data: customers = [] } = useQuery({
+    queryKey: ['customers-list', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/customers?branch_id=${activeBranch!.id}&limit=100`)
+      const json = await res.json()
+      return (json.data ?? []) as CustomerOption[]
+    },
+    enabled: !!activeBranch,
+    staleTime: 5 * 60_000,
+  })
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -75,7 +87,8 @@ export default function GiftCardsPage() {
     })
     if (res.ok) {
       setFormValue(''); setFormExpiry(''); setFormCustomerIds([]); setFormAllCustomers(true)
-      setSheetOpen(false); fetchData()
+      setSheetOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['gift-cards', activeBranch.id] })
     }
     setFormSubmitting(false)
   }
@@ -98,7 +111,7 @@ export default function GiftCardsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_active: false }),
     })
-    fetchData()
+    queryClient.invalidateQueries({ queryKey: ['gift-cards', activeBranch?.id] })
   }
 
   async function printGiftCard(card: GiftCardRow) {
@@ -217,14 +230,18 @@ export default function GiftCardsPage() {
           <p className="text-sm text-gray-500">{activeCount} active · {formatCurrency(totalBalance)} outstanding</p>
         </div>
         <Button onClick={() => setSheetOpen(true)}>
-          <Plus className="h-4 w-4" /> Issue Gift Card
+          <Plus className="h-4 w-4" /> Create Gift Card
         </Button>
       </div>
 
       <DataTable
         data={giftCards}
         columns={columns}
-        isLoading={loading}
+        isLoading={isLoading}
+        totalCount={totalCards}
+        pageIndex={page}
+        pageSize={20}
+        onPageChange={setPage}
         emptyMessage="No gift cards issued yet."
       />
 
@@ -244,7 +261,7 @@ export default function GiftCardsPage() {
         </div>
       )}
 
-      <InlineFormSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Issue Gift Card">
+      <InlineFormSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Create Gift Card">
         <form onSubmit={onCreate} className="space-y-4">
           <Input
             label="Value (£)"
@@ -347,7 +364,7 @@ export default function GiftCardsPage() {
 
           <Input label="Expiry Date (optional)" type="date" value={formExpiry} onChange={e => setFormExpiry(e.target.value)} />
           <p className="text-xs text-gray-400">A unique code will be auto-generated</p>
-          <Button type="submit" className="w-full" loading={formSubmitting} disabled={!formValue}>Issue Gift Card</Button>
+          <Button type="submit" className="w-full" loading={formSubmitting} disabled={!formValue}>Create Gift Card</Button>
         </form>
       </InlineFormSheet>
     </div>

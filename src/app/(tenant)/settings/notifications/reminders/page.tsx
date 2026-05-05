@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Clock, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,16 +31,20 @@ export default function InvoiceRemindersPage() {
   })
   const [saving, setSaving] = useState(false)
 
-  const fetchReminders = useCallback(async () => {
-    const res = await fetch('/api/settings/invoice-reminders')
-    const json = await res.json()
-    if (json.data) setReminderSettings(json.data)
-  }, [])
+  const { data: remindersData } = useQuery<InvoiceReminderSettings | null>({
+    queryKey: ['settings-invoice-reminders', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch('/api/settings/invoice-reminders')
+      const json = await res.json()
+      return json.data ?? null
+    },
+    enabled: !!activeBranch,
+    staleTime: 60_000,
+  })
 
   useEffect(() => {
-    if (!activeBranch) return
-    fetchReminders()
-  }, [activeBranch, fetchReminders])
+    if (remindersData) setReminderSettings(remindersData)
+  }, [remindersData])
 
   async function saveReminders() {
     setSaving(true)

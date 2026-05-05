@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, use, useCallback, useRef } from 'react'
+import { useState, useEffect, use } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, Save, Trash2, Store } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -9,7 +10,6 @@ import { Modal } from '@/components/ui/modal'
 import { ImageUpload } from '@/components/ui/image-upload'
 import { formatCurrency } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
-import { useDashboardStore } from '@/store/dashboard.store'
 import Link from 'next/link'
 
 interface BranchAvailability {
@@ -44,17 +44,38 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const { id } = use(params)
   const { activeBranch, branches } = useAuthStore()
   const router = useRouter()
+  const qc = useQueryClient()
 
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
-
-  const [categories, setCategories] = useState<Category[]>([])
-  const [allBrands, setAllBrands] = useState<Brand[]>([])
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
-  const [allDevices, setAllDevices] = useState<ServiceDevice[]>([])
-  const [allPartTypes, setAllPartTypes] = useState<PartType[]>([])
+  // ── Reference data (shared, cached) ───────────────────────────────────────────────────────
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ['inv-categories'],
+    queryFn: async () => { const r = await fetch('/api/categories'); const j = await r.json(); return j.data ?? [] },
+    staleTime: 10 * 60_000,
+  })
+  const { data: allBrands = [] } = useQuery<Brand[]>({
+    queryKey: ['inv-brands'],
+    queryFn: async () => { const r = await fetch('/api/brands'); const j = await r.json(); return j.data ?? [] },
+    staleTime: 10 * 60_000,
+  })
+  const { data: suppliers = [] } = useQuery<Supplier[]>({
+    queryKey: ['inv-suppliers'],
+    queryFn: async () => { const r = await fetch('/api/suppliers'); const j = await r.json(); return j.data ?? [] },
+    staleTime: 10 * 60_000,
+  })
+  const { data: allDevices = [] } = useQuery<ServiceDevice[]>({
+    queryKey: ['inv-devices'],
+    queryFn: async () => { const r = await fetch('/api/services/devices'); const j = await r.json(); return j.data ?? [] },
+    staleTime: 10 * 60_000,
+  })
+  const { data: allPartTypes = [] } = useQuery<PartType[]>({
+    queryKey: ['inv-part-types'],
+    queryFn: async () => { const r = await fetch('/api/part-types'); const j = await r.json(); return j.data ?? [] },
+    staleTime: 10 * 60_000,
+  })
 
   const [addingCategory, setAddingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
@@ -88,40 +109,41 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [barcodeConflict, setBarcodeConflict] = useState(false)
   const [checkingAvailability, setCheckingAvailability] = useState(false)
 
-  const [branchAvailability, setBranchAvailability] = useState<BranchAvailability[]>([])
   const [togglingBranch, setTogglingBranch] = useState<string | null>(null)
 
-  const fetchProduct = useCallback(async () => {
-    setLoading(true)
-    const branchParam = activeBranch ? `?branch_id=${activeBranch.id}` : ''
-    const res = await fetch(`/api/products/${id}${branchParam}`)
-    const json = await res.json()
-    const p: Product & { on_hand?: number } = json.data ?? json
-    setProduct(p)
-    if (p.on_hand !== undefined) setOnHand(String(p.on_hand))
-
-    setItemType((p.item_type as ItemType) ?? (p.is_service ? 'part' : 'product'))
-    setName(p.name ?? '')
-    setCategoryId(p.category_id ?? '')
-    setBrandId(p.brand_id ?? '')
-    setModelId(p.model_id ?? p.service_devices?.id ?? '')
-    setSku(p.sku ?? '')
-    setBarcode(p.barcode ?? '')
-    setImageUrl(p.image_url ?? '')
-    setPartType(p.part_type ?? '')
-    setCostPrice(p.cost_price != null ? String(p.cost_price) : '')
-    setSellingPrice(p.selling_price != null ? String(p.selling_price) : '')
-    setSupplierId(p.supplier_id ?? p.suppliers?.id ?? '')
-    setLowStockAlert(p.low_stock_alert != null ? String(p.low_stock_alert) : '5')
-    setPhysicalLocation(p.physical_location ?? '')
-    setCommissionEnabled(p.commission_enabled ?? false)
-    setCommissionType(p.commission_type ?? 'percentage')
-    setCommissionRate(p.commission_rate != null ? String(p.commission_rate) : '')
-    setLoyaltyEnabled(p.loyalty_enabled ?? true)
-    setLoading(false)
-  }, [id, activeBranch])
-
-  useEffect(() => { fetchProduct() }, [fetchProduct])
+  // ── Product fetch ───────────────────────────────────────────────────────────────────────
+  useQuery({
+    queryKey: ['inv-product', id, activeBranch?.id],
+    queryFn: async () => {
+      const branchParam = activeBranch ? `?branch_id=${activeBranch.id}` : ''
+      const res = await fetch(`/api/products/${id}${branchParam}`)
+      const json = await res.json()
+      const p: Product & { on_hand?: number } = json.data ?? json
+      setProduct(p)
+      if (p.on_hand !== undefined) setOnHand(String(p.on_hand))
+      setItemType((p.item_type as ItemType) ?? (p.is_service ? 'part' : 'product'))
+      setName(p.name ?? '')
+      setCategoryId(p.category_id ?? '')
+      setBrandId(p.brand_id ?? '')
+      setModelId(p.model_id ?? p.service_devices?.id ?? '')
+      setSku(p.sku ?? '')
+      setBarcode(p.barcode ?? '')
+      setImageUrl(p.image_url ?? '')
+      setPartType(p.part_type ?? '')
+      setCostPrice(p.cost_price != null ? String(p.cost_price) : '')
+      setSellingPrice(p.selling_price != null ? String(p.selling_price) : '')
+      setSupplierId(p.supplier_id ?? p.suppliers?.id ?? '')
+      setLowStockAlert(p.low_stock_alert != null ? String(p.low_stock_alert) : '5')
+      setPhysicalLocation(p.physical_location ?? '')
+      setCommissionEnabled(p.commission_enabled ?? false)
+      setCommissionType(p.commission_type ?? 'percentage')
+      setCommissionRate(p.commission_rate != null ? String(p.commission_rate) : '')
+      setLoyaltyEnabled(p.loyalty_enabled ?? true)
+      setLoading(false)
+      return p
+    },
+    staleTime: 30_000,
+  })
 
   // ── Uniqueness Check ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -155,18 +177,21 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     return () => clearTimeout(timer)
   }, [sku, barcode, id])
 
-  const fetchBranchAvailability = useCallback(async () => {
-    const res = await fetch(`/api/products/${id}/branch-availability`)
-    const json = await res.json()
-    if (res.ok) setBranchAvailability(json.data ?? [])
-  }, [id])
-
-  useEffect(() => { fetchBranchAvailability() }, [fetchBranchAvailability])
+  // ── Branch availability ──────────────────────────────────────────────────────────────
+  const { data: branchAvailability = [] } = useQuery<BranchAvailability[]>({
+    queryKey: ['inv-product-branches', id],
+    queryFn: async () => {
+      const res = await fetch(`/api/products/${id}/branch-availability`)
+      const json = await res.json()
+      return json.data ?? []
+    },
+    staleTime: 60_000,
+  })
 
   async function toggleBranchAvailability(branchId: string, currentValue: boolean) {
     setTogglingBranch(branchId)
-    // Optimistic update
-    setBranchAvailability(prev =>
+    // Optimistic update via cache
+    qc.setQueryData<BranchAvailability[]>(['inv-product-branches', id], (prev = []) =>
       prev.map(b => b.branch_id === branchId ? { ...b, is_enabled: !currentValue } : b)
     )
     const res = await fetch(`/api/products/${id}/branch-availability`, {
@@ -176,19 +201,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     })
     if (!res.ok) {
       // Revert on failure
-      setBranchAvailability(prev =>
+      qc.setQueryData<BranchAvailability[]>(['inv-product-branches', id], (prev = []) =>
         prev.map(b => b.branch_id === branchId ? { ...b, is_enabled: currentValue } : b)
       )
     }
     setTogglingBranch(null)
   }
-  useEffect(() => {
-    fetch('/api/categories').then(r => r.json()).then(j => setCategories(j.data ?? [])).catch(() => { })
-    fetch('/api/brands').then(r => r.json()).then(j => setAllBrands(j.data ?? [])).catch(() => { })
-    fetch('/api/suppliers').then(r => r.json()).then(j => setSuppliers(j.data ?? [])).catch(() => { })
-    fetch('/api/services/devices').then(r => r.json()).then(j => setAllDevices(j.data ?? [])).catch(() => { })
-    fetch('/api/part-types').then(r => r.json()).then(j => setAllPartTypes(j.data ?? [])).catch(() => { })
-  }, [])
 
   // Filtered lists based on hierarchy.
   // Always include the currently-selected item even if it doesn't pass the filter —
@@ -218,7 +236,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     })
     if (res.ok) {
       const json = await res.json()
-      setCategories(prev => [...prev, json.data])
+      qc.setQueryData<Category[]>(['inv-categories'], (prev = []) => [...prev, json.data])
       setCategoryId(json.data.id)
       setNewCategoryName(''); setAddingCategory(false)
     }
@@ -232,7 +250,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     })
     if (res.ok) {
       const json = await res.json()
-      setAllBrands(prev => [...prev, json.data])
+      qc.setQueryData<Brand[]>(['inv-brands'], (prev = []) => [...prev, json.data])
       setBrandId(json.data.id)
       setNewBrandName(''); setAddingBrand(false)
     }
@@ -259,7 +277,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     })
     if (res.ok) {
       const json = await res.json()
-      setAllDevices(prev => [...prev, json.data])
+      qc.setQueryData<ServiceDevice[]>(['inv-devices'], (prev = []) => [...prev, json.data])
       setModelId(json.data.id)
       setNewDeviceName(''); setAddingDevice(false)
     }
@@ -300,16 +318,16 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       const j = await res.json()
       alert(j?.message || j?.error?.message || 'Failed to update product.')
     } else {
-      useDashboardStore.getState().clearCache()
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.invalidateQueries({ queryKey: ['inv-product', id, activeBranch?.id] })
     }
-    await fetchProduct()
     setSaving(false)
   }
 
   async function handleDelete() {
     const res = await fetch(`/api/products/${id}`, { method: 'DELETE' })
     if (res.ok) {
-      useDashboardStore.getState().clearCache()
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
     }
     router.push('/inventory')
   }

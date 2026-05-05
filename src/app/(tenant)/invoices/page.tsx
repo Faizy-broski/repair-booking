@@ -356,60 +356,73 @@ export default function InvoicesPage() {
               <span style={{ width: '5rem' }} className="text-xs font-medium text-gray-500">Unit Price</span>
             </div>
             <div className="space-y-1.5">
-              {lineItems.map((item, idx) => (
-                <div key={idx} className="flex gap-1.5 items-center">
-                  <input
-                    placeholder="e.g. Screen replacement"
-                    value={item.description}
-                    onChange={(e) => {
-                      const updated = [...lineItems]
-                      updated[idx] = { ...updated[idx], description: e.target.value }
-                      setLineItems(updated)
-                      setValue('items', updated)
-                    }}
-                    className="h-8 min-w-0 flex-1 rounded-md border border-gray-300 px-2 text-sm"
-                  />
-                  <input
-                    type="number"
-                    min="1"
-                    value={item.quantity}
-                    onChange={(e) => {
-                      const updated = [...lineItems]
-                      updated[idx] = { ...updated[idx], quantity: Number(e.target.value) }
-                      setLineItems(updated)
-                      setValue('items', updated)
-                    }}
-                    style={{ width: '4rem' }}
-                    className="h-8 shrink-0 rounded-md border border-gray-300 px-2 text-sm"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={item.unit_price}
-                    onChange={(e) => {
-                      const updated = [...lineItems]
-                      updated[idx] = { ...updated[idx], unit_price: Number(e.target.value) }
-                      setLineItems(updated)
-                      setValue('items', updated)
-                    }}
-                    style={{ width: '5rem' }}
-                    className="h-8 shrink-0 rounded-md border border-gray-300 px-2 text-sm"
-                  />
-                  {lineItems.length > 1 ? (
-                    <button
-                      type="button"
-                      onClick={() => removeLineItem(idx)}
-                      className="shrink-0 text-gray-300 hover:text-red-500 text-lg leading-none"
-                    >
-                      ×
-                    </button>
-                  ) : <span className="w-4 shrink-0" />}
-                </div>
-              ))}
+              {lineItems.map((item, idx) => {
+                const rowErrors = errors.items?.[idx]
+                return (
+                  <div key={idx}>
+                    <div className="flex gap-1.5 items-center">
+                      <input
+                        placeholder="e.g. Screen replacement"
+                        value={item.description}
+                        onChange={(e) => {
+                          const updated = [...lineItems]
+                          updated[idx] = { ...updated[idx], description: e.target.value }
+                          setLineItems(updated)
+                          setValue('items', updated, { shouldValidate: true })
+                        }}
+                        className={`h-8 min-w-0 flex-1 rounded-md border px-2 text-sm ${rowErrors?.description ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                      />
+                      <input
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(e) => {
+                          const updated = [...lineItems]
+                          updated[idx] = { ...updated[idx], quantity: Number(e.target.value) }
+                          setLineItems(updated)
+                          setValue('items', updated, { shouldValidate: true })
+                        }}
+                        style={{ width: '4rem' }}
+                        className={`h-8 shrink-0 rounded-md border px-2 text-sm ${rowErrors?.quantity ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={item.unit_price}
+                        onChange={(e) => {
+                          const updated = [...lineItems]
+                          updated[idx] = { ...updated[idx], unit_price: Number(e.target.value) }
+                          setLineItems(updated)
+                          setValue('items', updated, { shouldValidate: true })
+                        }}
+                        style={{ width: '5rem' }}
+                        className={`h-8 shrink-0 rounded-md border px-2 text-sm ${rowErrors?.unit_price ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                      />
+                      {lineItems.length > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => removeLineItem(idx)}
+                          className="shrink-0 text-gray-300 hover:text-red-500 text-lg leading-none"
+                        >
+                          ×
+                        </button>
+                      ) : <span className="w-4 shrink-0" />}
+                    </div>
+                    {rowErrors && (
+                      <div className="flex gap-1.5 mt-0.5 pr-5">
+                        <span className="flex-1 text-xs text-red-500">{rowErrors.description?.message}</span>
+                        <span style={{ width: '4rem' }} className="text-xs text-red-500">{rowErrors.quantity?.message}</span>
+                        <span style={{ width: '5rem' }} className="text-xs text-red-500">{rowErrors.unit_price?.message}</span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
-            {errors.items && <p className="mt-1 text-xs text-red-500">{errors.items.message as string}</p>}
+            {errors.items?.message && <p className="mt-1 text-xs text-red-500">{errors.items.message as string}</p>}
+            {errors.items?.root?.message && <p className="mt-1 text-xs text-red-500">{errors.items.root.message}</p>}
           </div>
 
           <div className="rounded-lg bg-gray-50 p-3 space-y-1 text-sm">

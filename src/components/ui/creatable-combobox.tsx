@@ -104,7 +104,9 @@ export function CreatableCombobox({
     if (e.key === 'Escape') { setOpen(false); setQuery('') }
     if (e.key === 'Enter') {
       e.preventDefault()
-      if (filtered.length === 1) { selectOption(filtered[0]); return }
+      // Always prefer selecting a matching option over creating
+      if (filtered.length > 0) { selectOption(filtered[0]); return }
+      // Only create when there is truly nothing to select
       if (showCreate) handleCreate()
     }
   }

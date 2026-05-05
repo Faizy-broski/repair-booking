@@ -39,6 +39,18 @@ export const AppointmentService = {
     return data
   },
 
+  async checkConflict(branchId: string, startTime: string, endTime: string, excludeId?: string) {
+    let q = db('appointments')
+      .select('id, title, start_time, end_time')
+      .eq('branch_id', branchId)
+      .neq('status', 'cancelled')
+      .lt('start_time', endTime)
+      .gt('end_time', startTime)
+    if (excludeId) q = q.neq('id', excludeId)
+    const { data } = await q.limit(1)
+    return data && data.length > 0 ? data[0] : null
+  },
+
   async create(payload: Record<string, unknown>) {
     const { data, error } = await db('appointments').insert(payload).select().single()
     if (error) throw error

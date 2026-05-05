@@ -3,6 +3,7 @@ import { type RequestContext } from '@/backend/middleware'
 import { GiftCardService } from '@/backend/services/gift-card.service'
 import { ok, created, notFound, serverError } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
+import { getPagination } from '@/backend/utils/pagination'
 import { z } from 'zod'
 
 const createSchema = z.object({
@@ -22,9 +23,10 @@ export const GiftCardController = {
   async list(request: NextRequest, ctx: RequestContext) {
     const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId
     if (!branchId) return notFound('Branch ID is required')
+    const { page, limit } = getPagination(request.nextUrl.searchParams)
     try {
-      const data = await GiftCardService.list(branchId)
-      return ok(data)
+      const { data, count } = await GiftCardService.list(branchId, page, limit)
+      return ok(data, { page, limit, total: count ?? 0 })
     } catch (err) {
       return serverError('Failed to fetch gift cards', err)
     }

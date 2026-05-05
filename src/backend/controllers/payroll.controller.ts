@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { PayrollService, CommissionService, ShiftService, PermissionService } from '@/backend/services/payroll.service'
 import { ActivityLogService, IpWhitelistService } from '@/backend/services/activity-log.service'
-import { ok, created, serverError } from '@/backend/utils/api-response'
+import { ok, created, serverError, badRequest } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
 import { z } from 'zod'
@@ -188,7 +188,8 @@ export const ShiftController = {
   async update(request: NextRequest, ctx: RequestContext, id: string) {
     const { data, error } = await validateBody(request, shiftSchema.partial().omit({ branch_id: true }))
     if (error) return error
-    const branchId = ctx.auth.branchId ?? undefined
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
+    if (!branchId) return badRequest('branch_id query param is required')
     try {
       const shift = await ShiftService.update(id, branchId, data)
       return ok(shift)
@@ -198,8 +199,10 @@ export const ShiftController = {
   },
 
   async remove(request: NextRequest, ctx: RequestContext, id: string) {
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
+    if (!branchId) return badRequest('branch_id query param is required')
     try {
-      await ShiftService.remove(id, ctx.auth.branchId ?? undefined)
+      await ShiftService.remove(id, branchId)
       return ok({ deleted: true })
     } catch (err) {
       return serverError('Failed to delete shift', err)

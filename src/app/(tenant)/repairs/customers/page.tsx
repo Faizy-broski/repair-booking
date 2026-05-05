@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { Eye, Pencil, Trash2, Search, FileDown, FileSpreadsheet, Printer, FileText, Columns } from 'lucide-react'
@@ -54,11 +55,9 @@ function exportPDF(rows: CustomerRow[]) {
 export default function RepairCustomersPage() {
   const { activeBranch } = useAuthStore()
   const router = useRouter()
-  const [customers, setCustomers] = useState<CustomerRow[]>([])
-  const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
   const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
 
   const [editSheetOpen, setEditSheetOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<CustomerRow | null>(null)
@@ -70,19 +69,21 @@ export default function RepairCustomersPage() {
 
   const editForm = useForm<FormData>({ resolver: zodResolver(schema) })
 
-  const fetchCustomers = useCallback(async () => {
-    if (!activeBranch) return
-    setLoading(true)
-    const params = new URLSearchParams({ branch_id: activeBranch.id, page: String(page + 1), limit: '25' })
-    if (search) params.set('search', search)
-    const res = await fetch(`/api/customers?${params}`)
-    const json = await res.json()
-    setCustomers(json.data ?? [])
-    setTotal(json.meta?.total ?? 0)
-    setLoading(false)
-  }, [activeBranch, page, search])
+  const { data: customerResponse, isLoading: loading } = useQuery({
+    queryKey: ['repair-customers', activeBranch?.id, page, search],
+    queryFn: async () => {
+      const params = new URLSearchParams({ branch_id: activeBranch!.id, page: String(page + 1), limit: '25' })
+      if (search) params.set('search', search)
+      const res = await fetch(`/api/customers?${params}`)
+      return res.json()
+    },
+    enabled: !!activeBranch,
+    placeholderData: (prev) => prev,
+    staleTime: 30_000,
+  })
 
-  useEffect(() => { fetchCustomers() }, [fetchCustomers])
+  const customers: CustomerRow[] = customerResponse?.data ?? []
+  const total = customerResponse?.meta?.total ?? 0
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -103,14 +104,14 @@ export default function RepairCustomersPage() {
     if (!editingCustomer) return
     setEditError(null)
     const res = await fetch(`/api/customers/${editingCustomer.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...data, email: data.email || null }) })
-    if (res.ok) { setEditSheetOpen(false); fetchCustomers() }
+    if (res.ok) { setEditSheetOpen(false); queryClient.invalidateQueries({ queryKey: ['repair-customers', activeBranch?.id] }) }
     else { const j = await res.json(); setEditError(j?.error?.message ?? 'Failed to update.') }
   }
 
   async function onDelete(c: CustomerRow) {
     if (!confirm(`Delete "${[c.first_name, c.last_name].filter(Boolean).join(' ')}"? This cannot be undone.`)) return
     await fetch(`/api/customers/${c.id}`, { method: 'DELETE' })
-    fetchCustomers()
+    queryClient.invalidateQueries({ queryKey: ['repair-customers', activeBranch?.id] })
   }
 
   const TOGGLEABLE = ['email', 'business', 'phone', 'address']

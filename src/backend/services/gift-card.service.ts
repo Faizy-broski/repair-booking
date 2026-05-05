@@ -13,15 +13,16 @@ export const GiftCardService = {
       .lt('expires_at', new Date().toISOString())
   },
 
-  async list(branchId: string) {
+  async list(branchId: string, page = 1, limit = 20) {
     await this.expireCards(branchId)
-    const { data, error } = await adminSupabase
+    const { data, error, count } = await adminSupabase
       .from('gift_cards')
-      .select('*, customers(first_name,last_name)')
+      .select('*, customers(first_name,last_name)', { count: 'exact' })
       .eq('branch_id', branchId)
       .order('created_at', { ascending: false })
+      .range((page - 1) * limit, page * limit - 1)
     if (error) throw error
-    return data
+    return { data, count }
   },
 
   async getByCode(code: string, branchId: string, customerId?: string | null) {

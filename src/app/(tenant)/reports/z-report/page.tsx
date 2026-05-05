@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, ArrowLeft, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -28,11 +29,9 @@ function exportCsv<T extends Record<string, unknown>>(rows: T[], filename: strin
 
 export default function ZReportPage() {
   const { activeBranch } = useAuthStore()
+  const queryClient = useQueryClient()
   const [dateFrom, setDateFrom] = useState(firstOfMonth)
   const [dateTo, setDateTo] = useState(today)
-  const [loading, setLoading] = useState(false)
-  const [sessions, setSessions] = useState<RegisterSession[]>([])
-  const [currentSession, setCurrentSession] = useState<RegisterSession | null>(null)
   const [openModal, setOpenModal] = useState(false)
   const [closeModal, setCloseModal] = useState(false)
   const [openingFloat, setOpeningFloat] = useState('')
@@ -40,25 +39,28 @@ export default function ZReportPage() {
   const [sessionLoading, setSessionLoading] = useState(false)
   const [zReportData, setZReportData] = useState<Record<string, unknown> | null>(null)
 
-  const fetchSessions = useCallback(async () => {
-    if (!activeBranch) return
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({ type: 'sessions', branch_id: activeBranch.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` })
+  const { data: sessions = [], isLoading: loading, refetch: refetchSessions } = useQuery<RegisterSession[]>({
+    queryKey: ['report-sessions', activeBranch?.id, dateFrom, dateTo],
+    queryFn: async () => {
+      const params = new URLSearchParams({ type: 'sessions', branch_id: activeBranch!.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` })
       const res = await fetch(`/api/reports?${params}`)
       const json = await res.json()
-      setSessions(json.data ?? [])
-    } finally { setLoading(false) }
-  }, [activeBranch, dateFrom, dateTo])
+      return json.data ?? []
+    },
+    enabled: !!activeBranch,
+    staleTime: 30_000,
+  })
 
-  const fetchCurrentSession = useCallback(async () => {
-    if (!activeBranch) return
-    const res = await fetch(`/api/pos/session?branch_id=${activeBranch.id}`)
-    const json = await res.json()
-    setCurrentSession(json.data)
-  }, [activeBranch])
-
-  useEffect(() => { fetchSessions(); fetchCurrentSession() }, [activeBranch]) // eslint-disable-line react-hooks/exhaustive-deps
+  const { data: currentSession = null } = useQuery<RegisterSession | null>({
+    queryKey: ['report-pos-session', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/pos/session?branch_id=${activeBranch!.id}`)
+      const json = await res.json()
+      return json.data ?? null
+    },
+    enabled: !!activeBranch,
+    staleTime: 30_000,
+  })
 
   async function handleOpenSession() {
     setSessionLoading(true)
@@ -66,7 +68,11 @@ export default function ZReportPage() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ opening_float: parseFloat(openingFloat) || 0, branch_id: activeBranch?.id }),
     })
-    if (res.ok) { setOpenModal(false); setOpeningFloat(''); fetchCurrentSession() }
+    if (res.ok) {
+      setOpenModal(false)
+      setOpeningFloat('')
+      queryClient.invalidateQueries({ queryKey: ['report-pos-session', activeBranch?.id] })
+    }
     setSessionLoading(false)
   }
 
@@ -80,8 +86,10 @@ export default function ZReportPage() {
     if (res.ok) {
       const json = await res.json()
       setZReportData(json.data)
-      setCloseModal(false); setClosingCash(''); setCurrentSession(null)
-      fetchSessions()
+      setCloseModal(false)
+      setClosingCash('')
+      queryClient.invalidateQueries({ queryKey: ['report-pos-session', activeBranch?.id] })
+      queryClient.invalidateQueries({ queryKey: ['report-sessions', activeBranch?.id] })
     }
     setSessionLoading(false)
   }
@@ -123,7 +131,7 @@ export default function ZReportPage() {
         </div>
       )}
 
-      <DateRangeBar dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} onApply={fetchSessions} />
+      <DateRangeBar dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} onApply={refetchSessions} />
 
       {/* Z-Report result */}
       {zReportData && (

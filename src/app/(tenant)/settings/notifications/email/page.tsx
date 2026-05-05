@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Server, Settings2, Send, Eye as EyeIcon, EyeOff,
   CheckCircle2, Info, ToggleLeft, ToggleRight,
@@ -22,6 +23,8 @@ interface SmtpConfig {
 export default function EmailSmtpPage() {
   const { activeBranch } = useAuthStore()
 
+  const queryClient = useQueryClient()
+
   const [smtpConfig, setSmtpConfig] = useState<SmtpConfig | null>(null)
   const [smtpForm, setSmtpForm] = useState({
     smtp_enabled: true,
@@ -37,28 +40,30 @@ export default function EmailSmtpPage() {
   const [smtpTestMsg, setSmtpTestMsg] = useState<{ ok: boolean; msg: string } | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const fetchSmtpConfig = useCallback(async () => {
-    const res = await fetch('/api/settings/email')
-    const json = await res.json()
-    const cfg: SmtpConfig | null = json.data ?? null
-    setSmtpConfig(cfg)
-    if (cfg) {
-      setSmtpForm({
-        smtp_enabled: cfg.smtp_enabled,
-        smtp_host: cfg.smtp_host,
-        smtp_port: cfg.smtp_port,
-        smtp_user: cfg.smtp_user,
-        smtp_pass: cfg.smtp_pass,
-        smtp_from: cfg.smtp_from,
-        smtp_secure: cfg.smtp_secure,
-      })
-    }
-  }, [])
+  const { data: emailConfigData } = useQuery<SmtpConfig | null>({
+    queryKey: ['settings-email', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch('/api/settings/email')
+      const json = await res.json()
+      return json.data ?? null
+    },
+    enabled: !!activeBranch,
+    staleTime: 60_000,
+  })
 
   useEffect(() => {
-    if (!activeBranch) return
-    fetchSmtpConfig()
-  }, [activeBranch, fetchSmtpConfig])
+    if (!emailConfigData) return
+    setSmtpConfig(emailConfigData)
+    setSmtpForm({
+      smtp_enabled: emailConfigData.smtp_enabled,
+      smtp_host: emailConfigData.smtp_host,
+      smtp_port: emailConfigData.smtp_port,
+      smtp_user: emailConfigData.smtp_user,
+      smtp_pass: emailConfigData.smtp_pass,
+      smtp_from: emailConfigData.smtp_from,
+      smtp_secure: emailConfigData.smtp_secure,
+    })
+  }, [emailConfigData])
 
   async function saveSmtpConfig() {
     setSaving(true)
@@ -71,7 +76,7 @@ export default function EmailSmtpPage() {
     const json = await res.json()
     setSaving(false)
     if (res.ok) {
-      await fetchSmtpConfig()
+      queryClient.invalidateQueries({ queryKey: ['settings-email', activeBranch?.id] })
       setSmtpTestMsg({ ok: true, msg: 'Configuration saved successfully.' })
     } else {
       setSmtpTestMsg({ ok: false, msg: json.error?.message ?? json.error ?? 'Failed to save.' })

@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   Plus, Pencil, Trash2, Check, X, ChevronRight,
   Wrench, Cpu, Tag, Layers, Info, Loader2,
@@ -158,7 +159,6 @@ export default function ServiceCataloguePage() {
   const [mobileStep, setMobileStep]           = useState<0 | 1 | 2 | 3>(0)
 
   // ── Loading states ───────────────────────────────────────────────────
-  const [loadingTypes,    setLoadingTypes]    = useState(false)
   const [loadingBrands,   setLoadingBrands]   = useState(false)
   const [loadingDevices,  setLoadingDevices]  = useState(false)
   const [loadingServices, setLoadingServices] = useState(false)
@@ -201,15 +201,20 @@ export default function ServiceCataloguePage() {
 
   // ── Data loading ───────────────────────────────────────────────────
 
-  const loadCategories = useCallback(async () => {
-    setLoadingTypes(true)
-    try {
+  const { data: categoriesData, isLoading: loadingTypes } = useQuery<DeviceType[]>({
+    queryKey: ['service-categories'],
+    queryFn: async () => {
       const res = await fetch('/api/services/categories')
-      const j   = await res.json()
-      setDeviceTypes(j.data ?? [])
-    } catch (e) { console.error(e) }
-    finally { setLoadingTypes(false) }
-  }, [])
+      const j = await res.json()
+      return j.data ?? []
+    },
+    staleTime: 60_000,
+  })
+
+  // Seed local state from query (once on first load; mutations update optimistically)
+  useEffect(() => {
+    if (categoriesData) setDeviceTypes(categoriesData)
+  }, [categoriesData])
 
   const loadBrands = useCallback(async (catId: string, page = 1, append = false) => {
     brandsAbortRef.current?.abort()
@@ -267,11 +272,6 @@ export default function ServiceCataloguePage() {
     } catch (e: any) { if (e.name !== 'AbortError') console.error(e) }
     finally { setLoadingServices(false) }
   }, [])
-
-  // Initial load
-  useEffect(() => {
-    loadCategories()
-  }, [loadCategories])
 
   // Cascade loading — reset pagination on each new selection
   useEffect(() => {

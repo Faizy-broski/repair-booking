@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   Search, Plus, ArrowRight, MoreHorizontal, Wrench, ShoppingBag,
   Tag, ClipboardList, Camera, Check,
@@ -10,12 +11,13 @@ import { usePosStore } from '@/store/pos.store'
 import { formatCurrency } from '@/lib/utils'
 import { PatternLock } from '@/components/ui/pattern-lock'
 import { CustomFieldRenderer, useCustomFieldDefs } from '@/components/shared/custom-field-renderer'
+import { AsyncEmployeeSelect } from '@/components/shared/async-employee-select'
 import { useRouter } from 'next/navigation'
 import type { Product } from '@/types/database'
 import {
   WARRANTY_OPTIONS, REPAIR_STATUS_OPTIONS, TASK_TYPE_OPTIONS,
   type ServiceCategory, type ServiceBrand, type ServiceDevice,
-  type ServiceProblem, type Employee, type RepairDetailsForm,
+  type ServiceProblem, type RepairDetailsForm,
   type RepairLevel,
 } from '../_types'
 
@@ -43,7 +45,6 @@ export function RepairsTab() {
 
   // ── Problems & details ─────────────────────────────────────────────────────
   const [selectedProblems, setSelectedProblems] = useState<ServiceProblem[]>([])
-  const [employees, setEmployees]               = useState<Employee[]>([])
   const [repairDetails, setRepairDetails]       = useState<RepairDetailsForm>({
     imei_type: 'Serial', serial_number: '', lock_type: 'passcode', passcode: '',
     repair_charges: 0, charge_deposit: false, deposit_amount: 0,
@@ -72,7 +73,17 @@ export function RepairsTab() {
     setRepairLoading(false)
   }
 
-  useEffect(() => { loadLevel('categories') }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // Initial categories load — cached, fires once
+  useQuery({
+    queryKey: ['pos-repair-categories'],
+    queryFn: async () => {
+      const res = await fetch('/api/services/categories')
+      const j = await res.json()
+      setRepairItems(j.data ?? [])
+      return j.data ?? []
+    },
+    staleTime: 5 * 60_000,
+  })
 
   // ── Navigation helpers ─────────────────────────────────────────────────────
   function resetRepairs() {
@@ -104,9 +115,6 @@ export function RepairsTab() {
   async function goToDetailsStep() {
     if (!activeBranch) return
     setRepairLevel('details')
-    const res = await fetch(`/api/employees?branch_id=${activeBranch.id}&limit=100`)
-    const j = await res.json()
-    setEmployees((j.data ?? []).map((e: any) => ({ id: e.id, full_name: e.full_name ?? `${e.first_name ?? ''} ${e.last_name ?? ''}`.trim() })))
     const warranties: Record<string, string> = {}
     selectedProblems.forEach(p => { warranties[p.id] = 'No Warranty' })
     setRepairDetails(d => ({ ...d, problem_warranties: warranties }))
@@ -445,14 +453,15 @@ export function RepairsTab() {
               <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">Assigned to</label>
-                  <select
-                    value={repairDetails.assigned_to}
-                    onChange={e => setRepairDetails(d => ({ ...d, assigned_to: e.target.value }))}
-                    className="h-10 w-full rounded border border-gray-200 bg-white px-2 text-sm focus:border-brand-teal focus:outline-none"
-                  >
-                    <option value="">Unassigned</option>
-                    {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.full_name}</option>)}
-                  </select>
+                  {activeBranch && (
+                    <AsyncEmployeeSelect
+                      branchId={activeBranch.id}
+                      value={repairDetails.assigned_to}
+                      onChange={(id) => setRepairDetails(d => ({ ...d, assigned_to: id }))}
+                      label=""
+                      placeholder="— Search employee —"
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">Task Due Date &amp; Time</label>

@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { MessageSquare, Settings2, Send, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,21 +24,22 @@ const GATEWAY_OPTIONS: SelectOption[] = [
 export default function SmsGatewayPage() {
   const { activeBranch } = useAuthStore()
 
-  const [smsConfig, setSmsConfig] = useState<SmsConfig | null>(null)
+  const queryClient = useQueryClient()
+
   const [smsForm, setSmsForm] = useState({ gateway: '', api_key: '', api_secret: '', sender_id: '' })
   const [smsTestNumber, setSmsTestNumber] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const fetchSmsConfig = useCallback(async () => {
-    const res = await fetch('/api/settings/sms')
-    const json = await res.json()
-    setSmsConfig(json.data ?? null)
-  }, [])
-
-  useEffect(() => {
-    if (!activeBranch) return
-    fetchSmsConfig()
-  }, [activeBranch, fetchSmsConfig])
+  const { data: smsConfig = null } = useQuery<SmsConfig | null>({
+    queryKey: ['settings-sms', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch('/api/settings/sms')
+      const json = await res.json()
+      return json.data ?? null
+    },
+    enabled: !!activeBranch,
+    staleTime: 60_000,
+  })
 
   async function saveSmsConfig() {
     setSaving(true)
@@ -52,7 +54,7 @@ export default function SmsGatewayPage() {
       }),
     })
     setSaving(false)
-    await fetchSmsConfig()
+    queryClient.invalidateQueries({ queryKey: ['settings-sms', activeBranch?.id] })
   }
 
   async function testSms() {

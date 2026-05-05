@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   Search, Plus, X, Package, ShoppingBag, Tag, Phone,
   Layers, ChevronRight, Check, ShieldCheck, ExternalLink, ArrowLeft,
@@ -27,7 +28,6 @@ export function ProductsTab() {
   useEffect(() => {
     const newId = activeBranch?.id ?? null
     if (prevBranchIdRef.current !== null && prevBranchIdRef.current !== newId) {
-      setAllProductsList([])
       setCategoryProducts([])
       setPartProducts([])
       setAdvSearchResults([])
@@ -39,12 +39,46 @@ export function ProductsTab() {
   const [productsView, setProductsView] = useState<ProductsView>('all_products')
 
   // ── All Products view ──────────────────────────────────────────────────────
-  const [allProductsList, setAllProductsList]       = useState<ProductWithStock[]>([])
-  const [allProductsLoading, setAllProductsLoading] = useState(false)
-  const [allProductsSearch, setAllProductsSearch]   = useState('')
+  const [allProductsSearch, setAllProductsSearch]     = useState('')
+  const [debouncedSearch, setDebouncedSearch]         = useState('')
   const [allProductsItemType, setAllProductsItemType] = useState<'all' | 'product' | 'part'>('all')
   const [allProductsCategoryId, setAllProductsCategoryId] = useState('')
-  const [allCats, setAllCats]                       = useState<{ id: string; name: string; parent_id: string | null }[]>([])
+
+  // Debounce search input
+  useEffect(() => {
+    if (!allProductsSearch) { setDebouncedSearch(''); return }
+    const t = setTimeout(() => setDebouncedSearch(allProductsSearch), 300)
+    return () => clearTimeout(t)
+  }, [allProductsSearch])
+
+  // Categories — cached, shared across all views
+  const { data: allCats = [] } = useQuery<{ id: string; name: string; parent_id: string | null }[]>({
+    queryKey: ['pos-categories'],
+    queryFn: async () => {
+      const res = await fetch('/api/categories?limit=200')
+      const j = await res.json()
+      return j.data ?? []
+    },
+    enabled: !!activeBranch,
+    staleTime: 10 * 60_000, // categories rarely change
+  })
+
+  // All Products — fires once per unique [branchId, search, type, cat]
+  const { data: allProductsList = [], isFetching: allProductsLoading } = useQuery<ProductWithStock[]>({
+    queryKey: ['pos-products', activeBranch?.id, debouncedSearch, allProductsItemType, allProductsCategoryId],
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: '150', branch_id: activeBranch!.id })
+      if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
+      if (allProductsItemType !== 'all') params.set('item_type', allProductsItemType)
+      if (allProductsCategoryId) params.set('category_id', allProductsCategoryId)
+      const res = await fetch(`/api/products?${params}`)
+      const j = await res.json()
+      return j.data ?? []
+    },
+    enabled: !!activeBranch && productsView === 'all_products',
+    staleTime: 30_000,
+    placeholderData: (prev) => prev, // keep previous data while fetching
+  })
 
   // ── By Products hierarchy ──────────────────────────────────────────────────
   const [catLevel, setCatLevel]                         = useState<CatLevel>('device_types')
@@ -91,12 +125,6 @@ export function ProductsTab() {
   const [warrantyClaimSubmitting, setWarrantyClaimSubmitting] = useState(false)
 
   // ── Helpers ────────────────────────────────────────────────────────────────
-  async function fetchAllCats() {
-    const res = await fetch('/api/categories?limit=200')
-    const j = await res.json()
-    setAllCats(j.data ?? [])
-  }
-
   async function openVariantSelect(product: ProductWithStock) {
     setVariantProduct(product); setSelectedVariantId(null); setVariantLoading(true); setVariantList([])
     const res = await fetch(`/api/products/${product.id}/variants`)
@@ -118,28 +146,9 @@ export function ProductsTab() {
     pos.addToCart(vp); setMiscName(''); setMiscPrice('')
   }
 
-  // ── All Products fetch ─────────────────────────────────────────────────────
-  useEffect(() => {
-    if (productsView !== 'all_products' || !activeBranch) return
-    setAllProductsLoading(true)
-    const delay = allProductsSearch ? 300 : 0
-    const t = setTimeout(async () => {
-      const params = new URLSearchParams({ limit: '150', branch_id: activeBranch.id })
-      if (allProductsSearch.trim()) params.set('search', allProductsSearch.trim())
-      if (allProductsItemType !== 'all') params.set('item_type', allProductsItemType)
-      if (allProductsCategoryId) params.set('category_id', allProductsCategoryId)
-      const res = await fetch(`/api/products?${params}`)
-      const j = await res.json()
-      setAllProductsList(j.data ?? [])
-      setAllProductsLoading(false)
-    }, delay)
-    return () => clearTimeout(t)
-  }, [productsView, allProductsSearch, allProductsItemType, allProductsCategoryId, activeBranch]) // eslint-disable-line
-
   useEffect(() => {
     if (productsView === 'by_products' && catBreadcrumb.length === 0) loadCatLevel('device_types')
     if (productsView === 'by_parts'    && partBreadcrumb.length === 0) loadPartLevel('device_types')
-    if (productsView === 'all_products' && allCats.length === 0) fetchAllCats()
   }, [productsView]) // eslint-disable-line
 
   // ── Ctrl+S → Advanced Search ───────────────────────────────────────────────
@@ -149,15 +158,14 @@ export function ProductsTab() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [activeBranch, allCats.length]) // eslint-disable-line
+  }, [activeBranch]) // eslint-disable-line
 
   // ── By Products drill-down ─────────────────────────────────────────────────
   async function loadCatLevel(level: CatLevel, parentId?: string) {
     setCatItemsLoading(true); setCategoryProducts([]); setCatLevel(level)
     try {
       if (level === 'device_types') {
-        const j = await (await fetch('/api/categories?limit=200')).json()
-        setCatItems((j.data ?? []).map((c: any) => ({ id: c.id, name: c.name, image_url: c.image_url })))
+        setCatItems(allCats.map((c: any) => ({ id: c.id, name: c.name, image_url: c.image_url })))
       } else if (level === 'brands' && parentId) {
         const j = await (await fetch(`/api/brands?category_id=${parentId}`)).json()
         setCatItems((j.data ?? []).map((b: any) => ({ id: b.id, name: b.name, image_url: b.image_url })))
@@ -194,8 +202,7 @@ export function ProductsTab() {
     setPartItemsLoading(true); setPartLevel(level); setPartProducts([])
     try {
       if (level === 'device_types') {
-        const j = await (await fetch('/api/categories?limit=200')).json()
-        setPartItems((j.data ?? []).map((c: any) => ({ id: c.id, name: c.name, image_url: c.image_url })))
+        setPartItems(allCats.map((c: any) => ({ id: c.id, name: c.name, image_url: c.image_url })))
       } else if (level === 'brands' && parentId) {
         const j = await (await fetch(`/api/brands?category_id=${parentId}`)).json()
         setPartItems((j.data ?? []).map((b: any) => ({ id: b.id, name: b.name, image_url: b.image_url })))
@@ -233,7 +240,6 @@ export function ProductsTab() {
   // ── Advanced search ────────────────────────────────────────────────────────
   function openAdvSearch() {
     setAdvSearchOpen(true); setAdvSearchResults([]); setAdvSearchName(''); setAdvSearchSku(''); setAdvSearchCatIds(new Set())
-    if (allCats.length === 0) fetchAllCats()
     runAdvSearch()
   }
 

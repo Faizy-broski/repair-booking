@@ -40,6 +40,12 @@ const schema = z.object({
   start_time: z.string().min(1, 'Start time is required'),
   end_time: z.string().min(1, 'End time is required'),
   notes: z.string().optional(),
+}).refine((data) => {
+  if (!data.start_time || !data.end_time) return true
+  return new Date(data.end_time) > new Date(data.start_time)
+}, {
+  message: 'End time must be after start time',
+  path: ['end_time'],
 })
 
 type FormData = z.infer<typeof schema>
@@ -61,7 +67,7 @@ export default function AppointmentsPage() {
     resolver: zodResolver(schema),
     defaultValues: {
       start_time: format(new Date(), "yyyy-MM-dd") + 'T09:00',
-      end_time: format(new Date(), "yyyy-MM-dd") + 'T09:30',
+      end_time: format(new Date(), "yyyy-MM-dd") + 'T10:00',
     },
   })
 
@@ -117,12 +123,20 @@ export default function AppointmentsPage() {
 
   function openEdit(appt: AppointmentRow) {
     setEditingAppointment(appt)
+    let startVal = appt.start_time.slice(0, 16)
+    let endVal = appt.end_time.slice(0, 16)
+    // If end_time is same as or before start_time, default to 1 hour after
+    if (endVal <= startVal) {
+      const d = new Date(startVal)
+      d.setHours(d.getHours() + 1)
+      endVal = format(d, "yyyy-MM-dd") + 'T' + format(d, 'HH:mm')
+    }
     resetEdit({
       title: appt.title,
       customer_id: '',
       employee_id: '',
-      start_time: appt.start_time.slice(0, 16),
-      end_time: appt.end_time.slice(0, 16),
+      start_time: startVal,
+      end_time: endVal,
     })
     setEditError(null)
     setEditSheetOpen(true)

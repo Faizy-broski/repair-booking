@@ -55,6 +55,14 @@ export const MessageService = {
     if (error) throw error
   },
 
+  async updateBody(messageId: string, body: string) {
+    const { error } = await adminSupabase
+      .from('messages')
+      .update({ body })
+      .eq('id', messageId)
+    if (error) throw error
+  },
+
   async unreadCount(businessId: string, branchId?: string) {
     let q = adminSupabase
       .from('messages')
@@ -87,7 +95,7 @@ export const MessageService = {
    * ORIGINAL SENDER gets a reply (the reply row has to_branch_id = sender,
    * but the root has to_branch_id = original recipient).
    */
-  async listUnread(businessId: string, branchId?: string) {
+  async listUnread(businessId: string, branchId?: string, excludeFromBranchId?: string) {
     // Fetch all unread messages (root + replies) addressed to this branch.
     // We'll group by thread, count unique threads, and pick the latest message
     // body per thread as the preview.
@@ -101,6 +109,13 @@ export const MessageService = {
 
     if (branchId) {
       unreadQ = unreadQ.eq('to_branch_id', branchId)
+    }
+    // Exclude messages sent FROM the active branch — those are outgoing messages
+    // that should not appear as unread notifications for the sender.
+    // Use .or() instead of .neq() so rows with from_branch_id IS NULL (system
+    // messages with no sender branch) are still included.
+    if (excludeFromBranchId) {
+      unreadQ = (unreadQ as any).or(`from_branch_id.neq.${excludeFromBranchId},from_branch_id.is.null`)
     }
 
     const { data: unreadData, error } = await unreadQ
@@ -161,5 +176,25 @@ export const MessageService = {
       count: threadMap.size,
       messages,
     }
+  },
+
+  /** Delete an entire thread (root + all replies). Only the business that owns it may delete. */
+  async deleteThread(rootId: string, businessId: string) {
+    const { error } = await adminSupabase
+      .from('messages')
+      .delete()
+      .eq('business_id', businessId)
+      .or(`id.eq.${rootId},parent_id.eq.${rootId}`)
+    if (error) throw error
+  },
+
+  /** Delete a single message (root or reply). Only the business that owns it may delete. */
+  async deleteMessage(messageId: string, businessId: string) {
+    const { error } = await adminSupabase
+      .from('messages')
+      .delete()
+      .eq('id', messageId)
+      .eq('business_id', businessId)
+    if (error) throw error
   },
 }

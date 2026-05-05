@@ -6,7 +6,7 @@
  *   1. Per-business SMTP config (smtp_enabled = true) — stored in businesses table
  *   2. Global platform SMTP (env vars SMTP_HOST / SMTP_USER / SMTP_PASS)
  */
-import nodemailer from 'nodemailer'
+import nodemailer from 'nodemailer'      
 import { resolve4 } from 'dns/promises'
 
 // ── Transporter helpers ────────────────────────────────────────────────────────

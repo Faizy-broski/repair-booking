@@ -14,7 +14,7 @@ export const PATCH = withMiddleware(async (req, ctx, { params }) => {
   const { data, error } = await validateBody(req, schema)
   if (error) return error
   try {
-    const { data: row, error: dbErr } = await adminSupabase
+    const { data: row, error: dbErr } = await (adminSupabase as any)
       .from('repair_faults')
       .update(data)
       .eq('id', id)
@@ -31,7 +31,7 @@ export const PATCH = withMiddleware(async (req, ctx, { params }) => {
 export const DELETE = withMiddleware(async (_req, ctx, { params }) => {
   const { id } = await params
   try {
-    const { error } = await adminSupabase
+    const { error } = await (adminSupabase as any)
       .from('repair_faults')
       .delete()
       .eq('id', id)

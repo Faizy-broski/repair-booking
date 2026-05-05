@@ -1,5 +1,6 @@
 ﻿'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Save, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -154,24 +155,25 @@ export function CustomFieldRenderer({
 
 /**
  * Hook to load field definitions for a module + optional repair category.
+ * Pass enabled=false to defer the fetch until the caller is ready (e.g. until
+ * the repair detail is loaded and device_type is known).
  */
-export function useCustomFieldDefs(module: string, repairCategory?: string | null) {
-  const [defs, setDefs] = useState<CustomFieldDef[]>([])
-  const [loading, setLoading] = useState(false)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    const params = new URLSearchParams({ module })
-    if (repairCategory) params.set('repair_category', repairCategory)
-    const res = await fetch(`/api/custom-fields?${params}`)
-    if (res.ok) {
+export function useCustomFieldDefs(module: string, repairCategory?: string | null, enabled = true) {
+  const { data: defs = [], isLoading: loading } = useQuery<CustomFieldDef[]>({
+    queryKey: ['custom-field-defs', module, repairCategory ?? null],
+    queryFn: async () => {
+      const params = new URLSearchParams({ module })
+      if (repairCategory) params.set('repair_category', repairCategory)
+      const res = await fetch(`/api/custom-fields?${params}`)
+      if (!res.ok) return []
       const j = await res.json()
-      setDefs(j.data ?? [])
-    }
-    setLoading(false)
-  }, [module, repairCategory])
+      return j.data ?? []
+    },
+    enabled,
+    staleTime: Infinity,
+  })
 
-  useEffect(() => { load() }, [load])
-
-  return { defs, loading, reload: load }
+  // reload kept for backward compat but React Query handles refetch internally
+  const reload = useCallback(() => {}, [])
+  return { defs, loading, reload }
 }

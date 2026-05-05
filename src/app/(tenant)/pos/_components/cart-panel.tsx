@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   Search, Plus, Minus, Trash2, UserPlus, X, AlertTriangle,
   Gift, Phone, Mail, ExternalLink, CheckCircle2, DollarSign,
@@ -55,7 +56,17 @@ export function CartPanel({ mobileView }: Props) {
 
   // ── Checkout panel collapsed/expanded (mobile) ────────────────────────────
   const [showFullTotals, setShowFullTotals] = useState(false)
-  const [invoiceSettings, setInvoiceSettings] = useState<any>(null)
+
+  const { data: invoiceSettings = null } = useQuery({
+    queryKey: ['pos-invoice-settings', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/settings/invoice?branch_id=${activeBranch!.id}`)
+      const json = await res.json()
+      return json.data ?? null
+    },
+    enabled: !!activeBranch,
+    staleTime: 5 * 60_000,
+  })
 
   // ── Computed totals ────────────────────────────────────────────────────────
   const subtotal        = pos.subtotal()
@@ -84,18 +95,6 @@ export function CartPanel({ mobileView }: Props) {
     }, 300)
     return () => clearTimeout(t)
   }, [customerSearch])
-
-  useEffect(() => {
-    async function fetchSettings() {
-      if (!activeBranch) return
-      const res = await fetch(`/api/settings/invoice?branch_id=${activeBranch.id}`)
-      if (res.ok) {
-        const json = await res.json()
-        setInvoiceSettings(json.data)
-      }
-    }
-    fetchSettings()
-  }, [activeBranch])
 
   useEffect(() => {
     function h(e: MouseEvent) {

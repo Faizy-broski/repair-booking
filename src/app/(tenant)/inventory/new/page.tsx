@@ -9,7 +9,7 @@ import { CreatableCombobox } from '@/components/ui/creatable-combobox'
 import { ImageUpload } from '@/components/ui/image-upload'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/store/auth.store'
-import { useDashboardStore } from '@/store/dashboard.store'
+import { queryClient } from '@/lib/query-client'
 import { formatCurrency } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -216,8 +216,6 @@ export default function NewProductPage() {
       image_url: imageUrl || null,
       is_service: false,
       part_type: itemType === 'part' ? (partType || null) : null,
-      is_service: false,
-      part_type: itemType === 'part' ? (partType || null) : null,
       cost_price: parseFloat(costPrice) || 0,
       selling_price: parseFloat(sellingPrice) || 0,
       supplier_id: supplierId || null,
@@ -241,7 +239,7 @@ export default function NewProductPage() {
     if (res.ok) {
       const json = await res.json()
       const productId = json.data?.id ?? json.id
-      useDashboardStore.getState().clearCache()
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       if (andNew) {
         setName(''); setCategoryId(''); setBrandId(''); setModelId(''); setSku(''); setBarcode('')
         setImageUrl(''); setPartType(''); setCostPrice(''); setSellingPrice('')

@@ -5,8 +5,8 @@ import { RotateCcw } from 'lucide-react'
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface PatternLockProps {
-  /** Called when user lifts pointer after drawing ≥2 nodes */
-  onChange: (pattern: string) => void
+  /** Called when user lifts pointer after drawing ≥2 nodes. Not required when readOnly. */
+  onChange?: (pattern: string) => void
   /** Current encoded value, e.g. "0-1-4-8" */
   value?: string
   /** Grid dimension in pixels. Default 220. */
@@ -204,7 +204,7 @@ export function PatternLock({ onChange, value = '', size = 220, readOnly = false
     s.dragging = false
 
     if (s.path.length >= 2) {
-      onChange(encode(s.path))
+      onChange?.(encode(s.path))
       setPatternSet(true)
     } else {
       // flash error
@@ -270,7 +270,7 @@ export function PatternLock({ onChange, value = '', size = 220, readOnly = false
     stateRef.current.path  = []
     stateRef.current.error = false
     setPatternSet(false)
-    onChange('')
+    onChange?.('')
     scheduleFrame()
   }
 

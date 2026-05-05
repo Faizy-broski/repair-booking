@@ -37,10 +37,22 @@ export function DataTable<T>({
   })
 
   const totalPages = totalCount ? Math.ceil(totalCount / pageSize) : 1
+  const rows = table.getRowModel().rows
+  // True only on the very first load when there is no cached data yet
+  const initialLoading = isLoading && rows.length === 0
+  // Re-fetch (page / filter change) — previous rows are still present via placeholderData
+  const refetching = isLoading && rows.length > 0
 
   return (
     <div className="w-full">
-      <div className="overflow-x-auto rounded-xl border border-outline-variant/50 shadow-sm">
+      <div className="relative overflow-x-auto rounded-xl border border-outline-variant/50 shadow-sm">
+        {/* Spinner overlay during re-fetch — keeps existing rows visible, no layout shift */}
+        {refetching && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/60 backdrop-blur-[1px]">
+            <div className="h-7 w-7 animate-spin rounded-full border-[3px] border-primary border-t-transparent" />
+          </div>
+        )}
+
         <table className="w-full text-sm">
           <thead>
             {table.getHeaderGroups().map((hg) => (
@@ -74,24 +86,23 @@ export function DataTable<T>({
             ))}
           </thead>
           <tbody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i} className={`border-t border-outline-variant/30 ${i % 2 === 0 ? 'bg-white' : 'bg-surface-container-low'}`}>
-                  {columns.map((_, j) => (
-                    <td key={j} className="px-4 py-4">
-                      <div className="h-4 w-full animate-pulse rounded bg-surface-container" />
-                    </td>
-                  ))}
-                </tr>
-              ))
-            ) : table.getRowModel().rows.length === 0 ? (
+            {initialLoading ? (
+              // First load — centered spinner row, no skeleton flicker
+              <tr>
+                <td colSpan={columns.length} className="px-4 py-16 text-center">
+                  <div className="flex items-center justify-center">
+                    <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-primary border-t-transparent" />
+                  </div>
+                </td>
+              </tr>
+            ) : rows.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="px-4 py-10 text-center text-outline">
                   {emptyMessage}
                 </td>
               </tr>
             ) : (
-              table.getRowModel().rows.map((row, i) => (
+              rows.map((row, i) => (
                 <tr
                   key={row.id}
                   className={`border-t border-outline-variant/30 transition-colors hover:bg-primary-container/20 ${

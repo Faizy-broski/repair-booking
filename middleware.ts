@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
-const PUBLIC_PATHS = ['/api/auth/', '/api/webhooks/', '/api/public/', '/book/', '/_next/', '/favicon.ico', '/images/']
+const PUBLIC_PATHS = ['/api/auth/', '/api/webhooks/', '/api/public/', '/book/', '/_next/', '/favicon.ico', '/images/', '/api/google-reviews/oauth/callback']
 const SUPERADMIN_SUBDOMAIN = 'admin'
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'repairbooking.co.uk'
 
@@ -124,7 +124,7 @@ export async function middleware(request: NextRequest) {
       .maybeSingle()
 
     if (!adminProfile || adminProfile.role !== 'super_admin') {
-      await supabase.auth.signOut()
+      await supabase.auth.signOut({ scope: 'local' })
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('error', 'not_superadmin')
       return forwardAuthCookies(supabaseResponse, NextResponse.redirect(loginUrl))
@@ -206,7 +206,7 @@ export async function middleware(request: NextRequest) {
       // Sign the user out if they have an active session, so the stale session
       // doesn't let them access the tenant API routes.
       if (user) {
-        await supabase.auth.signOut()
+        await supabase.auth.signOut({ scope: 'local' })
       }
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('error', 'suspended')
@@ -237,7 +237,7 @@ export async function middleware(request: NextRequest) {
         }
 
         if (loginProfile && loginProfile.business_id !== business.id) {
-          await supabase.auth.signOut()
+          await supabase.auth.signOut({ scope: 'local' })
         }
       }
       return forwardAuthCookies(supabaseResponse, NextResponse.next({ request }))
@@ -266,7 +266,7 @@ export async function middleware(request: NextRequest) {
         )
       }
       // Sign the user OUT so the stale cross-tenant session is destroyed.
-      await supabase.auth.signOut()
+      await supabase.auth.signOut({ scope: 'local' })
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('error', 'wrong_tenant')
       return forwardAuthCookies(supabaseResponse, NextResponse.redirect(loginUrl))

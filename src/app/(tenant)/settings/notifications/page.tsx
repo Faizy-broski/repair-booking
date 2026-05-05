@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Bell, Mail, Send, Eye as EyeIcon, RefreshCw,
 } from 'lucide-react'
@@ -49,6 +50,8 @@ const CHANNEL_OPTIONS: SelectOption[] = [
 export default function NotificationTemplatesPage() {
   const { activeBranch } = useAuthStore()
 
+  const queryClient = useQueryClient()
+
   const [templates, setTemplates]       = useState<NotificationTemplate[]>([])
   const [macroCatalog, setMacroCatalog] = useState<Record<string, string[]>>({})
   const [loading, setLoading]           = useState(false)
@@ -68,24 +71,25 @@ export default function NotificationTemplatesPage() {
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
-  const fetchTemplates = useCallback(async () => {
-    const res = await fetch('/api/settings/notifications')
-    const json = await res.json()
-    setTemplates(json.data?.templates ?? [])
-    setMacroCatalog(json.data?.macro_catalog ?? {})
-  }, [])
-
-  useEffect(() => {
-    if (!activeBranch) return
-    fetchTemplates()
-  }, [activeBranch, fetchTemplates])
+  useQuery({
+    queryKey: ['notification-templates', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch('/api/settings/notifications')
+      const json = await res.json()
+      setTemplates(json.data?.templates ?? [])
+      setMacroCatalog(json.data?.macro_catalog ?? {})
+      return json.data
+    },
+    enabled: !!activeBranch,
+    staleTime: 60_000,
+  })
 
   // ── Seed defaults ──────────────────────────────────────────────────────────
 
   async function seedDefaults() {
     setLoading(true)
     await fetch('/api/settings/notifications/seed', { method: 'POST' })
-    await fetchTemplates()
+    queryClient.invalidateQueries({ queryKey: ['notification-templates', activeBranch?.id] })
     setLoading(false)
   }
 
@@ -112,7 +116,7 @@ export default function NotificationTemplatesPage() {
     })
     setSaving(false)
     setEditModal({ open: false, template: null })
-    await fetchTemplates()
+    queryClient.invalidateQueries({ queryKey: ['notification-templates', activeBranch?.id] })
   }
 
   // ── Preview ────────────────────────────────────────────────────────────────

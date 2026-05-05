@@ -63,6 +63,7 @@ export const PosController = {
         limit,
         from: searchParams.get('from') ?? undefined,
         to: searchParams.get('to') ?? undefined,
+        status: searchParams.get('status') ?? undefined,
       })
       return ok(data, { page, limit, total: count ?? 0 })
     } catch (err) {

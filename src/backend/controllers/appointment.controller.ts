@@ -91,6 +91,13 @@ export const AppointmentController = {
       if (!limitCheck.allowed) {
         return forbidden(`Appointment limit reached. Your plan allows ${limitCheck.limit} appointments per month.`)
       }
+
+      // Check for overlapping appointments
+      const conflict = await AppointmentService.checkConflict(data.branch_id, data.start_time, data.end_time)
+      if (conflict) {
+        return badRequest(`This time slot overlaps with an existing appointment ("${conflict.title}"). Please choose a different time.`)
+      }
+
       const appt = await AppointmentService.create(data)
 
       // Fire notification if customer email is available
@@ -129,6 +136,13 @@ export const AppointmentController = {
     if (error) return error
     const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     try {
+      // Check for overlapping appointments when time is being changed
+      if (data.start_time && data.end_time && branchId) {
+        const conflict = await AppointmentService.checkConflict(branchId, data.start_time, data.end_time, id)
+        if (conflict) {
+          return badRequest(`This time slot overlaps with an existing appointment ("${conflict.title}"). Please choose a different time.`)
+        }
+      }
       const appt = await AppointmentService.update(id, branchId, data)
       return ok(appt)
     } catch (err) {

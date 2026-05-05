@@ -4,6 +4,7 @@ import { EmployeeService } from '@/backend/services/employee.service'
 import { ok, created, notFound, badRequest, serverError, forbidden } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 import { PlanLimitService } from '@/backend/services/plan-limit.service'
+import { getPagination } from '@/backend/utils/pagination'
 import { z } from 'zod'
 
 const createSchema = z.object({
@@ -29,12 +30,25 @@ const clockSchema = z.object({
 export const EmployeeController = {
   async list(request: NextRequest, ctx: RequestContext) {
     const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
-    if (!branchId) return ok([])
+    if (!branchId) return ok([], { page: 1, limit: 20, total: 0 })
+    const { page, limit } = getPagination(request.nextUrl.searchParams)
     try {
-      const data = await EmployeeService.list(branchId)
-      return ok(data)
+      const { data, count } = await EmployeeService.list(branchId, page, limit)
+      return ok(data, { page, limit, total: count ?? 0 })
     } catch (err) {
       return serverError('Failed to fetch employees', err)
+    }
+  },
+
+  async search(request: NextRequest, ctx: RequestContext) {
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
+    const q = request.nextUrl.searchParams.get('q') ?? ''
+    if (!branchId) return ok([])
+    try {
+      const data = await EmployeeService.search(branchId, q.trim())
+      return ok(data)
+    } catch (err) {
+      return serverError('Failed to search employees', err)
     }
   },
 
@@ -58,9 +72,14 @@ export const EmployeeController = {
       if (!limitCheck.allowed) {
         return forbidden(`Employee limit reached. Your plan allows ${limitCheck.limit} employee${limitCheck.limit === 1 ? '' : 's'}.`)
       }
+      const email = data.email || null
+      if (email) {
+        const isUnique = await EmployeeService.checkEmailUnique(email, data.branch_id)
+        if (!isUnique) return badRequest('An employee with this email already exists.')
+      }
       const employee = await EmployeeService.create({
         ...data,
-        email: data.email || null,
+        email,
         access_pin: data.access_pin || null,
       })
       return created(employee)
@@ -72,17 +91,36 @@ export const EmployeeController = {
   async update(request: NextRequest, ctx: RequestContext, id: string) {
     const { data, error } = await validateBody(request, updateSchema)
     if (error) return error
-    const branchId = ctx.auth.branchId
-    if (!branchId) return ok(null)
+    // branch_id comes from the URL query param (?branch_id=...) — same pattern as list/getById.
+    // ctx.auth.branchId is only set for staff tied to a specific branch; owners have it null.
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
+    if (!branchId) return badRequest('branch_id query param is required')
     try {
+      const email = data.email || null
+      if (email) {
+        const isUnique = await EmployeeService.checkEmailUnique(email, branchId, id)
+        if (!isUnique) return badRequest('An employee with this email already exists.')
+      }
       const employee = await EmployeeService.update(id, branchId, {
         ...data,
-        email: data.email || null,
+        email,
         access_pin: data.access_pin || null,
       })
       return ok(employee)
     } catch (err) {
       return serverError('Failed to update employee', err)
+    }
+  },
+
+  async delete(request: NextRequest, ctx: RequestContext, id: string) {
+    // Same pattern: branch_id in query string
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
+    if (!branchId) return badRequest('branch_id query param is required')
+    try {
+      const employee = await EmployeeService.delete(id, branchId)
+      return ok(employee)
+    } catch (err) {
+      return serverError('Failed to delete employee', err)
     }
   },
 

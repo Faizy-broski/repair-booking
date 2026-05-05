@@ -90,7 +90,7 @@ export default function SalesPage() {
   })
 
   const { data: salesData, isLoading: loading } = useQuery({
-    queryKey: ['sales', activeBranch?.id, page, dateFrom, dateTo],
+    queryKey: ['sales', activeBranch?.id, page, dateFrom, dateTo, statusFilter],
     queryFn: async () => {
       const params = new URLSearchParams({
         branch_id: activeBranch!.id,
@@ -99,6 +99,7 @@ export default function SalesPage() {
       })
       if (dateFrom) params.set('from', dateFrom)
       if (dateTo) params.set('to', dateTo)
+      if (statusFilter) params.set('status', statusFilter)
       const res = await fetch(`/api/pos/sales?${params}`)
       const json = await res.json()
       const rows: SaleRow[] = json.data ?? []
@@ -112,7 +113,8 @@ export default function SalesPage() {
         refundCount: refunds.length
       }
     },
-    enabled: !!activeBranch
+    enabled: !!activeBranch,
+    placeholderData: (prev) => prev,
   })
 
   const { data: detail = null, isLoading: detailLoading } = useQuery<SaleDetail | null>({
@@ -127,7 +129,7 @@ export default function SalesPage() {
     enabled: !!detailId && detailOpen
   })
 
-  const sales = statusFilter && salesData ? salesData.rows.filter(r => r.payment_status === statusFilter) : (salesData?.rows ?? [])
+  const sales = salesData?.rows ?? []
   const total = salesData?.total ?? 0
   const summary = {
     totalSales: salesData?.rows.filter(r => !r.is_refund).length ?? 0,

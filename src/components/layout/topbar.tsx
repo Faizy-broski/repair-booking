@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
-import { Bell, Menu, ChevronDown, MessageSquare, ArrowRight, User, Settings, LogOut, Megaphone, Info, AlertTriangle, Wrench, X } from 'lucide-react'
+import { Menu, ChevronDown, MessageSquare, ArrowRight, User, Settings, LogOut, Megaphone, Info, AlertTriangle, Wrench, X } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 import { useMessageStore } from '@/store/message.store'
 import { useBroadcastsStore } from '@/store/broadcasts.store'
@@ -52,9 +52,9 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     clearAuthStore()
     queryClient.clear()
     const supabase = createClient()
-    // scope: 'global' revokes the refresh token server-side, so the session can't
-    // be reused even if the shared .repairbooking.co.uk cookie isn't cleared by the browser
-    await supabase.auth.signOut({ scope: 'global' })
+    // scope: 'local' clears only this browser's session cookie — other devices
+    // (other browser tabs, other staff members) remain logged in independently.
+    await supabase.auth.signOut({ scope: 'local' })
     // Full-page navigation to the ROOT domain login — not router.push (which would
     // stay on this subdomain and risk re-using the stale shared cookie)
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
@@ -176,7 +176,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
             className="relative rounded-xl p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface"
             aria-label={unreadCount > 0 ? `${unreadCount} unread messages` : 'Messages'}
           >
-            <Bell style={{ width: '1.125rem', height: '1.125rem' }} />
+            <MessageSquare style={{ width: '1.125rem', height: '1.125rem' }} />
             {unreadCount > 0 && (
               <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-error px-0.5 text-[10px] font-bold leading-none text-on-error ring-2 ring-surface-container-lowest">
                 {unreadCount > 99 ? '99+' : unreadCount}
@@ -185,7 +185,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           </button>
 
           {bellOpen && (
-            <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-outline-variant bg-surface-container-lowest shadow-xl">
+            <div className="absolute left-1/2 -translate-x-1/2 top-full z-50 mt-2 w-80 rounded-xl border border-outline-variant bg-surface-container-lowest shadow-xl">
               {/* Header */}
               <div className="flex items-center justify-between border-b border-outline-variant px-4 py-3">
                 <h3 className="text-sm font-semibold text-on-surface">Messages</h3>
@@ -218,7 +218,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
                       >
                         <div className="flex items-start justify-between gap-2">
                           <p className="truncate text-sm font-semibold text-on-surface">
-                            {msg.subject || '(no subject)'}
+                            {msg.subject || msg.body?.slice(0, 40) || 'New message'}
                           </p>
                           <span className="shrink-0 text-[11px] text-on-surface-variant">
                             {formatDateTime(msg.created_at)}

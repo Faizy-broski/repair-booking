@@ -40,8 +40,8 @@ export const PosService = {
     return data as string
   },
 
-  async getSales(branchId: string, params: { page?: number; limit?: number; from?: string; to?: string }) {
-    const { page = 1, limit = 20, from, to } = params
+  async getSales(branchId: string, params: { page?: number; limit?: number; from?: string; to?: string; status?: string }) {
+    const { page = 1, limit = 20, from, to, status } = params
     let q = adminSupabase
       .from('sales')
       .select('*, customers(first_name,last_name), profiles!cashier_id(full_name)', { count: 'exact' })
@@ -51,6 +51,7 @@ export const PosService = {
 
     if (from) q = q.gte('created_at', from)
     if (to) q = q.lte('created_at', to)
+    if (status) q = q.eq('payment_status', status)
 
     const { data, error, count } = await q
     if (error) throw error

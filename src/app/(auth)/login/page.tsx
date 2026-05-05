@@ -188,7 +188,7 @@ function LoginForm() {
       } else {
         // Fire-and-forget signOut so the error shows immediately without
         // waiting for the network round-trip.
-        supabase.auth.signOut().catch(() => {})
+        supabase.auth.signOut({ scope: 'local' }).catch(() => {})
         clearAuthStore()
         invalidateModuleConfig()
         setServerError(
@@ -204,7 +204,7 @@ function LoginForm() {
     // invalid-credentials message. Fire-and-forget the signOut so the error
     // appears instantly without awaiting the network round-trip.
     if (isSuperAdmin) {
-      supabase.auth.signOut().catch(() => {})
+      supabase.auth.signOut({ scope: 'local' }).catch(() => {})
       clearAuthStore()
       invalidateModuleConfig()
       setServerError('Invalid credentials. Please check your email and password.')
@@ -216,7 +216,7 @@ function LoginForm() {
     // business ID — this is a synchronous check, no DB query needed.
     if (subdomainBusinessId && profile) {
       if ((profile as { business_id: string }).business_id !== subdomainBusinessId) {
-        supabase.auth.signOut().catch(() => {})
+        supabase.auth.signOut({ scope: 'local' }).catch(() => {})
         clearAuthStore()
         invalidateModuleConfig()
         setServerError('Invalid credentials. Please check your email and password.')
