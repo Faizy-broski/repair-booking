@@ -328,9 +328,11 @@ export default function RepairsPage() {
   const [existingMode, setExistingMode] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<SelectedCustomer | null>(null)
   const [newCust, setNewCust] = useState(EMPTY_NEW_CUST)
+  const [phoneError, setPhoneError] = useState('')
   const [jobData, setJobData] = useState(EMPTY_JOB)
   const [submitting, setSubmitting] = useState(false)
   const [step1Error, setStep1Error] = useState('')
+  const [chargesError, setChargesError] = useState('')
 
   const [emailPrompt, setEmailPrompt] = useState<{ repairId: string; jobNumber: string } | null>(null)
   const [slipRepair, setSlipRepair] = useState<RepairRow | null>(null)
@@ -345,6 +347,7 @@ export default function RepairsPage() {
   const [editRepair, setEditRepair] = useState<RepairRow | null>(null)
   const [editData, setEditData] = useState({ due_date: '', estimated_cost: '', deposit_paid: '', payment_method: '' as '' | 'cash' | 'card', status: '' })
   const [editSaving, setEditSaving] = useState(false)
+  const [editErrors, setEditErrors] = useState<{ due_date?: string; estimated_cost?: string; deposit_paid?: string }>({})
 
   // Declare before the lazy queries that use them as enabled guards
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false)
@@ -536,11 +539,24 @@ export default function RepairsPage() {
       payment_method: (cf.payment_method as '' | 'cash' | 'card') ?? '',
       status: r.status ?? '',
     })
+    setEditErrors({})
     setEditOpen(true)
   }
 
   async function saveEdit() {
     if (!editRepair) return
+    // Validate required fields
+    const errs: { due_date?: string; estimated_cost?: string; deposit_paid?: string } = {}
+    if (!editData.due_date) errs.due_date = 'Due date is required.'
+    else if (editData.due_date < new Date().toISOString().split('T')[0]) errs.due_date = 'Due date cannot be in the past.'
+    const costVal = parseFloat(editData.estimated_cost)
+    if (editData.estimated_cost.trim() === '' || isNaN(costVal) || costVal < 0)
+      errs.estimated_cost = 'Total Repair Charges is required and must be a valid amount.'
+    const depositVal = parseFloat(editData.deposit_paid)
+    if (editData.deposit_paid.trim() === '' || isNaN(depositVal) || depositVal < 0)
+      errs.deposit_paid = 'Deposit is required and must be a valid amount.'
+    if (Object.keys(errs).length > 0) { setEditErrors(errs); return }
+    setEditErrors({})
     setEditSaving(true)
     try {
       const cf = (editRepair.custom_fields as any) ?? {}
@@ -582,6 +598,8 @@ export default function RepairsPage() {
     setNewCust(EMPTY_NEW_CUST)
     setJobData(EMPTY_JOB)
     setStep1Error('')
+    setPhoneError('')
+    setChargesError('')
     setModalOpen(true)
   }
 
@@ -595,6 +613,18 @@ export default function RepairsPage() {
     }
   }, [searchParams, pathname, router])
 
+  /** Allow digits, +, spaces, hyphens, parentheses — min 6 digits, max 15 digits (E.164 standard) */
+  function validatePhone(value: string): string {
+    const trimmed = value.trim()
+    if (!trimmed) return 'Phone number is required.'
+    if (/[a-zA-Z]/.test(trimmed)) return 'Phone number must not contain letters.'
+    const digits = trimmed.replace(/\D/g, '')
+    if (digits.length < 6) return 'Phone number is too short (minimum 6 digits).'
+    if (digits.length > 15) return 'Phone number is too long (maximum 15 digits).'
+    if (!/^[+\d][\d\s\-().]*$/.test(trimmed)) return 'Phone number contains invalid characters.'
+    return ''
+  }
+
   async function goToStep2() {
     setStep1Error('')
     if (existingMode) {
@@ -602,7 +632,9 @@ export default function RepairsPage() {
       setModalStep(2)
     } else {
       if (!newCust.first_name.trim()) { setStep1Error('Customer name is required.'); return }
-      if (!newCust.phone.trim()) { setStep1Error('Phone number is required.'); return }
+      const pErr = validatePhone(newCust.phone)
+      if (pErr) { setPhoneError(pErr); return }
+      setPhoneError('')
       setModalStep(2)
     }
   }
@@ -610,6 +642,12 @@ export default function RepairsPage() {
   async function createRepair() {
     if (!activeBranch) return
     if (jobData.faults.length === 0) return
+    const totalVal = parseFloat(jobData.estimated_cost)
+    if (!jobData.estimated_cost.trim() || isNaN(totalVal) || totalVal < 0) {
+      setChargesError('Total Charges is required and must be a valid amount.')
+      return
+    }
+    setChargesError('')
     setSubmitting(true)
 
     let customerId = selectedCustomer?.id ?? null
@@ -1230,7 +1268,7 @@ export default function RepairsPage() {
             <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
               <button
                 type="button"
-                onClick={() => { setExistingMode((v) => !v); setSelectedCustomer(null); setStep1Error('') }}
+                onClick={() => { setExistingMode((v) => !v); setSelectedCustomer(null); setStep1Error(''); setPhoneError('') }}
                 className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${existingMode ? 'bg-gray-900' : 'bg-gray-300'}`}
               >
                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${existingMode ? 'translate-x-6' : 'translate-x-1'}`} />
@@ -1310,9 +1348,27 @@ export default function RepairsPage() {
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Phone Number <span className="text-red-400">*</span></label>
-                    <input value={newCust.phone} onChange={(e) => setNewCust((p) => ({ ...p, phone: e.target.value }))}
-                      placeholder="Enter Phone Number"
-                      className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm transition focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+                    <input
+                      type="tel"
+                      value={newCust.phone}
+                      onChange={(e) => {
+                        // Only allow: digits, +, spaces, hyphens, parentheses, dots
+                        const filtered = e.target.value.replace(/[^\d+\s\-().]/g, '')
+                        setNewCust((p) => ({ ...p, phone: filtered }))
+                        if (phoneError) setPhoneError(validatePhone(filtered))
+                      }}
+                      onBlur={() => setPhoneError(validatePhone(newCust.phone))}
+                      placeholder="e.g. +44 7911 123456"
+                      maxLength={20}
+                      className={`h-9 w-full rounded-lg border px-3 text-sm transition focus:outline-none focus:ring-2 ${
+                        phoneError
+                          ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20'
+                          : 'border-gray-300 focus:border-gray-900 focus:ring-gray-900/10'
+                      }`}
+                    />
+                    {phoneError && (
+                      <p className="mt-1 text-xs text-red-500">{phoneError}</p>
+                    )}
                   </div>
                 </div>
                 <div>
@@ -1496,8 +1552,29 @@ export default function RepairsPage() {
                     <label className={lbl}>Total Charges <span className="text-red-400">*</span></label>
                     <div className="relative">
                       <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">£</span>
-                      <input type="number" step="0.01" min="0" value={jobData.estimated_cost} onChange={(e) => setJobData((p) => ({ ...p, estimated_cost: e.target.value }))} placeholder="0.00" className={`${inp} pl-6`} />
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={jobData.estimated_cost}
+                        onChange={(e) => {
+                          setJobData((p) => ({ ...p, estimated_cost: e.target.value }))
+                          if (chargesError) {
+                            const v = parseFloat(e.target.value)
+                            setChargesError(!e.target.value.trim() || isNaN(v) || v < 0 ? 'Total Charges is required and must be a valid amount.' : '')
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const v = parseFloat(e.target.value)
+                          setChargesError(!e.target.value.trim() || isNaN(v) || v < 0 ? 'Total Charges is required and must be a valid amount.' : '')
+                        }}
+                        placeholder="0.00"
+                        className={`${inp} pl-6 ${chargesError ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20' : ''}`}
+                      />
                     </div>
+                    {chargesError && (
+                      <p className="mt-1 text-xs text-red-500">{chargesError}</p>
+                    )}
                   </div>
                   <div>
                     <label className={lbl}>Deposit</label>
@@ -1605,7 +1682,7 @@ export default function RepairsPage() {
                 </button>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => setModalOpen(false)}>Cancel</Button>
-                  <Button onClick={createRepair} loading={submitting} disabled={jobData.faults.length === 0}>
+                  <Button onClick={createRepair} loading={submitting} disabled={jobData.faults.length === 0 || !jobData.estimated_cost.trim() || isNaN(parseFloat(jobData.estimated_cost)) || parseFloat(jobData.estimated_cost) < 0}>
                     Create Job
                   </Button>
                 </div>
@@ -1634,19 +1711,72 @@ export default function RepairsPage() {
               {/* Due Date */}
               <div>
                 <label className={lbl}>Due Date <span className="text-red-500">*</span></label>
-                <input type="date" value={editData.due_date} onChange={(e) => setEditData((p) => ({ ...p, due_date: e.target.value }))} className={inp} />
+                <input
+                  type="date"
+                  min={new Date().toISOString().split('T')[0]}
+                  value={editData.due_date}
+                  onChange={(e) => {
+                    setEditData((p) => ({ ...p, due_date: e.target.value }))
+                    const today = new Date().toISOString().split('T')[0]
+                    setEditErrors((p) => ({ ...p, due_date: !e.target.value ? 'Due date is required.' : e.target.value < today ? 'Due date cannot be in the past.' : undefined }))
+                  }}
+                  onBlur={(e) => {
+                    const today = new Date().toISOString().split('T')[0]
+                    setEditErrors((p) => ({ ...p, due_date: !e.target.value ? 'Due date is required.' : e.target.value < today ? 'Due date cannot be in the past.' : undefined }))
+                  }}
+                  className={`${inp} ${editErrors.due_date ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20' : ''}`}
+                />
+                {editErrors.due_date && <p className="mt-1 text-xs text-red-500">{editErrors.due_date}</p>}
               </div>
 
               {/* Total Repair Charges */}
               <div>
                 <label className={lbl}>Total Repair Charges <span className="text-red-500">*</span></label>
-                <input type="number" step="0.01" min="0" value={editData.estimated_cost} onChange={(e) => setEditData((p) => ({ ...p, estimated_cost: e.target.value }))} placeholder="0.00" className={inp} />
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editData.estimated_cost}
+                  onChange={(e) => {
+                    setEditData((p) => ({ ...p, estimated_cost: e.target.value }))
+                    if (editErrors.estimated_cost) {
+                      const v = parseFloat(e.target.value)
+                      setEditErrors((p) => ({ ...p, estimated_cost: !e.target.value.trim() || isNaN(v) || v < 0 ? 'Total Repair Charges is required and must be a valid amount.' : undefined }))
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const v = parseFloat(e.target.value)
+                    if (!e.target.value.trim() || isNaN(v) || v < 0) setEditErrors((p) => ({ ...p, estimated_cost: 'Total Repair Charges is required and must be a valid amount.' }))
+                  }}
+                  placeholder="0.00"
+                  className={`${inp} ${editErrors.estimated_cost ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20' : ''}`}
+                />
+                {editErrors.estimated_cost && <p className="mt-1 text-xs text-red-500">{editErrors.estimated_cost}</p>}
               </div>
 
               {/* Deposit */}
               <div>
                 <label className={lbl}>Deposit <span className="text-red-500">*</span></label>
-                <input type="number" step="0.01" min="0" value={editData.deposit_paid} onChange={(e) => setEditData((p) => ({ ...p, deposit_paid: e.target.value }))} placeholder="Enter Deposit Amount" className={inp} />
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editData.deposit_paid}
+                  onChange={(e) => {
+                    setEditData((p) => ({ ...p, deposit_paid: e.target.value }))
+                    if (editErrors.deposit_paid) {
+                      const v = parseFloat(e.target.value)
+                      setEditErrors((p) => ({ ...p, deposit_paid: !e.target.value.trim() || isNaN(v) || v < 0 ? 'Deposit is required and must be a valid amount.' : undefined }))
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const v = parseFloat(e.target.value)
+                    if (!e.target.value.trim() || isNaN(v) || v < 0) setEditErrors((p) => ({ ...p, deposit_paid: 'Deposit is required and must be a valid amount.' }))
+                  }}
+                  placeholder="Enter Deposit Amount"
+                  className={`${inp} ${editErrors.deposit_paid ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20' : ''}`}
+                />
+                {editErrors.deposit_paid && <p className="mt-1 text-xs text-red-500">{editErrors.deposit_paid}</p>}
               </div>
 
               {/* Remaining Charges */}

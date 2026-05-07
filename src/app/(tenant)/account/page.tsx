@@ -1,9 +1,11 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import {
   User, CreditCard, Receipt, CheckCircle2, AlertTriangle,
   Clock, Download, ExternalLink, Loader2, RefreshCw, Zap, PlayCircle, XCircle,
+  Camera, Trash2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
@@ -104,7 +106,7 @@ function StatusBadge({ status }: { status: string }) {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AccountPage() {
-  const { profile, subscriptionStatus, isOwner } = useAuthStore()
+  const { profile, subscriptionStatus, isOwner, setProfile } = useAuthStore()
   const router = useRouter()
   const { restart: restartTour } = useTour(profile?.id ?? null)
   const hasAccess = subscriptionStatus === null || subscriptionStatus.hasAccess
@@ -118,6 +120,50 @@ export default function AccountPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [plans, setPlans] = useState<Plan[]>([])
   const [openingPortal, setOpeningPortal] = useState(false)
+
+  // Avatar state
+  const avatarFileRef = useRef<HTMLInputElement>(null)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [avatarRemoving, setAvatarRemoving] = useState(false)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
+
+  async function handleAvatarUpload(file: File) {
+    setAvatarError(null)
+    setAvatarUploading(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch('/api/account/avatar', { method: 'POST', body: form })
+      const json = await res.json()
+      if (!res.ok) {
+        setAvatarError(json.error ?? 'Upload failed')
+      } else if (profile) {
+        setProfile({ ...profile, avatar_url: json.url })
+      }
+    } catch {
+      setAvatarError('Network error — please try again')
+    } finally {
+      setAvatarUploading(false)
+    }
+  }
+
+  async function handleAvatarRemove() {
+    setAvatarError(null)
+    setAvatarRemoving(true)
+    try {
+      const res = await fetch('/api/account/avatar', { method: 'DELETE' })
+      const json = await res.json()
+      if (!res.ok) {
+        setAvatarError(json.error ?? 'Remove failed')
+      } else if (profile) {
+        setProfile({ ...profile, avatar_url: null })
+      }
+    } catch {
+      setAvatarError('Network error — please try again')
+    } finally {
+      setAvatarRemoving(false)
+    }
+  }
 
   // Fetch account + subscription details
   useEffect(() => {
@@ -289,12 +335,90 @@ export default function AccountPage() {
                 <Loader2 className="h-6 w-6 animate-spin text-on-surface-variant" />
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <InfoRow label="Full name"   value={accountData?.user.full_name ?? profile?.full_name ?? '—'} />
-                <InfoRow label="Email"       value={accountData?.user.email ?? '—'} />
-                <InfoRow label="Role"        value={profile?.role?.replace(/_/g, ' ') ?? '—'} capitalize />
-                <InfoRow label="Business"    value={accountData?.business.name ?? '—'} />
-              </div>
+              <>
+                {/* ── Avatar section ─────────────────────────────────── */}
+                <div className="flex items-center gap-5">
+                  {/* Avatar circle */}
+                  <div className="relative shrink-0">
+                    <div className="h-20 w-20 rounded-full overflow-hidden ring-2 ring-outline-variant bg-gradient-to-br from-primary to-primary-dim flex items-center justify-center">
+                      {profile?.avatar_url ? (
+                        <Image
+                          src={profile.avatar_url}
+                          alt={profile.full_name ?? 'Avatar'}
+                          width={80}
+                          height={80}
+                          className="h-full w-full object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <span className="text-2xl font-bold text-on-primary">
+                          {(profile?.full_name ?? accountData?.user.full_name ?? 'U').charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    {/* Camera overlay button */}
+                    {(avatarUploading || avatarRemoving) && (
+                      <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center">
+                        <Loader2 className="h-5 w-5 animate-spin text-white" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Upload / remove actions */}
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 text-xs"
+                        onClick={() => avatarFileRef.current?.click()}
+                        disabled={avatarUploading || avatarRemoving}
+                      >
+                        <Camera className="h-3.5 w-3.5" />
+                        {profile?.avatar_url ? 'Change photo' : 'Upload photo'}
+                      </Button>
+                      {profile?.avatar_url && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-2 text-xs text-error hover:text-error hover:bg-error/10"
+                          onClick={handleAvatarRemove}
+                          disabled={avatarUploading || avatarRemoving}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-xs text-on-surface-variant">JPG, PNG or WebP · max 2 MB</p>
+                    {avatarError && (
+                      <p className="text-xs text-error">{avatarError}</p>
+                    )}
+                  </div>
+
+                  {/* Hidden file input */}
+                  <input
+                    ref={avatarFileRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) handleAvatarUpload(file)
+                      e.target.value = ''
+                    }}
+                  />
+                </div>
+
+                <div className="h-px bg-outline-variant" />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <InfoRow label="Full name"   value={accountData?.user.full_name ?? profile?.full_name ?? '—'} />
+                  <InfoRow label="Email"       value={accountData?.user.email ?? '—'} />
+                  <InfoRow label="Role"        value={profile?.role?.replace(/_/g, ' ') ?? '—'} capitalize />
+                  <InfoRow label="Business"    value={accountData?.business.name ?? '—'} />
+                </div>
+              </>
             )}
           </div>
 

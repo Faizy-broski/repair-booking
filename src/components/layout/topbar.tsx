@@ -6,6 +6,7 @@ import { useMessageStore } from '@/store/message.store'
 import { useBroadcastsStore } from '@/store/broadcasts.store'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { formatDateTime } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { queryClient } from '@/lib/query-client'
@@ -258,8 +259,19 @@ export function Topbar({ onMenuClick }: TopbarProps) {
             onClick={() => setUserOpen((v) => !v)}
             className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 transition-colors hover:bg-surface-container-low"
           >
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-dim text-xs font-bold text-on-primary shadow-sm shadow-primary/30">
-              {initials}
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full overflow-hidden bg-gradient-to-br from-primary to-primary-dim text-xs font-bold text-on-primary shadow-sm shadow-primary/30">
+              {profile?.avatar_url ? (
+                <Image
+                  src={profile.avatar_url}
+                  alt={profile.full_name ?? 'Avatar'}
+                  width={28}
+                  height={28}
+                  className="h-full w-full object-cover"
+                  unoptimized
+                />
+              ) : (
+                initials
+              )}
             </div>
             {profile?.full_name && (
               <span className="hidden text-sm font-medium text-on-surface sm:block max-w-[120px] truncate">

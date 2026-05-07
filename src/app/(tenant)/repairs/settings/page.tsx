@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Plus, Pencil, Trash2, Check, X } from 'lucide-react'
+import { ArrowLeft, Plus, Pencil, Trash2, Check, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -122,6 +122,7 @@ export default function RepairSettingsPage() {
     setAddingStatus(false)
     setStatusSaving(false)
     queryClient.invalidateQueries({ queryKey: ['repair-custom-statuses'] })
+    queryClient.invalidateQueries({ queryKey: ['repairs-meta'] })
   }
 
   async function updateStatus() {
@@ -135,6 +136,7 @@ export default function RepairSettingsPage() {
     setEditingStatus(null)
     setStatusSaving(false)
     queryClient.invalidateQueries({ queryKey: ['repair-custom-statuses'] })
+    queryClient.invalidateQueries({ queryKey: ['repairs-meta'] })
   }
 
   async function deleteStatus(id: string, name: string) {
@@ -148,8 +150,13 @@ export default function RepairSettingsPage() {
     const res = await fetch(`/api/repairs/${endpoint}/${confirmDelete.id}`, { method: 'DELETE' })
     if (res.ok) {
       toast.success(`${confirmDelete.type === 'status' ? 'Status' : 'Fault'} "${confirmDelete.name}" deleted.`)
-      if (confirmDelete.type === 'status') queryClient.invalidateQueries({ queryKey: ['repair-custom-statuses'] })
-      else queryClient.invalidateQueries({ queryKey: ['repair-faults'] })
+      if (confirmDelete.type === 'status') {
+        queryClient.invalidateQueries({ queryKey: ['repair-custom-statuses'] })
+        queryClient.invalidateQueries({ queryKey: ['repairs-meta'] })
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['repair-faults'] })
+        queryClient.invalidateQueries({ queryKey: ['repairs-meta'] })
+      }
       setConfirmDelete(null)
     } else {
       toast.error(`Failed to delete ${confirmDelete.type}.`)
@@ -172,6 +179,7 @@ export default function RepairSettingsPage() {
         toast.success('Default settings seeded successfully')
         queryClient.invalidateQueries({ queryKey: ['repair-custom-statuses'] })
         queryClient.invalidateQueries({ queryKey: ['repair-faults'] })
+        queryClient.invalidateQueries({ queryKey: ['repairs-meta'] })
       } else {
         toast.error('Failed to seed defaults')
       }
@@ -195,6 +203,7 @@ export default function RepairSettingsPage() {
     setAddingFault(false)
     setFaultSaving(false)
     queryClient.invalidateQueries({ queryKey: ['repair-faults'] })
+    queryClient.invalidateQueries({ queryKey: ['repairs-meta'] })
   }
 
   async function updateFault() {
@@ -208,6 +217,7 @@ export default function RepairSettingsPage() {
     setEditingFault(null)
     setFaultSaving(false)
     queryClient.invalidateQueries({ queryKey: ['repair-faults'] })
+    queryClient.invalidateQueries({ queryKey: ['repairs-meta'] })
   }
 
   async function deleteFault(id: string, name: string) {
@@ -260,7 +270,10 @@ export default function RepairSettingsPage() {
       {tab === 'status' && (
         <div className="mt-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Manage Statuses</h2>
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              Manage Statuses
+              {statusLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
+            </h2>
             <div className="flex gap-2">
               {statuses.length === 0 && !statusLoading && (
                 <Button variant="outline" onClick={seedDefaults} loading={isSeeding}>
@@ -405,7 +418,10 @@ export default function RepairSettingsPage() {
       {tab === 'faults' && (
         <div className="mt-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Manage Faults</h2>
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              Manage Faults
+              {faultLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
+            </h2>
             <div className="flex gap-2">
               {faults.length === 0 && !faultLoading && (
                 <Button variant="outline" onClick={seedDefaults} loading={isSeeding}>

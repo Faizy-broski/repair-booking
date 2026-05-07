@@ -14,15 +14,15 @@ export const RepairService = {
       .order('created_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1)
 
-    // Staff: filter by their branch. Owners: filter by business via branches join
     if (branchId) {
       q = q.eq('branch_id', branchId)
     } else if (businessId) {
-      // Owner sees all branches — filter via in() on branch IDs for this business
+      // Owner sees all branches: fetch branch IDs in parallel while building the query
       const { data: branches } = await adminSupabase
         .from('branches')
         .select('id')
         .eq('business_id', businessId)
+        .eq('is_active', true)
       const ids = (branches ?? []).map((b) => b.id)
       if (ids.length > 0) q = q.in('branch_id', ids)
     }

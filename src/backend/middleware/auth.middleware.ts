@@ -1,12 +1,22 @@
 import { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { unauthorized } from '@/backend/utils/api-response'
+import { adminSupabase } from '@/backend/config/supabase'
 
 export interface AuthContext {
   userId: string
   role: string
   businessId: string | null
   branchId: string | null
+}
+
+// Profile cache: avoids a DB round-trip on every request.
+// TTL is short so role/branch changes propagate within 2 minutes.
+const profileCache = new Map<string, { ctx: Omit<AuthContext, 'userId'>; expires: number }>()
+const PROFILE_TTL_MS = 2 * 60 * 1000
+
+export function invalidateProfileCache(userId: string) {
+  profileCache.delete(userId)
 }
 
 export async function authMiddleware(
@@ -29,7 +39,14 @@ export async function authMiddleware(
     return { context: null, error: unauthorized() }
   }
 
-  const { data: profile } = await supabase
+  const now = Date.now()
+  const cached = profileCache.get(user.id)
+  if (cached && cached.expires > now) {
+    return { context: { userId: user.id, ...cached.ctx }, error: null }
+  }
+
+  // Use admin client so we don't need an extra Supabase auth round-trip for the query
+  const { data: profile } = await adminSupabase
     .from('profiles')
     .select('role, business_id, branch_id')
     .eq('id', user.id)
@@ -39,13 +56,8 @@ export async function authMiddleware(
     return { context: null, error: unauthorized('Profile not found') }
   }
 
-  return {
-    context: {
-      userId: user.id,
-      role: profile.role,
-      businessId: profile.business_id,
-      branchId: profile.branch_id,
-    },
-    error: null,
-  }
+  const ctx = { role: profile.role, businessId: profile.business_id, branchId: profile.branch_id }
+  profileCache.set(user.id, { ctx, expires: now + PROFILE_TTL_MS })
+
+  return { context: { userId: user.id, ...ctx }, error: null }
 }

@@ -58,6 +58,32 @@ export const ActivityLogService = {
 
 // ── IP Whitelist ──────────────────────────────────────────────────────────────
 
+// Cache keyed by `${businessId}:${profileId}` → set of allowed IPs (null = no whitelist)
+// TTL of 5 min is fine; admins can force a refresh by re-saving a whitelist entry.
+const _whitelistCache = new Map<string, { ips: Set<string> | null; expires: number }>()
+const WHITELIST_TTL_MS = 5 * 60 * 1000
+
+function _clearWhitelistCache(businessId: string, profileId: string) {
+  _whitelistCache.delete(`${businessId}:${profileId}`)
+}
+
+async function _loadWhitelist(businessId: string, profileId: string): Promise<Set<string> | null> {
+  const key = `${businessId}:${profileId}`
+  const now = Date.now()
+  const cached = _whitelistCache.get(key)
+  if (cached && cached.expires > now) return cached.ips
+
+  // Single query fetches all IPs for this user — no whitelist = allow all
+  const { data } = await db('employee_ip_whitelist')
+    .select('ip_address')
+    .eq('business_id', businessId)
+    .eq('profile_id', profileId)
+
+  const ips = data && data.length > 0 ? new Set<string>(data.map((r: any) => r.ip_address)) : null
+  _whitelistCache.set(key, { ips, expires: now + WHITELIST_TTL_MS })
+  return ips
+}
+
 export const IpWhitelistService = {
   async list(businessId: string, profileId: string) {
     const { data, error } = await db('employee_ip_whitelist')
@@ -87,33 +113,25 @@ export const IpWhitelistService = {
       .select()
       .single()
     if (error) throw error
+    _clearWhitelistCache(businessId, profileId)
     return data
   },
 
   async remove(id: string, businessId: string) {
+    // Fetch the row first so we can bust the right cache key
+    const { data: row } = await db('employee_ip_whitelist').select('profile_id').eq('id', id).maybeSingle()
     const { error } = await db('employee_ip_whitelist')
       .delete()
       .eq('id', id)
       .eq('business_id', businessId)
     if (error) throw error
+    if (row?.profile_id) _clearWhitelistCache(businessId, row.profile_id)
   },
 
-  /** Returns true if this user's IP is allowed (whitelist empty = allow all) */
+  /** Returns true if this user's IP is allowed (whitelist empty = allow all). Single query + cached. */
   async isAllowed(businessId: string, profileId: string, ipAddress: string): Promise<boolean> {
-    const { data } = await db('employee_ip_whitelist')
-      .select('id')
-      .eq('business_id', businessId)
-      .eq('profile_id', profileId)
-
-    if (!data || data.length === 0) return true  // no whitelist = all IPs allowed
-
-    // Check if this IP is in the whitelist
-    const { data: match } = await db('employee_ip_whitelist')
-      .select('id')
-      .eq('business_id', businessId)
-      .eq('profile_id', profileId)
-      .eq('ip_address', ipAddress)
-      .maybeSingle()
-    return match !== null
+    const ips = await _loadWhitelist(businessId, profileId)
+    if (ips === null) return true  // no whitelist = all IPs allowed
+    return ips.has(ipAddress)
   },
 }

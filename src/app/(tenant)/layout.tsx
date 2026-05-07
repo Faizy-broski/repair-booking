@@ -127,6 +127,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
 
       setProfile(profile)
 
+      // Non-critical: fire in background, don't block setLoading
       if (profile.business_id) {
         supabase
           .from('businesses')
@@ -134,6 +135,30 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
           .eq('id', profile.business_id)
           .single()
           .then(({ data }) => { if (data?.currency) setCurrency(data.currency) })
+
+        supabase
+          .from('subscriptions')
+          .select('status, trial_ends_at, current_period_end, plans(name, plan_type)')
+          .eq('business_id', profile.business_id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+          .then(({ data: sub }) => {
+            const plans = sub?.plans as { name?: string; plan_type?: string } | null
+            const planType = (plans?.plan_type ?? null) as SubscriptionStatus['planType']
+            const planName = plans?.name ?? null
+            const trialEndsAt = sub?.trial_ends_at ?? null
+            const freeTrialExpired = planType === 'free' && trialEndsAt && new Date(trialEndsAt) < new Date()
+            const paidSubInactive = planType === 'paid' && sub?.status && !['active', 'trialing'].includes(sub.status)
+            setSubscriptionStatus({
+              status: sub?.status ?? null,
+              planType,
+              planName,
+              trialEndsAt,
+              currentPeriodEnd: (sub as any)?.current_period_end ?? null,
+              hasAccess: !freeTrialExpired && !paidSubInactive,
+            })
+          })
       }
 
       if (profile.business_id) {
@@ -168,32 +193,6 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
             fetchConfigs(resolvedBranch.id)
           }
         }
-      }
-
-      if (profile.business_id) {
-        supabase
-          .from('subscriptions')
-          .select('status, trial_ends_at, current_period_end, plans(name, plan_type)')
-          .eq('business_id', profile.business_id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-          .then(({ data: sub }) => {
-            const plans = sub?.plans as { name?: string; plan_type?: string } | null
-            const planType = (plans?.plan_type ?? null) as SubscriptionStatus['planType']
-            const planName = plans?.name ?? null
-            const trialEndsAt = sub?.trial_ends_at ?? null
-            const freeTrialExpired = planType === 'free' && trialEndsAt && new Date(trialEndsAt) < new Date()
-            const paidSubInactive = planType === 'paid' && sub?.status && !['active', 'trialing'].includes(sub.status)
-            setSubscriptionStatus({
-              status: sub?.status ?? null,
-              planType,
-              planName,
-              trialEndsAt,
-              currentPeriodEnd: (sub as any)?.current_period_end ?? null,
-              hasAccess: !freeTrialExpired && !paidSubInactive,
-            })
-          })
       }
 
       setLoading(false)
