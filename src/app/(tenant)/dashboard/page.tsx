@@ -1,5 +1,5 @@
 'use client'
-import { DollarSign, Wrench, ArrowLeftRight, TrendingUp, AlertTriangle, Clock, Package } from 'lucide-react'
+import { DollarSign, Wrench, ArrowLeftRight, TrendingUp, AlertTriangle, Clock, Package, Receipt } from 'lucide-react'
 import { StatsCard } from '@/components/dashboard/stats-card'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
@@ -14,6 +14,7 @@ interface DashboardStats {
   repairs_open: number
   repairs_completed: number
   repairs_urgent: number
+  repairs_revenue: number
   total_expenses: number
   low_stock_count: number
 }
@@ -123,14 +124,15 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Stats Grid (6 cards) ── */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7">
         {loading ? (
-          Array.from({ length: 6 }).map((_, i) => (
+          Array.from({ length: 7 }).map((_, i) => (
             <div key={i} className="h-28 sm:h-32 animate-pulse rounded-xl bg-surface-container" />
           ))
         ) : (
           <>
-            <StatsCard title="Total Sales" value={formatCurrencyCompact(stats?.total_sales ?? 0)} subtitle="this month" icon={<DollarSign className="h-5 w-5" />} color="green" />
+            <StatsCard title="Sales Revenue" value={formatCurrencyCompact(stats?.total_sales ?? 0)} subtitle="this month" icon={<DollarSign className="h-5 w-5" />} color="green" />
+            <StatsCard title="Repairs Revenue" value={formatCurrencyCompact(stats?.repairs_revenue ?? 0)} subtitle="deposits collected" icon={<Receipt className="h-5 w-5" />} color="purple" />
             <StatsCard title="Transactions" value={stats?.sales_count ?? 0} subtitle="this month" icon={<ArrowLeftRight className="h-5 w-5" />} color="blue" />
             <StatsCard title="Open Repairs" value={stats?.repairs_open ?? 0} icon={<Wrench className="h-5 w-5" />} color="yellow" />
             <StatsCard title="Completed Repairs" value={stats?.repairs_completed ?? 0} subtitle="this month" icon={<Wrench className="h-5 w-5" />} color="green" />

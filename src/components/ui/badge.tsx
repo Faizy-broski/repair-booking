@@ -35,6 +35,7 @@ export const REPAIR_STATUS_VARIANTS: Record<string, BadgeProps['variant']> = {
   repaired:       'success',
   unrepairable:   'destructive',
   collected:      'default',
+  refunded:       'destructive',
 }
 
 export const SUBSCRIPTION_STATUS_VARIANTS: Record<string, BadgeProps['variant']> = {

@@ -29,7 +29,23 @@ export const RepairService = {
 
     if (status) q = q.eq('status', status)
     if (customerId) q = q.eq('customer_id', customerId)
-    if (search) q = q.or(`job_number.ilike.%${search}%,device_model.ilike.%${search}%`)
+    if (search) {
+      // Look up customer IDs that match email or phone so we can include them
+      const { data: matchedCustomers } = await adminSupabase
+        .from('customers')
+        .select('id')
+        .or(`email.ilike.%${search}%,phone.ilike.%${search}%`)
+        .limit(50)
+      const customerIds = (matchedCustomers ?? []).map((c) => c.id)
+
+      if (customerIds.length > 0) {
+        q = q.or(
+          `job_number.ilike.%${search}%,device_model.ilike.%${search}%,customer_id.in.(${customerIds.join(',')})`
+        )
+      } else {
+        q = q.or(`job_number.ilike.%${search}%,device_model.ilike.%${search}%`)
+      }
+    }
 
     const { data, error, count } = await q
     if (error) throw error
@@ -39,7 +55,11 @@ export const RepairService = {
   async getById(id: string, branchId?: string) {
     let q = adminSupabase
       .from('repairs')
-      .select('*, customers(*), repair_items(*), repair_status_history(*,profiles!changed_by(full_name))')
+      .select(
+        // customers(*) is intentional — detail view shows full customer profile
+        // repair_status_history: exclude sms_sent and repair_id (redundant noise)
+        '*, customers(*), repair_items(*), repair_status_history(id,new_status,old_status,note,created_at,email_sent,profiles!changed_by(full_name))'
+      )
       .eq('id', id)
     // branchId is null/empty for business owners who have access to all branches
     if (branchId) q = q.eq('branch_id', branchId)

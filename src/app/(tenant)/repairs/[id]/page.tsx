@@ -79,7 +79,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
   const [newStatus, setNewStatus] = useState('')
   const [statusNote, setStatusNote] = useState('')
   const [updating, setUpdating] = useState(false)
-  const [emailPrompt, setEmailPrompt] = useState<{ repairId: string; jobNumber: string } | null>(null)
+  const [emailPrompt, setEmailPrompt] = useState<{ repairId: string; jobNumber: string; currentStatus: string } | null>(null)
   const [labelIds, setLabelIds] = useState<string[]>([])
   const [showCannedPicker, setShowCannedPicker] = useState(false)
   const [assigningTech, setAssigningTech] = useState(false)
@@ -183,11 +183,13 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
     if (res.ok) {
       setStatusModalOpen(false)
       setStatusNote('')
-      // Invalidate cache — React Query refetches automatically, no manual re-fetch needed
+      // Invalidate this repair's detail + the list for this branch only.
+      // Using the branch prefix avoids invalidating cached lists from other branches.
       queryClient.invalidateQueries({ queryKey: ['repair-detail', id] })
-      queryClient.invalidateQueries({ queryKey: ['repairs'] })
-      if (repair.notify_customer && repair.customers?.email) {
-        setEmailPrompt({ repairId: id, jobNumber: repair.job_number })
+      queryClient.invalidateQueries({ queryKey: ['repairs', activeBranch?.id] })
+      queryClient.invalidateQueries({ queryKey: ['repairs-stats', activeBranch?.id], exact: true })
+      if (repair.customers?.email) {
+        setEmailPrompt({ repairId: id, jobNumber: repair.job_number, currentStatus: newStatus })
       }
     }
     setUpdating(false)
@@ -234,32 +236,34 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-xl font-bold text-gray-900">Job #{repair.job_number}</h1>
-          <div className="mt-1 flex items-center gap-2 flex-wrap">
-            <p className="text-sm text-gray-500">{formatDateTime(repair.created_at)}</p>
-            <LabelPicker repairId={repair.id} selectedIds={labelIds} onChange={setLabelIds} />
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => router.back()} className="shrink-0">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1 min-w-0">
+            <h1 className="truncate text-lg font-bold text-gray-900 sm:text-xl">Job #{repair.job_number}</h1>
+            <p className="text-xs text-gray-500 sm:text-sm">{formatDateTime(repair.created_at)}</p>
           </div>
+          {(() => {
+            const sc = customStatuses.find((cs) => cs.name === repair.status)
+            return (
+              <span
+                className="shrink-0 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold text-white sm:px-3 sm:text-xs"
+                style={{ backgroundColor: sc?.color ?? '#9ca3af' }}
+              >
+                {repair.status}
+              </span>
+            )
+          })()}
+          <Button onClick={() => setStatusModalOpen(true)} size="sm" className="shrink-0">
+            <Edit className="h-4 w-4" />
+            <span className="hidden sm:inline">Update Status</span>
+          </Button>
         </div>
-        {(() => {
-          const sc = customStatuses.find((cs) => cs.name === repair.status)
-          return (
-            <span
-              className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold text-white"
-              style={{ backgroundColor: sc?.color ?? '#9ca3af' }}
-            >
-              {repair.status}
-            </span>
-          )
-        })()}
-        <Button onClick={() => setStatusModalOpen(true)}>
-          <Edit className="h-4 w-4" />
-          Update Status
-        </Button>
+        <div className="pl-10">
+          <LabelPicker repairId={repair.id} selectedIds={labelIds} onChange={setLabelIds} />
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -301,15 +305,15 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
             <InfoRow label="Actual cost" value={repair.actual_cost ? formatCurrency(repair.actual_cost) : null} />
             <InfoRow label="Deposit paid" value={formatCurrency(repair.deposit_paid)} />
             <InfoRow label="Due Date" value={repair.custom_fields?.due_date ? formatDate(repair.custom_fields.due_date) : null} />
-            <div className="flex items-center justify-between py-0.5">
-              <span className="text-gray-500">Assigned Technician</span>
-              <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 py-0.5">
+              <span className="w-24 shrink-0 text-gray-400">Assigned</span>
+              <div className="flex flex-1 items-center gap-2">
                 {assigningTech && <span className="text-xs text-gray-400">Saving…</span>}
                 <select
                   value={repair.assigned_to ?? ''}
                   onChange={(e) => assignTechnician(e.target.value || null)}
                   disabled={assigningTech}
-                  className="h-7 rounded-md border border-gray-200 bg-white px-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none disabled:opacity-50"
+                  className="h-8 min-w-0 flex-1 rounded-md border border-gray-200 bg-white px-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none disabled:opacity-50"
                 >
                   <option value="">— Unassigned —</option>
                   {technicians.map((t) => (
@@ -559,6 +563,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
         <RepairEmailPrompt
           repairId={emailPrompt.repairId}
           jobNumber={emailPrompt.jobNumber}
+          currentStatus={emailPrompt.currentStatus}
           onClose={() => setEmailPrompt(null)}
         />
       )}
@@ -569,9 +574,9 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
 function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null
   return (
-    <div className="flex gap-2">
-      <span className="w-28 shrink-0 text-gray-400">{label}</span>
-      <span className="text-gray-900">{value}</span>
+    <div className="flex flex-wrap gap-x-2 gap-y-0.5">
+      <span className="w-24 shrink-0 text-gray-400">{label}</span>
+      <span className="flex-1 break-words text-gray-900">{value}</span>
     </div>
   )
 }

@@ -56,15 +56,15 @@ export interface NotificationLogEntry {
 // ── Available macros per trigger event ────────────────────────────────────────
 
 export const MACRO_CATALOG: Record<string, string[]> = {
-  ticket_created:         ['customer_name', 'ticket_number', 'device_model', 'store_name', 'store_phone', 'store_email'],
-  ticket_status_changed:  ['customer_name', 'ticket_number', 'device_model', 'status', 'note', 'store_name', 'store_phone'],
-  repair_ready:           ['customer_name', 'ticket_number', 'device_model', 'store_name', 'store_phone', 'store_email'],
+  ticket_created:         ['customer_name', 'ticket_number', 'device_type', 'device_brand', 'device_model', 'issue', 'store_name', 'store_phone', 'store_email'],
+  ticket_status_changed:  ['customer_name', 'ticket_number', 'device_type', 'device_brand', 'device_model', 'issue', 'status', 'note', 'store_name', 'store_phone', 'store_email'],
+  repair_ready:           ['customer_name', 'ticket_number', 'device_type', 'device_brand', 'device_model', 'issue', 'store_name', 'store_phone', 'store_email'],
   invoice_created:        ['customer_name', 'invoice_number', 'total', 'balance_due', 'due_date', 'currency', 'store_name'],
   invoice_overdue:        ['customer_name', 'invoice_number', 'total', 'balance_due', 'due_date', 'currency', 'store_name'],
-  part_arrived:           ['customer_name', 'ticket_number', 'device_model', 'store_name', 'store_phone'],
-  estimate_sent:          ['customer_name', 'ticket_number', 'device_model', 'estimate_total', 'currency', 'store_name'],
-  estimate_approved:      ['customer_name', 'ticket_number', 'device_model', 'estimate_total', 'currency', 'store_name'],
-  estimate_declined:      ['customer_name', 'ticket_number', 'device_model', 'estimate_total', 'currency', 'store_name'],
+  part_arrived:           ['customer_name', 'ticket_number', 'device_type', 'device_brand', 'device_model', 'store_name', 'store_phone'],
+  estimate_sent:          ['customer_name', 'ticket_number', 'device_type', 'device_brand', 'device_model', 'estimate_total', 'currency', 'store_name'],
+  estimate_approved:      ['customer_name', 'ticket_number', 'device_type', 'device_brand', 'device_model', 'estimate_total', 'currency', 'store_name'],
+  estimate_declined:      ['customer_name', 'ticket_number', 'device_type', 'device_brand', 'device_model', 'estimate_total', 'currency', 'store_name'],
   appointment_reminder:   ['customer_name', 'appointment_date', 'appointment_time', 'store_name', 'store_phone', 'store_email'],
 }
 

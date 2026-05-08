@@ -38,6 +38,7 @@ export const GET = withMiddleware(async (_req, ctx) => {
     // ID maps — used by the frontend for inline creation without extra API calls
     const brandIdMap: Record<string, string> = Object.fromEntries((mans ?? []).map(m => [m.name, m.id]))
     const typeIdMap:  Record<string, string> = Object.fromEntries((cats ?? []).map(c => [c.name, c.id]))
+    const modelIdMap: Record<string, string> = Object.fromEntries((devs ?? []).map(d => [d.name, d.id]))
 
     // Construct the "raw" list that the frontend expects for filtering
     const raw = (devs ?? []).map(d => {
@@ -50,7 +51,7 @@ export const GET = withMiddleware(async (_req, ctx) => {
       }
     })
 
-    return ok({ types, brands, models, raw, brandIdMap, typeIdMap })
+    return ok({ types, brands, models, raw, brandIdMap, typeIdMap, modelIdMap })
   } catch (err) {
     return serverError('Failed to fetch device catalogue', err)
   }

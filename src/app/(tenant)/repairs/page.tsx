@@ -7,7 +7,6 @@ import { DataTable } from '@/components/shared/data-table'
 import { AsyncEmployeeSelect } from '@/components/shared/async-employee-select'
 import { Modal } from '@/components/ui/modal'
 import { KanbanBoard } from '@/components/repairs/kanban-board'
-import { CustomerSearch } from '@/components/repairs/customer-search'
 import { CreatableCombobox } from '@/components/ui/creatable-combobox'
 import { useAuthStore } from '@/store/auth.store'
 import { useForm } from 'react-hook-form'
@@ -61,6 +60,7 @@ const EMPTY_JOB = {
   status: '', assigned_to: '',
   lock_type: '' as '' | 'passcode' | 'pattern',
   passcode: '',
+  price_pending: false,
 }
 
 function ActionsMenu({ onEdit, onSlip, onInvoice, onDelete, onMessage }: {
@@ -117,6 +117,16 @@ type DeviceData = {
   raw: { device_type: string | null; device_brand: string | null; device_model: string | null }[]
   brandIdMap: Record<string, string>
   typeIdMap:  Record<string, string>
+  modelIdMap: Record<string, string>
+}
+
+interface RepairLineItem {
+  tempId: string
+  product_id: string | null
+  name: string
+  qty: number
+  unit_price: number
+  unit_cost: number
 }
 
 function ComboInput({ value, onChange, options, placeholder }: {
@@ -325,7 +335,6 @@ export default function RepairsPage() {
   // Modal state
   const [modalOpen, setModalOpen] = useState(false)
   const [modalStep, setModalStep] = useState<1 | 2>(1)
-  const [existingMode, setExistingMode] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<SelectedCustomer | null>(null)
   const [newCust, setNewCust] = useState(EMPTY_NEW_CUST)
   const [phoneError, setPhoneError] = useState('')
@@ -333,8 +342,24 @@ export default function RepairsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [step1Error, setStep1Error] = useState('')
   const [chargesError, setChargesError] = useState('')
+  // Customer autocomplete
+  const [custSuggestions, setCustSuggestions] = useState<SelectedCustomer[]>([])
+  const [showSuggestions, setShowSuggestions] = useState<'name' | 'phone' | 'email' | null>(null)
+  const [custSearchLoading, setCustSearchLoading] = useState(false)
+  const custSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const [emailPrompt, setEmailPrompt] = useState<{ repairId: string; jobNumber: string } | null>(null)
+  // Repair parts state
+  const [repairParts, setRepairParts] = useState<RepairLineItem[]>([])
+  const [partQuery, setPartQuery] = useState('')
+  const [partResults, setPartResults] = useState<Array<{ id: string; name: string; selling_price: number | null; cost_price: number | null }>>([])
+  const [showPartDrop, setShowPartDrop] = useState(false)
+  const [partSearchLoading, setPartSearchLoading] = useState(false)
+  const partSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const partDropRef = useRef<HTMLDivElement>(null)
+  const [quickPartPrice, setQuickPartPrice] = useState('')
+  const [deviceError, setDeviceError] = useState('')
+
+  const [emailPrompt, setEmailPrompt] = useState<{ repairId: string; jobNumber: string; currentStatus: string } | null>(null)
   const [slipRepair, setSlipRepair] = useState<RepairRow | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, jobNumber: string } | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -358,6 +383,16 @@ export default function RepairsPage() {
     function handler(e: MouseEvent) {
       if (colMenuRef.current && !colMenuRef.current.contains(e.target as Node)) {
         setColMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (partDropRef.current && !partDropRef.current.contains(e.target as Node)) {
+        setShowPartDrop(false)
       }
     }
     document.addEventListener('mousedown', handler)
@@ -395,14 +430,9 @@ export default function RepairsPage() {
   // Use local loading only for actions, use repairsLoading for initial data
   useEffect(() => { setLoading(repairsLoading) }, [repairsLoading])
 
-  // Gate for secondary queries: deferred until the repairs list is visible.
-  // On re-visits, repairs are cached so repairsLoading is immediately false
-  // and all secondary queries fire in parallel (fully cached).
-  const afterRepairs = !!activeBranch && !repairsLoading
-
   // ── Single meta call: custom-statuses + faults ─────────────────────────────
-  // Deferred until repairs are shown. staleTime: Infinity — fetched once per
-  // session, only invalidated after settings mutations.
+  // Fires in parallel with repairs — staleTime: Infinity means it's fetched
+  // once per session and never refetched unless explicitly invalidated.
   const { data: metaData } = useQuery<RepairMeta>({
     queryKey: ['repairs-meta', activeBranch?.id],
     queryFn: async () => {
@@ -410,43 +440,42 @@ export default function RepairsPage() {
       const json = await res.json()
       return json.data || { customStatuses: [], faults: [] }
     },
-    enabled: afterRepairs,
+    enabled: !!activeBranch,
     staleTime: Infinity,
   })
   const customStatuses = metaData?.customStatuses ?? []
   const faults         = metaData?.faults         ?? []
 
-  // ── Device catalogue — deferred so modal data loads silently after list ──
-  const { data: deviceData = { types: [], brands: [], models: [], raw: [], brandIdMap: {}, typeIdMap: {} } } = useQuery<DeviceData>({
+  // ── Device catalogue — fires in parallel; staleTime:Infinity so fetched once ──
+  const { data: deviceData = { types: [], brands: [], models: [], raw: [], brandIdMap: {}, typeIdMap: {}, modelIdMap: {} } } = useQuery<DeviceData>({
     queryKey: ['device-data', activeBranch?.id],
     queryFn: async () => {
       const res = await fetch(`/api/repairs/devices?branch_id=${activeBranch!.id}`)
       const json = await res.json()
-      return json.data || { types: [], brands: [], models: [], raw: [], brandIdMap: {}, typeIdMap: {} }
+      return json.data || { types: [], brands: [], models: [], raw: [], brandIdMap: {}, typeIdMap: {}, modelIdMap: {} }
     },
-    enabled: afterRepairs,
+    enabled: !!activeBranch,
     staleTime: Infinity,
   })
 
-  // ── Repair stats — deferred; reuses ['dashboard', branchId] cache ──
+  // ── Repair stats — fires in parallel with repairs ─────────────────────────
   const { data: repairStats = null } = useQuery({
-    queryKey: ['dashboard', activeBranch?.id],
+    queryKey: ['repairs-stats', activeBranch?.id],
     queryFn: async () => {
-      const res = await fetch(`/api/dashboard?branch_id=${activeBranch!.id}`)
+      const res = await fetch(`/api/repairs/stats?branch_id=${activeBranch!.id}`)
       const json = await res.json()
-      return json.data ?? {}
+      return json.data ?? null
     },
-    enabled: afterRepairs,
-    staleTime: 5 * 60 * 1000,
+    enabled: !!activeBranch,
+    staleTime: 60 * 1000,
     select: (d: any) => {
-      const s = d?.stats
-      if (!s) return null
+      if (!d) return null
       return {
-        total_repairs: s.repairs_total ?? (s.repairs_open + s.repairs_completed),
-        repairs_open: s.repairs_open,
-        repairs_completed: s.repairs_completed,
-        repairs_urgent: s.repairs_urgent,
-        total_sales: s.total_sales,
+        total_repairs:     d.repairs_total,
+        repairs_open:      d.repairs_open,
+        repairs_completed: d.repairs_completed,
+        repairs_urgent:    d.repairs_urgent,
+        total_sales:       d.repairs_revenue ?? 0,
       }
     },
   })
@@ -463,6 +492,17 @@ export default function RepairsPage() {
     staleTime: Infinity,
   })
 
+  function invalidateStats() {
+    queryClient.invalidateQueries({ queryKey: ['repairs-stats', activeBranch?.id], exact: true })
+  }
+
+  // Auto-populate total charges from repair parts total
+  useEffect(() => {
+    if (repairParts.length === 0) return
+    const total = repairParts.reduce((s, p) => s + p.unit_price * p.qty, 0)
+    setJobData((prev) => ({ ...prev, estimated_cost: total.toFixed(2) }))
+  }, [repairParts])
+
   function deleteRepair(repairId: string, jobNumber: string) {
     setConfirmDelete({ id: repairId, jobNumber })
   }
@@ -478,7 +518,8 @@ export default function RepairsPage() {
     const res = await fetch(`/api/repairs/${confirmDelete.id}`, { method: 'DELETE' })
     if (res.ok) {
       toast.success(`Repair ${confirmDelete.jobNumber} deleted.`)
-      queryClient.invalidateQueries({ queryKey: ['repairs'] })
+      queryClient.invalidateQueries({ queryKey: repairsQueryKey, exact: true })
+      invalidateStats()
       setConfirmDelete(null)
     } else {
       if (res.status === 403) {
@@ -493,17 +534,16 @@ export default function RepairsPage() {
   async function handleStatusChange(repairId: string, newStatus: string) {
     const previousData = queryClient.getQueryData<RepairListResponse>(repairsQueryKey)
 
-    if (previousData?.data) {
-      queryClient.setQueryData<RepairListResponse>(repairsQueryKey, (old) => {
-        if (!old?.data) return old
-        return {
-          ...old,
-          data: old.data.map((repair: RepairRow) =>
-            repair.id === repairId ? { ...repair, status: newStatus } : repair
-          ),
-        }
-      })
-    }
+    // Optimistic update — status badge in the list flips instantly.
+    queryClient.setQueryData<RepairListResponse>(repairsQueryKey, (old) => {
+      if (!old?.data) return old
+      return {
+        ...old,
+        data: old.data.map((r: RepairRow) =>
+          r.id === repairId ? { ...r, status: newStatus } : r
+        ),
+      }
+    })
 
     const res = await fetch(`/api/repairs/${repairId}/status`, {
       method: 'PATCH',
@@ -511,19 +551,20 @@ export default function RepairsPage() {
       body: JSON.stringify({ status: newStatus, note: '', send_email: false }),
     })
 
-    if (res.ok) {
-      queryClient.invalidateQueries({ queryKey: ['repairs'] })
-    } else {
-      if (previousData) {
-        queryClient.setQueryData(repairsQueryKey, previousData)
-      }
+    if (!res.ok) {
+      if (previousData) queryClient.setQueryData(repairsQueryKey, previousData)
+      queryClient.invalidateQueries({ queryKey: repairsQueryKey, exact: true })
       if (res.status === 403) {
         toast.error("Permission Denied: You don't have permission to update repair status.")
       } else {
         toast.error('Failed to update status.')
       }
-      // Re-fetch to sync state if failed
-      queryClient.invalidateQueries({ queryKey: ['repairs'] })
+    } else {
+      invalidateStats()
+      toast.success('Status updated · Customer notified by email', {
+        icon: '✉️',
+        duration: 3500,
+      })
     }
   }
 
@@ -583,6 +624,7 @@ export default function RepairsPage() {
       toast.success('Repair job updated successfully.')
       setEditOpen(false)
       fetchRepairs()
+      invalidateStats()
     } catch (err: any) {
       console.error('Save edit error:', err)
       toast.error(err.message || 'An error occurred while saving.')
@@ -593,13 +635,20 @@ export default function RepairsPage() {
 
   function openModal() {
     setModalStep(1)
-    setExistingMode(false)
     setSelectedCustomer(null)
     setNewCust(EMPTY_NEW_CUST)
     setJobData(EMPTY_JOB)
     setStep1Error('')
     setPhoneError('')
     setChargesError('')
+    setDeviceError('')
+    setCustSuggestions([])
+    setShowSuggestions(null)
+    setRepairParts([])
+    setPartQuery('')
+    setPartResults([])
+    setShowPartDrop(false)
+    setQuickPartPrice('')
     setModalOpen(true)
   }
 
@@ -627,33 +676,133 @@ export default function RepairsPage() {
 
   async function goToStep2() {
     setStep1Error('')
-    if (existingMode) {
-      if (!selectedCustomer) { setStep1Error('Please search and select an existing customer.'); return }
-      setModalStep(2)
-    } else {
-      if (!newCust.first_name.trim()) { setStep1Error('Customer name is required.'); return }
-      const pErr = validatePhone(newCust.phone)
-      if (pErr) { setPhoneError(pErr); return }
-      setPhoneError('')
-      setModalStep(2)
-    }
+    setShowSuggestions(null)
+    if (selectedCustomer) { setModalStep(2); return }
+    if (!newCust.first_name.trim()) { setStep1Error('Customer name is required.'); return }
+    const pErr = validatePhone(newCust.phone)
+    if (pErr) { setPhoneError(pErr); return }
+    setPhoneError('')
+    setModalStep(2)
+  }
+
+  function triggerCustSearch(q: string, field: 'name' | 'phone' | 'email') {
+    if (custSearchRef.current) clearTimeout(custSearchRef.current)
+    if (!q.trim() || q.length < 2) { setCustSuggestions([]); setShowSuggestions(null); return }
+    setCustSearchLoading(true)
+    custSearchRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/customers?search=${encodeURIComponent(q)}&limit=5`)
+        const json = await res.json()
+        const data = (json.data ?? []) as SelectedCustomer[]
+        setCustSuggestions(data)
+        setShowSuggestions(data.length > 0 ? field : null)
+      } finally {
+        setCustSearchLoading(false)
+      }
+    }, 250)
+  }
+
+  async function fetchRecentCustomers(field: 'name' | 'phone' | 'email') {
+    if (selectedCustomer) return
+    try {
+      const res = await fetch('/api/customers?limit=5&sort=created_at')
+      const json = await res.json()
+      const data = (json.data ?? []) as SelectedCustomer[]
+      if (data.length > 0) { setCustSuggestions(data); setShowSuggestions(field) }
+    } catch { /* silent */ }
+  }
+
+  function searchParts(q: string) {
+    if (partSearchRef.current) clearTimeout(partSearchRef.current)
+    if (!q.trim()) { setPartResults([]); setShowPartDrop(false); return }
+    setPartSearchLoading(true)
+    partSearchRef.current = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ item_type: 'part', branch_id: activeBranch!.id, search: q, limit: '8' })
+        const res = await fetch(`/api/products?${params}`)
+        const json = await res.json()
+        setPartResults(json.data ?? [])
+        setShowPartDrop(true)
+      } finally {
+        setPartSearchLoading(false)
+      }
+    }, 300)
+  }
+
+  function addPartFromInventory(p: { id: string; name: string; selling_price: number | null; cost_price: number | null }) {
+    setRepairParts((prev) => {
+      const existing = prev.find((r) => r.product_id === p.id)
+      if (existing) return prev.map((r) => r.product_id === p.id ? { ...r, qty: r.qty + 1 } : r)
+      return [...prev, {
+        tempId: Math.random().toString(36).slice(2),
+        product_id: p.id,
+        name: p.name,
+        qty: 1,
+        unit_price: p.selling_price ?? 0,
+        unit_cost: p.cost_price ?? 0,
+      }]
+    })
+    setPartQuery('')
+    setPartResults([])
+    setShowPartDrop(false)
+  }
+
+  function addQuickPart() {
+    const name = partQuery.trim()
+    const price = parseFloat(quickPartPrice) || 0
+    if (!name) return
+    setRepairParts((prev) => [...prev, {
+      tempId: Math.random().toString(36).slice(2),
+      product_id: null,
+      name,
+      qty: 1,
+      unit_price: price,
+      unit_cost: 0,
+    }])
+    setPartQuery('')
+    setQuickPartPrice('')
+    setShowPartDrop(false)
+  }
+
+  function handleCustSuggestionSelect(c: SelectedCustomer) {
+    setSelectedCustomer(c)
+    setNewCust({
+      first_name: [c.first_name, c.last_name].filter(Boolean).join(' '),
+      last_name: '',
+      business_name: c.business_name ?? '',
+      email: c.email ?? '',
+      phone: c.phone ?? '',
+      address: c.address ?? '',
+    })
+    setCustSuggestions([])
+    setShowSuggestions(null)
+    setStep1Error('')
+    setPhoneError('')
   }
 
   async function createRepair() {
     if (!activeBranch) return
-    if (jobData.faults.length === 0) return
-    const totalVal = parseFloat(jobData.estimated_cost)
-    if (!jobData.estimated_cost.trim() || isNaN(totalVal) || totalVal < 0) {
-      setChargesError('Total Charges is required and must be a valid amount.')
+    // Device selection required
+    if (!jobData.device_type || !jobData.device_brand || !jobData.device_model) {
+      setDeviceError('Device Type, Brand and Model are all required.')
       return
+    }
+    setDeviceError('')
+    if (jobData.faults.length === 0) return
+    if (!jobData.price_pending) {
+      const totalVal = parseFloat(jobData.estimated_cost)
+      if (!jobData.estimated_cost.trim() || isNaN(totalVal) || totalVal < 0) {
+        setChargesError('Total Charges is required and must be a valid amount.')
+        return
+      }
     }
     setChargesError('')
     setSubmitting(true)
 
     let customerId = selectedCustomer?.id ?? null
 
-    // Create new customer if needed
-    if (!existingMode && !customerId) {
+    // Create new customer if no existing customer was selected
+    if (!customerId) {
       const custRes = await fetch('/api/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -703,13 +852,22 @@ export default function RepairsPage() {
           due_date: jobData.due_date || null,
           customer_note: jobData.customer_note || null,
           staff_note: jobData.staff_note || null,
+          price_pending: jobData.price_pending || undefined,
         },
+        parts: repairParts.map((p) => ({
+          product_id: p.product_id,
+          name: p.name,
+          quantity: p.qty,
+          unit_cost: p.unit_cost,
+          unit_price: p.unit_price,
+        })),
       }),
     })
 
     if (res.ok) {
       setModalOpen(false)
       fetchRepairs()
+      invalidateStats()
       toast.success('Repair job created.')
     } else {
       const j = await res.json().catch(() => ({}))
@@ -839,6 +997,22 @@ export default function RepairsPage() {
       }
     },
     {
+      id: 'customer_phone', header: 'Phone', cell: ({ row }) => {
+        const c = row.original.customers
+        return c?.phone ? (
+          <a href={`tel:${c.phone}`} onClick={(e) => e.stopPropagation()} className="text-xs text-blue-600 hover:underline whitespace-nowrap">{c.phone}</a>
+        ) : '—'
+      }
+    },
+    {
+      id: 'customer_email', header: 'Email', cell: ({ row }) => {
+        const c = row.original.customers
+        return c?.email ? (
+          <a href={`mailto:${c.email}`} onClick={(e) => e.stopPropagation()} className="text-xs text-blue-600 hover:underline max-w-[160px] truncate block">{c.email}</a>
+        ) : '—'
+      }
+    },
+    {
       accessorKey: 'device_type', header: 'Type', cell: ({ getValue }) => (getValue() as string) || '—'
     },
     {
@@ -942,7 +1116,7 @@ export default function RepairsPage() {
               onSlip={() => setSlipRepair(r)}
               onInvoice={() => handleOpenInvoice(r)}
               onDelete={() => deleteRepair(r.id, r.job_number)}
-              onMessage={() => setEmailPrompt({ repairId: r.id, jobNumber: r.job_number })}
+              onMessage={() => setEmailPrompt({ repairId: r.id, jobNumber: r.job_number, currentStatus: r.status ?? 'received' })}
             />
           </div>
         )
@@ -950,9 +1124,11 @@ export default function RepairsPage() {
     },
   ]
 
-  const TOGGLEABLE_COLS = ['customers', 'device_type', 'device_brand', 'device_model', 'issue', 'status', 'actual_cost', 'created_at']
+  const TOGGLEABLE_COLS = ['customers', 'customer_phone', 'customer_email', 'device_type', 'device_brand', 'device_model', 'issue', 'status', 'actual_cost', 'created_at']
   const COL_LABELS: Record<string, string> = {
     customers: 'Customer',
+    customer_phone: 'Phone',
+    customer_email: 'Email',
     device_type: 'Type',
     device_brand: 'Brand',
     device_model: 'Model',
@@ -961,10 +1137,12 @@ export default function RepairsPage() {
     actual_cost: 'Cost',
     created_at: 'Created',
   }
+  // Hide phone/email by default — user can toggle on from Columns menu
+  const effectiveColVisibility: VisibilityState = { customer_phone: false, customer_email: false, ...colVisibility }
 
   const visibleColumns = columns.filter((col) => {
     const key = (col as { accessorKey?: string }).accessorKey ?? col.id
-    return key === undefined || colVisibility[key] !== false
+    return key === undefined || effectiveColVisibility[key] !== false
   })
 
   return (
@@ -1138,7 +1316,7 @@ export default function RepairsPage() {
             <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               type="search"
-              placeholder="Search by job # or device..."
+              placeholder="Search by job #, device, email or phone..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(0) }}
               className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
@@ -1186,10 +1364,11 @@ export default function RepairsPage() {
               <div className="absolute left-0 top-full z-20 mt-1 w-48 rounded-xl border border-gray-700 bg-gray-900 py-2 shadow-xl">
                 <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-500">Toggle columns</p>
                 {TOGGLEABLE_COLS.map((key) => {
-                  const checked = colVisibility[key] !== false
+                  const isCustomerDetail = key === 'customer_phone' || key === 'customer_email'
+                  const checked = effectiveColVisibility[key] !== false
                   return (
-                    <label key={key} className="flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-xs text-gray-200 hover:bg-gray-800 transition-colors">
-                      <span>{COL_LABELS[key]}</span>
+                    <label key={key} className={`flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-xs text-gray-200 hover:bg-gray-800 transition-colors ${isCustomerDetail ? 'pl-6' : ''}`}>
+                      <span className={isCustomerDetail ? 'text-gray-400' : ''}>{isCustomerDetail ? '↳ ' : ''}{COL_LABELS[key]}</span>
                       <span className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${checked ? 'bg-teal-500' : 'bg-gray-600'}`}>
                         <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
                         <input
@@ -1264,121 +1443,226 @@ export default function RepairsPage() {
         {/* ── STEP 1: Customer ── */}
         {modalStep === 1 && (
           <div className="space-y-4">
-            {/* Toggle */}
-            <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
-              <button
-                type="button"
-                onClick={() => { setExistingMode((v) => !v); setSelectedCustomer(null); setStep1Error(''); setPhoneError('') }}
-                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${existingMode ? 'bg-gray-900' : 'bg-gray-300'}`}
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${existingMode ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-              <div>
-                <span className="text-sm font-semibold text-gray-800">Existing Customer</span>
-                <p className="text-xs text-gray-500">{existingMode ? 'Search and select from your customer list' : 'Toggle on to search existing customers'}</p>
+
+            {/* Existing-customer pill — shown once a suggestion is selected */}
+            {selectedCustomer && (
+              <div className="flex items-center gap-3 rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-600 text-xs font-bold text-white">
+                  {selectedCustomer.first_name.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-teal-900 truncate">
+                    {selectedCustomer.first_name} {selectedCustomer.last_name ?? ''}
+                  </p>
+                  <p className="text-xs text-teal-700 truncate">{selectedCustomer.phone ?? selectedCustomer.email ?? 'Existing customer'}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setSelectedCustomer(null); setNewCust(EMPTY_NEW_CUST); setStep1Error(''); setPhoneError('') }}
+                  className="shrink-0 rounded-md p-1 text-teal-600 hover:bg-teal-100 transition-colors"
+                  title="Change customer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Name + Email */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Customer Name — autocomplete on type */}
+              <div className="relative">
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Customer Name <span className="text-red-400">*</span>
+                </label>
+                <input
+                  readOnly={!!selectedCustomer}
+                  value={newCust.first_name}
+                  onChange={(e) => {
+                    setNewCust((p) => ({ ...p, first_name: e.target.value }))
+                    triggerCustSearch(e.target.value, 'name')
+                  }}
+                  onFocus={() => { if (!newCust.first_name) fetchRecentCustomers('name') }}
+                  onBlur={() => setTimeout(() => setShowSuggestions(null), 150)}
+                  placeholder="Enter Customer Name"
+                  className={`h-9 w-full rounded-lg border px-3 text-sm transition focus:outline-none focus:ring-2 ${
+                    selectedCustomer
+                      ? 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed'
+                      : 'border-gray-300 focus:border-gray-900 focus:ring-gray-900/10'
+                  }`}
+                />
+                {custSearchLoading && showSuggestions === null && newCust.first_name.length >= 2 && (
+                  <div className="absolute right-3 top-8 h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
+                )}
+                {showSuggestions === 'name' && custSuggestions.length > 0 && (
+                  <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+                    <ul className="max-h-52 overflow-y-auto py-1">
+                      {custSuggestions.map((c) => (
+                        <li key={c.id}>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => { e.preventDefault(); handleCustSuggestionSelect(c) }}
+                            className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600">
+                              {c.first_name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {c.first_name} {c.last_name ?? ''}
+                              </p>
+                              <p className="text-xs text-gray-500 truncate">{c.phone ?? c.email ?? ''}</p>
+                            </div>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {/* Email */}
+              <div className="relative">
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Customer Email</label>
+                <input
+                  type="email"
+                  readOnly={!!selectedCustomer}
+                  value={newCust.email}
+                  onChange={(e) => {
+                    setNewCust((p) => ({ ...p, email: e.target.value }))
+                    triggerCustSearch(e.target.value, 'email')
+                  }}
+                  onFocus={() => { if (!newCust.email) fetchRecentCustomers('email') }}
+                  onBlur={() => setTimeout(() => setShowSuggestions(null), 150)}
+                  placeholder="Enter Customer Email"
+                  className={`h-9 w-full rounded-lg border px-3 text-sm transition focus:outline-none focus:ring-2 ${
+                    selectedCustomer
+                      ? 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed'
+                      : 'border-gray-300 focus:border-gray-900 focus:ring-gray-900/10'
+                  }`}
+                />
+                {showSuggestions === 'email' && custSuggestions.length > 0 && (
+                  <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+                    <ul className="max-h-52 overflow-y-auto py-1">
+                      {custSuggestions.map((c) => (
+                        <li key={c.id}>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => { e.preventDefault(); handleCustSuggestionSelect(c) }}
+                            className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600">
+                              {c.first_name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {c.first_name} {c.last_name ?? ''}
+                              </p>
+                              <p className="text-xs text-gray-500 truncate">{c.email ?? c.phone ?? ''}</p>
+                            </div>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </div>
 
-            {existingMode ? (
-              <div className="space-y-3">
-                {/* Search row */}
-                <div className="grid grid-cols-2 gap-3 items-start">
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Select Customer</label>
-                    <CustomerSearch value={null} onChange={setSelectedCustomer} />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Customer Name <span className="text-red-400">*</span></label>
-                    <input readOnly value={selectedCustomer ? `${selectedCustomer.first_name} ${selectedCustomer.last_name ?? ''}`.trim() : ''}
-                      placeholder="Auto-filled after search"
-                      className="h-9 w-full rounded-lg border border-gray-200 bg-gray-100 px-3 text-sm text-gray-600 cursor-not-allowed" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Customer Email</label>
-                    <input readOnly value={selectedCustomer?.email ?? ''}
-                      placeholder="Auto-filled"
-                      className="h-9 w-full rounded-lg border border-gray-200 bg-gray-100 px-3 text-sm text-gray-600 cursor-not-allowed" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Business Name</label>
-                    <input readOnly value={selectedCustomer?.business_name ?? ''}
-                      placeholder="Auto-filled"
-                      className="h-9 w-full rounded-lg border border-gray-200 bg-gray-100 px-3 text-sm text-gray-600 cursor-not-allowed" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Phone Number <span className="text-red-400">*</span></label>
-                    <input readOnly value={selectedCustomer?.phone ?? ''}
-                      placeholder="Auto-filled"
-                      className="h-9 w-full rounded-lg border border-gray-200 bg-gray-100 px-3 text-sm text-gray-600 cursor-not-allowed" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Customer Address</label>
-                    <input readOnly value={selectedCustomer?.address ?? ''}
-                      placeholder="Auto-filled"
-                      className="h-9 w-full rounded-lg border border-gray-200 bg-gray-100 px-3 text-sm text-gray-600 cursor-not-allowed" />
-                  </div>
-                </div>
+            {/* Business Name + Phone */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Business Name */}
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Business Name</label>
+                <input
+                  readOnly={!!selectedCustomer}
+                  value={newCust.business_name}
+                  onChange={(e) => setNewCust((p) => ({ ...p, business_name: e.target.value }))}
+                  placeholder="Enter Business Name"
+                  className={`h-9 w-full rounded-lg border px-3 text-sm transition focus:outline-none focus:ring-2 ${
+                    selectedCustomer
+                      ? 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed'
+                      : 'border-gray-300 focus:border-gray-900 focus:ring-gray-900/10'
+                  }`}
+                />
               </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Customer Name <span className="text-red-400">*</span></label>
-                    <input value={newCust.first_name} onChange={(e) => setNewCust((p) => ({ ...p, first_name: e.target.value }))}
-                      placeholder="Enter Customer Name"
-                      className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm transition focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
+
+              {/* Phone Number — autocomplete on type */}
+              <div className="relative">
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Phone Number <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="tel"
+                  readOnly={!!selectedCustomer}
+                  value={newCust.phone}
+                  onChange={(e) => {
+                    const filtered = e.target.value.replace(/[^\d+\s\-().]/g, '')
+                    setNewCust((p) => ({ ...p, phone: filtered }))
+                    if (phoneError) setPhoneError(validatePhone(filtered))
+                    triggerCustSearch(filtered, 'phone')
+                  }}
+                  onFocus={() => { if (!newCust.phone) fetchRecentCustomers('phone') }}
+                  onBlur={() => {
+                    if (!selectedCustomer) setPhoneError(validatePhone(newCust.phone))
+                    setTimeout(() => setShowSuggestions(null), 150)
+                  }}
+                  placeholder="e.g. +44 7911 123456"
+                  maxLength={20}
+                  className={`h-9 w-full rounded-lg border px-3 text-sm transition focus:outline-none focus:ring-2 ${
+                    selectedCustomer
+                      ? 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed'
+                      : phoneError
+                        ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20'
+                        : 'border-gray-300 focus:border-gray-900 focus:ring-gray-900/10'
+                  }`}
+                />
+                {phoneError && !selectedCustomer && (
+                  <p className="mt-1 text-xs text-red-500">{phoneError}</p>
+                )}
+                {showSuggestions === 'phone' && custSuggestions.length > 0 && (
+                  <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+                    <ul className="max-h-52 overflow-y-auto py-1">
+                      {custSuggestions.map((c) => (
+                        <li key={c.id}>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => { e.preventDefault(); handleCustSuggestionSelect(c) }}
+                            className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-gray-50 transition-colors"
+                          >
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600">
+                              {c.first_name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {c.first_name} {c.last_name ?? ''}
+                              </p>
+                              <p className="text-xs text-gray-500 truncate">{c.phone ?? c.email ?? ''}</p>
+                            </div>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Customer Email</label>
-                    <input type="email" value={newCust.email} onChange={(e) => setNewCust((p) => ({ ...p, email: e.target.value }))}
-                      placeholder="Enter Customer Email"
-                      className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm transition focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Business Name</label>
-                    <input value={newCust.business_name} onChange={(e) => setNewCust((p) => ({ ...p, business_name: e.target.value }))}
-                      placeholder="Enter Business Name"
-                      className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm transition focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10" />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Phone Number <span className="text-red-400">*</span></label>
-                    <input
-                      type="tel"
-                      value={newCust.phone}
-                      onChange={(e) => {
-                        // Only allow: digits, +, spaces, hyphens, parentheses, dots
-                        const filtered = e.target.value.replace(/[^\d+\s\-().]/g, '')
-                        setNewCust((p) => ({ ...p, phone: filtered }))
-                        if (phoneError) setPhoneError(validatePhone(filtered))
-                      }}
-                      onBlur={() => setPhoneError(validatePhone(newCust.phone))}
-                      placeholder="e.g. +44 7911 123456"
-                      maxLength={20}
-                      className={`h-9 w-full rounded-lg border px-3 text-sm transition focus:outline-none focus:ring-2 ${
-                        phoneError
-                          ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20'
-                          : 'border-gray-300 focus:border-gray-900 focus:ring-gray-900/10'
-                      }`}
-                    />
-                    {phoneError && (
-                      <p className="mt-1 text-xs text-red-500">{phoneError}</p>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Customer Address</label>
-                  <textarea rows={2} value={newCust.address} onChange={(e) => setNewCust((p) => ({ ...p, address: e.target.value }))}
-                    placeholder="Enter Customer Address"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm transition focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10 resize-none" />
-                </div>
+                )}
               </div>
-            )}
+            </div>
+
+            {/* Address — full width */}
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Customer Address</label>
+              <textarea
+                rows={2}
+                readOnly={!!selectedCustomer}
+                value={newCust.address}
+                onChange={(e) => setNewCust((p) => ({ ...p, address: e.target.value }))}
+                placeholder="Enter Customer Address"
+                className={`w-full rounded-lg border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 resize-none ${
+                  selectedCustomer
+                    ? 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed'
+                    : 'border-gray-300 focus:border-gray-900 focus:ring-gray-900/10'
+                }`}
+              />
+            </div>
 
             {step1Error && (
               <p className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-600">{step1Error}</p>
@@ -1422,6 +1706,7 @@ export default function RepairsPage() {
               )]
             : deviceData.models
           const remaining = (parseFloat(jobData.estimated_cost) || 0) - (parseFloat(jobData.deposit_paid) || 0)
+          const pricePending = jobData.price_pending
           const inp = 'h-8 w-full rounded-md border border-indigo-200 bg-white px-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400/20'
           const sel = `${inp} appearance-none`
           const lbl = 'mb-0.5 block text-[11px] font-bold uppercase tracking-wide text-outline'
@@ -1437,7 +1722,7 @@ export default function RepairsPage() {
                 <div className="grid grid-cols-4 gap-2">
                   {/* TYPE */}
                   <div>
-                    <label className={lbl}>Type</label>
+                    <label className={lbl}>Type <span className="text-red-400">*</span></label>
                     <CreatableCombobox
                       options={deviceData.types.map(t => ({ value: t, label: t }))}
                       value={jobData.device_type}
@@ -1451,7 +1736,7 @@ export default function RepairsPage() {
                   {/* BRAND — locked until type chosen */}
                   <div>
                     <label className={`${lbl} flex items-center gap-1`}>
-                      Brand
+                      Brand <span className="text-red-400">*</span>
                       {!jobData.device_type && <Lock className="h-2.5 w-2.5 text-gray-300" />}
                     </label>
                     {jobData.device_type ? (
@@ -1474,7 +1759,7 @@ export default function RepairsPage() {
                   {/* MODEL — locked until brand chosen */}
                   <div>
                     <label className={`${lbl} flex items-center gap-1`}>
-                      Model
+                      Model <span className="text-red-400">*</span>
                       {!jobData.device_brand && <Lock className="h-2.5 w-2.5 text-gray-300" />}
                     </label>
                     {jobData.device_brand ? (
@@ -1500,6 +1785,154 @@ export default function RepairsPage() {
                     <input value={jobData.imei} onChange={(e) => setJobData((p) => ({ ...p, imei: e.target.value }))} placeholder="Enter IMEI…" className={inp} />
                   </div>
                 </div>
+                {deviceError && (
+                  <p className="mt-1.5 text-xs text-red-500 bg-red-50 border border-red-200 rounded-md px-3 py-1.5">{deviceError}</p>
+                )}
+              </div>
+
+              <div className="h-px bg-gray-100" />
+
+              {/* REPAIR PARTS */}
+              <div>
+                <p className="mb-1.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-outline">
+                  <Wrench className="h-2.5 w-2.5" /> Repair Parts
+                </p>
+
+                {(!jobData.device_type || !jobData.device_brand || !jobData.device_model) && (
+                  <p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-600">
+                    Select Device Type, Brand and Model above to add repair parts.
+                  </p>
+                )}
+
+                {/* Parts search input */}
+                <div className="relative" ref={partDropRef}>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                      <input
+                        value={partQuery}
+                        onChange={(e) => { setPartQuery(e.target.value); searchParts(e.target.value) }}
+                        onFocus={() => { if (partResults.length > 0 || partQuery.trim()) setShowPartDrop(true) }}
+                        placeholder="Search inventory parts…"
+                        className={`${inp} pl-7`}
+                        disabled={!jobData.device_model}
+                      />
+                      {partSearchLoading && (
+                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-transparent" />
+                      )}
+                    </div>
+                  </div>
+
+                  {showPartDrop && (
+                    <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+                      <ul className="max-h-44 overflow-y-auto py-1">
+                        {partResults.map((p) => (
+                          <li key={p.id}>
+                            <button
+                              type="button"
+                              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
+                              onMouseDown={(e) => { e.preventDefault(); addPartFromInventory(p) }}
+                            >
+                              <span className="text-gray-700">{p.name}</span>
+                              <span className="text-xs font-semibold text-teal-700">£{(p.selling_price ?? 0).toFixed(2)}</span>
+                            </button>
+                          </li>
+                        ))}
+                        {partQuery.trim() && (
+                          <li className="border-t border-gray-100">
+                            <div className="flex items-center gap-2 px-3 py-2">
+                              <span className="flex-1 truncate text-xs italic text-gray-500">Add &quot;{partQuery.trim()}&quot;</span>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={quickPartPrice}
+                                onChange={(e) => setQuickPartPrice(e.target.value)}
+                                placeholder="£0.00"
+                                className="h-6 w-20 rounded border border-gray-300 px-2 text-xs"
+                                onMouseDown={(e) => e.stopPropagation()}
+                              />
+                              <button
+                                type="button"
+                                className="shrink-0 rounded bg-gray-900 px-2 py-1 text-xs font-semibold text-white hover:bg-gray-700 transition-colors"
+                                onMouseDown={(e) => { e.preventDefault(); addQuickPart() }}
+                              >
+                                Add
+                              </button>
+                            </div>
+                          </li>
+                        )}
+                        {partResults.length === 0 && !partSearchLoading && (
+                          <li className="px-3 py-2 text-xs italic text-gray-400">
+                            {partQuery.trim() ? 'No inventory parts found — use quick-add above.' : 'Type to search parts…'}
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Parts line items table */}
+                {repairParts.length > 0 && (
+                  <div className="mt-2 overflow-hidden rounded-lg border border-gray-200">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-gray-50 font-semibold text-gray-500">
+                          <th className="px-3 py-1.5 text-left">Part</th>
+                          <th className="w-16 px-2 py-1.5 text-center">Qty</th>
+                          <th className="w-20 px-2 py-1.5 text-right">Unit £</th>
+                          <th className="w-20 px-2 py-1.5 text-right">Total</th>
+                          <th className="w-8" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {repairParts.map((p) => (
+                          <tr key={p.tempId} className="border-t border-gray-100">
+                            <td className="px-3 py-1.5 text-gray-700">{p.name}</td>
+                            <td className="px-2 py-1.5 text-center">
+                              <input
+                                type="number"
+                                min="1"
+                                value={p.qty}
+                                onChange={(e) => setRepairParts((prev) => prev.map((r) => r.tempId === p.tempId ? { ...r, qty: Math.max(1, parseInt(e.target.value) || 1) } : r))}
+                                className="h-6 w-12 rounded border border-gray-200 px-1 text-center text-xs"
+                              />
+                            </td>
+                            <td className="px-2 py-1.5 text-right">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={p.unit_price}
+                                onChange={(e) => setRepairParts((prev) => prev.map((r) => r.tempId === p.tempId ? { ...r, unit_price: parseFloat(e.target.value) || 0 } : r))}
+                                className="h-6 w-16 rounded border border-gray-200 px-1 text-right text-xs"
+                              />
+                            </td>
+                            <td className="px-2 py-1.5 text-right font-semibold text-gray-700">£{(p.unit_price * p.qty).toFixed(2)}</td>
+                            <td className="px-1 py-1.5 text-center">
+                              <button
+                                type="button"
+                                onClick={() => setRepairParts((prev) => prev.filter((r) => r.tempId !== p.tempId))}
+                                className="text-red-400 hover:text-red-600 transition-colors"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t border-gray-200 bg-gray-50">
+                          <td colSpan={3} className="px-3 py-1.5 text-right text-xs font-bold text-gray-600">Parts Total:</td>
+                          <td className="px-2 py-1.5 text-right text-xs font-bold text-gray-900">
+                            £{repairParts.reduce((s, p) => s + p.unit_price * p.qty, 0).toFixed(2)}
+                          </td>
+                          <td />
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
               </div>
 
               <div className="h-px bg-gray-100" />
@@ -1547,15 +1980,30 @@ export default function RepairsPage() {
                 <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-outline">
                   <DollarSign className="h-2.5 w-2.5" /> Financials & Assignment
                 </p>
+                {/* Price Pending toggle */}
+                <label className="mb-2 flex cursor-pointer items-center gap-2.5 w-fit">
+                  <div
+                    onClick={() => setJobData((p) => ({ ...p, price_pending: !p.price_pending, estimated_cost: !p.price_pending ? '' : p.estimated_cost, deposit_paid: !p.price_pending ? '' : p.deposit_paid }))}
+                    className={`relative flex h-5 w-9 items-center rounded-full transition-colors ${pricePending ? 'bg-amber-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`absolute inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${pricePending ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                  </div>
+                  <span className="text-[11px] font-semibold text-gray-600">
+                    {pricePending ? (
+                      <span className="flex items-center gap-1 text-amber-600"><span>⚠</span> Issue Not Found — Price TBD</span>
+                    ) : 'No fault found / Price TBD'}
+                  </span>
+                </label>
                 <div className="grid grid-cols-4 gap-2">
                   <div>
-                    <label className={lbl}>Total Charges <span className="text-red-400">*</span></label>
+                    <label className={lbl}>Total Charges {!pricePending && <span className="text-red-400">*</span>}</label>
                     <div className="relative">
                       <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">£</span>
                       <input
                         type="number"
                         step="0.01"
                         min="0"
+                        disabled={pricePending}
                         value={jobData.estimated_cost}
                         onChange={(e) => {
                           setJobData((p) => ({ ...p, estimated_cost: e.target.value }))
@@ -1565,11 +2013,13 @@ export default function RepairsPage() {
                           }
                         }}
                         onBlur={(e) => {
-                          const v = parseFloat(e.target.value)
-                          setChargesError(!e.target.value.trim() || isNaN(v) || v < 0 ? 'Total Charges is required and must be a valid amount.' : '')
+                          if (!pricePending) {
+                            const v = parseFloat(e.target.value)
+                            setChargesError(!e.target.value.trim() || isNaN(v) || v < 0 ? 'Total Charges is required and must be a valid amount.' : '')
+                          }
                         }}
-                        placeholder="0.00"
-                        className={`${inp} pl-6 ${chargesError ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20' : ''}`}
+                        placeholder={pricePending ? 'TBD' : '0.00'}
+                        className={`${inp} pl-6 ${pricePending ? 'opacity-40 cursor-not-allowed' : ''} ${chargesError ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20' : ''}`}
                       />
                     </div>
                     {chargesError && (
@@ -1580,13 +2030,17 @@ export default function RepairsPage() {
                     <label className={lbl}>Deposit</label>
                     <div className="relative">
                       <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">£</span>
-                      <input type="number" step="0.01" min="0" value={jobData.deposit_paid} onChange={(e) => setJobData((p) => ({ ...p, deposit_paid: e.target.value }))} placeholder="0.00" className={`${inp} pl-6`} />
+                      <input type="number" step="0.01" min="0" disabled={pricePending} value={jobData.deposit_paid} onChange={(e) => setJobData((p) => ({ ...p, deposit_paid: e.target.value }))} placeholder={pricePending ? 'TBD' : '0.00'} className={`${inp} pl-6 ${pricePending ? 'opacity-40 cursor-not-allowed' : ''}`} />
                     </div>
                   </div>
                   <div>
                     <label className={lbl}>Remaining</label>
-                    <div className={`flex h-8 items-center rounded-md border px-2.5 text-sm font-semibold ${remaining > 0 ? 'border-orange-200 bg-orange-50 text-orange-600' : 'border-green-200 bg-green-50 text-green-600'}`}>
-                      £{remaining.toFixed(2)}
+                    <div className={`flex h-8 items-center rounded-md border px-2.5 text-sm font-semibold ${
+                      pricePending
+                        ? 'border-amber-200 bg-amber-50 text-amber-600'
+                        : remaining > 0 ? 'border-orange-200 bg-orange-50 text-orange-600' : 'border-green-200 bg-green-50 text-green-600'
+                    }`}>
+                      {pricePending ? 'TBD' : `£${remaining.toFixed(2)}`}
                     </div>
                   </div>
                   <div>
@@ -1682,7 +2136,7 @@ export default function RepairsPage() {
                 </button>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => setModalOpen(false)}>Cancel</Button>
-                  <Button onClick={createRepair} loading={submitting} disabled={jobData.faults.length === 0 || !jobData.estimated_cost.trim() || isNaN(parseFloat(jobData.estimated_cost)) || parseFloat(jobData.estimated_cost) < 0}>
+                  <Button onClick={createRepair} loading={submitting} disabled={!jobData.device_type || !jobData.device_brand || !jobData.device_model || jobData.faults.length === 0 || (!jobData.price_pending && (!jobData.estimated_cost.trim() || isNaN(parseFloat(jobData.estimated_cost)) || parseFloat(jobData.estimated_cost) < 0))}>
                     Create Job
                   </Button>
                 </div>
@@ -1830,6 +2284,8 @@ export default function RepairsPage() {
         <RepairEmailPrompt
           repairId={emailPrompt.repairId}
           jobNumber={emailPrompt.jobNumber}
+          currentStatus={emailPrompt.currentStatus}
+          modal
           onClose={() => setEmailPrompt(null)}
         />
       )}

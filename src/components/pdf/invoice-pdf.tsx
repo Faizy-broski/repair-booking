@@ -8,7 +8,8 @@ function fmt(n: number, currency = 'GBP') {
   return `${sym}${n.toFixed(2)}`
 }
 
-function hexToRgba(hex: string, alpha: number): string {
+function hexToRgba(hex: string | undefined | null, alpha: number): string {
+  if (!hex || hex.length < 4) return `rgba(0,0,0,${alpha})`
   const r = parseInt(hex.slice(1, 3), 16)
   const g = parseInt(hex.slice(3, 5), 16)
   const b = parseInt(hex.slice(5, 7), 16)
@@ -90,9 +91,9 @@ export function InvoicePdf(props: InvoicePdfProps) {
   const isUnpaid = (status === 'unpaid' || status === 'issued' || status === 'partial') && balanceDue > 0
   const family = settings.font_family ?? 'Helvetica'
   const bold = boldFont(family)
-  const pc = settings.primary_color
-  const sc = settings.secondary_color
-  const tc = settings.text_color
+  const pc = settings.primary_color ?? '#0f766e'
+  const sc = settings.secondary_color ?? '#f0fdfa'
+  const tc = settings.text_color ?? '#111827'
 
   // Social links array (non-empty values only)
   const socialEntries = Object.entries(settings.social_links ?? {})

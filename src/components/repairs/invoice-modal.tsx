@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Printer, Download, Loader2, X } from 'lucide-react'
 import { PDFViewer, blobStream, pdf } from '@react-pdf/renderer'
 import { InvoicePdf } from '@/components/pdf/invoice-pdf'
-import type { InvoiceSettings } from '@/types/invoice-settings'
+import { DEFAULT_INVOICE_SETTINGS, type InvoiceSettings } from '@/types/invoice-settings'
 
 interface Props {
   open: boolean
@@ -33,9 +33,17 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
           unit_price: repair.estimated_cost ?? 0
         }]
 
+        const mergedSettings: InvoiceSettings = {
+          ...DEFAULT_INVOICE_SETTINGS,
+          ...settings,
+          // Fall back to branch logo if the invoice settings have no logo configured
+          logo_url: settings.logo_url ?? branch?.logo_url ?? null,
+          show_logo: settings.show_logo !== false && !!(settings.logo_url ?? branch?.logo_url),
+        }
+
         const doc = (
           <InvoicePdf
-            settings={settings}
+            settings={mergedSettings}
             invoiceNumber={repair.job_number}
             status={repair.status}
             issuedAt={repair.created_at}

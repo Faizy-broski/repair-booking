@@ -113,7 +113,7 @@ export default function InvoicesPage() {
     })
     if (res.ok) {
       toast.success(`Invoice status updated to ${newStatus}`)
-      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['invoices', activeBranch?.id] })
     } else {
       const err = await res.json()
       toast.error(err?.error?.message ?? 'Failed to update status')
@@ -153,7 +153,7 @@ export default function InvoicesPage() {
       reset()
       setLineItems([{ description: '', quantity: 1, unit_price: 0 }])
       setSheetOpen(false)
-      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['invoices', activeBranch?.id] })
     }
   }
 
@@ -169,7 +169,7 @@ export default function InvoicesPage() {
       toast.success('Payment recorded successfully')
       setPaymentModal(null)
       setPaymentAmount('')
-      queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['invoices', activeBranch?.id] })
     } else {
       const err = await res.json()
       toast.error(err?.error?.message ?? 'Failed to record payment')

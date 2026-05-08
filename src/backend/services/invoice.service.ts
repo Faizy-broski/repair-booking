@@ -126,6 +126,7 @@ export const InvoiceService = {
     const effectiveSettings = {
       ...settings,
       logo_url: settings.logo_url ?? branch?.logo_url ?? null,
+      show_logo: settings.show_logo !== false && !!(settings.logo_url ?? branch?.logo_url),
     }
 
     const doc = React.createElement(InvoicePdf, {

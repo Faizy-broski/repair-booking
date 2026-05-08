@@ -28,7 +28,7 @@ const createSchema = z.object({
   custom_fields: z.record(z.string(), z.unknown()).default({}),
   asset_id: z.string().uuid().optional().nullable(),
   parts: z.array(z.object({
-    product_id: z.string().uuid(),
+    product_id: z.string().uuid().optional().nullable(),
     name: z.string(),
     quantity: z.number().int().min(1).default(1),
     unit_cost: z.number().min(0).default(0),
@@ -113,7 +113,10 @@ export const RepairController = {
               variables: {
                 customer_name: customerName,
                 ticket_number: repair.job_number,
+                device_type:   repairDetail.device_type ?? '',
+                device_brand:  repairDetail.device_brand ?? '',
                 device_model:  deviceInfo,
+                issue:         repairDetail.issue ?? '',
                 store_name:    business?.name ?? 'RepairBooking',
                 store_phone:   business?.phone ?? '',
                 store_email:   business?.email ?? '',
@@ -152,6 +155,19 @@ export const RepairController = {
     try {
       await RepairService.updateStatus(id, data.status, data.note, ctx.auth.userId)
 
+      // When marked as refunded, record the deposit_paid as the refund_amount
+      if (data.status === 'refunded') {
+        const branchId = ctx.auth.branchId ?? null
+        const repair = await RepairService.getById(id, branchId)
+        if (repair) {
+          const depositPaid = (repair as any).deposit_paid ?? 0
+          await adminSupabase
+            .from('repairs')
+            .update({ refund_amount: depositPaid })
+            .eq('id', id)
+        }
+      }
+
       // Fire-and-forget commission recording on completion
       if (data.status === 'completed') {
         const branchId = ctx.auth.branchId ?? null
@@ -163,47 +179,51 @@ export const RepairController = {
         }).catch(() => {})
       }
 
-      // Non-blocking notification via NotificationEngine
-      if (data.send_email) {
-        const branchId = ctx.auth.branchId ?? null
-        Promise.all([
-          RepairService.getById(id, branchId),
-          adminSupabase.from('businesses').select('name, phone, email').eq('id', ctx.businessId).single()
-        ]).then(([repair, { data: business }]) => {
-          if (repair?.customers) {
-            const customerName = `${repair.customers.first_name} ${repair.customers.last_name ?? ''}`.trim()
-            const deviceInfo = [repair.device_brand, repair.device_model].filter(Boolean).join(' ') || 'Device'
-            const businessName = business?.name ?? 'RepairBooking'
+      // Non-blocking notification via NotificationEngine — always fires on every status change.
+      // The NotificationEngine checks whether an active template exists for this event;
+      // if none is configured the call is a no-op.  send_email flag is no longer the gate.
+      const branchId = ctx.auth.branchId ?? null
+      Promise.all([
+        RepairService.getById(id, branchId),
+        adminSupabase.from('businesses').select('name, phone, email').eq('id', ctx.businessId).single()
+      ]).then(([repair, { data: business }]) => {
+        if (repair?.customers) {
+          const customerName = `${repair.customers.first_name} ${repair.customers.last_name ?? ''}`.trim()
+          const deviceInfo = [repair.device_brand, repair.device_model].filter(Boolean).join(' ') || 'Device'
+          const businessName = business?.name ?? 'RepairBooking'
 
-            // Determine trigger event
-            const STATUS_LABELS: Record<string, string> = {
-              received: 'Received', in_progress: 'In Progress', waiting_parts: 'Waiting for Parts',
-              repaired: 'Repaired & Ready', unrepairable: 'Unfortunately Unrepairable', collected: 'Collected',
-            }
-            const triggerEvent = data.status === 'repaired' ? 'repair_ready' : 'ticket_status_changed'
+          const STATUS_LABELS: Record<string, string> = {
+            received: 'Received', in_progress: 'In Progress', waiting_parts: 'Waiting for Parts',
+            repaired: 'Repaired & Ready', unrepairable: 'Unfortunately Unrepairable', collected: 'Collected',
+          }
+          const triggerEvent = data.status === 'repaired' ? 'repair_ready' : 'ticket_status_changed'
 
-            NotificationEngine.fire(triggerEvent as any, {
-              businessId: ctx.businessId,
-              branchId,
-              relatedId: id,
-              relatedType: 'repair',
-              variables: {
-                customer_name:  customerName,
-                ticket_number:  repair.job_number,
-                device_model:   deviceInfo,
-                status:         STATUS_LABELS[data.status] ?? data.status,
-                note:           data.note || '',
-                store_name:     businessName,
-                store_phone:    business?.phone ?? '',
-                store_email:    business?.email ?? '',
-              },
-              recipient: {
-                email: repair.customers.email ?? null,
-                phone: repair.customers.phone ?? null,
-              },
-            }).catch(console.error)
+          NotificationEngine.fire(triggerEvent as any, {
+            businessId: ctx.businessId,
+            branchId,
+            relatedId: id,
+            relatedType: 'repair',
+            variables: {
+              customer_name:  customerName,
+              ticket_number:  repair.job_number,
+              device_type:    repair.device_type ?? '',
+              device_brand:   repair.device_brand ?? '',
+              device_model:   deviceInfo,
+              issue:          repair.issue ?? '',
+              status:         STATUS_LABELS[data.status] ?? data.status,
+              note:           data.note || '',
+              store_name:     businessName,
+              store_phone:    business?.phone ?? '',
+              store_email:    business?.email ?? '',
+            },
+            recipient: {
+              email: repair.customers.email ?? null,
+              phone: repair.customers.phone ?? null,
+            },
+          }).catch(console.error)
 
-            // Mark email sent in status history
+          // Mark email sent in status history
+          if (data.send_email) {
             adminSupabase
               .from('repair_status_history')
               .update({ email_sent: true })
@@ -213,8 +233,8 @@ export const RepairController = {
               .limit(1)
               .then()
           }
-        }).catch(console.error)
-      }
+        }
+      }).catch(console.error)
 
       return ok({ updated: true })
     } catch (err) {

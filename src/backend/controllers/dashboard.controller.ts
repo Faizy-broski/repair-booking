@@ -12,7 +12,7 @@ export const DashboardController = {
     try {
       const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
       const urgentCutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-      const TERMINAL_IN = '(repaired,collected,unrepairable)'
+      const TERMINAL_IN = '(repaired,collected,unrepairable,refunded)'
 
       const [
         salesRes,
@@ -24,6 +24,7 @@ export const DashboardController = {
         inventoryRes,
         recentRepairsRes,
         activityRes,
+        repairsRevenueRes,
       ] = await Promise.all([
         // Total sales this month
         adminSupabase
@@ -88,11 +89,22 @@ export const DashboardController = {
           .eq('repairs.branch_id', branchId)
           .order('created_at', { ascending: false })
           .limit(20),
+
+        // Repair revenue this month — tiered by lifecycle stage:
+        //   collected/repaired → full actual/estimated cost minus any refund
+        //   refunded           → deposit minus refund (partial refund keeps some money)
+        //   all others         → deposit only (money in hand so far)
+        adminSupabase
+          .from('repairs')
+          .select('status, deposit_paid, actual_cost, estimated_cost, refund_amount')
+          .eq('branch_id', branchId)
+          .gte('created_at', monthStart),
       ])
 
       const sales = salesRes.data ?? []
       const expenses = expensesRes.data ?? []
       const inventory = inventoryRes.data ?? []
+      const repairsRevenueRows = repairsRevenueRes.data ?? []
       const recentRepairs = (recentRepairsRes.data ?? []).map((r) => {
         const customer = r.customers as { first_name: string; last_name?: string } | null
         const customerName = customer ? [customer.first_name, customer.last_name].filter(Boolean).join(' ') : null
@@ -135,6 +147,15 @@ export const DashboardController = {
         repairs_urgent:    repairsUrgentRes.count    ?? 0,
         total_expenses: expenses.reduce((s, r) => s + (r.amount ?? 0), 0),
         low_stock_count: lowStockCount,
+        repairs_revenue: repairsRevenueRows.reduce((s, r) => {
+          const row = r as any
+          const deposit = row.deposit_paid ?? 0
+          const fullCost = row.actual_cost ?? row.estimated_cost ?? 0
+          const refund = row.refund_amount ?? 0
+          if (row.status === 'collected' || row.status === 'repaired') return s + fullCost - refund
+          if (row.status === 'refunded') return s + Math.max(0, deposit - refund)
+          return s + deposit
+        }, 0),
       }
 
       // Branch revenue breakdown (owner only)

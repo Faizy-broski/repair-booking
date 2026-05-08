@@ -8,7 +8,7 @@ import {
   Phone, Settings, UserCheck, LogOut, Receipt, X, UploadCloud,
   CreditCard, AlertCircle, Smartphone, BookOpen, TrendingUp, PieChart,
   ChevronDown, Bell, Server, Clock, Activity, Mail, Users2,
-  Store, GitBranch, Sliders, Layers, Settings2,
+  Store, GitBranch, Sliders, Layers, Settings2, PackagePlus, Cpu,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
@@ -43,9 +43,11 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Service Catalogue', href: '/repairs/service-catalogue', icon: BookOpen, requiredRole: 'branch_manager', module: 'repairs', subItem: true },
   { label: 'Repair Customers',  href: '/repairs/customers',         icon: Users2,   requiredRole: 'staff',          module: 'repairs', subItem: true },
   { label: 'Repair Settings',   href: '/repairs/settings',          icon: Settings, requiredRole: 'branch_manager', module: 'repairs', subItem: true },
-  { label: 'Inventory',      href: '/inventory',       icon: Package,         requiredRole: 'staff',          module: 'inventory' },
-  { label: 'Bulk Upload',    href: '/inventory/bulk-upload', icon: UploadCloud, requiredRole: 'branch_manager', module: 'inventory', subItem: true },
-  { label: 'Catalogue',      href: '/inventory/catalogue',   icon: Smartphone,  requiredRole: 'branch_manager', module: 'inventory', subItem: true },
+  { label: 'Inventory',      href: '/inventory',                  icon: Package,      requiredRole: 'staff',          module: 'inventory' },
+  { label: 'Add Product',    href: '/inventory/new/product',     icon: PackagePlus,  requiredRole: 'staff',          module: 'inventory', subItem: true },
+  { label: 'Add Part',       href: '/inventory/new/part',        icon: Cpu,          requiredRole: 'staff',          module: 'inventory', subItem: true },
+  { label: 'Bulk Upload',    href: '/inventory/bulk-upload',     icon: UploadCloud,  requiredRole: 'branch_manager', module: 'inventory', subItem: true },
+  { label: 'Catalogue',      href: '/inventory/catalogue',       icon: Smartphone,   requiredRole: 'branch_manager', module: 'inventory', subItem: true },
   { label: 'Customers',      href: '/customers',       icon: Users,           requiredRole: 'staff',          module: 'customers' },
   { label: 'Appointments',   href: '/appointments',    icon: Calendar,        requiredRole: 'staff',          module: 'appointments' },
   { label: 'Invoices',       href: '/invoices',        icon: FileText,        requiredRole: 'staff',          module: 'invoices' },

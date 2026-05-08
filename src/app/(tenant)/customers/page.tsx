@@ -190,7 +190,7 @@ export default function CustomersPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, branch_id: activeBranch.id, custom_fields: customFields }),
     })
-    if (res.ok) { createForm.reset(); setSheetOpen(false); queryClient.invalidateQueries({ queryKey: ['customers'] }) }
+    if (res.ok) { createForm.reset(); setSheetOpen(false); queryClient.invalidateQueries({ queryKey: ['customers', activeBranch?.id] }) }
     else { const j = await res.json(); setCreateError(j?.error?.message ?? 'Failed to create customer.') }
   }
 
@@ -216,7 +216,7 @@ export default function CustomersPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, email: data.email || null }),
     })
-    if (res.ok) { setEditSheetOpen(false); queryClient.invalidateQueries({ queryKey: ['customers'] }) }
+    if (res.ok) { setEditSheetOpen(false); queryClient.invalidateQueries({ queryKey: ['customers', activeBranch?.id] }) }
     else { const j = await res.json(); setEditError(j?.error?.message ?? 'Failed to update customer.') }
   }
 
@@ -232,7 +232,7 @@ export default function CustomersPage() {
     const res = await fetch(`/api/customers/${confirmDelete.id}`, { method: 'DELETE' })
     if (res.ok) {
       toast.success(`Customer "${name}" deleted.`)
-      queryClient.invalidateQueries({ queryKey: ['customers'] })
+      queryClient.invalidateQueries({ queryKey: ['customers', activeBranch?.id] })
       setConfirmDelete(null)
     } else {
       toast.error('Failed to delete customer.')

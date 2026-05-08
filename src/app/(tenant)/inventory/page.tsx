@@ -127,7 +127,8 @@ export default function InventoryPage() {
       return res.json()
     },
     enabled: !!branchId,
-    placeholderData: (prev) => prev, // keep table visible during filter/page changes
+    placeholderData: (prev) => prev,
+    staleTime: 30_000,
   })
 
   const products = productResponse?.data ?? []

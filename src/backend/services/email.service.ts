@@ -7,8 +7,6 @@
  *   2. Global platform SMTP (env vars SMTP_HOST / SMTP_USER / SMTP_PASS)
  */
 import nodemailer from 'nodemailer'      
-import { resolve4 } from 'dns/promises'
-
 // ── Transporter helpers ────────────────────────────────────────────────────────
 
 interface SmtpConfig {
@@ -20,29 +18,15 @@ interface SmtpConfig {
   from: string
 }
 
-/**
- * Resolve a hostname to its first IPv4 address.
- * This bypasses the OS address-selection algorithm which may prefer unreachable
- * AAAA (IPv6) records. Falls back to the original hostname on any DNS error.
- */
-async function resolveIPv4(hostname: string): Promise<string> {
-  try {
-    const addresses = await resolve4(hostname)
-    return addresses[0] ?? hostname
-  } catch {
-    return hostname
-  }
-}
-
 async function buildTransporter(cfg: SmtpConfig) {
-  const host = await resolveIPv4(cfg.host)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return nodemailer.createTransport({
-    host,
+    host:   cfg.host,   // keep original hostname so TLS SNI matches the certificate
     port:   cfg.port,
     secure: cfg.secure,
     auth:   { user: cfg.user, pass: cfg.pass },
-    tls:    { rejectUnauthorized: false },
-  })
+    tls:    { rejectUnauthorized: false, servername: cfg.host },
+  } as any)
 }
 
 /** Global platform transporter — used when no per-business SMTP is configured. */
@@ -53,18 +37,17 @@ async function getGlobalTransporter() {
     ? process.env.SMTP_SECURE === 'true'
     : port === 465
 
-  const host = await resolveIPv4(hostname)
-
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return nodemailer.createTransport({
-    host,
+    host:   hostname,
     port,
     secure: isSecure,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
-    tls: { rejectUnauthorized: false },
-  })
+    tls: { rejectUnauthorized: false, servername: hostname },
+  } as any)
 }
 
 function globalFromAddress(displayName?: string): string {
@@ -80,11 +63,26 @@ function globalFromAddress(displayName?: string): string {
 async function getBusinessSmtpConfig(businessId: string): Promise<SmtpConfig | null> {
   try {
     const { adminSupabase } = await import('@/backend/config/supabase')
-    const { data } = await (adminSupabase as any)
+    const { data, error } = await (adminSupabase as any)
       .from('businesses')
-      .select('smtp_enabled, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from')
+      .select('smtp_enabled, smtp_host, smtp_port, smtp_secure, smtp_user, smtp_pass, smtp_from')
       .eq('id', businessId)
       .single()
+
+    if (error) {
+      console.error('[EmailService] SMTP config DB error:', error.message)
+      return null
+    }
+
+    console.log('[EmailService] SMTP config fetched:', {
+      smtp_enabled: data?.smtp_enabled,
+      smtp_host: data?.smtp_host,
+      smtp_port: data?.smtp_port,
+      smtp_secure_raw: data?.smtp_secure,
+      smtp_user: data?.smtp_user,
+      smtp_from: data?.smtp_from,
+      has_pass: !!data?.smtp_pass,
+    })
 
     if (
       !data ||
@@ -93,20 +91,74 @@ async function getBusinessSmtpConfig(businessId: string): Promise<SmtpConfig | n
       !data.smtp_user ||
       !data.smtp_pass
     ) {
+      console.warn('[EmailService] SMTP not configured or disabled — missing required field(s)')
       return null
     }
 
+    const port = data.smtp_port ?? 587
+    // Port 465 is SMTPS (always SSL). If smtp_secure is false but port is 465, force true.
+    const secure = port === 465 ? true : !!data.smtp_secure
     return {
       host:   data.smtp_host,
-      port:   data.smtp_port ?? 587,
-      secure: data.smtp_secure ?? false,
+      port,
+      secure,
       user:   data.smtp_user,
       pass:   data.smtp_pass,
       from:   data.smtp_from ?? data.smtp_user,
     }
-  } catch {
+  } catch (err) {
+    console.error('[EmailService] getBusinessSmtpConfig threw:', err)
     return null
   }
+}
+
+// ── Branded email shell ────────────────────────────────────────────────────────
+
+interface EmailShellOptions {
+  logoUrl?:      string | null
+  storeName:     string
+  storePhone?:   string
+  storeEmail?:   string
+  primaryColor?: string
+}
+
+function wrapInEmailShell(content: string, opts: EmailShellOptions): string {
+  const { logoUrl, storeName, storePhone, storeEmail, primaryColor = '#008080' } = opts
+  const logoHtml = logoUrl
+    ? `<img src="${logoUrl}" alt="${storeName}" style="max-height:64px;max-width:180px;object-fit:contain;margin-bottom:10px;border-radius:6px;" /><br/>`
+    : ''
+  const contactParts = [storePhone, storeEmail].filter(Boolean)
+  const contactLine  = contactParts.length ? `<p style="margin:4px 0 0;font-size:12px;color:#9ca3af;">${contactParts.join(' &nbsp;·&nbsp; ')}</p>` : ''
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background-color:#f3f4f6;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:24px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr>
+          <td align="center" style="background:${primaryColor};padding:28px 32px;">
+            ${logoHtml}
+            <h1 style="margin:0;font-size:20px;font-weight:700;color:#ffffff;letter-spacing:-0.3px;">${storeName}</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px;color:#374151;font-size:14px;line-height:1.6;">
+            ${content}
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f9fafb;border-top:1px solid #f3f4f6;padding:16px 32px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; ${new Date().getFullYear()} ${storeName}</p>
+            ${contactLine}
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
 }
 
 // ── Public types ───────────────────────────────────────────────────────────────
@@ -128,6 +180,11 @@ export interface TemplatedEmailPayload {
   fromName?: string
   /** When provided, the per-business SMTP config is used if enabled. */
   businessId?: string
+  /** Passed to wrapInEmailShell for branded email layout */
+  logoUrl?:     string | null
+  storePhone?:  string
+  storeEmail?:  string
+  primaryColor?: string
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -147,28 +204,50 @@ export const EmailService = {
       ? await getBusinessSmtpConfig(payload.businessId)
       : null
 
+    const wrappedHtml = wrapInEmailShell(payload.html, {
+      logoUrl:      payload.logoUrl,
+      storeName:    payload.fromName ?? 'RepairBooking',
+      storePhone:   payload.storePhone,
+      storeEmail:   payload.storeEmail,
+      primaryColor: payload.primaryColor,
+    })
+
     if (bizCfg) {
+      console.log(`[EmailService] Sending via business SMTP: host=${bizCfg.host}:${bizCfg.port} secure=${bizCfg.secure} from=${bizCfg.from} to=${payload.to}`)
       const from = payload.fromName
         ? `"${payload.fromName}" <${bizCfg.from}>`
         : bizCfg.from
       const transport = await buildTransporter(bizCfg)
-      await transport.sendMail({
-        from,
-        to:      payload.to,
-        subject: payload.subject,
-        html:    payload.html,
-      })
+      try {
+        const info = await transport.sendMail({
+          from,
+          to:      payload.to,
+          subject: payload.subject,
+          html:    wrappedHtml,
+        })
+        console.log(`[EmailService] Business SMTP sent OK — messageId=${info.messageId}`)
+      } catch (err) {
+        console.error(`[EmailService] Business SMTP sendMail failed:`, err)
+        throw err
+      }
     } else {
+      console.log(`[EmailService] No business SMTP — falling back to global SMTP for ${payload.to}`)
       const from = payload.fromName
         ? `"${payload.fromName}" <${process.env.SMTP_FROM ?? process.env.EMAIL_FROM ?? process.env.SMTP_USER}>`
         : (process.env.SMTP_FROM ?? process.env.EMAIL_FROM ?? process.env.SMTP_USER)
       const transport = await getGlobalTransporter()
-      await transport.sendMail({
-        from,
-        to:      payload.to,
-        subject: payload.subject,
-        html:    payload.html,
-      })
+      try {
+        const info = await transport.sendMail({
+          from,
+          to:      payload.to,
+          subject: payload.subject,
+          html:    wrappedHtml,
+        })
+        console.log(`[EmailService] Global SMTP sent OK — messageId=${info.messageId}`)
+      } catch (err) {
+        console.error(`[EmailService] Global SMTP sendMail failed:`, err)
+        throw err
+      }
     }
   },
 

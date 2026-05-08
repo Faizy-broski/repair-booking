@@ -47,7 +47,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const qc = useQueryClient()
 
   const [product, setProduct] = useState<Product | null>(null)
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
   // ── Reference data (shared, cached) ───────────────────────────────────────────────────────
@@ -112,38 +111,41 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [togglingBranch, setTogglingBranch] = useState<string | null>(null)
 
   // ── Product fetch ───────────────────────────────────────────────────────────────────────
-  useQuery({
+  const { data: productData, isLoading: productLoading } = useQuery<Product & { on_hand?: number }>({
     queryKey: ['inv-product', id, activeBranch?.id],
     queryFn: async () => {
       const branchParam = activeBranch ? `?branch_id=${activeBranch.id}` : ''
       const res = await fetch(`/api/products/${id}${branchParam}`)
       const json = await res.json()
-      const p: Product & { on_hand?: number } = json.data ?? json
-      setProduct(p)
-      if (p.on_hand !== undefined) setOnHand(String(p.on_hand))
-      setItemType((p.item_type as ItemType) ?? (p.is_service ? 'part' : 'product'))
-      setName(p.name ?? '')
-      setCategoryId(p.category_id ?? '')
-      setBrandId(p.brand_id ?? '')
-      setModelId(p.model_id ?? p.service_devices?.id ?? '')
-      setSku(p.sku ?? '')
-      setBarcode(p.barcode ?? '')
-      setImageUrl(p.image_url ?? '')
-      setPartType(p.part_type ?? '')
-      setCostPrice(p.cost_price != null ? String(p.cost_price) : '')
-      setSellingPrice(p.selling_price != null ? String(p.selling_price) : '')
-      setSupplierId(p.supplier_id ?? p.suppliers?.id ?? '')
-      setLowStockAlert(p.low_stock_alert != null ? String(p.low_stock_alert) : '5')
-      setPhysicalLocation(p.physical_location ?? '')
-      setCommissionEnabled(p.commission_enabled ?? false)
-      setCommissionType(p.commission_type ?? 'percentage')
-      setCommissionRate(p.commission_rate != null ? String(p.commission_rate) : '')
-      setLoyaltyEnabled(p.loyalty_enabled ?? true)
-      setLoading(false)
-      return p
+      return json.data ?? json
     },
     staleTime: 30_000,
   })
+
+  useEffect(() => {
+    if (!productData) return
+    const p = productData
+    setProduct(p)
+    if (p.on_hand !== undefined) setOnHand(String(p.on_hand))
+    setItemType((p.item_type as ItemType) ?? (p.is_service ? 'part' : 'product'))
+    setName(p.name ?? '')
+    setCategoryId(p.category_id ?? '')
+    setBrandId(p.brand_id ?? '')
+    setModelId(p.model_id ?? p.service_devices?.id ?? '')
+    setSku(p.sku ?? '')
+    setBarcode(p.barcode ?? '')
+    setImageUrl(p.image_url ?? '')
+    setPartType(p.part_type ?? '')
+    setCostPrice(p.cost_price != null ? String(p.cost_price) : '')
+    setSellingPrice(p.selling_price != null ? String(p.selling_price) : '')
+    setSupplierId(p.supplier_id ?? p.suppliers?.id ?? '')
+    setLowStockAlert(p.low_stock_alert != null ? String(p.low_stock_alert) : '5')
+    setPhysicalLocation(p.physical_location ?? '')
+    setCommissionEnabled(p.commission_enabled ?? false)
+    setCommissionType(p.commission_type ?? 'percentage')
+    setCommissionRate(p.commission_rate != null ? String(p.commission_rate) : '')
+    setLoyaltyEnabled(p.loyalty_enabled ?? true)
+  }, [productData])
 
   // ── Uniqueness Check ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -332,7 +334,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     router.push('/inventory')
   }
 
-  if (loading) {
+  if (productLoading && !productData) {
     return (
       <div className="flex items-center justify-center py-32">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-brand-teal" />

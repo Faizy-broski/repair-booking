@@ -238,16 +238,23 @@ export default function NewProductPage() {
 
     if (res.ok) {
       const json = await res.json()
-      const productId = json.data?.id ?? json.id
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      const newProduct = json.data ?? json
+      const productId = newProduct?.id ?? json.id
+      if (newProduct?.id) queryClient.setQueryData(['product', newProduct.id], newProduct)
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory-stats'] })
       if (andNew) {
         setName(''); setCategoryId(''); setBrandId(''); setModelId(''); setSku(''); setBarcode('')
         setImageUrl(''); setPartType(''); setCostPrice(''); setSellingPrice('')
         setInitialStock('0'); setLowStockAlert('5'); setSupplierId(''); setPhysicalLocation('')
         setCommissionEnabled(false); setCommissionType('percentage'); setCommissionRate('')
         setLoyaltyEnabled(true)
+        toast.success('Saved! Add another.')
       } else {
-        router.push(`/inventory/${productId}`)
+        toast.success(`"${newProduct?.name}" added to inventory.`, {
+          action: { label: 'View', onClick: () => router.push(`/inventory/${productId}`) },
+        })
+        router.push('/inventory')
       }
     } else {
       const j = await res.json().catch(() => ({}))

@@ -43,6 +43,7 @@ export const REPAIR_STATUS_OPTIONS = [
   { value: 'waiting_for_parts',      label: 'Waiting for Parts' },
   { value: 'repaired',               label: 'Repaired' },
   { value: 'picked_up',              label: 'Picked Up' },
+  { value: 'refunded',               label: 'Refunded' },
 ]
 
 export const TASK_TYPE_OPTIONS = ['In-Store', 'Mail-In', 'Pick-Up']

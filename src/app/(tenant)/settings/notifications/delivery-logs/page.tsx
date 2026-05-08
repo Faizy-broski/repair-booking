@@ -110,9 +110,14 @@ export default function DeliveryLogsPage() {
                         <td className="px-4 py-3">
                           {entry.status === 'sent' && <Badge variant="success">Sent</Badge>}
                           {entry.status === 'failed' && (
-                            <span title={entry.error_message ?? ''}>
+                            <div>
                               <Badge variant="destructive">Failed</Badge>
-                            </span>
+                              {entry.error_message && (
+                                <p className="mt-1 max-w-[260px] text-[11px] leading-snug text-red-600 break-words">
+                                  {entry.error_message}
+                                </p>
+                              )}
+                            </div>
                           )}
                           {entry.status === 'queued' && <Badge variant="warning">Queued</Badge>}
                         </td>

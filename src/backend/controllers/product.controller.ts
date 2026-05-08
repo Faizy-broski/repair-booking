@@ -123,57 +123,37 @@ export const ProductController = {
       
       if (targetBranch) {
         const { adminSupabase } = await import('@/backend/config/supabase')
+        const qty = (needsStock ? initial_stock : 0) ?? 0
 
-        // 1. Enable product in the creating branch's catalog
-        const { error: bpError } = await adminSupabase
-          .from('branch_products')
-          .upsert(
-            { branch_id: targetBranch, product_id: product.id, is_enabled: true },
-            { onConflict: 'branch_id,product_id' }
-          )
-        if (bpError) {
-          console.error('[ProductController.create] Failed to seed branch_products:', bpError)
-        }
+        // Run branch_products + inventory seeding in parallel — both depend only on product.id
+        const [bpResult, invResult] = await Promise.all([
+          adminSupabase
+            .from('branch_products')
+            .upsert(
+              { branch_id: targetBranch, product_id: product.id, is_enabled: true },
+              { onConflict: 'branch_id,product_id' }
+            ),
+          needsStock
+            ? adminSupabase
+                .from('inventory')
+                .insert({ branch_id: targetBranch, product_id: product.id, variant_id: null, quantity: qty, low_stock_alert: low_stock_alert ?? 5 })
+            : Promise.resolve({ error: null }),
+        ])
 
-        // 2. Seed the inventory row with the specified initial_stock
-        if (needsStock) {
-          const qty = initial_stock ?? 0
-          console.log(`[ProductController.create] Seeding inventory for product ${product.id} at branch ${targetBranch} with stock ${qty}`)
-          
-          const { data: invData, error: invError } = await adminSupabase
-            .from('inventory')
-            .insert({
-              branch_id: targetBranch,
-              product_id: product.id,
-              variant_id: null, // Explicitly null for base products
-              quantity: qty,
-              low_stock_alert: low_stock_alert ?? 5
-            })
-            .select()
-            .single()
+        if (bpResult.error) console.error('[ProductController.create] branch_products upsert failed:', bpResult.error)
+        if (invResult.error) console.error('[ProductController.create] inventory insert failed:', invResult.error)
 
-          if (invError) {
-            console.error('[ProductController.create] Failed to seed inventory:', invError)
-          } else if (qty > 0) {
-            // Also record a stock movement for the opening stock
-            const { error: moveError } = await adminSupabase
-              .from('stock_movements')
-              .insert({
-                branch_id: targetBranch,
-                product_id: product.id,
-                variant_id: null,
-                quantity: qty,
-                type: 'adjustment',
-                note: 'Opening stock',
-                created_by: ctx.auth.userId
-              })
-            if (moveError) {
-              console.error('[ProductController.create] Failed to record initial stock movement:', moveError)
-            }
-          }
+        // Stock movement is independent — fire after inventory insert succeeds
+        if (needsStock && qty > 0 && !invResult.error) {
+          adminSupabase.from('stock_movements').insert({
+            branch_id: targetBranch, product_id: product.id, variant_id: null,
+            quantity: qty, type: 'adjustment', note: 'Opening stock', created_by: ctx.auth.userId,
+          }).then(({ error }) => {
+            if (error) console.error('[ProductController.create] stock_movements insert failed:', error)
+          })
         }
       } else {
-        console.warn('[ProductController.create] No target branch identified for inventory seeding. (branch_id from body or session is missing)')
+        console.warn('[ProductController.create] No target branch — inventory seeding skipped.')
       }
 
       return created(product)
