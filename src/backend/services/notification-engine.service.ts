@@ -85,19 +85,10 @@ function buildFallbackRepairEmail(v: Record<string, string>): string {
   const statusLabel = STATUS_LABEL[statusKey] ?? v.status ?? 'Updated'
   const statusColor = STATUS_COLOR[statusKey] ?? '#008080'
 
-  const deviceLine = [v.device_brand, v.device_type, v.device_model].filter(Boolean).join(' · ')
-
   return `
 <div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#1f2937;line-height:1.6">
   <p style="margin:0 0 16px">Hi <strong>${v.customer_name || 'Customer'}</strong>,</p>
   <p style="margin:0 0 20px">We have an update on your repair job. Here are the details:</p>
-
-  <!-- Status badge -->
-  <div style="margin:0 0 24px;text-align:center">
-    <span style="display:inline-block;background:${statusColor};color:#fff;font-weight:700;font-size:14px;padding:8px 24px;border-radius:999px;letter-spacing:0.5px">
-      ${statusLabel}
-    </span>
-  </div>
 
   <!-- Repair summary card -->
   <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:24px">
@@ -111,13 +102,18 @@ function buildFallbackRepairEmail(v: Record<string, string>): string {
       <td style="padding:10px 16px;color:#6b7280;font-size:13px;width:40%;border-bottom:1px solid #f3f4f6">Job Number</td>
       <td style="padding:10px 16px;font-weight:600;color:#111827;border-bottom:1px solid #f3f4f6">${v.ticket_number}</td>
     </tr>` : ''}
-    ${deviceLine ? `
+    ${v.device_brand ? `
+    <tr style="background:#f8fafc">
+      <td style="padding:10px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #f3f4f6">Brand</td>
+      <td style="padding:10px 16px;font-weight:600;color:#111827;border-bottom:1px solid #f3f4f6">${v.device_brand}</td>
+    </tr>` : ''}
+    ${v.device_model ? `
     <tr>
-      <td style="padding:10px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #f3f4f6">Device</td>
-      <td style="padding:10px 16px;font-weight:600;color:#111827;border-bottom:1px solid #f3f4f6">${deviceLine}</td>
+      <td style="padding:10px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #f3f4f6">Model</td>
+      <td style="padding:10px 16px;font-weight:600;color:#111827;border-bottom:1px solid #f3f4f6">${v.device_model}</td>
     </tr>` : ''}
     ${v.issue ? `
-    <tr>
+    <tr style="background:#f8fafc">
       <td style="padding:10px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #f3f4f6">Issue</td>
       <td style="padding:10px 16px;color:#111827;border-bottom:1px solid #f3f4f6">${v.issue}</td>
     </tr>` : ''}

@@ -124,10 +124,16 @@ export default function EmailSmtpPage() {
 
       <div className="max-w-lg space-y-6">
         {/* Status badge */}
-        {smtpConfig?.is_configured && (
+        {smtpConfig?.is_configured && smtpForm.smtp_enabled && (
           <div className="flex items-center gap-2 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
             <CheckCircle2 className="h-4 w-4" />
             Custom SMTP is configured. Emails send from <strong>{smtpConfig.smtp_from || smtpConfig.smtp_user}</strong>
+          </div>
+        )}
+        {smtpConfig?.is_configured && !smtpForm.smtp_enabled && (
+          <div className="flex items-center gap-2 rounded-md bg-yellow-50 px-3 py-2 text-sm text-yellow-700">
+            <Info className="h-4 w-4" />
+            Custom SMTP is configured but <strong>disabled</strong>. Emails are sent from the platform default. Enable the toggle below to use your own SMTP.
           </div>
         )}
 
