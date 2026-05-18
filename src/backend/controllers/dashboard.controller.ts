@@ -129,13 +129,11 @@ export const DashboardController = {
       const inventory = inventoryRes.data ?? []
       const repairsRevenueRows = repairsRevenueRes.data ?? []
 
-      // Count completed repairs — handles both hardcoded and custom status names
-      const TERMINAL_NAMES = new Set(['repaired', 'collected', 'unrepairable', 'refunded'])
+      const TERMINAL_NAMES      = new Set(['repaired', 'collected', 'unrepairable'])
       const COMPLETION_KEYWORDS = ['complet', 'done', 'fixed', 'pick', 'closed', 'resolv', 'finish', 'collect', 'handover']
-      const repairsCompleted = repairsRevenueRows.filter((r: any) => {
-        const s = (r.status ?? '').toLowerCase()
-        return TERMINAL_NAMES.has(s) || COMPLETION_KEYWORDS.some(kw => s.includes(kw))
-      }).length
+      const isTerminal = (s: string) => TERMINAL_NAMES.has(s) || COMPLETION_KEYWORDS.some(kw => s.includes(kw))
+
+      const repairsCompleted = repairsRevenueRows.filter((r: any) => isTerminal((r.status ?? '').toLowerCase())).length
       const salesCogs = ((salesCogsRes.data ?? []) as any[]).reduce((s, item) => {
         return s + (item.quantity ?? 0) * (item.products?.cost_price ?? 0)
       }, 0)
@@ -178,12 +176,13 @@ export const DashboardController = {
       const totalSales = sales.reduce((s, r) => s + (r.total ?? 0), 0)
       const totalExpenses = expenses.reduce((s, r) => s + (r.amount ?? 0), 0)
       const repairsRevenue = repairsRevenueRows.reduce((s, r) => {
-          const row = r as any
-          const deposit = row.deposit_paid ?? 0
-          const fullCost = row.actual_cost ?? row.estimated_cost ?? 0
-          const refund = row.refund_amount ?? 0
-          if (row.status === 'collected' || row.status === 'repaired') return s + fullCost - refund
-          if (row.status === 'refunded') return s + Math.max(0, deposit - refund)
+          const row      = r as any
+          const status   = (row.status ?? '').toLowerCase()
+          const deposit  = row.deposit_paid  ?? 0
+          const fullCost = row.actual_cost   ?? row.estimated_cost ?? 0
+          const refund   = row.refund_amount ?? 0
+          if (isTerminal(status))    return s + fullCost - refund
+          if (status === 'refunded') return s + Math.max(0, deposit - refund)
           return s + deposit
         }, 0)
 

@@ -19,8 +19,9 @@ export const GET = withMiddleware(async (req, ctx) => {
   const monthStart    = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
   const db            = adminSupabase as any
 
-  const TERMINAL_NAMES      = new Set(['repaired', 'collected', 'unrepairable', 'refunded'])
+  const TERMINAL_NAMES      = new Set(['repaired', 'collected', 'unrepairable'])
   const COMPLETION_KEYWORDS = ['complet', 'done', 'fixed', 'pick', 'closed', 'resolv', 'finish', 'collect', 'handover']
+  const isTerminal = (s: string) => TERMINAL_NAMES.has(s) || COMPLETION_KEYWORDS.some(kw => s.includes(kw))
 
   try {
     const [totalRes, openRes, urgentRes, revenueRes] = await Promise.all([
@@ -32,18 +33,15 @@ export const GET = withMiddleware(async (req, ctx) => {
 
     const rows: any[] = revenueRes.data ?? []
 
-    // Count completed using keyword matching so custom statuses (e.g. "Complete") are recognised
-    const repairsCompleted = rows.filter((r: any) => {
-      const s = (r.status ?? '').toLowerCase()
-      return TERMINAL_NAMES.has(s) || COMPLETION_KEYWORDS.some(kw => s.includes(kw))
-    }).length
+    const repairsCompleted = rows.filter((r: any) => isTerminal((r.status ?? '').toLowerCase())).length
 
     const revenue = rows.reduce((sum: number, r: any) => {
+      const s        = (r.status ?? '').toLowerCase()
       const deposit  = r.deposit_paid  ?? 0
       const fullCost = r.actual_cost   ?? r.estimated_cost ?? 0
       const refund   = r.refund_amount ?? 0
-      if (r.status === 'collected' || r.status === 'repaired') return sum + fullCost - refund
-      if (r.status === 'refunded') return sum + Math.max(0, deposit - refund)
+      if (isTerminal(s))    return sum + fullCost - refund
+      if (s === 'refunded') return sum + Math.max(0, deposit - refund)
       return sum + deposit
     }, 0)
 
