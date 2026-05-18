@@ -240,18 +240,35 @@ export function ProductsTab() {
   // ── Advanced search ────────────────────────────────────────────────────────
   function openAdvSearch() {
     setAdvSearchOpen(true); setAdvSearchResults([]); setAdvSearchName(''); setAdvSearchSku(''); setAdvSearchCatIds(new Set())
-    runAdvSearch()
   }
 
   async function runAdvSearch() {
     setAdvSearching(true)
-    const params = new URLSearchParams({ limit: '100', show_on_pos: 'true' })
+    const params = new URLSearchParams({ limit: '200', show_on_pos: 'true' })
     if (activeBranch) params.set('branch_id', activeBranch.id)
-    if (advSearchName.trim()) params.set('search', advSearchName.trim())
-    else if (advSearchSku.trim()) params.set('search', advSearchSku.trim())
+    const nameTerm = advSearchName.trim()
+    const skuTerm  = advSearchSku.trim()
+    // Pass whichever term is provided to the API for server-side pre-filtering
+    if (nameTerm) params.set('search', nameTerm)
+    else if (skuTerm) params.set('search', skuTerm)
     const res = await fetch(`/api/products?${params}`)
     const j = await res.json()
     let results: ProductWithStock[] = j.data ?? []
+    // Client-side name filter (case-insensitive substring)
+    if (nameTerm) {
+      const lower = nameTerm.toLowerCase()
+      results = results.filter(p => p.name.toLowerCase().includes(lower))
+    }
+    // Client-side SKU/identifier filter
+    if (skuTerm) {
+      const lower = skuTerm.toLowerCase()
+      results = results.filter(p =>
+        (p.sku ?? '').toLowerCase().includes(lower) ||
+        (p.barcode ?? '').toLowerCase().includes(lower) ||
+        p.id.toLowerCase().includes(lower)
+      )
+    }
+    // Category filter
     if (advSearchCatIds.size > 0) results = results.filter(p => p.category_id && advSearchCatIds.has(p.category_id as string))
     setAdvSearchResults(results); setAdvSearching(false)
   }
@@ -291,11 +308,22 @@ export function ProductsTab() {
   // ── Product card renderer ──────────────────────────────────────────────────
   function ProductCard({ product, size = 'md' }: { product: ProductWithStock; size?: 'sm' | 'md' }) {
     const hasVariants = product.has_variants || (product.variant_count ?? 0) > 0
+    const outOfStock = !product.is_service && !hasVariants && product.on_hand !== undefined && (product.on_hand ?? 0) <= 0
     return (
       <button
+        disabled={outOfStock}
         onClick={() => hasVariants ? openVariantSelect(product) : pos.addToCart(product as unknown as Product)}
-        className="relative flex w-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-brand-teal hover:shadow-sm transition-all"
+        className={`relative flex w-full flex-col overflow-hidden rounded-xl border bg-white p-3 text-left transition-all ${
+          outOfStock
+            ? 'border-gray-100 opacity-50 cursor-not-allowed'
+            : 'border-gray-200 hover:border-brand-teal hover:shadow-sm cursor-pointer'
+        }`}
       >
+        {outOfStock && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/60">
+            <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-600">Out of Stock</span>
+          </div>
+        )}
         {product.image_url ? (
           <div className="mb-3 w-full overflow-hidden rounded-xl bg-gray-50 aspect-[4/3]">
             <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
@@ -316,7 +344,7 @@ export function ProductsTab() {
             <span className="text-sm font-bold text-brand-teal">{formatCurrency(product.selling_price)}</span>
             {product.on_hand !== undefined && !product.is_service && (
               <span className={`block text-xs font-medium ${(product.on_hand ?? 0) > 0 ? 'text-gray-400' : 'text-red-500'}`}>
-                {product.on_hand ?? 0} on hand
+                {(product.on_hand ?? 0) > 0 ? `${product.on_hand} on hand` : 'Out of stock'}
               </span>
             )}
             {hasVariants && <span className="block text-xs text-indigo-500 font-medium">Select variant</span>}
@@ -510,8 +538,15 @@ export function ProductsTab() {
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                   {partProducts.map(product => {
                     const hasVariants = product.has_variants || (product as any).variant_count > 0
+                    const oos = !hasVariants && typeof product.on_hand === 'number' && product.on_hand <= 0
                     return (
-                      <button key={product.id} onClick={() => hasVariants ? openVariantSelect(product) : pos.addToCart(product as unknown as Product)} className="flex flex-col items-center rounded-xl border border-gray-200 bg-white p-3 text-center hover:border-brand-teal hover:shadow-sm transition-all cursor-pointer w-full overflow-hidden">
+                      <button key={product.id} disabled={oos} onClick={() => hasVariants ? openVariantSelect(product) : pos.addToCart(product as unknown as Product)}
+                        className={`relative flex flex-col items-center rounded-xl border bg-white p-3 text-center transition-all w-full overflow-hidden ${oos ? 'border-gray-100 opacity-50 cursor-not-allowed' : 'border-gray-200 hover:border-brand-teal hover:shadow-sm cursor-pointer'}`}>
+                        {oos && (
+                          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/60">
+                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-600">Out of Stock</span>
+                          </div>
+                        )}
                         {product.image_url ? (
                           <div className="mb-2 w-full h-28 flex items-center justify-center rounded-lg bg-gray-50">
                             <img src={product.image_url} alt={product.name} className="h-full w-full object-contain rounded-lg" />
@@ -521,7 +556,11 @@ export function ProductsTab() {
                         )}
                         <span className="text-sm font-semibold text-gray-800 line-clamp-2 leading-tight w-full">{product.name}</span>
                         <span className="text-sm font-bold text-brand-teal mt-1">{formatCurrency(Number(product.selling_price))}</span>
-                        {typeof product.on_hand === 'number' && <span className="text-xs text-gray-400 mt-0.5">{product.on_hand} on hand</span>}
+                        {typeof product.on_hand === 'number' && (
+                          <span className={`text-xs mt-0.5 ${product.on_hand > 0 ? 'text-gray-400' : 'text-red-500 font-medium'}`}>
+                            {product.on_hand > 0 ? `${product.on_hand} on hand` : 'Out of stock'}
+                          </span>
+                        )}
                       </button>
                     )
                   })}
@@ -686,12 +725,19 @@ export function ProductsTab() {
                           </td>
                           <td className="py-2 text-right text-xs font-semibold text-brand-teal">{formatCurrency(p.selling_price)}</td>
                           <td className="py-2 pl-2">
-                            <button
-                              onClick={() => { if ((p.has_variants || (p.variant_count ?? 0) > 0)) { openVariantSelect(p); setAdvSearchOpen(false) } else { pos.addToCart(p as unknown as Product); setAdvSearchOpen(false) } }}
-                              className="flex h-7 w-7 items-center justify-center rounded border border-gray-200 text-gray-500 hover:border-brand-teal hover:text-brand-teal"
-                            >
-                              <Plus className="h-3.5 w-3.5" />
-                            </button>
+                            {(() => {
+                              const advOos = !p.is_service && !(p.has_variants || (p.variant_count ?? 0) > 0) && p.on_hand !== undefined && (p.on_hand ?? 0) <= 0
+                              return (
+                                <button
+                                  disabled={advOos}
+                                  title={advOos ? 'Out of stock' : undefined}
+                                  onClick={() => { if ((p.has_variants || (p.variant_count ?? 0) > 0)) { openVariantSelect(p); setAdvSearchOpen(false) } else { pos.addToCart(p as unknown as Product); setAdvSearchOpen(false) } }}
+                                  className={`flex h-7 w-7 items-center justify-center rounded border text-gray-500 ${advOos ? 'border-gray-100 opacity-40 cursor-not-allowed' : 'border-gray-200 hover:border-brand-teal hover:text-brand-teal'}`}
+                                >
+                                  <Plus className="h-3.5 w-3.5" />
+                                </button>
+                              )
+                            })()}
                           </td>
                         </tr>
                       ))}

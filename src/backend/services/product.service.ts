@@ -272,7 +272,8 @@ export const ProductService = {
         if (!p?.is_active || p?.is_service) return
         stockRetailValue += (p.selling_price ?? 0) * row.quantity
         stockCostValue   += (p.cost_price   ?? 0) * row.quantity
-        if (row.low_stock_alert != null && row.quantity > 0 && row.quantity <= row.low_stock_alert) lowStockCount++
+        const threshold = row.low_stock_alert ?? 5
+        if (row.quantity <= threshold) lowStockCount++
       })
     }
     // When no branchId, return zeros — summing raw prices without quantities

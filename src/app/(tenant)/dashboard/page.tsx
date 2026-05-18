@@ -1,8 +1,9 @@
 'use client'
+import { useState } from 'react'
 import { DollarSign, Wrench, ArrowLeftRight, TrendingUp, AlertTriangle, Clock, Package, Receipt } from 'lucide-react'
 import { StatsCard } from '@/components/dashboard/stats-card'
 import { useAuthStore } from '@/store/auth.store'
-import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
+import { cn, formatCurrency, formatCurrencyCompact } from '@/lib/utils'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
@@ -17,6 +18,9 @@ interface DashboardStats {
   repairs_revenue: number
   total_expenses: number
   low_stock_count: number
+  net_profit: number
+  sales_profit: number
+  repairs_profit: number
 }
 
 interface BranchRevenue {
@@ -88,20 +92,27 @@ function RepairStatusBadge({ status }: { status: string }) {
 }
 
 /* ── Page ──────────────────────────────────────────────────── */
+const PERIODS = [
+  { value: 'month',   label: 'This Month' },
+  { value: '3months', label: '3 Months'   },
+  { value: '6months', label: '6 Months'   },
+  { value: 'year',    label: 'This Year'  },
+] as const
+type Period = typeof PERIODS[number]['value']
+
 export default function DashboardPage() {
   const { activeBranch, isOwner, isLoading: authLoading } = useAuthStore()
   const branchId = activeBranch?.id ?? null
+  const [period, setPeriod] = useState<Period>('month')
 
   const { data, isLoading: queryLoading } = useQuery({
-    queryKey: ['dashboard', branchId],
+    queryKey: ['dashboard', branchId, period],
     queryFn: async () => {
-      const res = await fetch(`/api/dashboard?branch_id=${branchId}`)
+      const res = await fetch(`/api/dashboard?branch_id=${branchId}&period=${period}`)
       const json = await res.json()
       return json.data ?? {}
     },
     enabled: !!branchId,
-    // Dashboard stats refresh every 5 min; the 60 min gcTime (global default)
-    // means re-navigating to the dashboard within the same shift is instant.
     staleTime: 5 * 60 * 1000,
   })
 
@@ -116,27 +127,52 @@ export default function DashboardPage() {
     <div className="space-y-6">
 
       {/* ── Header ── */}
-      <div>
-        <h1 className="text-lg sm:text-xl font-bold text-on-surface">
-          {isOwner() ? 'Business Overview' : `${activeBranch?.name ?? ''} Dashboard`}
-        </h1>
-        <p className="text-sm text-on-surface-variant">Last 30 days</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-lg sm:text-xl font-bold text-on-surface">
+            {isOwner() ? 'Business Overview' : `${activeBranch?.name ?? ''} Dashboard`}
+          </h1>
+          <p className="text-sm text-on-surface-variant">
+            {PERIODS.find(p => p.value === period)?.label}
+          </p>
+        </div>
+
+        {/* Period selector */}
+        <div className="flex items-center rounded-xl border border-outline-variant bg-surface-container-lowest p-1 gap-1 self-start sm:self-auto">
+          {PERIODS.map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setPeriod(value)}
+              className={cn(
+                'rounded-lg px-3 py-1.5 text-xs font-semibold transition-all',
+                period === value
+                  ? 'bg-primary text-on-primary shadow-sm'
+                  : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* ── Stats Grid (6 cards) ── */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 lg:grid-cols-4">
         {loading ? (
-          Array.from({ length: 7 }).map((_, i) => (
+          Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="h-28 sm:h-32 animate-pulse rounded-xl bg-surface-container" />
           ))
         ) : (
           <>
-            <StatsCard title="Sales Revenue" value={formatCurrencyCompact(stats?.total_sales ?? 0)} subtitle="this month" icon={<DollarSign className="h-5 w-5" />} color="green" />
-            <StatsCard title="Repairs Revenue" value={formatCurrencyCompact(stats?.repairs_revenue ?? 0)} subtitle="deposits collected" icon={<Receipt className="h-5 w-5" />} color="purple" />
-            <StatsCard title="Transactions" value={stats?.sales_count ?? 0} subtitle="this month" icon={<ArrowLeftRight className="h-5 w-5" />} color="blue" />
+            {/* Row 1 — Sales & Repairs */}
+            <StatsCard title="Sales Revenue" value={formatCurrencyCompact(stats?.total_sales ?? 0)} subtitle={PERIODS.find(p => p.value === period)?.label} icon={<DollarSign className="h-5 w-5" />} color="green" />
+            <StatsCard title="Sales Profit" value={formatCurrencyCompact(stats?.sales_profit ?? 0)} subtitle="revenue − cost of goods" icon={<TrendingUp className="h-5 w-5" />} color={(stats?.sales_profit ?? 0) >= 0 ? 'green' : 'red'} />
+            <StatsCard title="Repairs Revenue" value={formatCurrencyCompact(stats?.repairs_revenue ?? 0)} subtitle="collected" icon={<Receipt className="h-5 w-5" />} color="purple" />
+            {/* Row 2 — Operations */}
+            <StatsCard title="Net Profit" value={formatCurrencyCompact(stats?.net_profit ?? 0)} subtitle="all revenue − expenses" icon={<TrendingUp className="h-5 w-5" />} color={(stats?.net_profit ?? 0) >= 0 ? 'green' : 'red'} />
+            <StatsCard title="Transactions" value={stats?.sales_count ?? 0} subtitle={PERIODS.find(p => p.value === period)?.label} icon={<ArrowLeftRight className="h-5 w-5" />} color="blue" />
             <StatsCard title="Open Repairs" value={stats?.repairs_open ?? 0} icon={<Wrench className="h-5 w-5" />} color="yellow" />
-            <StatsCard title="Completed Repairs" value={stats?.repairs_completed ?? 0} subtitle="this month" icon={<Wrench className="h-5 w-5" />} color="green" />
-            <StatsCard title="Total Expenses" value={formatCurrencyCompact(stats?.total_expenses ?? 0)} subtitle="this month" icon={<TrendingUp className="h-5 w-5" />} color="red" />
+            <StatsCard title="Total Expenses" value={formatCurrencyCompact(stats?.total_expenses ?? 0)} subtitle={PERIODS.find(p => p.value === period)?.label} icon={<TrendingUp className="h-5 w-5" />} color="red" />
             <StatsCard title="Low Stock" value={stats?.low_stock_count ?? 0} subtitle="items" icon={<AlertTriangle className="h-5 w-5" />} color={(stats?.low_stock_count ?? 0) > 0 ? 'red' : 'green'} />
           </>
         )}
@@ -157,7 +193,7 @@ export default function DashboardPage() {
                   <BarChart data={branchRevenue.map((b) => ({ name: b.branchName, revenue: b.total }))}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-container)" />
                     <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `£${(v / 1000).toFixed(0)}k`} />
+                    <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => v >= 1000 ? `£${(v / 1000).toFixed(1)}k` : `£${v}`} />
                     <Tooltip formatter={(v) => formatCurrency(v as number)} />
                     <Bar dataKey="revenue" fill="var(--primary)" radius={[4, 4, 0, 0]} />
                   </BarChart>

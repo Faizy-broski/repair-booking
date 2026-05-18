@@ -193,7 +193,7 @@ export function ImageUpload({ value, onChange, label, compact = false, className
         </div>
 
         {/* Text */}
-        <div className="min-w-0 flex-1" onClick={(e) => e.stopPropagation()}>
+        <div className="min-w-0 flex-1">
           {uploading ? (
             <p className="text-sm text-brand-teal font-medium">Uploading…</p>
           ) : value ? (

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { PosService } from '@/backend/services/pos.service'
 import { CommissionService } from '@/backend/services/payroll.service'
-import { ok, created, serverError } from '@/backend/utils/api-response'
+import { ok, created, badRequest, serverError } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
 import { z } from 'zod'
@@ -48,7 +48,9 @@ export const PosController = {
       // Fire-and-forget commission recording (never blocks the response)
       CommissionService.recordForSale(ctx.businessId, data.cashier_id, saleId, data.total).catch(() => {})
       return created({ sale_id: saleId })
-    } catch (err) {
+    } catch (err: any) {
+      // Postgres RAISE EXCEPTION (P0001) — forward the message directly to the client
+      if (err?.code === 'P0001' && err?.message) return badRequest(err.message, 'STOCK_ERROR')
       return serverError('Failed to process sale', err)
     }
   },

@@ -442,38 +442,46 @@ function ReceiptPdf({
   fmt: (n: number) => string
   socialEntries: [keyof SocialLinks, string][]
 }) {
-  const pc = settings.primary_color
-  const tc = settings.text_color
+  const pc = settings.primary_color ?? '#0f766e'
+  const tc = settings.text_color ?? '#111827'
   const balanceDue = Math.max(0, total - amountPaid)
   const pageWidth = settings.paper_size === 'Receipt58' ? 165 : 227
+  // Fixed amount column width so long descriptions wrap without pushing the price off-line
+  const amtWidth = settings.paper_size === 'Receipt58' ? 44 : 52
+
+  // Deduplicate footer lines — don't repeat the thank-you message if it was accidentally
+  // copied into footer_line_1/2/3 as well
+  const uniqueFooterLines = [settings.footer_line_1, settings.footer_line_2, settings.footer_line_3]
+    .filter((line): line is string => !!line && line !== settings.thank_you_message)
 
   const s = StyleSheet.create({
     page: { fontFamily: family, backgroundColor: '#ffffff', padding: 10 },
     center: { textAlign: 'center' },
-    businessName: { fontSize: 12, fontFamily: bold, color: tc, textAlign: 'center', marginBottom: 1 },
+    businessName: { fontSize: 12, fontFamily: bold, color: '#000000', textAlign: 'center', marginBottom: 1 },
     branchName: { fontSize: 8, color: '#6b7280', textAlign: 'center', marginBottom: 1 },
     detail: { fontSize: 7.5, color: '#6b7280', textAlign: 'center', marginBottom: 1 },
-    divider: { borderTop: '1 dashed #d1d5db', marginVertical: 6 },
-    invoiceNo: { fontSize: 9, fontFamily: bold, textAlign: 'center', color: tc, marginBottom: 2 },
+    divider: { borderTop: '1 dashed #9ca3af', marginVertical: 6 },
+    invoiceNo: { fontSize: 9, fontFamily: bold, textAlign: 'center', color: '#000000', marginBottom: 2 },
     dateRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
-    dateLabel: { fontSize: 7.5, color: '#6b7280' },
-    dateValue: { fontSize: 7.5, color: tc },
-    itemRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
-    itemDesc: { fontSize: 8, color: tc, flex: 1, paddingRight: 4 },
-    itemAmt: { fontSize: 8, color: tc, textAlign: 'right' },
-    itemQty: { fontSize: 7, color: '#9ca3af' },
+    dateLabel: { fontSize: 7.5, color: '#6b7280', flex: 1 },
+    dateValue: { fontSize: 7.5, color: '#000000', fontFamily: bold },
+    // Item rows: desc wraps in flex column; amount stays right-aligned at fixed width
+    itemRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 },
+    itemDesc: { fontSize: 8, color: '#000000', flex: 1, paddingRight: 4 },
+    itemAmt: { fontSize: 8, color: '#000000', textAlign: 'right', width: amtWidth, flexShrink: 0 },
+    itemQty: { fontSize: 7, color: '#6b7280', marginTop: 1 },
     totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 1.5 },
     totalLabel: { fontSize: 8, color: '#6b7280' },
-    totalValue: { fontSize: 8, color: tc },
+    totalValue: { fontSize: 8, color: '#000000' },
     grandRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 3 },
-    grandLabel: { fontSize: 11, fontFamily: bold, color: tc },
+    grandLabel: { fontSize: 11, fontFamily: bold, color: '#000000' },
     grandValue: { fontSize: 11, fontFamily: bold, color: pc },
-    balanceRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: pc, padding: 5, borderRadius: 3, marginTop: 4 },
+    balanceRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: pc, padding: 6, borderRadius: 3, marginTop: 4 },
     balanceLabel: { fontSize: 9, fontFamily: bold, color: '#ffffff' },
     balanceValue: { fontSize: 9, fontFamily: bold, color: '#ffffff' },
     thankYou: { fontSize: 8, fontFamily: bold, color: pc, textAlign: 'center', marginTop: 6 },
-    footerText: { fontSize: 7, color: '#9ca3af', textAlign: 'center', marginTop: 1 },
-    policy: { fontSize: 6, color: '#9ca3af', textAlign: 'center', marginTop: 5 },
+    footerText: { fontSize: 7, color: '#6b7280', textAlign: 'center', marginTop: 1.5 },
+    policy: { fontSize: 6, color: '#9ca3af', textAlign: 'center', marginTop: 5, borderTop: '0.5 solid #e5e7eb', paddingTop: 4 },
   })
 
   return (
@@ -499,7 +507,7 @@ function ReceiptPdf({
         </View>
         <View style={s.dateRow}>
           <Text style={s.dateLabel}>Status</Text>
-          <Text style={[s.dateValue, { color: pc }]}>{status}</Text>
+          <Text style={[s.dateValue, { color: '#000000', fontFamily: bold }]}>{status}</Text>
         </View>
 
         <View style={s.divider} />
@@ -528,11 +536,13 @@ function ReceiptPdf({
         )}
 
         <View style={s.divider} />
-        {settings.thank_you_message && <Text style={s.thankYou}>{settings.thank_you_message}</Text>}
-        {settings.footer_line_1 && <Text style={s.footerText}>{settings.footer_line_1}</Text>}
-        {settings.footer_line_2 && <Text style={s.footerText}>{settings.footer_line_2}</Text>}
-        {settings.footer_line_3 && <Text style={s.footerText}>{settings.footer_line_3}</Text>}
-        {socialEntries.map(([key, val]) => (
+        {settings.thank_you_message && (
+          <Text style={s.thankYou}>{settings.thank_you_message}</Text>
+        )}
+        {uniqueFooterLines.map((line, i) => (
+          <Text key={i} style={s.footerText}>{line}</Text>
+        ))}
+        {socialEntries.map(([key, val], i) => (
           <Text key={key} style={s.footerText}>{SOCIAL_LABELS[key]}: {val}</Text>
         ))}
         {settings.policy_text && <Text style={s.policy}>{settings.policy_text}</Text>}

@@ -246,16 +246,39 @@ export async function middleware(request: NextRequest) {
     // All other routes require authentication
     if (!user) return redirectToLogin('/login')
 
-    // ── Tenant isolation: verify this user belongs to THIS business ──────────
+    // Compute exemption before the parallel fetch so the subscription query
+    // can be skipped entirely on paths that never need it.
+    const isExemptPath =
+      pathname.startsWith('/account') ||
+      pathname.startsWith('/api/account/') ||
+      pathname.startsWith('/api/stripe/') ||
+      pathname.startsWith('/upgrade')
+
+    // ── Parallel fetch: tenant isolation + subscription enforcement ───────────
+    // Profile (tenant isolation) and subscription status are independent of each
+    // other — run them simultaneously to eliminate one sequential round-trip
+    // (~80-120 ms) on every authenticated page load.
+    const [{ data: userProfile }, subResult] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('business_id, role')
+        .eq('id', user.id)
+        .maybeSingle(),
+      isExemptPath
+        ? Promise.resolve({ data: null })
+        : tenantSupabase
+            .from('subscriptions')
+            .select('status, trial_ends_at, plans(plan_type)')
+            .eq('business_id', business.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+    ])
+
+    // ── Tenant isolation ───────────────────────────────────────────────────────
     // Prevents a user from business A accessing business B's subdomain.
     // Uses the main `supabase` client (which has proper cookie setters) so that
     // calling signOut() actually clears the session cookies in the response.
-    const { data: userProfile } = await supabase
-      .from('profiles')
-      .select('business_id, role')
-      .eq('id', user.id)
-      .maybeSingle()
-
     if (!userProfile || userProfile.business_id !== business.id) {
       // Super admins have no business_id — don't sign them out, just send them
       // to the tenant login page so their admin session stays intact.
@@ -272,23 +295,9 @@ export async function middleware(request: NextRequest) {
       return forwardAuthCookies(supabaseResponse, NextResponse.redirect(loginUrl))
     }
 
-    // ── Trial / subscription enforcement ─────────────────────────────────
-    // Skip enforcement on account page, its API, stripe routes, and upgrade page
-    const isExemptPath =
-      pathname.startsWith('/account') ||
-      pathname.startsWith('/api/account/') ||
-      pathname.startsWith('/api/stripe/') ||
-      pathname.startsWith('/upgrade')
-
+    // ── Trial / subscription enforcement ──────────────────────────────────────
     if (!isExemptPath) {
-      const { data: sub } = await tenantSupabase
-        .from('subscriptions')
-        .select('status, trial_ends_at, plans(plan_type)')
-        .eq('business_id', business.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
+      const sub = subResult.data
       const planType = (sub?.plans as { plan_type?: string } | null)?.plan_type
 
       const freeTrialExpired =

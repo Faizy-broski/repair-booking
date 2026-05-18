@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { Plus, Download, CreditCard, RotateCcw } from 'lucide-react'
+import { Plus, Download, CreditCard, RotateCcw, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -70,6 +70,7 @@ export default function InvoicesPage() {
   const [paymentModal, setPaymentModal] = useState<{ invoiceId: string; remaining: number } | null>(null)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [recordingPayment, setRecordingPayment] = useState(false)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
   const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -178,15 +179,20 @@ export default function InvoicesPage() {
   }
 
   async function downloadPdf(invoiceId: string) {
-    const res = await fetch(`/api/invoices/${invoiceId}/pdf`)
-    if (res.ok) {
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `invoice-${invoiceId}.pdf`
-      a.click()
-      URL.revokeObjectURL(url)
+    setDownloadingId(invoiceId)
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}/pdf`)
+      if (res.ok) {
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `invoice-${invoiceId}.pdf`
+        a.click()
+        URL.revokeObjectURL(url)
+      }
+    } finally {
+      setDownloadingId(null)
     }
   }
 
@@ -266,8 +272,16 @@ export default function InvoicesPage() {
                 Refund
               </Button>
             )}
-            <Button size="sm" variant="ghost" onClick={() => downloadPdf(row.original.id)}>
-              <Download className="h-3.5 w-3.5" />
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => downloadPdf(row.original.id)}
+              disabled={downloadingId === row.original.id}
+              title="Download PDF"
+            >
+              {downloadingId === row.original.id
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <Download className="h-3.5 w-3.5" />}
             </Button>
           </div>
         )

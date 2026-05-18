@@ -16,6 +16,7 @@ import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { pdf } from '@react-pdf/renderer'
 import { SaleReceiptPdf } from '@/components/pdf/sale-receipt-pdf'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import type { Customer, Product } from '@/types/database'
 import type { ProductWithStock } from '../_types'
 
@@ -58,7 +59,7 @@ export function CartPanel({ mobileView }: Props) {
   const [showFullTotals, setShowFullTotals] = useState(false)
 
   const { data: invoiceSettings = null } = useQuery({
-    queryKey: ['pos-invoice-settings', activeBranch?.id],
+    queryKey: ['invoice-settings', activeBranch?.id],
     queryFn: async () => {
       const res = await fetch(`/api/settings/invoice?branch_id=${activeBranch!.id}`)
       const json = await res.json()
@@ -180,7 +181,7 @@ export function CartPanel({ mobileView }: Props) {
           logoUrl={(activeBranch as any)?.logo_url ?? undefined}
           currency="£"
           taxRate={pos.taxRate > 0 ? pos.taxRate : undefined}
-          settings={invoiceSettings}
+          settings={invoiceSettings ?? undefined}
         />
       ).toBlob()
       const url = URL.createObjectURL(blob)
@@ -221,6 +222,10 @@ export function CartPanel({ mobileView }: Props) {
       await printReceipt(saleJson.data?.sale_id ?? 'unknown', pos.paymentMethod, paymentSplits)
       pos.clearCart(); setCashTendered('')
       setTimeout(() => { setSuccess(false); setPaymentOpen(false) }, 2500)
+    } else {
+      const errJson = await res.json().catch(() => ({}))
+      const msg = errJson?.error?.message ?? errJson?.message ?? 'Payment failed. Please try again.'
+      toast.error(msg)
     }
     setProcessing(false)
   }
@@ -251,6 +256,10 @@ export function CartPanel({ mobileView }: Props) {
       await printReceipt(saleJson.data?.sale_id ?? 'unknown', 'cash')
       pos.clearCart(); setCashTendered('')
       setTimeout(() => setSuccess(false), 2500)
+    } else {
+      const errJson = await res.json().catch(() => ({}))
+      const msg = errJson?.error?.message ?? errJson?.message ?? 'Payment failed. Please try again.'
+      toast.error(msg)
     }
     setProcessing(false)
   }

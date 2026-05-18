@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ImageUpload } from '@/components/ui/image-upload'
@@ -63,7 +64,7 @@ function Toggle({ label, desc, checked, onChange }: {
         )}
       >
         <span className={cn(
-          'absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow transition-transform',
+          'absolute top-0.5 left-0.5 h-3.5 w-3.5 rounded-full bg-white shadow transition-transform',
           checked ? 'translate-x-4' : 'translate-x-0'
         )} />
       </button>
@@ -258,6 +259,7 @@ function InvoicePreview({ s, businessName, branchName }: {
 
 export function InvoiceDesignTab() {
   const { activeBranch, branches, profile, isOwner } = useAuthStore()
+  const queryClient = useQueryClient()
   const [settings, setSettings] = useState<InvoiceSettings>({ ...DEFAULT_INVOICE_SETTINGS })
   const [scope, setScope] = useState<'business' | 'branch'>('business')
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null)
@@ -315,6 +317,9 @@ export function InvoiceDesignTab() {
       setSaved(true)
       setError(null)
       setTimeout(() => setSaved(false), 3000)
+      // Bust the cache on every page that loads invoice settings so the
+      // next invoice/receipt generated uses the settings just saved.
+      queryClient.invalidateQueries({ queryKey: ['invoice-settings'] })
     } else {
       const json = await res.json()
       setError(json?.error?.message || json?.error || 'Failed to save settings. Please check your inputs.')

@@ -20,14 +20,12 @@ interface RepairRow extends Repair {
   customers?: { first_name: string; last_name: string | null; phone: string | null } | null
 }
 
-const STATUSES = [
-  { id: 'received',      label: 'Received',       color: 'bg-gray-100 border-gray-300' },
-  { id: 'in_progress',   label: 'In Progress',     color: 'bg-blue-50 border-blue-200' },
-  { id: 'waiting_parts', label: 'Waiting Parts',   color: 'bg-yellow-50 border-yellow-200' },
-  { id: 'repaired',      label: 'Repaired',        color: 'bg-green-50 border-green-200' },
-  { id: 'unrepairable',  label: 'Unrepairable',    color: 'bg-red-50 border-red-200' },
-  { id: 'collected',     label: 'Collected',       color: 'bg-purple-50 border-purple-200' },
-]
+interface CustomStatus {
+  id: string
+  name: string
+  color: string
+  sort_order: number
+}
 
 // ── Draggable card ─────────────────────────────────────────────────────────────
 function RepairCard({ repair, isDragOverlay = false }: { repair: RepairRow; isDragOverlay?: boolean }) {
@@ -86,14 +84,21 @@ function KanbanColumn({
   status,
   repairs,
 }: {
-  status: (typeof STATUSES)[number]
+  status: { id: string; label: string; hexColor: string }
   repairs: RepairRow[]
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status.id })
 
+  // Build light tint from hex for header and body backgrounds
+  const headerStyle = { backgroundColor: `${status.hexColor}26`, borderColor: `${status.hexColor}66` }
+  const bodyStyle   = { backgroundColor: `${status.hexColor}14`, borderColor: `${status.hexColor}66` }
+
   return (
     <div className="flex w-60 shrink-0 flex-col">
-      <div className={`mb-2 flex items-center justify-between rounded-t-lg border px-3 py-2 ${status.color}`}>
+      <div
+        style={headerStyle}
+        className="mb-2 flex items-center justify-between rounded-t-lg border px-3 py-2"
+      >
         <span className="text-xs font-semibold text-gray-700">{status.label}</span>
         <span className="rounded-full bg-white/80 px-2 py-0.5 text-xs font-medium text-gray-600">
           {repairs.length}
@@ -101,9 +106,10 @@ function KanbanColumn({
       </div>
       <div
         ref={setNodeRef}
+        style={bodyStyle}
         className={`flex min-h-[200px] flex-1 flex-col gap-2 rounded-b-lg border border-t-0 p-2 transition-colors ${
-          status.color
-        } ${isOver ? 'ring-2 ring-blue-400 ring-inset' : ''}`}
+          isOver ? 'ring-2 ring-blue-400 ring-inset' : ''
+        }`}
       >
         {repairs.map((r) => (
           <RepairCard key={r.id} repair={r} />
@@ -113,18 +119,37 @@ function KanbanColumn({
   )
 }
 
+// Hex colours for the built-in statuses
+const BUILTIN_STATUSES: { id: string; label: string; hexColor: string }[] = [
+  { id: 'received',      label: 'Received',      hexColor: '#9ca3af' },
+  { id: 'in_progress',   label: 'In Progress',   hexColor: '#3b82f6' },
+  { id: 'waiting_parts', label: 'Waiting Parts', hexColor: '#f59e0b' },
+  { id: 'repaired',      label: 'Repaired',      hexColor: '#22c55e' },
+  { id: 'unrepairable',  label: 'Unrepairable',  hexColor: '#ef4444' },
+  { id: 'collected',     label: 'Collected',     hexColor: '#a855f7' },
+]
+
 // ── Main board ─────────────────────────────────────────────────────────────────
 interface KanbanBoardProps {
   repairs: RepairRow[]
   onStatusChange: (repairId: string, newStatus: string) => void
+  customStatuses?: CustomStatus[]
 }
 
-export function KanbanBoard({ repairs, onStatusChange }: KanbanBoardProps) {
+export function KanbanBoard({ repairs, onStatusChange, customStatuses = [] }: KanbanBoardProps) {
   const [activeRepair, setActiveRepair] = useState<RepairRow | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   )
+
+  // Build the ordered column list: built-ins first, then custom statuses sorted by sort_order
+  const statuses = [
+    ...BUILTIN_STATUSES,
+    ...[...customStatuses]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((cs) => ({ id: cs.name, label: cs.name, hexColor: cs.color })),
+  ]
 
   const grouped = useCallback(
     (statusId: string) => repairs.filter((r) => r.status === statusId),
@@ -143,7 +168,7 @@ export function KanbanBoard({ repairs, onStatusChange }: KanbanBoardProps) {
     const newStatus = over.id as string
     const repair = repairs.find((r) => r.id === active.id)
     if (!repair || repair.status === newStatus) return
-    if (STATUSES.some((s) => s.id === newStatus)) {
+    if (statuses.some((s) => s.id === newStatus)) {
       onStatusChange(repair.id, newStatus)
     }
   }
@@ -156,7 +181,7 @@ export function KanbanBoard({ repairs, onStatusChange }: KanbanBoardProps) {
       onDragEnd={handleDragEnd}
     >
       <div className="flex gap-3 overflow-x-auto pb-4">
-        {STATUSES.map((status) => (
+        {statuses.map((status) => (
           <KanbanColumn key={status.id} status={status} repairs={grouped(status.id)} />
         ))}
       </div>

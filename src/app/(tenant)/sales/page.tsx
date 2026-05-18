@@ -1,7 +1,7 @@
 'use client'
 import { useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Eye, Receipt, X, Download, Printer } from 'lucide-react'
+import { Eye, Receipt, X, Download, Printer, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
 import { Modal } from '@/components/ui/modal'
@@ -78,6 +78,10 @@ export default function SalesPage() {
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailId, setDetailId] = useState<string | null>(null)
 
+  // Download states
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [downloadingDetail, setDownloadingDetail] = useState(false)
+
   const { data: invoiceSettings = null } = useQuery({
     queryKey: ['invoice-settings', activeBranch?.id],
     queryFn: async () => {
@@ -143,7 +147,8 @@ export default function SalesPage() {
     setDetailOpen(true)
   }
 
-  async function downloadReceipt(sale: SaleDetail) {
+  async function downloadReceipt(sale: SaleDetail, fromDetail = false) {
+    if (fromDetail) setDownloadingDetail(true)
     const blob = await pdf(
       <SaleReceiptPdf
         saleId={sale.id}
@@ -170,7 +175,7 @@ export default function SalesPage() {
         branchEmail={activeBranch?.email ?? undefined}
         logoUrl={activeBranch?.logo_url ?? undefined}
         currency="£"
-        settings={invoiceSettings}
+        settings={invoiceSettings ?? undefined}
       />
     ).toBlob()
     const url = URL.createObjectURL(blob)
@@ -179,13 +184,19 @@ export default function SalesPage() {
     a.download = `receipt-${sale.id.slice(-8)}.pdf`
     a.click()
     URL.revokeObjectURL(url)
+    if (fromDetail) setDownloadingDetail(false)
   }
 
   async function fetchAndDownloadReceipt(id: string) {
-    const res = await fetch(`/api/pos/sales/${id}`)
-    if (!res.ok) return
-    const json = await res.json()
-    if (json.data) await downloadReceipt(json.data)
+    setDownloadingId(id)
+    try {
+      const res = await fetch(`/api/pos/sales/${id}`)
+      if (!res.ok) return
+      const json = await res.json()
+      if (json.data) await downloadReceipt(json.data)
+    } finally {
+      setDownloadingId(null)
+    }
   }
 
   // ── Columns ──────────────────────────────────────────────────────────────
@@ -257,8 +268,16 @@ export default function SalesPage() {
           <Button variant="ghost" size="sm" onClick={() => viewDetail(row.original.id)} title="View details">
             <Eye className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => fetchAndDownloadReceipt(row.original.id)} title="Download receipt">
-            <Download className="h-4 w-4" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => fetchAndDownloadReceipt(row.original.id)}
+            disabled={downloadingId === row.original.id}
+            title="Download receipt"
+          >
+            {downloadingId === row.original.id
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : <Download className="h-4 w-4" />}
           </Button>
         </div>
       ),
@@ -411,8 +430,11 @@ export default function SalesPage() {
               <div className="text-sm"><span className="text-gray-500">Notes:</span> {detail.notes}</div>
             )}
 
-            <Button className="w-full" variant="outline" onClick={() => downloadReceipt(detail)}>
-              <Printer className="mr-2 h-4 w-4" /> Download Receipt
+            <Button className="w-full" variant="outline" onClick={() => downloadReceipt(detail, true)} disabled={downloadingDetail}>
+              {downloadingDetail
+                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                : <Printer className="mr-2 h-4 w-4" />}
+              {downloadingDetail ? 'Generating PDF…' : 'Download Receipt'}
             </Button>
           </div>
         ) : (

@@ -16,6 +16,7 @@ import { formatCurrency, formatCurrencyCompact, formatDateTime, formatDate, form
 import { Select } from '@/components/ui/select'
 import type { ColumnDef, VisibilityState } from '@tanstack/react-table'
 import type { Repair } from '@/types/database'
+import type { InvoiceSettings } from '@/types/invoice-settings'
 import { RepairEmailPrompt } from '@/components/repairs/email-prompt-modal'
 import { RepairSlipModal } from '@/components/repairs/slip-modal'
 import { toast } from 'sonner'
@@ -481,19 +482,20 @@ export default function RepairsPage() {
   })
 
   // ── Invoice settings — lazy: only fetched when the invoice modal opens ──
-  const { data: invoiceSettings = null } = useQuery({
+  const { data: invoiceSettings } = useQuery<InvoiceSettings | null>({
     queryKey: ['invoice-settings', activeBranch?.id],
     queryFn: async () => {
       const res = await fetch(`/api/settings/invoice?branch_id=${activeBranch!.id}`)
       const json = await res.json()
-      return json.data || null
+      return (json.data as InvoiceSettings) ?? null
     },
     enabled: !!activeBranch && invoiceModalOpen,
-    staleTime: Infinity,
+    staleTime: 0,
   })
 
   function invalidateStats() {
     queryClient.invalidateQueries({ queryKey: ['repairs-stats', activeBranch?.id], exact: true })
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] })
   }
 
   // Auto-populate total charges from repair parts total
@@ -1243,31 +1245,30 @@ export default function RepairsPage() {
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-brand-yellow" />
         </div>
 
-        {/* Urgent Jobs */}
+        {/* Completed Jobs */}
         <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-5 px-5 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Urgent Jobs</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Completed Jobs</p>
               {repairStats ? (
-                <p className="mt-2 text-3xl font-bold text-on-surface">{repairStats.repairs_urgent}</p>
+                <p className="mt-2 text-3xl font-bold text-on-surface">{repairStats.repairs_completed}</p>
               ) : (
                 <div className="mt-2 h-8 w-12 rounded bg-surface-container animate-pulse" />
               )}
             </div>
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-error-container/20">
-              <AlertTriangle className="h-5 w-5 text-error" />
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-container">
+              <CheckCircle className="h-5 w-5 text-primary" />
             </div>
           </div>
           {repairStats ? (
-            <p className={`mt-3 flex items-center gap-1 text-xs font-medium ${repairStats.repairs_urgent === 0 ? 'text-primary' : 'text-error'}`}>
-              {repairStats.repairs_urgent === 0
-                ? <><CheckCircle className="h-3 w-3" /> All clear</>
-                : <><AlertTriangle className="h-3 w-3" /> Needs attention</>}
+            <p className="mt-3 flex items-center gap-1 text-xs font-medium text-primary">
+              <CheckCircle className="h-3 w-3" />
+              {repairStats.repairs_completed === 0 ? 'None completed yet' : 'Completed this month'}
             </p>
           ) : (
             <div className="mt-3 h-4 w-28 rounded bg-surface-container animate-pulse" />
           )}
-          <div className={`absolute bottom-0 left-0 right-0 h-1 ${repairStats && repairStats.repairs_urgent > 0 ? 'bg-error' : 'bg-outline-variant'}`} />
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />
         </div>
       </div>
 
@@ -1275,7 +1276,7 @@ export default function RepairsPage() {
         open={invoiceModalOpen}
         onClose={() => setInvoiceModalOpen(false)}
         repair={selectedInvoiceRepair}
-        settings={invoiceSettings || {}}
+        settings={invoiceSettings}
         branch={activeBranch}
       />
 
@@ -1408,7 +1409,7 @@ export default function RepairsPage() {
               ))}
             </div>
           ) : (
-            <KanbanBoard repairs={repairs} onStatusChange={handleStatusChange} />
+            <KanbanBoard repairs={repairs} onStatusChange={handleStatusChange} customStatuses={customStatuses} />
           )}
         </div>
       )}

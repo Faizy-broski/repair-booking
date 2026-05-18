@@ -49,15 +49,10 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   }
 
   async function handleSignOut() {
-    // Clear local store immediately so stale profile/branch don't flash
-    clearAuthStore()
-    queryClient.clear()
     const supabase = createClient()
-    // scope: 'local' clears only this browser's session cookie — other devices
-    // (other browser tabs, other staff members) remain logged in independently.
     await supabase.auth.signOut({ scope: 'local' })
-    // Full-page navigation to the ROOT domain login — not router.push (which would
-    // stay on this subdomain and risk re-using the stale shared cookie)
+    // Full page unload destroys React state — no need to clear stores first
+    // (clearing before navigation causes the sidebar to briefly re-render empty)
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
     window.location.href = appUrl ? `${appUrl}/login` : '/login'
   }

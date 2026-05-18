@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
@@ -381,8 +382,12 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
       <div className="shrink-0 border-t border-white/10 p-3">
         {!collapsed && profile && (
           <div className="mb-2 flex items-center gap-2.5 rounded-xl px-2 py-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-teal text-sm font-bold text-white shadow">
-              {(profile.full_name ?? 'U').charAt(0).toUpperCase()}
+            <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full overflow-hidden bg-brand-teal text-sm font-bold text-white shadow">
+              {profile.avatar_url ? (
+                <Image src={profile.avatar_url} alt={profile.full_name ?? 'User'} fill className="object-cover" />
+              ) : (
+                (profile.full_name ?? 'U').charAt(0).toUpperCase()
+              )}
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-white/90">{profile.full_name}</p>

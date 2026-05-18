@@ -1,5 +1,5 @@
 import {
-  Document, Page, Text, View, StyleSheet, Image, Font,
+  Document, Page, Text, View, StyleSheet, Image,
 } from '@react-pdf/renderer'
 import type { InvoiceSettings } from '@/types/invoice-settings'
 import { DEFAULT_INVOICE_SETTINGS } from '@/types/invoice-settings'
@@ -105,10 +105,15 @@ export function SaleReceiptPdf({
   const bold = boldFont(family)
   const pc = settings.primary_color || C.brand
   const tc = settings.text_color || C.dark
-  const sc = settings.secondary_color || C.bgBrand
 
   const paperSizeKey = settings.paper_size in PAPER_SIZES ? settings.paper_size : 'A4'
   const pageSize = PAPER_SIZES[paperSizeKey]
+  // Fixed amount column width on narrow thermal paper
+  const amtWidth = settings.paper_size === 'Receipt58' ? 44 : 52
+
+  // Deduplicate footer lines so the thank-you message isn't repeated
+  const uniqueFooterLines = [settings.footer_line_1, settings.footer_line_2, settings.footer_line_3]
+    .filter((l): l is string => !!l && l !== settings.thank_you_message)
 
   const s = StyleSheet.create({
     page: { 
@@ -219,16 +224,26 @@ export function SaleReceiptPdf({
     totalRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 4 },
     totalLabel: { width: 100, textAlign: 'right', color: C.muted, fontSize: 8.5 },
     totalVal: { width: 90, textAlign: 'right', fontSize: 9, color: tc },
-    grandRow: { 
-      flexDirection: 'row', 
-      justifyContent: 'flex-end', 
-      marginTop: 4, 
-      paddingTop: 6, 
-      borderTopWidth: 1, 
-      borderTopColor: C.border 
+    grandRow: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      marginTop: 4,
+      paddingTop: 6,
+      borderTopWidth: 1,
+      borderTopColor: C.border
     },
     grandLabel: { width: 100, textAlign: 'right', fontFamily: bold, fontSize: 10, color: tc },
     grandVal: { width: 90, textAlign: 'right', fontFamily: bold, fontSize: 14, color: pc },
+    // Receipt-mode item rows
+    rctItemRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 5, borderBottomWidth: 0.5, borderBottomColor: C.border, paddingBottom: 4 },
+    rctItemAmt: { fontSize: 9, color: tc, fontFamily: bold, textAlign: 'right', width: amtWidth, flexShrink: 0 },
+    // Receipt-mode totals
+    rctTotalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+    rctTotalLabel: { fontSize: 8.5, color: C.muted },
+    rctTotalVal: { fontSize: 9, color: tc },
+    rctGrandRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, paddingTop: 6, borderTopWidth: 1, borderTopColor: C.border },
+    rctGrandLabel: { fontSize: 10, fontFamily: bold, color: tc },
+    rctGrandVal: { fontSize: 14, fontFamily: bold, color: pc },
     footer: { marginTop: 24, borderTopWidth: 0.5, borderTopColor: C.border, paddingTop: 12, alignItems: 'center' },
     footerMain: { fontSize: 9, fontFamily: bold, color: pc, textAlign: 'center', marginBottom: 3 },
     footerSub: { fontSize: 7.5, color: C.muted, textAlign: 'center', marginBottom: 1 },
@@ -308,51 +323,97 @@ export function SaleReceiptPdf({
           </View>
 
           {/* ── Items table ── */}
-          <View style={s.tableHead}>
-            <Text style={[s.thText, { flex: 4 }]}>Item</Text>
-            <Text style={[s.thText, { flex: 1, textAlign: 'center' }]}>Qty</Text>
-            <Text style={[s.thText, { flex: 1.4, textAlign: 'right' }]}>Price</Text>
-            <Text style={[s.thText, { flex: 1.4, textAlign: 'right' }]}>Disc.</Text>
-            <Text style={[s.thText, { flex: 1.6, textAlign: 'right' }]}>Total</Text>
-          </View>
-
-          {items.map((item, i) => (
-            <View key={i} style={s.tableRow}>
-              <Text style={[s.tdText, { flex: 4 }]}>{item.name}</Text>
-              <Text style={[s.tdText, { flex: 1, textAlign: 'center' }]}>{item.quantity}</Text>
-              <Text style={[s.tdText, { flex: 1.4, textAlign: 'right' }]}>{fmt(Number(item.unit_price))}</Text>
-              <Text style={[s.tdText, { color: C.muted, flex: 1.4, textAlign: 'right' }]}>
-                {Number(item.discount) > 0 ? `-${fmt(Number(item.discount))}` : '—'}
-              </Text>
-              <Text style={[s.tdText, { flex: 1.6, textAlign: 'right', fontFamily: bold }]}>
-                {fmt(Number(item.total))}
-              </Text>
-            </View>
-          ))}
+          {isReceipt ? (
+            <>
+              <View style={{ borderBottomWidth: 1.5, borderBottomColor: C.border, marginBottom: 6, paddingBottom: 4 }}>
+                <Text style={[s.thText, { textAlign: 'center' }]}>Items</Text>
+              </View>
+              {items.map((item, i) => (
+                <View key={i} style={s.rctItemRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 9, color: tc }}>{item.name}</Text>
+                    <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 2 }}>
+                      {item.quantity} × {fmt(Number(item.unit_price))}
+                      {Number(item.discount) > 0 ? `  -${fmt(Number(item.discount))}` : ''}
+                    </Text>
+                  </View>
+                  <Text style={s.rctItemAmt}>{fmt(Number(item.total))}</Text>
+                </View>
+              ))}
+            </>
+          ) : (
+            <>
+              <View style={s.tableHead}>
+                <Text style={[s.thText, { flex: 4 }]}>Item</Text>
+                <Text style={[s.thText, { flex: 1, textAlign: 'center' }]}>Qty</Text>
+                <Text style={[s.thText, { flex: 1.4, textAlign: 'right' }]}>Price</Text>
+                <Text style={[s.thText, { flex: 1.4, textAlign: 'right' }]}>Disc.</Text>
+                <Text style={[s.thText, { flex: 1.6, textAlign: 'right' }]}>Total</Text>
+              </View>
+              {items.map((item, i) => (
+                <View key={i} style={s.tableRow}>
+                  <Text style={[s.tdText, { flex: 4 }]}>{item.name}</Text>
+                  <Text style={[s.tdText, { flex: 1, textAlign: 'center' }]}>{item.quantity}</Text>
+                  <Text style={[s.tdText, { flex: 1.4, textAlign: 'right' }]}>{fmt(Number(item.unit_price))}</Text>
+                  <Text style={[s.tdText, { color: C.muted, flex: 1.4, textAlign: 'right' }]}>
+                    {Number(item.discount) > 0 ? `-${fmt(Number(item.discount))}` : '—'}
+                  </Text>
+                  <Text style={[s.tdText, { flex: 1.6, textAlign: 'right', fontFamily: bold }]}>
+                    {fmt(Number(item.total))}
+                  </Text>
+                </View>
+              ))}
+            </>
+          )}
 
           {/* ── Totals ── */}
-          <View style={s.totalsWrap}>
-            <View style={s.totalRow}>
-              <Text style={s.totalLabel}>Subtotal</Text>
-              <Text style={s.totalVal}>{fmt(subtotal)}</Text>
-            </View>
-            {discount > 0 && (
-              <View style={s.totalRow}>
-                <Text style={[s.totalLabel, { color: '#10b981' }]}>Discount</Text>
-                <Text style={[s.totalVal, { color: '#10b981' }]}>-{fmt(discount)}</Text>
+          {isReceipt ? (
+            <View style={s.totalsWrap}>
+              <View style={s.rctTotalRow}>
+                <Text style={s.rctTotalLabel}>Subtotal</Text>
+                <Text style={s.rctTotalVal}>{fmt(subtotal)}</Text>
               </View>
-            )}
-            {settings.show_tax_breakdown && tax > 0 && (
-              <View style={s.totalRow}>
-                <Text style={s.totalLabel}>Tax{taxRate ? ` (${taxRate}%)` : ''}</Text>
-                <Text style={s.totalVal}>{fmt(tax)}</Text>
+              {discount > 0 && (
+                <View style={s.rctTotalRow}>
+                  <Text style={[s.rctTotalLabel, { color: '#10b981' }]}>Discount</Text>
+                  <Text style={[s.rctTotalVal, { color: '#10b981' }]}>-{fmt(discount)}</Text>
+                </View>
+              )}
+              {settings.show_tax_breakdown && tax > 0 && (
+                <View style={s.rctTotalRow}>
+                  <Text style={s.rctTotalLabel}>Tax{taxRate ? ` (${taxRate}%)` : ''}</Text>
+                  <Text style={s.rctTotalVal}>{fmt(tax)}</Text>
+                </View>
+              )}
+              <View style={s.rctGrandRow}>
+                <Text style={s.rctGrandLabel}>{isRefund ? 'Refunded' : 'Total'}</Text>
+                <Text style={[s.rctGrandVal, isRefund ? { color: C.red } : {}]}>{fmt(total)}</Text>
               </View>
-            )}
-            <View style={s.grandRow}>
-              <Text style={s.grandLabel}>{isRefund ? 'Amount Refunded' : 'Total'}</Text>
-              <Text style={[s.grandVal, isRefund ? { color: C.red } : {}]}>{fmt(total)}</Text>
             </View>
-          </View>
+          ) : (
+            <View style={s.totalsWrap}>
+              <View style={s.totalRow}>
+                <Text style={s.totalLabel}>Subtotal</Text>
+                <Text style={s.totalVal}>{fmt(subtotal)}</Text>
+              </View>
+              {discount > 0 && (
+                <View style={s.totalRow}>
+                  <Text style={[s.totalLabel, { color: '#10b981' }]}>Discount</Text>
+                  <Text style={[s.totalVal, { color: '#10b981' }]}>-{fmt(discount)}</Text>
+                </View>
+              )}
+              {settings.show_tax_breakdown && tax > 0 && (
+                <View style={s.totalRow}>
+                  <Text style={s.totalLabel}>Tax{taxRate ? ` (${taxRate}%)` : ''}</Text>
+                  <Text style={s.totalVal}>{fmt(tax)}</Text>
+                </View>
+              )}
+              <View style={s.grandRow}>
+                <Text style={s.grandLabel}>{isRefund ? 'Amount Refunded' : 'Total'}</Text>
+                <Text style={[s.grandVal, isRefund ? { color: C.red } : {}]}>{fmt(total)}</Text>
+              </View>
+            </View>
+          )}
 
           {/* ── Payment splits breakdown ── */}
           {settings.show_payment_method && paymentMethod === 'split' && paymentSplits && paymentSplits.length > 0 && (
@@ -382,16 +443,16 @@ export function SaleReceiptPdf({
                 {isRefund ? 'Your refund has been processed.' : settings.thank_you_message}
               </Text>
             )}
-            {settings.footer_line_1 && <Text style={s.footerSub}>{settings.footer_line_1}</Text>}
-            {settings.footer_line_2 && <Text style={s.footerSub}>{settings.footer_line_2}</Text>}
-            {settings.footer_line_3 && <Text style={s.footerSub}>{settings.footer_line_3}</Text>}
-            
+            {uniqueFooterLines.map((line, i) => (
+              <Text key={i} style={s.footerSub}>{line}</Text>
+            ))}
+
             {settings.social_links && Object.entries(settings.social_links).filter(([_,v])=>v).length > 0 && (
-              <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 5 }}>
-                {Object.entries(settings.social_links).filter(([_,v])=>v).map(([k,v], i) => (
-                   <Text key={k} style={{ fontSize: 7, color: C.faint }}>
-                     {i > 0 ? ' · ' : ''}{k}: {String(v).replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
-                   </Text>
+              <View style={{ flexDirection: 'column', alignItems: 'center', marginTop: 5, gap: 2 }}>
+                {Object.entries(settings.social_links).filter(([_,v])=>v).map(([k,v]) => (
+                  <Text key={k} style={{ fontSize: 7, color: C.faint, textAlign: 'center' }}>
+                    {k.charAt(0).toUpperCase() + k.slice(1)}: {String(v).replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
+                  </Text>
                 ))}
               </View>
             )}
@@ -402,9 +463,11 @@ export function SaleReceiptPdf({
               </Text>
             )}
             
-            <Text style={s.footerBrand}>
-              Receipt generated by RepairPOS · {date}
-            </Text>
+            {!isReceipt && (
+              <Text style={s.footerBrand}>
+                Receipt generated by RepairPOS · {date}
+              </Text>
+            )}
           </View>
 
         </View>
