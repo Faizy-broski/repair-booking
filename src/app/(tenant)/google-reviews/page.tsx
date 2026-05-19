@@ -1,11 +1,12 @@
 'use client'
 import { useState, useEffect, useCallback, Suspense } from 'react'
+import { confirmToast } from '@/lib/confirm-toast'
 import { useSearchParams, useRouter } from 'next/navigation'
 import {
   Star, RefreshCw, ExternalLink, Copy, CheckCircle2, AlertCircle,
-  Search, Filter, ChevronDown, Info, Eye, EyeOff, Zap,
-  TrendingUp, MessageSquare, ThumbsUp, Clock, ArrowUpRight,
-  Building2, LogOut, ChevronRight,
+  Search, Filter, ChevronDown, Clock,
+  TrendingUp, MessageSquare, ThumbsUp,
+  Building2, LogOut, MapPin, ArrowRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,12 +27,6 @@ interface ReviewRow {
   profile_photo_url?: string | null
 }
 
-interface GBPLocation {
-  name: string
-  title: string
-  placeId?: string
-}
-
 interface ReviewSettings {
   place_id:          string | null
   api_key:           string | null
@@ -39,12 +34,19 @@ interface ReviewSettings {
   access_token:      string | null
   location_name:     string | null
   location_title:    string | null
-  pending_locations: GBPLocation[] | null
+  pending_locations: unknown[] | null
+}
+
+interface SearchResult {
+  place_id:     string
+  name:         string
+  address:      string
+  rating:       number | null
+  review_count: number
 }
 
 type SortOption  = 'newest' | 'oldest' | 'highest' | 'lowest'
 type FilterStar  = 0 | 1 | 2 | 3 | 4 | 5
-type SetupMode   = 'none' | 'oauth' | 'manual'
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
 
@@ -90,281 +92,185 @@ function RatingBar({ star, count, max }: { star: number; count: number; max: num
   )
 }
 
-// ── Google OAuth Connect Panel ─────────────────────────────────────────────────
+// ── Business Search Panel ──────────────────────────────────────────────────────
 
-function OAuthConnectPanel({
-  onConnectClick, connecting, oauthError,
+function BusinessSearchPanel({
+  branchId,
+  onConnected,
 }: {
-  onConnectClick: () => void
-  connecting: boolean
-  oauthError: string | null
-}) {
-  return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      <div className="border-b border-gray-100 bg-gray-50 px-6 py-4 flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100">
-          <Building2 className="h-4 w-4 text-blue-600" />
-        </div>
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900">Connect Google Business Profile</h3>
-          <p className="text-xs text-gray-500">Authorise once — we handle everything automatically</p>
-        </div>
-      </div>
-
-      <div className="p-6 space-y-5">
-        {oauthError && (
-          <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <p>{oauthError}</p>
-          </div>
-        )}
-
-        {/* Steps */}
-        <ol className="space-y-3">
-          {[
-            { step: 1, label: 'Click "Connect with Google" below' },
-            { step: 2, label: 'Sign in and grant access to your Business Profile' },
-            { step: 3, label: 'Pick which location to sync reviews from' },
-            { step: 4, label: 'Done — reviews sync automatically' },
-          ].map(({ step, label }) => (
-            <li key={step} className="flex items-start gap-3">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-[11px] font-bold text-white mt-0.5">
-                {step}
-              </span>
-              <span className="text-sm text-gray-700">{label}</span>
-            </li>
-          ))}
-        </ol>
-
-        <div className="rounded-lg bg-blue-50 border border-blue-100 p-3 flex items-start gap-2">
-          <Info className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
-          <p className="text-xs text-blue-700">
-            We request <strong>read-only</strong> access to your Google Business Profile.
-            Your account credentials are never stored — only a secure access token.
-          </p>
-        </div>
-
-        <Button onClick={onConnectClick} loading={connecting} className="w-full justify-center gap-2">
-          <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
-            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-          </svg>
-          {connecting ? 'Redirecting to Google…' : 'Connect with Google'}
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-// ── Location Picker ────────────────────────────────────────────────────────────
-
-function LocationPicker({
-  locations, onSelect, saving,
-}: {
-  locations: GBPLocation[]
-  onSelect: (loc: GBPLocation) => void
-  saving: boolean
-}) {
-  const [selected, setSelected] = useState<GBPLocation | null>(null)
-
-  return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50 shadow-sm overflow-hidden">
-      <div className="border-b border-amber-100 bg-amber-50 px-6 py-4 flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100">
-          <Building2 className="h-4 w-4 text-amber-700" />
-        </div>
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900">Choose your business location</h3>
-          <p className="text-xs text-gray-600">Select the location whose reviews you want to sync</p>
-        </div>
-      </div>
-      <div className="p-6 space-y-3">
-        {locations.length === 0 ? (
-          <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-white p-4 text-sm text-amber-800">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            No locations found on this Google account. Make sure your Business Profile is verified.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {locations.map((loc) => (
-              <button
-                key={loc.name}
-                onClick={() => setSelected(loc)}
-                className={`w-full flex items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors ${
-                  selected?.name === loc.name
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 bg-white hover:border-gray-300'
-                }`}
-              >
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{loc.title}</p>
-                  <p className="text-xs text-gray-400 font-mono mt-0.5">{loc.name}</p>
-                </div>
-                {selected?.name === loc.name && (
-                  <CheckCircle2 className="h-5 w-5 text-blue-500 shrink-0" />
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <Button
-          onClick={() => selected && onSelect(selected)}
-          disabled={!selected || saving}
-          loading={saving}
-          className="w-full justify-center"
-        >
-          <ChevronRight className="h-4 w-4" />
-          {saving ? 'Connecting…' : 'Use this location'}
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-// ── Manual Setup Panel ─────────────────────────────────────────────────────────
-
-function ManualSetupPanel({
-  placeId, apiKey, onPlaceIdChange, onApiKeyChange, onSave, saving, lastSynced,
-}: {
-  placeId: string; apiKey: string
-  onPlaceIdChange: (v: string) => void; onApiKeyChange: (v: string) => void
-  onSave: () => void; saving: boolean; lastSynced: string | null
-}) {
-  const [showKey, setShowKey] = useState(false)
-
-  return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      <div className="border-b border-gray-100 bg-gray-50 px-6 py-4 flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-200">
-          <Zap className="h-4 w-4 text-gray-600" />
-        </div>
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900">Manual Setup (Advanced)</h3>
-          <p className="text-xs text-gray-500">Use a Places API key if you prefer not to use OAuth</p>
-        </div>
-      </div>
-      <div className="p-6 space-y-4">
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-gray-800">Google Place ID</label>
-          <Input placeholder="ChIJxxxxxxxx" value={placeId} onChange={(e) => onPlaceIdChange(e.target.value)} className="font-mono text-sm" />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-gray-800">Places API Key</label>
-          <div className="relative">
-            <Input
-              placeholder="AIzaSy…"
-              type={showKey ? 'text' : 'password'}
-              value={apiKey}
-              onChange={(e) => onApiKeyChange(e.target.value)}
-              className="pr-10 font-mono text-sm"
-            />
-            <button type="button" onClick={() => setShowKey((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" tabIndex={-1}>
-              {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-        </div>
-        <div className="flex items-center justify-between pt-1">
-          <p className="text-xs text-gray-400">{lastSynced ? `Last synced ${formatDate(lastSynced)}` : 'Never synced'}</p>
-          <Button onClick={onSave} loading={saving} disabled={!placeId || !apiKey}>
-            <CheckCircle2 className="h-4 w-4" /> Save & Connect
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Token Saved Panel (quota fallback) ───────────────────────────────────────
-
-function TokenSavedPanel({ saving, error, onLoad, onManualSave }: {
   branchId: string
-  saving: boolean
-  error: string | null
-  onLoad: () => void
-  onManualSave: (locationName: string, locationTitle: string) => Promise<void>
+  onConnected: () => void
 }) {
-  const [showManual, setShowManual]   = useState(false)
-  const [locName, setLocName]         = useState('')
-  const [locTitle, setLocTitle]       = useState('')
+  const [step, setStep]                   = useState<'form' | 'results'>('form')
+  const [name, setName]                   = useState('')
+  const [postcode, setPostcode]           = useState('')
+  const [searching, setSearching]         = useState(false)
+  const [results, setResults]             = useState<SearchResult[]>([])
+  const [searchError, setSearchError]     = useState<string | null>(null)
+  const [connecting, setConnecting]       = useState<string | null>(null) // place_id being connected
+
+  async function handleSearch(e: React.FormEvent) {
+    e.preventDefault()
+    if (!name.trim() || !postcode.trim()) return
+    setSearching(true)
+    setSearchError(null)
+    try {
+      const res  = await fetch(`/api/google-reviews/search?name=${encodeURIComponent(name.trim())}&postcode=${encodeURIComponent(postcode.trim())}`)
+      const json = await res.json()
+      if (!res.ok) {
+        setSearchError(json.error?.message ?? 'Search failed — check your business name and postcode')
+        setSearching(false)
+        return
+      }
+      setResults(json.data ?? [])
+      setStep('results')
+    } catch {
+      setSearchError('Network error — please try again')
+    }
+    setSearching(false)
+  }
+
+  async function handleConnect(result: SearchResult) {
+    setConnecting(result.place_id)
+    try {
+      const res = await fetch(`/api/google-reviews/connect?branch_id=${branchId}`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          place_id: result.place_id,
+          name:     result.name,
+          address:  result.address,
+        }),
+      })
+      if (!res.ok) {
+        const json = await res.json()
+        setSearchError(json.error?.message ?? 'Failed to connect business')
+        setConnecting(null)
+        return
+      }
+      onConnected()
+    } catch {
+      setSearchError('Network error — please try again')
+      setConnecting(null)
+    }
+  }
 
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50 shadow-sm overflow-hidden">
-      <div className="border-b border-amber-100 px-6 py-4 flex items-center gap-3">
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="border-b border-gray-100 bg-gray-50 px-6 py-4 flex items-center gap-3">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100">
-          <CheckCircle2 className="h-4 w-4 text-amber-700" />
+          <Building2 className="h-4 w-4 text-amber-600" />
         </div>
         <div className="flex-1">
-          <p className="text-sm font-semibold text-gray-900">Google account connected</p>
-          <p className="text-xs text-gray-600">Waiting for API access approval to load locations automatically</p>
+          <h3 className="text-sm font-semibold text-gray-900">Find your Google Business listing</h3>
+          <p className="text-xs text-gray-500">Search by business name and postcode — no Google login required</p>
         </div>
-        <Button size="sm" onClick={onLoad} loading={saving} className="shrink-0">
-          <RefreshCw className="h-4 w-4" /> Retry
-        </Button>
+        {step === 'results' && (
+          <button
+            onClick={() => { setStep('form'); setResults([]); setSearchError(null) }}
+            className="text-xs text-blue-600 hover:underline"
+          >
+            ← Search again
+          </button>
+        )}
       </div>
 
-      <div className="px-6 py-5 space-y-4">
-        {error && (
-          <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-700">
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-medium">API quota not active yet</p>
-              <p className="mt-0.5">Google Business Profile APIs require access approval. Go to Google Cloud Console → My Business Account Management API → Quotas & System Limits → request an increase. Until approved, enter your location details manually below.</p>
-            </div>
+      <div className="p-6 space-y-4">
+        {searchError && (
+          <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{searchError}</p>
           </div>
         )}
 
-        <div className="rounded-lg bg-white border border-amber-200 p-4 space-y-2">
-          <p className="text-xs font-semibold text-gray-700">Manual location entry</p>
-          <p className="text-xs text-gray-500">
-            Find your location name in <a href="https://business.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">business.google.com</a> → your location URL contains an ID like <code className="bg-gray-100 px-1 rounded">accounts/12345/locations/67890</code>
-          </p>
-          <button
-            onClick={() => setShowManual((v) => !v)}
-            className="text-xs text-blue-600 hover:underline flex items-center gap-1"
-          >
-            <ChevronDown className={`h-3 w-3 transition-transform ${showManual ? 'rotate-180' : ''}`} />
-            {showManual ? 'Hide manual entry' : 'Enter location manually'}
-          </button>
-
-          {showManual && (
-            <div className="space-y-2 pt-1">
-              <Input
-                placeholder="Display name (e.g. Harrely Phone Repairs)"
-                value={locTitle}
-                onChange={(e) => setLocTitle(e.target.value)}
-                className="text-sm"
-              />
-              <Input
-                placeholder="accounts/123456789/locations/987654321"
-                value={locName}
-                onChange={(e) => setLocName(e.target.value)}
-                className="font-mono text-xs"
-              />
-              {locName && !/^accounts\/[^/]+\/locations\/[^/]+$/.test(locName.trim()) && (
-                <p className="text-xs text-red-600 flex items-center gap-1">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                  Must be in format: <code className="bg-red-50 px-1 rounded">accounts/123456789/locations/987654321</code>
-                </p>
-              )}
-              <p className="text-xs text-gray-400">
-                Find it in your Google Business Profile dashboard URL, e.g.:<br />
-                <code className="bg-gray-100 px-1 rounded text-gray-600">business.google.com/.../<strong>locations/10503114178016191880</strong></code><br />
-                — you also need your <strong>account ID</strong> from the URL (the number before <code>/locations/</code>).
-              </p>
-              <Button
-                size="sm"
-                disabled={!locName.trim() || !locTitle.trim() || saving || !/^accounts\/[^/]+\/locations\/[^/]+$/.test(locName.trim())}
-                loading={saving}
-                onClick={() => onManualSave(locName.trim(), locTitle.trim())}
-              >
-                <CheckCircle2 className="h-4 w-4" /> Save Location
-              </Button>
+        {/* Step 1 — Search form */}
+        {step === 'form' && (
+          <form onSubmit={handleSearch} className="space-y-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-gray-700">Business Name</label>
+                <Input
+                  placeholder="e.g. Harrely Phone Repairs"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-gray-700">Postcode / City</label>
+                <Input
+                  placeholder="e.g. SW1A 1AA or London"
+                  value={postcode}
+                  onChange={(e) => setPostcode(e.target.value)}
+                  required
+                />
+              </div>
             </div>
-          )}
-        </div>
+            <Button type="submit" loading={searching} className="w-full justify-center gap-2">
+              <Search className="h-4 w-4" />
+              {searching ? 'Searching…' : 'Search Google Business'}
+            </Button>
+            <p className="text-center text-xs text-gray-400">
+              We search Google Places to find your listing and import reviews automatically
+            </p>
+          </form>
+        )}
+
+        {/* Step 2 — Results list */}
+        {step === 'results' && (
+          <div className="space-y-3">
+            {results.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-lg border border-gray-200 py-10 gap-2">
+                <Search className="h-8 w-8 text-gray-300" />
+                <p className="text-sm font-medium text-gray-600">No listings found</p>
+                <p className="text-xs text-gray-400">Try a different name or postcode</p>
+                <button
+                  onClick={() => setStep('form')}
+                  className="mt-1 text-xs text-blue-600 hover:underline"
+                >
+                  Search again
+                </button>
+              </div>
+            ) : (
+              <>
+                <p className="text-xs text-gray-500">{results.length} listing{results.length !== 1 ? 's' : ''} found — pick yours</p>
+                <div className="space-y-2">
+                  {results.map((r) => (
+                    <div
+                      key={r.place_id}
+                      className="flex items-center gap-4 rounded-lg border border-gray-200 bg-white p-4 hover:border-amber-300 hover:bg-amber-50 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{r.name}</p>
+                        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500">
+                          <MapPin className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{r.address}</span>
+                        </div>
+                        {r.rating !== null && (
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <StarRating rating={Math.round(r.rating)} />
+                            <span className="text-xs text-gray-400">{r.rating.toFixed(1)} · {r.review_count.toLocaleString()} reviews</span>
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        loading={connecting === r.place_id}
+                        disabled={!!connecting}
+                        onClick={() => handleConnect(r)}
+                        className="shrink-0 gap-1"
+                      >
+                        <ArrowRight className="h-3.5 w-3.5" />
+                        {connecting === r.place_id ? 'Connecting…' : 'Select'}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -377,27 +283,19 @@ function GoogleReviewsInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
 
-  const [reviews, setReviews]               = useState<ReviewRow[]>([])
-  const [settings, setSettings]             = useState<ReviewSettings | null>(null)
-  const [loading, setLoading]               = useState(true)
-  const [syncing, setSyncing]               = useState(false)
-  const [syncError, setSyncError]           = useState<string | null>(null)
-  const [syncSuccess, setSyncSuccess]       = useState(false)
-  const [connecting, setConnecting]         = useState(false)
-  const [savingLocation, setSavingLocation] = useState(false)
-  const [setupMode, setSetupMode]           = useState<SetupMode>('none')
-  const [placeId, setPlaceId]               = useState('')
-  const [apiKey, setApiKey]                 = useState('')
-  const [savingManual, setSavingManual]     = useState(false)
+  const [reviews, setReviews]         = useState<ReviewRow[]>([])
+  const [settings, setSettings]       = useState<ReviewSettings | null>(null)
+  const [loading, setLoading]         = useState(true)
+  const [syncing, setSyncing]         = useState(false)
+  const [syncError, setSyncError]     = useState<string | null>(null)
+  const [syncSuccess, setSyncSuccess] = useState(false)
 
-  const [search, setSearch]           = useState('')
-  const [filterStar, setFilterStar]   = useState<FilterStar>(0)
-  const [sort, setSort]               = useState<SortOption>('newest')
+  const [search, setSearch]             = useState('')
+  const [filterStar, setFilterStar]     = useState<FilterStar>(0)
+  const [sort, setSort]                 = useState<SortOption>('newest')
   const [showSortMenu, setShowSortMenu] = useState(false)
 
-  // Read URL params set by the OAuth callback
-  const oauthConnected = searchParams.get('oauth_connected') === '1'
-  const oauthError     = searchParams.get('oauth_error')
+  const oauthError = searchParams.get('oauth_error')
 
   const fetchData = useCallback(async () => {
     if (!activeBranch) return
@@ -406,55 +304,23 @@ function GoogleReviewsInner() {
     const json = await res.json()
     const d    = json.data ?? {}
     setReviews(d.data ?? [])
-    if (d.settings) {
-      setSettings(d.settings)
-      setPlaceId(d.settings.place_id ?? '')
-      setApiKey(d.settings.api_key ?? '')
-    }
+    if (d.settings) setSettings(d.settings)
     setLoading(false)
   }, [activeBranch])
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  // After OAuth redirect, remove query params so they don't linger on refresh
   useEffect(() => {
-    if (oauthConnected || oauthError) {
-      router.replace('/google-reviews')
-    }
-  }, [oauthConnected, oauthError, router])
+    if (oauthError) router.replace('/google-reviews')
+  }, [oauthError, router])
 
   // ── Derived state ─────────────────────────────────────────────────────────
 
-  const isOAuthConnected    = !!(settings?.location_name && settings?.access_token)
-  const isManualConnected   = !!(settings?.place_id && settings?.api_key && !settings?.location_name)
-  const isConnected         = isOAuthConnected || isManualConnected
-  const hasPendingLocations = (settings?.pending_locations?.length ?? 0) > 0 && !settings?.location_name
-  // Tokens saved but location list is empty (quota error during callback)
-  const tokensSavedNoLocations = !!(settings?.access_token && !settings?.location_name && !hasPendingLocations)
+  // Search flow (primary) or legacy OAuth connection
+  const isConnected = !!(settings?.place_id) || !!(settings?.location_name && settings?.access_token)
+  const connectedTitle = settings?.location_title ?? (settings?.location_name ? 'Connected' : null)
 
   // ── Actions ───────────────────────────────────────────────────────────────
-
-  function startOAuth() {
-    if (!activeBranch) return
-    setConnecting(true)
-    window.location.href = `/api/google-reviews/oauth?branch_id=${activeBranch.id}`
-  }
-
-  async function selectLocation(loc: GBPLocation) {
-    if (!activeBranch) return
-    setSavingLocation(true)
-    await fetch(`/api/google-reviews/locations?branch_id=${activeBranch.id}`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location_name:  loc.name,
-        location_title: loc.title,
-        place_id:       loc.placeId,
-      }),
-    })
-    setSavingLocation(false)
-    await fetchData()
-  }
 
   async function syncReviews() {
     if (!activeBranch) return
@@ -477,35 +343,9 @@ function GoogleReviewsInner() {
     setSyncing(false)
   }
 
-  async function saveManualSettings() {
-    if (!activeBranch) return
-    setSavingManual(true)
-    await fetch(`/api/google-reviews?branch_id=${activeBranch.id}`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'save_settings', place_id: placeId, api_key: apiKey }),
-    })
-    setSavingManual(false)
-    setSetupMode('none')
-    await fetchData()
-  }
-
-  async function loadLocations() {
-    if (!activeBranch) return
-    setSavingLocation(true)
-    setSyncError(null)
-    const res  = await fetch(`/api/google-reviews/locations/reload?branch_id=${activeBranch.id}`, { method: 'POST' })
-    const json = await res.json()
-    if (!res.ok) {
-      setSyncError(json.error?.message ?? 'Failed to load locations — API access may not be approved yet')
-    } else {
-      await fetchData()
-    }
-    setSavingLocation(false)
-  }
-
   async function disconnect() {
-    if (!activeBranch || !confirm('Disconnect your Google Business Profile?')) return
+    if (!activeBranch) return
+    if (!await confirmToast('Disconnect your Google Business Profile? This will remove all synced reviews.', 'Disconnect')) return
     await fetch(`/api/google-reviews/locations?branch_id=${activeBranch.id}`, { method: 'DELETE' })
     setSettings(null)
     setReviews([])
@@ -575,14 +415,14 @@ function GoogleReviewsInner() {
             {isConnected && (
               <span className="flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700 border border-green-200">
                 <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-                {isOAuthConnected ? settings?.location_title ?? 'Connected' : 'Connected (manual)'}
+                {connectedTitle ?? 'Connected'}
               </span>
             )}
           </div>
           <p className="mt-1 text-sm text-gray-500">
             {reviews.length > 0
               ? `${reviews.length} reviews · ${avgRatingStr} avg rating`
-              : 'Sync reviews from your Google Business Profile'}
+              : 'Connect your Google Business listing to import reviews'}
             {settings?.last_synced && (
               <span className="text-gray-400"> · synced {formatDate(settings.last_synced)}</span>
             )}
@@ -590,7 +430,7 @@ function GoogleReviewsInner() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {isConnected ? (
+          {isConnected && (
             <>
               <button
                 onClick={disconnect}
@@ -603,17 +443,11 @@ function GoogleReviewsInner() {
                 {syncing ? 'Syncing…' : 'Sync Now'}
               </Button>
             </>
-          ) : (
-            !hasPendingLocations && (
-              <Button size="sm" onClick={startOAuth} loading={connecting}>
-                <Building2 className="h-4 w-4" /> Connect Google
-              </Button>
-            )
           )}
         </div>
       </div>
 
-      {/* OAuth redirect error */}
+      {/* OAuth error banner */}
       {oauthError && (
         <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -641,106 +475,24 @@ function GoogleReviewsInner() {
         </div>
       )}
 
-      {/* ── Token saved but locations not yet loaded (API quota / access pending) ── */}
-      {tokensSavedNoLocations && (
-        <TokenSavedPanel
+      {/* ── Not connected — search panel ── */}
+      {!isConnected && !loading && (
+        <BusinessSearchPanel
           branchId={activeBranch?.id ?? ''}
-          saving={savingLocation}
-          error={syncError}
-          onLoad={loadLocations}
-          onManualSave={async (locationName, locationTitle) => {
-            if (!activeBranch) return
-            setSavingLocation(true)
-            await fetch(`/api/google-reviews/locations?branch_id=${activeBranch.id}`, {
-              method:  'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ location_name: locationName, location_title: locationTitle }),
-            })
-            setSavingLocation(false)
-            setSyncError(null)
-            await fetchData()
-          }}
+          onConnected={fetchData}
         />
-      )}
-
-      {/* ── Location picker (after OAuth, before location is chosen) ── */}
-      {hasPendingLocations && (
-        <LocationPicker
-          locations={settings!.pending_locations!}
-          onSelect={selectLocation}
-          saving={savingLocation}
-        />
-      )}
-
-      {/* ── Not connected CTA ── */}
-      {!isConnected && !hasPendingLocations && setupMode === 'none' && (
-        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 py-16 gap-5">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100">
-            <Star className="h-8 w-8 fill-amber-400 text-amber-400" />
-          </div>
-          <div className="text-center">
-            <p className="text-lg font-semibold text-gray-800">Connect Google Business Profile</p>
-            <p className="mt-1 text-sm text-gray-500 max-w-sm">
-              Authorise access with one click and we'll automatically import all your reviews.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button onClick={() => setSetupMode('oauth')} className="gap-2">
-              <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-              </svg>
-              Connect with Google
-            </Button>
-            <button
-              onClick={() => setSetupMode('manual')}
-              className="text-xs text-gray-400 hover:text-gray-600 underline"
-            >
-              Manual setup
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── OAuth connect panel ── */}
-      {setupMode === 'oauth' && !isConnected && (
-        <OAuthConnectPanel
-          onConnectClick={startOAuth}
-          connecting={connecting}
-          oauthError={oauthError ? decodeURIComponent(oauthError) : null}
-        />
-      )}
-
-      {/* ── Manual setup panel ── */}
-      {setupMode === 'manual' && !isConnected && (
-        <div className="space-y-3">
-          <ManualSetupPanel
-            placeId={placeId}
-            apiKey={apiKey}
-            onPlaceIdChange={setPlaceId}
-            onApiKeyChange={setApiKey}
-            onSave={saveManualSettings}
-            saving={savingManual}
-            lastSynced={settings?.last_synced ?? null}
-          />
-          <button onClick={() => setSetupMode('oauth')} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
-            <ArrowUpRight className="h-3 w-3" /> Switch to OAuth (recommended)
-          </button>
-        </div>
       )}
 
       {/* ── Stats ── */}
       {isConnected && reviews.length > 0 && (
         <>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard label="Average Rating" value={avgRatingStr} sub="out of 5.0"        icon={Star}         color="bg-amber-100 text-amber-600" />
-            <StatCard label="Total Reviews"  value={reviews.length} sub="all time"        icon={MessageSquare} color="bg-blue-100 text-blue-600" />
+            <StatCard label="Average Rating" value={avgRatingStr} sub="out of 5.0"        icon={Star}          color="bg-amber-100 text-amber-600" />
+            <StatCard label="Total Reviews"  value={reviews.length} sub="all time"        icon={MessageSquare}  color="bg-blue-100 text-blue-600" />
             <StatCard label="5-Star Reviews" value={ratingCounts[0].count}
               sub={`${reviews.length > 0 ? Math.round((ratingCounts[0].count / reviews.length) * 100) : 0}% of total`}
               icon={ThumbsUp} color="bg-green-100 text-green-600" />
-            <StatCard label="This Month" value={trendData[5].reviews} sub="new reviews"   icon={TrendingUp}   color="bg-purple-100 text-purple-600" />
+            <StatCard label="This Month" value={trendData[5].reviews} sub="new reviews"   icon={TrendingUp}    color="bg-purple-100 text-purple-600" />
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
@@ -773,7 +525,7 @@ function GoogleReviewsInner() {
           {reviewLink && (
             <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 flex items-center gap-4">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100">
-                <ArrowUpRight className="h-5 w-5 text-blue-600" />
+                <ExternalLink className="h-5 w-5 text-blue-600" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-blue-900">Customer Review Link</p>

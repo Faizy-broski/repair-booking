@@ -51,6 +51,11 @@ export const UserController = {
       })
       return created(user)
     } catch (err) {
+      const code = (err as any)?.code ?? ''
+      const msg  = (err instanceof Error ? err.message : String(err)).toLowerCase()
+      if (code === 'email_exists' || msg.includes('already been registered') || msg.includes('already registered') || msg.includes('already exists')) {
+        return badRequest('An account with this email address is already registered.')
+      }
       return serverError('Failed to create user', err)
     }
   },

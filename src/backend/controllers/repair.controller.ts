@@ -84,7 +84,61 @@ export const RepairController = {
 
       // Save repair items (parts) if any
       if (parts && parts.length > 0 && repair) {
-        const items = parts.map(p => ({
+        // For quick-add parts (product_id === null), auto-create a product in the catalog
+        // so the part appears in future inventory searches for this branch.
+        const resolvedParts = await Promise.all(
+          parts.map(async (p) => {
+            if (p.product_id) return p
+
+            // Check if a part with the same name already exists for this business
+            const { data: existing } = await adminSupabase
+              .from('products')
+              .select('id')
+              .eq('business_id', ctx.businessId)
+              .ilike('name', p.name.trim())
+              .eq('item_type', 'part')
+              .maybeSingle()
+
+            let productId: string
+            if (existing) {
+              productId = existing.id
+            } else {
+              const { data: newProduct, error: prodErr } = await adminSupabase
+                .from('products')
+                .insert({
+                  business_id: ctx.businessId,
+                  name: p.name.trim(),
+                  item_type: 'part',
+                  is_service: false,
+                  cost_price: p.unit_cost ?? 0,
+                  selling_price: p.unit_price ?? 0,
+                })
+                .select('id')
+                .single()
+              if (prodErr || !newProduct) return { ...p, product_id: null }
+              productId = newProduct.id
+
+              // Seed inventory row (qty 0 — parts are consumed, not pre-stocked)
+              await adminSupabase.from('inventory').insert({
+                branch_id: data.branch_id,
+                product_id: productId,
+                variant_id: null,
+                quantity: 0,
+                low_stock_alert: 5,
+              })
+            }
+
+            // Ensure the product is visible in this branch's catalog
+            await adminSupabase.from('branch_products').upsert(
+              { branch_id: data.branch_id, product_id: productId, is_enabled: true },
+              { onConflict: 'branch_id,product_id' }
+            )
+
+            return { ...p, product_id: productId }
+          })
+        )
+
+        const items = resolvedParts.map(p => ({
           repair_id: repair.id,
           product_id: p.product_id,
           name: p.name,

@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { confirmToast } from '@/lib/confirm-toast'
 import { Plus, Pencil, Trash2, Package2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -98,7 +99,7 @@ export default function BundlesPage() {
   }
 
   async function deleteBundle(id: string) {
-    if (!confirm('Delete this bundle?')) return
+    if (!await confirmToast('Delete this bundle?', 'Delete')) return
     await fetch(`/api/inventory/bundles/${id}`, { method: 'DELETE' })
     fetchData()
   }

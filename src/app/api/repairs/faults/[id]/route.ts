@@ -26,7 +26,7 @@ export const PATCH = withMiddleware(async (req, ctx, { params }) => {
   } catch (err) {
     return serverError('Failed to update fault', err)
   }
-}, { requiredRole: 'branch_manager' })
+}, { requiredRole: 'cashier' })
 
 export const DELETE = withMiddleware(async (_req, ctx, { params }) => {
   const { id } = await params
@@ -41,4 +41,4 @@ export const DELETE = withMiddleware(async (_req, ctx, { params }) => {
   } catch (err) {
     return serverError('Failed to delete fault', err)
   }
-}, { requiredRole: 'branch_manager' })
+}, { requiredRole: 'cashier' })

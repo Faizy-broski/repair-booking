@@ -156,17 +156,17 @@ async function getSmsConfig(businessId: string): Promise<SmsConfig | null> {
 }
 
 async function getBusinessInfo(businessId: string): Promise<{
-  name: string; phone: string; email: string; logoUrl: string | null; primaryColor: string
+  name: string; phone: string; email: string; replyToEmail: string | null; logoUrl: string | null; primaryColor: string
 }> {
   const [{ data: biz }, { data: invSettings }] = await Promise.all([
-    db('businesses').select('name, phone, email, logo_url').eq('id', businessId).single(),
+    db('businesses').select('name, phone, email, reply_to_email, logo_url').eq('id', businessId).single(),
     db('invoice_settings').select('primary_color, logo_url').eq('business_id', businessId).single(),
   ])
   return {
-    name:         biz?.name     ?? 'RepairBooking',
-    phone:        biz?.phone    ?? '',
-    email:        biz?.email    ?? '',
-    // Invoice settings logo takes priority over branch logo
+    name:         biz?.name            ?? 'RepairBooking',
+    phone:        biz?.phone           ?? '',
+    email:        biz?.email           ?? '',
+    replyToEmail: biz?.reply_to_email  ?? null,
     logoUrl:      invSettings?.logo_url ?? biz?.logo_url ?? null,
     primaryColor: invSettings?.primary_color ?? '#008080',
   }
@@ -244,6 +244,7 @@ export const NotificationEngine = {
           logoUrl:      bizInfo.logoUrl,
           storePhone:   variables.store_phone || bizInfo.phone,
           storeEmail:   variables.store_email || bizInfo.email,
+          replyTo:      bizInfo.replyToEmail ?? undefined,
           primaryColor: bizInfo.primaryColor,
         })
           .then(() => {

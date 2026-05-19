@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, use } from 'react'
+import { confirmToast } from '@/lib/confirm-toast'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Save, CheckCircle2, XCircle, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -79,7 +80,7 @@ export default function StockCountDetailPage({ params }: { params: Promise<{ id:
   }
 
   async function cancelCount() {
-    if (!confirm('Cancel this stock count? No adjustments will be made.')) return
+    if (!await confirmToast('Cancel this stock count? No adjustments will be made.', 'Cancel')) return
     await fetch(`/api/inventory/counts/${id}/cancel`, { method: 'POST' })
     fetchCount()
   }

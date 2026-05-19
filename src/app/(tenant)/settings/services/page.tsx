@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { confirmToast } from '@/lib/confirm-toast'
 import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -116,7 +117,7 @@ export default function ServicesSettingsPage() {
   // ── CRUD helpers ───────────────────────────────────────────────────────────
 
   async function deleteRow(endpoint: string, id: string) {
-    if (!confirm('Delete this item? This cannot be undone.')) return
+    if (!await confirmToast('Delete this item? This cannot be undone.', 'Delete')) return
     await fetch(`${endpoint}/${id}`, { method: 'DELETE' })
     fetchAll()
   }

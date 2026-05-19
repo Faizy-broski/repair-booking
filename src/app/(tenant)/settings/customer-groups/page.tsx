@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { confirmToast } from '@/lib/confirm-toast'
 import { Plus, Pencil, Trash2, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -58,7 +59,7 @@ export default function CustomerGroupsPage() {
   }
 
   async function deleteGroup(id: string) {
-    if (!confirm('Delete this group? Customers in this group will be ungrouped.')) return
+    if (!await confirmToast('Delete this group? Customers in this group will be ungrouped.', 'Delete')) return
     await fetch(`/api/customer-groups/${id}`, { method: 'DELETE' })
     fetchGroups()
   }

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Save, Plus } from 'lucide-react'
+import { ChevronLeft, Save, Plus, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -196,6 +196,22 @@ export default function NewProductPage() {
       toast.error(`Please enter a ${itemType === 'part' ? 'part' : 'product'} name.`)
       return
     }
+    if (!categoryId) {
+      toast.error('Please select a Device Type.')
+      return
+    }
+    if (!brandId) {
+      toast.error('Please select a Brand.')
+      return
+    }
+    if (!modelId) {
+      toast.error('Please select a Model.')
+      return
+    }
+    if (itemType === 'part' && !partType) {
+      toast.error('Please select a Part Type.')
+      return
+    }
     if (!sellingPrice) {
       toast.error('Please enter a selling price.')
       return
@@ -334,7 +350,7 @@ export default function NewProductPage() {
               />
 
               <Input
-                label="Name *"
+                label="Name"
                 placeholder={itemType === 'part' ? 'e.g. iPhone 13 Screen' : 'e.g. iPhone 13 Pro Max'}
                 required
                 value={name}
@@ -345,7 +361,7 @@ export default function NewProductPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Device Type
+                    Device Type <span className="text-red-500">*</span>
                     <span className="ml-1 text-xs font-normal text-gray-400">(select or create)</span>
                   </label>
                   <CreatableCombobox
@@ -358,55 +374,72 @@ export default function NewProductPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Brand
-                    <span className="ml-1 text-xs font-normal text-gray-400">(select or create)</span>
+                  <label className={`block text-sm font-medium mb-1 flex items-center gap-1 ${!categoryId ? 'text-gray-400' : 'text-gray-700'}`}>
+                    Brand <span className="text-red-500">*</span>
+                    <span className="text-xs font-normal text-gray-400">(select or create)</span>
+                    {!categoryId && <Lock className="h-3 w-3 text-gray-300 ml-auto" />}
                   </label>
-                  <CreatableCombobox
-                    options={brandOptions}
-                    value={brandId}
-                    onChange={(id) => { setBrandId(id); setModelId('') }}
-                    onCreate={createBrand}
-                    placeholder="Select or type to create..."
-                    createLabel="Add brand"
-                  />
+                  {categoryId ? (
+                    <CreatableCombobox
+                      options={brandOptions}
+                      value={brandId}
+                      onChange={(id) => { setBrandId(id); setModelId(''); setPartType('') }}
+                      onCreate={createBrand}
+                      placeholder="Select or type to create..."
+                      createLabel="Add brand"
+                    />
+                  ) : (
+                    <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                      <Lock className="h-3.5 w-3.5 shrink-0" /> Select device type first
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Model + Part Type */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Model
-                    <span className="ml-1 text-xs font-normal text-gray-400">(select or create)</span>
+                  <label className={`block text-sm font-medium mb-1 flex items-center gap-1 ${!brandId ? 'text-gray-400' : 'text-gray-700'}`}>
+                    Model <span className="text-red-500">*</span>
+                    <span className="text-xs font-normal text-gray-400">(select or create)</span>
+                    {!brandId && <Lock className="h-3 w-3 text-gray-300 ml-auto" />}
                   </label>
-                  <CreatableCombobox
-                    options={deviceOptions}
-                    value={modelId}
-                    onChange={setModelId}
-                    onCreate={brandId ? createModel : undefined}
-                    placeholder={brandId ? 'Select or type to create...' : 'Select a brand first'}
-                    createLabel="Add model"
-                    disabled={false}
-                  />
-                  {!brandId && (
-                    <p className="mt-1 text-xs text-amber-600">Select a brand to create a new model</p>
+                  {brandId ? (
+                    <CreatableCombobox
+                      options={deviceOptions}
+                      value={modelId}
+                      onChange={(id) => { setModelId(id); setPartType('') }}
+                      onCreate={createModel}
+                      placeholder="Select or type to create..."
+                      createLabel="Add model"
+                    />
+                  ) : (
+                    <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                      <Lock className="h-3.5 w-3.5 shrink-0" /> Select brand first
+                    </div>
                   )}
                 </div>
                 {itemType === 'part' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Part Type
-                      <span className="ml-1 text-xs font-normal text-gray-400">(select or create)</span>
+                    <label className={`block text-sm font-medium mb-1 flex items-center gap-1 ${!modelId ? 'text-gray-400' : 'text-gray-700'}`}>
+                      Part Type <span className="text-red-500">*</span>
+                      <span className="text-xs font-normal text-gray-400">(select or create)</span>
+                      {!modelId && <Lock className="h-3 w-3 text-gray-300 ml-auto" />}
                     </label>
-                    <CreatableCombobox
-                      options={partTypeOptions}
-                      value={partType}
-                      onChange={(val) => setPartType(val)}
-                      onCreate={createPartType}
-                      placeholder="Select or type to create..."
-                      createLabel="Add part type"
-                    />
+                    {modelId ? (
+                      <CreatableCombobox
+                        options={partTypeOptions}
+                        value={partType}
+                        onChange={(val) => setPartType(val)}
+                        onCreate={createPartType}
+                        placeholder="Select or type to create..."
+                        createLabel="Add part type"
+                      />
+                    ) : (
+                      <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                        <Lock className="h-3.5 w-3.5 shrink-0" /> Select model first
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

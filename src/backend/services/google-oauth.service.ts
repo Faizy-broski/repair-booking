@@ -2,16 +2,22 @@
  * Google Business Profile OAuth service.
  * Handles token exchange, refresh, and GBP API calls for reviews.
  *
- * Required APIs to enable in Google Cloud Console:
- *  - My Business API v4 (mybusiness.googleapis.com) — accounts, locations, AND reviews
+ * Required APIs to enable in Google Cloud Console → APIs & Services → Library:
+ *  1. "My Business Account Management API"   (mybusinessaccountmanagement.googleapis.com) — list accounts
+ *  2. "My Business Business Information API" (mybusinessbusinessinformation.googleapis.com) — list locations
+ *  3. "My Business Reviews API"              (mybusiness.googleapis.com) — read/write reviews
  *
  * Required OAuth scope: https://www.googleapis.com/auth/business.manage
+ *
+ * Google split the old v4 mybusiness API into 3 separate APIs in 2022.
+ * Accounts + locations now live on their own hosts; only reviews remain on mybusiness v4.
  */
 
-const GOOGLE_AUTH_URL  = 'https://accounts.google.com/o/oauth2/v2/auth'
-const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
-// Use v4 for everything — one API, one quota pool, no extra enablement needed
-const GBP_V4           = 'https://mybusiness.googleapis.com/v4'
+const GOOGLE_AUTH_URL   = 'https://accounts.google.com/o/oauth2/v2/auth'
+const GOOGLE_TOKEN_URL  = 'https://oauth2.googleapis.com/token'
+const GBP_ACCOUNTS_URL  = 'https://mybusinessaccountmanagement.googleapis.com/v1'
+const GBP_LOCATIONS_URL = 'https://mybusinessbusinessinformation.googleapis.com/v1'
+const GBP_REVIEWS_URL   = 'https://mybusiness.googleapis.com/v4'
 
 const GBP_SCOPE = 'https://www.googleapis.com/auth/business.manage'
 
@@ -117,7 +123,8 @@ export const GoogleOAuthService = {
   },
 
   async listAccounts(accessToken: string): Promise<Array<{ name: string; accountName: string; type: string }>> {
-    const res = await fetch(`${GBP_V4}/accounts`, {
+    // My Business Account Management API (v1) — replaced v4/accounts
+    const res = await fetch(`${GBP_ACCOUNTS_URL}/accounts`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
     if (!res.ok) {
@@ -131,10 +138,10 @@ export const GoogleOAuthService = {
   },
 
   async listLocations(accessToken: string, accountName: string): Promise<GBPLocation[]> {
-    const res = await fetch(
-      `${GBP_V4}/${accountName}/locations?pageSize=100`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    )
+    // My Business Business Information API (v1) — replaced v4/{account}/locations
+    // readMask is required by this API
+    const url = `${GBP_LOCATIONS_URL}/${accountName}/locations?pageSize=100&readMask=name,title,storefrontAddress`
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
     if (!res.ok) {
       const body = await res.text()
       let message = `HTTP ${res.status}`
@@ -144,23 +151,21 @@ export const GoogleOAuthService = {
     const json = await res.json()
     return (json.locations ?? []).map((loc: {
       name: string
-      locationName?: string
       title?: string
-      locationKey?: { placeId?: string }
     }) => ({
-      name:    loc.name,
-      title:   loc.locationName ?? loc.title ?? loc.name,
-      placeId: loc.locationKey?.placeId,
+      name:  loc.name,
+      title: loc.title ?? loc.name,
     }))
   },
 
   async fetchReviews(accessToken: string, locationName: string): Promise<GBPReview[]> {
+    // Reviews still use the v4 mybusiness API (My Business Reviews API)
     // locationName = "accounts/{accountId}/locations/{locationId}"
     const all: GBPReview[] = []
     let pageToken = ''
 
     do {
-      const url = `${GBP_V4}/${locationName}/reviews?pageSize=50${pageToken ? `&pageToken=${pageToken}` : ''}`
+      const url = `${GBP_REVIEWS_URL}/${locationName}/reviews?pageSize=50${pageToken ? `&pageToken=${pageToken}` : ''}`
       const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
       if (!res.ok) {
         const body = await res.text()

@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { confirmToast } from '@/lib/confirm-toast'
 import { useQuery } from '@tanstack/react-query'
 import {
   Plus, Pencil, Trash2, Check, X, ChevronRight,
@@ -331,7 +332,7 @@ export default function ServiceCataloguePage() {
   }
 
   async function deleteType(id: string) {
-    if (!confirm('Delete this device type?')) return
+    if (!await confirmToast('Delete this device type?', 'Delete')) return
     setDeviceTypes(p => p.filter(t => t.id !== id))
     if (selectedTypeId === id) { setSelectedTypeId(null); setSelectedBrandId(null); setSelectedDevId(null) }
     fetch(`/api/services/categories/${id}`, { method: 'DELETE' })
@@ -389,7 +390,7 @@ export default function ServiceCataloguePage() {
   }
 
   async function deleteBrand(id: string) {
-    if (!confirm('Delete this brand? All its devices will also be removed.')) return
+    if (!await confirmToast('Delete this brand? All its devices will also be removed.', 'Delete')) return
     setBrands(p => p.filter(b => b.id !== id))
     if (selectedBrandId === id) { setSelectedBrandId(null); setSelectedDevId(null) }
     fetch(`/api/services/manufacturers/${id}`, { method: 'DELETE' })
@@ -423,7 +424,7 @@ export default function ServiceCataloguePage() {
   }
 
   async function deleteDevice(id: string) {
-    if (!confirm('Delete this device? Its services will be unlinked.')) return
+    if (!await confirmToast('Delete this device? Its services will be unlinked.', 'Delete')) return
     setDevices(p => p.filter(d => d.id !== id))
     if (selectedDevId === id) setSelectedDevId(null)
     fetch(`/api/services/devices/${id}`, { method: 'DELETE' })
@@ -469,7 +470,7 @@ export default function ServiceCataloguePage() {
   }
 
   async function deleteService(id: string) {
-    if (!confirm('Delete this service?')) return
+    if (!await confirmToast('Delete this service?', 'Delete')) return
     setServices(p => p.filter(s => s.id !== id))
     fetch(`/api/services/problems/${id}`, { method: 'DELETE' })
   }

@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { MessageSquare, Settings2, Send, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -67,7 +68,7 @@ export default function SmsGatewayPage() {
     })
     const json = await res.json()
     setSaving(false)
-    alert(json.data?.success ? 'Test SMS sent successfully!' : `Failed: ${json.error?.message ?? 'Unknown error'}`)
+    if (json.data?.success) { toast.success('Test SMS sent successfully!') } else { toast.error(`Failed: ${json.error?.message ?? 'Unknown error'}`) }
   }
 
   return (

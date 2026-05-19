@@ -7,7 +7,7 @@ import { Modal } from '@/components/ui/modal'
 import { DataTable } from '@/components/shared/data-table'
 import { Select } from '@/components/ui/select'
 import { useAuthStore } from '@/store/auth.store'
-import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
+import { formatCurrency } from '@/lib/utils'
 import type { ColumnDef } from '@tanstack/react-table'
 import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
@@ -365,11 +365,11 @@ export default function InventoryPage() {
         <div className="flex items-center gap-1">
           <Link
             href={`/inventory/${row.original.id}`}
-            className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600"
+            className="rounded p-1.5 text-blue-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
           >
             <Edit2 className="h-3.5 w-3.5" />
           </Link>
-          <button onClick={() => setDeleteTarget(row.original)} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-600">
+          <button onClick={() => setDeleteTarget(row.original)} className="rounded p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors">
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -429,7 +429,7 @@ export default function InventoryPage() {
         {[
           {
             label: 'Stock Retail Value',
-            value: stats ? formatCurrencyCompact(stats.stockRetailValue) : null,
+            value: stats ? formatCurrency(stats.stockRetailValue) : null,
             icon: Boxes,
             iconColor: 'text-blue-600',
             iconBg: 'bg-blue-100',
@@ -438,7 +438,7 @@ export default function InventoryPage() {
           },
           {
             label: 'Stock Cost Value',
-            value: stats ? formatCurrencyCompact(stats.stockCostValue) : null,
+            value: stats ? formatCurrency(stats.stockCostValue) : null,
             icon: Package,
             iconColor: 'text-indigo-600',
             iconBg: 'bg-indigo-100',

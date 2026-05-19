@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { confirmToast } from '@/lib/confirm-toast'
 import { Plus, Pencil, Trash2, GripVertical, Star, ChevronDown, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -90,7 +91,7 @@ export default function WorkflowsSettingsPage() {
   }
 
   async function deleteWorkflow(id: string) {
-    if (!confirm('Delete this workflow?')) return
+    if (!await confirmToast('Delete this workflow?', 'Delete')) return
     await fetch(`/api/workflows/${id}`, { method: 'DELETE' })
     fetchAll()
   }
@@ -142,7 +143,7 @@ export default function WorkflowsSettingsPage() {
   }
 
   async function deleteCanned(id: string) {
-    if (!confirm('Delete this canned response?')) return
+    if (!await confirmToast('Delete this canned response?', 'Delete')) return
     await fetch(`/api/canned-responses/${id}`, { method: 'DELETE' })
     fetchAll()
   }

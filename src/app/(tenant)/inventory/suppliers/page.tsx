@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import { confirmToast } from '@/lib/confirm-toast'
 import { Plus, Pencil, Trash2, Truck, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -62,7 +63,7 @@ export default function SuppliersPage() {
   }
 
   async function deleteSupplier(id: string) {
-    if (!confirm('Delete this supplier?')) return
+    if (!await confirmToast('Delete this supplier?', 'Delete')) return
     await fetch(`/api/suppliers/${id}`, { method: 'DELETE' })
     fetchSuppliers()
   }

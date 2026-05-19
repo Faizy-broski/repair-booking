@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, use } from 'react'
+import { toast } from 'sonner'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, Save, Trash2, Store } from 'lucide-react'
@@ -318,7 +319,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     })
     if (!res.ok) {
       const j = await res.json()
-      alert(j?.message || j?.error?.message || 'Failed to update product.')
+      toast.error(j?.message || j?.error?.message || 'Failed to update product.')
     } else {
       qc.invalidateQueries({ queryKey: ['dashboard'] })
       qc.invalidateQueries({ queryKey: ['inv-product', id, activeBranch?.id] })

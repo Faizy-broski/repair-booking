@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Save, Plus } from 'lucide-react'
+import { ChevronLeft, Save, Plus, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -132,6 +132,10 @@ export default function NewPartPage() {
 
   async function handleSave(andNew = false) {
     if (!name.trim()) { toast.error('Please enter a part name.'); return }
+    if (!categoryId) { toast.error('Please select a Device Type.'); return }
+    if (!brandId) { toast.error('Please select a Brand.'); return }
+    if (!modelId) { toast.error('Please select a Model.'); return }
+    if (!partType) { toast.error('Please select a Part Type.'); return }
     if (!sellingPrice) { toast.error('Please enter a selling price.'); return }
     setSaving(true); setSaveAndNew(andNew); setSaveError(null)
 
@@ -213,28 +217,45 @@ export default function NewPartPage() {
             </div>
             <div className="space-y-4">
               <ImageUpload label="Part image" value={imageUrl} onChange={setImageUrl} />
-              <Input label="Name * *" placeholder="e.g. iPhone 13 Screen" required value={name} onChange={e => setName(e.target.value)} />
+              <Input label="Name" placeholder="e.g. iPhone 13 Screen" required value={name} onChange={e => setName(e.target.value)} />
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Device Type <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Device Type <span className="text-red-500">*</span> <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
                   <CreatableCombobox options={categories.map(c => ({ value: c.id, label: c.name }))} value={categoryId} onChange={(id) => { setCategoryId(id); setBrandId(''); setModelId(''); setPartType('') }} onCreate={createCategory} placeholder="Select or type to create..." createLabel="Add device type" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Brand <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
-                  <CreatableCombobox options={brands.map(b => ({ value: b.id, label: b.name }))} value={brandId} onChange={(id) => { setBrandId(id); setModelId('') }} onCreate={createBrand} placeholder="Select or type to create..." createLabel="Add brand" />
+                  <label className={`block text-sm font-medium mb-1 ${!categoryId ? 'text-gray-400' : 'text-gray-700'}`}>Brand <span className="text-red-500">*</span> <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
+                  {categoryId ? (
+                    <CreatableCombobox options={brands.map(b => ({ value: b.id, label: b.name }))} value={brandId} onChange={(id) => { setBrandId(id); setModelId(''); setPartType('') }} onCreate={createBrand} placeholder="Select or type to create..." createLabel="Add brand" />
+                  ) : (
+                    <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                      <Lock className="h-3.5 w-3.5 shrink-0" /> Select device type first
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Model <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
-                  <CreatableCombobox options={devices.map(d => ({ value: d.id, label: d.name }))} value={modelId} onChange={setModelId} onCreate={brandId ? createModel : undefined} placeholder={brandId ? 'Select or type to create...' : 'Select a brand first'} createLabel="Add model" />
-                  {!brandId && <p className="mt-1 text-xs text-amber-600">Select a brand to create a new model</p>}
+                  <label className={`block text-sm font-medium mb-1 ${!brandId ? 'text-gray-400' : 'text-gray-700'}`}>Model <span className="text-red-500">*</span> <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
+                  {brandId ? (
+                    <CreatableCombobox options={devices.map(d => ({ value: d.id, label: d.name }))} value={modelId} onChange={(id) => { setModelId(id); setPartType('') }} onCreate={createModel} placeholder="Select or type to create..." createLabel="Add model" />
+                  ) : (
+                    <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                      <Lock className="h-3.5 w-3.5 shrink-0" /> Select brand first
+                    </div>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Part Type <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
-                  <CreatableCombobox options={partTypesForModel.map(p => ({ value: p.name, label: p.name }))} value={partType} onChange={setPartType} onCreate={createPartType} placeholder="Select or type to create..." createLabel="Add part type" />
+                  <label className={`block text-sm font-medium mb-1 ${!modelId ? 'text-gray-400' : 'text-gray-700'}`}>Part Type <span className="text-red-500">*</span> <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
+                  {modelId ? (
+                    <CreatableCombobox options={partTypesForModel.map(p => ({ value: p.name, label: p.name }))} value={partType} onChange={setPartType} onCreate={createPartType} placeholder="Select or type to create..." createLabel="Add part type" />
+                  ) : (
+                    <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                      <Lock className="h-3.5 w-3.5 shrink-0" /> Select model first
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -253,7 +274,7 @@ export default function NewPartPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <Input label="Cost Price (£)" type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
-                <Input label="Selling Price (£) * *" type="number" step="0.01" min="0" placeholder="0.00" required value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
+                <Input label="Selling Price (£)" type="number" step="0.01" min="0" placeholder="0.00" required value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
               </div>
               {hasMargin && (
                 <div className="rounded-lg bg-green-50 border border-green-100 px-4 py-2.5 flex items-center gap-4 text-sm">

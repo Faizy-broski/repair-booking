@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
-import { Menu, ChevronDown, MessageSquare, ArrowRight, User, Settings, LogOut, Megaphone, Info, AlertTriangle, Wrench, X } from 'lucide-react'
+import { Menu, ChevronDown, MessageSquare, ArrowRight, User, Settings, LogOut, Megaphone, Info, AlertTriangle, Wrench, X, Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 import { useMessageStore } from '@/store/message.store'
 import { useBroadcastsStore } from '@/store/broadcasts.store'
@@ -34,6 +34,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   const router = useRouter()
   const initials = (profile?.full_name ?? 'U').charAt(0).toUpperCase()
 
+  const [signingOut, setSigningOut] = useState(false)
   const [bellOpen, setBellOpen] = useState(false)
   const bellRef = useRef<HTMLDivElement>(null)
 
@@ -49,10 +50,10 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   }
 
   async function handleSignOut() {
+    setSigningOut(true)
+    setUserOpen(false)
     const supabase = createClient()
     await supabase.auth.signOut({ scope: 'local' })
-    // Full page unload destroys React state — no need to clear stores first
-    // (clearing before navigation causes the sidebar to briefly re-render empty)
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
     window.location.href = appUrl ? `${appUrl}/login` : '/login'
   }
@@ -76,7 +77,12 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   }
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-outline-variant bg-surface-container-lowest px-4 shadow-sm">
+    <header className="relative flex h-14 shrink-0 items-center gap-3 border-b border-outline-variant bg-surface-container-lowest px-4 shadow-sm">
+      {signingOut && (
+        <div className="absolute inset-x-0 top-0 h-0.5 overflow-hidden">
+          <div className="h-full w-full animate-[progress-bar_1.4s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-primary to-transparent" />
+        </div>
+      )}
       {/* Mobile menu toggle */}
       <button
         onClick={onMenuClick}
@@ -297,10 +303,15 @@ export function Topbar({ onMenuClick }: TopbarProps) {
               <div className="my-1 h-px bg-outline-variant mx-2" />
               <button
                 onClick={handleSignOut}
-                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-error hover:bg-error/5 transition-colors"
+                disabled={signingOut}
+                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-error hover:bg-error/5 transition-colors disabled:opacity-60"
               >
-                <LogOut className="h-4 w-4" />
-                Sign out
+                {signingOut ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <LogOut className="h-4 w-4" />
+                )}
+                {signingOut ? 'Signing out…' : 'Sign out'}
               </button>
             </div>
           )}

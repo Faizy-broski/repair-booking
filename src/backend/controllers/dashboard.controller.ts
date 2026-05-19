@@ -115,13 +115,12 @@ export const DashboardController = {
           .eq('sales.branch_id', branchId)
           .gte('sales.created_at', periodStart),
 
-        // Repair parts cost: repair_items × product cost_price (only where product_id is linked)
+        // Repair parts cost: use unit_cost recorded at repair time (not product.cost_price)
         adminSupabase
           .from('repair_items')
-          .select('quantity, product_id, products!product_id(cost_price), repairs!inner(branch_id, created_at)')
+          .select('quantity, unit_cost, repairs!inner(branch_id, created_at, status, deposit_paid)')
           .eq('repairs.branch_id', branchId)
-          .gte('repairs.created_at', periodStart)
-          .not('product_id', 'is', null),
+          .gte('repairs.created_at', periodStart),
       ])
 
       const sales = salesRes.data ?? []
@@ -137,8 +136,18 @@ export const DashboardController = {
       const salesCogs = ((salesCogsRes.data ?? []) as any[]).reduce((s, item) => {
         return s + (item.quantity ?? 0) * (item.products?.cost_price ?? 0)
       }, 0)
+      // Parts cost rules:
+      //   refunded → skip (device returned, job cancelled)
+      //   terminal (completed/collected) → include
+      //   open + deposit > 0 → include (work in progress, parts used)
+      //   open + deposit = 0 → skip (nothing collected, nothing counted)
       const repairsPartsCost = ((repairsPartsRes.data ?? []) as any[]).reduce((s, item) => {
-        return s + (item.quantity ?? 0) * (item.products?.cost_price ?? 0)
+        const repairStatus = (item.repairs?.status ?? '').toLowerCase()
+        const depositPaid  = item.repairs?.deposit_paid ?? 0
+        if (repairStatus === 'refunded')  return s
+        if (isTerminal(repairStatus))     return s + (item.quantity ?? 0) * (item.unit_cost ?? 0)
+        if (depositPaid > 0)              return s + (item.quantity ?? 0) * (item.unit_cost ?? 0)
+        return s
       }, 0)
       const recentRepairs = (recentRepairsRes.data ?? []).map((r) => {
         const customer = r.customers as { first_name: string; last_name?: string } | null
@@ -181,7 +190,8 @@ export const DashboardController = {
           const deposit  = row.deposit_paid  ?? 0
           const fullCost = row.actual_cost   ?? row.estimated_cost ?? 0
           const refund   = row.refund_amount ?? 0
-          if (isTerminal(status))    return s + fullCost - refund
+          // Terminal: full charge — refund_amount only applies when status IS 'refunded'
+          if (isTerminal(status))    return s + fullCost
           if (status === 'refunded') return s + Math.max(0, deposit - refund)
           return s + deposit
         }, 0)

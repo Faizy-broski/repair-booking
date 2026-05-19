@@ -185,6 +185,8 @@ export interface TemplatedEmailPayload {
   storePhone?:  string
   storeEmail?:  string
   primaryColor?: string
+  /** Reply-To address — used on platform SMTP only so customer replies reach the business inbox. */
+  replyTo?: string
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -232,9 +234,14 @@ export const EmailService = {
       }
     } else {
       console.log(`[EmailService] No business SMTP — falling back to global SMTP for ${payload.to}`)
-      const from = payload.fromName
-        ? `"${payload.fromName}" <${process.env.SMTP_FROM ?? process.env.EMAIL_FROM ?? process.env.SMTP_USER}>`
-        : (process.env.SMTP_FROM ?? process.env.EMAIL_FROM ?? process.env.SMTP_USER)
+      const platformAddr = process.env.SMTP_FROM ?? process.env.EMAIL_FROM ?? process.env.SMTP_USER ?? ''
+      // When sending via platform SMTP, show "Business Name via RepairBooking" so the customer
+      // knows which shop emailed them. Reply-To is set to the shop's own email so replies
+      // land in the business owner's inbox (not the platform inbox).
+      const displayName = payload.fromName ? `${payload.fromName} via RepairBooking` : 'RepairBooking'
+      const from        = `"${displayName}" <${platformAddr}>`
+      const replyTo     = payload.replyTo ?? payload.storeEmail ?? undefined
+
       const transport = await getGlobalTransporter()
       try {
         const info = await transport.sendMail({
@@ -242,8 +249,9 @@ export const EmailService = {
           to:      payload.to,
           subject: payload.subject,
           html:    wrappedHtml,
+          ...(replyTo ? { replyTo } : {}),
         })
-        console.log(`[EmailService] Global SMTP sent OK — messageId=${info.messageId}`)
+        console.log(`[EmailService] Global SMTP sent OK — messageId=${info.messageId}${replyTo ? ` replyTo=${replyTo}` : ''}`)
       } catch (err) {
         console.error(`[EmailService] Global SMTP sendMail failed:`, err)
         throw err

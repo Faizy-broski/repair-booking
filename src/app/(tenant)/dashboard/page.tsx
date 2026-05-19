@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { DollarSign, Wrench, ArrowLeftRight, TrendingUp, AlertTriangle, Clock, Package, Receipt } from 'lucide-react'
 import { StatsCard } from '@/components/dashboard/stats-card'
 import { useAuthStore } from '@/store/auth.store'
-import { cn, formatCurrency, formatCurrencyCompact } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
@@ -165,14 +165,14 @@ export default function DashboardPage() {
         ) : (
           <>
             {/* Row 1 — Sales & Repairs */}
-            <StatsCard title="Sales Revenue" value={formatCurrencyCompact(stats?.total_sales ?? 0)} subtitle={PERIODS.find(p => p.value === period)?.label} icon={<DollarSign className="h-5 w-5" />} color="green" />
-            <StatsCard title="Sales Profit" value={formatCurrencyCompact(stats?.sales_profit ?? 0)} subtitle="revenue − cost of goods" icon={<TrendingUp className="h-5 w-5" />} color={(stats?.sales_profit ?? 0) >= 0 ? 'green' : 'red'} />
-            <StatsCard title="Repairs Revenue" value={formatCurrencyCompact(stats?.repairs_revenue ?? 0)} subtitle="collected" icon={<Receipt className="h-5 w-5" />} color="purple" />
+            <StatsCard title="Sales Revenue" value={formatCurrency(stats?.total_sales ?? 0)} subtitle={PERIODS.find(p => p.value === period)?.label} icon={<DollarSign className="h-5 w-5" />} color="green" />
+            <StatsCard title="Sales Profit" value={formatCurrency(stats?.sales_profit ?? 0)} subtitle="revenue − cost of goods" icon={<TrendingUp className="h-5 w-5" />} color={(stats?.sales_profit ?? 0) >= 0 ? 'green' : 'red'} />
+            <StatsCard title="Repairs Revenue" value={formatCurrency(stats?.repairs_revenue ?? 0)} subtitle="collected" icon={<Receipt className="h-5 w-5" />} color="purple" />
             {/* Row 2 — Operations */}
-            <StatsCard title="Net Profit" value={formatCurrencyCompact(stats?.net_profit ?? 0)} subtitle="all revenue − expenses" icon={<TrendingUp className="h-5 w-5" />} color={(stats?.net_profit ?? 0) >= 0 ? 'green' : 'red'} />
+            <StatsCard title="Net Profit" value={formatCurrency(stats?.net_profit ?? 0)} subtitle="all revenue − expenses" icon={<TrendingUp className="h-5 w-5" />} color={(stats?.net_profit ?? 0) >= 0 ? 'green' : 'red'} />
             <StatsCard title="Transactions" value={stats?.sales_count ?? 0} subtitle={PERIODS.find(p => p.value === period)?.label} icon={<ArrowLeftRight className="h-5 w-5" />} color="blue" />
             <StatsCard title="Open Repairs" value={stats?.repairs_open ?? 0} icon={<Wrench className="h-5 w-5" />} color="yellow" />
-            <StatsCard title="Total Expenses" value={formatCurrencyCompact(stats?.total_expenses ?? 0)} subtitle={PERIODS.find(p => p.value === period)?.label} icon={<TrendingUp className="h-5 w-5" />} color="red" />
+            <StatsCard title="Total Expenses" value={formatCurrency(stats?.total_expenses ?? 0)} subtitle={PERIODS.find(p => p.value === period)?.label} icon={<TrendingUp className="h-5 w-5" />} color="red" />
             <StatsCard title="Low Stock" value={stats?.low_stock_count ?? 0} subtitle="items" icon={<AlertTriangle className="h-5 w-5" />} color={(stats?.low_stock_count ?? 0) > 0 ? 'red' : 'green'} />
           </>
         )}

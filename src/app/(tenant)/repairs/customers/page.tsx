@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { confirmToast } from '@/lib/confirm-toast'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
@@ -109,7 +110,7 @@ export default function RepairCustomersPage() {
   }
 
   async function onDelete(c: CustomerRow) {
-    if (!confirm(`Delete "${[c.first_name, c.last_name].filter(Boolean).join(' ')}"? This cannot be undone.`)) return
+    if (!await confirmToast(`Delete "${[c.first_name, c.last_name].filter(Boolean).join(' ')}"? This cannot be undone.`, 'Delete')) return
     await fetch(`/api/customers/${c.id}`, { method: 'DELETE' })
     queryClient.invalidateQueries({ queryKey: ['repair-customers', activeBranch?.id] })
   }

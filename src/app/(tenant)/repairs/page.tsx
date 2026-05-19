@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Plus, Search, LayoutGrid, List, Wrench, DollarSign, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail } from 'lucide-react'
+import { Plus, Search, LayoutGrid, List, Wrench, DollarSign, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
 import { AsyncEmployeeSelect } from '@/components/shared/async-employee-select'
@@ -12,7 +12,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { formatCurrency, formatCurrencyCompact, formatDateTime, formatDate, formatStatus } from '@/lib/utils'
+import { formatCurrency, formatDateTime, formatDate, formatStatus } from '@/lib/utils'
 import { Select } from '@/components/ui/select'
 import type { ColumnDef, VisibilityState } from '@tanstack/react-table'
 import type { Repair } from '@/types/database'
@@ -56,7 +56,7 @@ const EMPTY_NEW_CUST = { first_name: '', last_name: '', business_name: '', email
 const EMPTY_JOB = {
   device_name: '', device_type: '', device_brand: '', device_model: '',
   imei: '', faults: [] as string[],
-  estimated_cost: '', deposit_paid: '',
+  job_fee: '', estimated_cost: '', deposit_paid: '',
   due_date: '', customer_note: '', staff_note: '',
   status: '', assigned_to: '',
   lock_type: '' as '' | 'passcode' | 'pattern',
@@ -316,6 +316,7 @@ export default function RepairsPage() {
   
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [statsPeriod, setStatsPeriod] = useState<'month' | '3months' | '6months' | 'year'>('month')
 
   // URL-based state
   const page = parseInt(searchParams.get('page') || '0', 10)
@@ -348,6 +349,7 @@ export default function RepairsPage() {
   const [showSuggestions, setShowSuggestions] = useState<'name' | 'phone' | 'email' | null>(null)
   const [custSearchLoading, setCustSearchLoading] = useState(false)
   const custSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const recentCustCache = useRef<SelectedCustomer[]>([])
 
   // Repair parts state
   const [repairParts, setRepairParts] = useState<RepairLineItem[]>([])
@@ -358,6 +360,7 @@ export default function RepairsPage() {
   const partSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const partDropRef = useRef<HTMLDivElement>(null)
   const [quickPartPrice, setQuickPartPrice] = useState('')
+  const [quickPartCost, setQuickPartCost] = useState('')
   const [deviceError, setDeviceError] = useState('')
 
   const [emailPrompt, setEmailPrompt] = useState<{ repairId: string; jobNumber: string; currentStatus: string } | null>(null)
@@ -401,10 +404,11 @@ export default function RepairsPage() {
   }, [])
 
   const queryClient = useQueryClient()
-  const repairsQueryKey = ['repairs', activeBranch?.id, page, search, statusFilter, view] as const
+  const repairsQueryKey     = ['repairs', activeBranch?.id, page, search, statusFilter, view] as const
+  const repairsBaseKey      = ['repairs', activeBranch?.id] as const
 
   // ── Repairs Query — fires immediately, table shows as soon as this returns ──
-  const { data: repairResponse, isLoading: repairsLoading, refetch: fetchRepairs } = useQuery<RepairListResponse>({
+  const { data: repairResponse, isLoading: repairsLoading, isFetching: repairsFetching, refetch: fetchRepairs } = useQuery<RepairListResponse>({
     queryKey: repairsQueryKey,
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -461,9 +465,9 @@ export default function RepairsPage() {
 
   // ── Repair stats — fires in parallel with repairs ─────────────────────────
   const { data: repairStats = null } = useQuery({
-    queryKey: ['repairs-stats', activeBranch?.id],
+    queryKey: ['repairs-stats', activeBranch?.id, statsPeriod],
     queryFn: async () => {
-      const res = await fetch(`/api/repairs/stats?branch_id=${activeBranch!.id}`)
+      const res = await fetch(`/api/repairs/stats?branch_id=${activeBranch!.id}&period=${statsPeriod}`)
       const json = await res.json()
       return json.data ?? null
     },
@@ -477,6 +481,7 @@ export default function RepairsPage() {
         repairs_completed: d.repairs_completed,
         repairs_urgent:    d.repairs_urgent,
         total_sales:       d.repairs_revenue ?? 0,
+        repairs_profit:    d.repairs_profit  ?? 0,
       }
     },
   })
@@ -494,15 +499,17 @@ export default function RepairsPage() {
   })
 
   function invalidateStats() {
-    queryClient.invalidateQueries({ queryKey: ['repairs-stats', activeBranch?.id], exact: true })
+    queryClient.invalidateQueries({ queryKey: ['repairs-stats', activeBranch?.id, statsPeriod], exact: true })
     queryClient.invalidateQueries({ queryKey: ['dashboard'] })
   }
 
-  // Auto-populate total charges from repair parts total
+  // Auto-populate total charges = job fee + parts retail total
   useEffect(() => {
-    if (repairParts.length === 0) return
-    const total = repairParts.reduce((s, p) => s + p.unit_price * p.qty, 0)
-    setJobData((prev) => ({ ...prev, estimated_cost: total.toFixed(2) }))
+    setJobData((prev) => {
+      const partsTotal = repairParts.reduce((s, p) => s + p.unit_price * p.qty, 0)
+      const fee = parseFloat(prev.job_fee) || 0
+      return { ...prev, estimated_cost: (fee + partsTotal).toFixed(2) }
+    })
   }, [repairParts])
 
   function deleteRepair(repairId: string, jobNumber: string) {
@@ -520,7 +527,7 @@ export default function RepairsPage() {
     const res = await fetch(`/api/repairs/${confirmDelete.id}`, { method: 'DELETE' })
     if (res.ok) {
       toast.success(`Repair ${confirmDelete.jobNumber} deleted.`)
-      queryClient.invalidateQueries({ queryKey: repairsQueryKey, exact: true })
+      queryClient.invalidateQueries({ queryKey: repairsBaseKey })
       invalidateStats()
       setConfirmDelete(null)
     } else {
@@ -534,18 +541,38 @@ export default function RepairsPage() {
   }
 
   async function handleStatusChange(repairId: string, newStatus: string) {
-    const previousData = queryClient.getQueryData<RepairListResponse>(repairsQueryKey)
+    const previousData  = queryClient.getQueryData<RepairListResponse>(repairsQueryKey)
+    const previousStats = queryClient.getQueryData<any>(['repairs-stats', activeBranch?.id, statsPeriod])
+    const repair        = previousData?.data?.find((r: RepairRow) => r.id === repairId)
+    const oldStatus     = (repair?.status ?? '').toLowerCase()
+    const newStatusLo   = newStatus.toLowerCase()
 
-    // Optimistic update — status badge in the list flips instantly.
+    const TERM_EXACT = new Set(['repaired', 'collected', 'unrepairable'])
+    const TERM_KW    = ['complet', 'done', 'fixed', 'pick', 'closed', 'resolv', 'finish', 'collect', 'handover']
+    const isTerm = (s: string) => TERM_EXACT.has(s) || TERM_KW.some(kw => s.includes(kw))
+
+    // Optimistic: status badge flips instantly.
     queryClient.setQueryData<RepairListResponse>(repairsQueryKey, (old) => {
       if (!old?.data) return old
-      return {
-        ...old,
-        data: old.data.map((r: RepairRow) =>
-          r.id === repairId ? { ...r, status: newStatus } : r
-        ),
-      }
+      return { ...old, data: old.data.map((r: RepairRow) => r.id === repairId ? { ...r, status: newStatus } : r) }
     })
+
+    // Optimistic: revenue and counts flip instantly (profit waits for real refetch — needs parts data).
+    if (repair && previousStats) {
+      const deposit  = (repair as any).deposit_paid  ?? 0
+      const fullCost = (repair as any).actual_cost   ?? (repair as any).estimated_cost ?? 0
+      const refund   = (repair as any).refund_amount ?? 0
+      const calcRev  = (s: string) => isTerm(s) ? fullCost : s === 'refunded' ? Math.max(0, deposit - refund) : deposit
+      const revDelta = calcRev(newStatusLo) - calcRev(oldStatus)
+      const wasOpen  = !isTerm(oldStatus)  && oldStatus  !== 'refunded'
+      const isNowOpen = !isTerm(newStatusLo) && newStatusLo !== 'refunded'
+      queryClient.setQueryData(['repairs-stats', activeBranch?.id, statsPeriod], (old: any) => ({
+        ...old,
+        repairs_revenue:   (old.repairs_revenue  ?? 0) + revDelta,
+        repairs_completed: (old.repairs_completed ?? 0) + (isTerm(newStatusLo) ? 1 : 0) - (isTerm(oldStatus) ? 1 : 0),
+        repairs_open:      (old.repairs_open      ?? 0) + (isNowOpen ? 1 : 0) - (wasOpen ? 1 : 0),
+      }))
+    }
 
     const res = await fetch(`/api/repairs/${repairId}/status`, {
       method: 'PATCH',
@@ -554,14 +581,17 @@ export default function RepairsPage() {
     })
 
     if (!res.ok) {
-      if (previousData) queryClient.setQueryData(repairsQueryKey, previousData)
-      queryClient.invalidateQueries({ queryKey: repairsQueryKey, exact: true })
+      if (previousData)  queryClient.setQueryData(repairsQueryKey, previousData)
+      if (previousStats) queryClient.setQueryData(['repairs-stats', activeBranch?.id, statsPeriod], previousStats)
+      queryClient.invalidateQueries({ queryKey: repairsBaseKey })
       if (res.status === 403) {
         toast.error("Permission Denied: You don't have permission to update repair status.")
       } else {
         toast.error('Failed to update status.')
       }
     } else {
+      // Invalidate the other view's cache (kanban ↔ list) so switching views shows updated data
+      queryClient.invalidateQueries({ queryKey: repairsBaseKey })
       invalidateStats()
       toast.success('Status updated · Customer notified by email', {
         icon: '✉️',
@@ -651,7 +681,15 @@ export default function RepairsPage() {
     setPartResults([])
     setShowPartDrop(false)
     setQuickPartPrice('')
+    setQuickPartCost('')
     setModalOpen(true)
+    // Pre-fetch recent customers so the dropdown is instant on focus
+    if (recentCustCache.current.length === 0) {
+      fetch('/api/customers?limit=6&sort=created_at')
+        .then((r) => r.json())
+        .then((j) => { recentCustCache.current = j.data ?? [] })
+        .catch(() => {})
+    }
   }
 
   // Open modal if ?new=true is in the URL
@@ -704,14 +742,23 @@ export default function RepairsPage() {
     }, 250)
   }
 
-  async function fetchRecentCustomers(field: 'name' | 'phone' | 'email') {
+  function fetchRecentCustomers(field: 'name' | 'phone' | 'email') {
     if (selectedCustomer) return
-    try {
-      const res = await fetch('/api/customers?limit=5&sort=created_at')
-      const json = await res.json()
-      const data = (json.data ?? []) as SelectedCustomer[]
-      if (data.length > 0) { setCustSuggestions(data); setShowSuggestions(field) }
-    } catch { /* silent */ }
+    // Show cached results instantly
+    if (recentCustCache.current.length > 0) {
+      setCustSuggestions(recentCustCache.current)
+      setShowSuggestions(field)
+      return
+    }
+    // First time — fetch and cache
+    fetch('/api/customers?limit=6&sort=created_at')
+      .then((r) => r.json())
+      .then((j) => {
+        const data = (j.data ?? []) as SelectedCustomer[]
+        recentCustCache.current = data
+        if (data.length > 0) { setCustSuggestions(data); setShowSuggestions(field) }
+      })
+      .catch(() => {})
   }
 
   function searchParts(q: string) {
@@ -752,6 +799,7 @@ export default function RepairsPage() {
   function addQuickPart() {
     const name = partQuery.trim()
     const price = parseFloat(quickPartPrice) || 0
+    const cost  = parseFloat(quickPartCost)  || 0
     if (!name) return
     setRepairParts((prev) => [...prev, {
       tempId: Math.random().toString(36).slice(2),
@@ -759,10 +807,11 @@ export default function RepairsPage() {
       name,
       qty: 1,
       unit_price: price,
-      unit_cost: 0,
+      unit_cost: cost,
     }])
     setPartQuery('')
     setQuickPartPrice('')
+    setQuickPartCost('')
     setShowPartDrop(false)
   }
 
@@ -1151,7 +1200,7 @@ export default function RepairsPage() {
     <div className="space-y-4">
 
       {/* ── Repair Dashboard Stats ── */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-on-surface">Repairs</h1>
@@ -1164,9 +1213,24 @@ export default function RepairsPage() {
           </div>
           <p className="text-sm text-on-surface-variant">Real-time overview of your workshop performance.</p>
         </div>
+        <div className="flex items-center gap-1 rounded-lg border border-outline-variant bg-surface-container p-1">
+          {(['month', '3months', '6months', 'year'] as const).map((p) => (
+            <button
+              key={p}
+              onClick={() => setStatsPeriod(p)}
+              className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+                statsPeriod === p
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'text-on-surface-variant hover:bg-surface-container-high'
+              }`}
+            >
+              {p === 'month' ? 'Month' : p === '3months' ? '3M' : p === '6months' ? '6M' : 'Year'}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {/* Total Repairs */}
         <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-5 px-5 shadow-sm">
           <div className="flex items-start justify-between gap-3">
@@ -1185,7 +1249,7 @@ export default function RepairsPage() {
           {repairStats ? (
             <p className="mt-3 flex items-center gap-1 text-xs font-medium text-primary">
               <TrendingUp className="h-3 w-3" />
-              {repairStats.repairs_completed} completed this month
+              {repairStats.repairs_completed} completed this period
             </p>
           ) : (
             <div className="mt-3 h-4 w-36 rounded bg-surface-container animate-pulse" />
@@ -1199,7 +1263,7 @@ export default function RepairsPage() {
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Revenue</p>
               {repairStats ? (
-                <p className="mt-2 text-3xl font-bold text-on-surface">{formatCurrencyCompact(repairStats.total_sales)}</p>
+                <p className="mt-2 text-2xl font-bold text-on-surface">{formatCurrency(repairStats.total_sales)}</p>
               ) : (
                 <div className="mt-2 h-8 w-28 rounded bg-surface-container animate-pulse" />
               )}
@@ -1211,12 +1275,40 @@ export default function RepairsPage() {
           {repairStats ? (
             <p className="mt-3 flex items-center gap-1 text-xs font-medium text-tertiary">
               <TrendingUp className="h-3 w-3" />
-              total this month
+              total this period
             </p>
           ) : (
             <div className="mt-3 h-4 w-20 rounded bg-surface-container animate-pulse" />
           )}
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-tertiary" />
+        </div>
+
+        {/* Profit */}
+        <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-5 px-5 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Profit</p>
+              {repairStats ? (
+                <p className={`mt-2 text-2xl font-bold ${repairStats.repairs_profit >= 0 ? 'text-green-600' : 'text-error'}`}>
+                  {formatCurrency(repairStats.repairs_profit)}
+                </p>
+              ) : (
+                <div className="mt-2 h-8 w-28 rounded bg-surface-container animate-pulse" />
+              )}
+            </div>
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-50">
+              <TrendingUp className="h-5 w-5 text-green-600" />
+            </div>
+          </div>
+          {repairStats ? (
+            <p className="mt-3 flex items-center gap-1 text-xs font-medium text-green-600">
+              <TrendingUp className="h-3 w-3" />
+              after parts cost
+            </p>
+          ) : (
+            <div className="mt-3 h-4 w-24 rounded bg-surface-container animate-pulse" />
+          )}
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-green-500" />
         </div>
 
         {/* Open Jobs */}
@@ -1263,7 +1355,7 @@ export default function RepairsPage() {
           {repairStats ? (
             <p className="mt-3 flex items-center gap-1 text-xs font-medium text-primary">
               <CheckCircle className="h-3 w-3" />
-              {repairStats.repairs_completed === 0 ? 'None completed yet' : 'Completed this month'}
+              {repairStats.repairs_completed === 0 ? 'None completed yet' : 'Completed this period'}
             </p>
           ) : (
             <div className="mt-3 h-4 w-28 rounded bg-surface-container animate-pulse" />
@@ -1303,6 +1395,14 @@ export default function RepairsPage() {
               Kanban
             </button>
           </div>
+          <button
+            onClick={() => fetchRepairs()}
+            disabled={repairsFetching}
+            className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 hover:border-gray-300 hover:text-gray-900 transition-colors disabled:opacity-50"
+            title="Refresh repairs"
+          >
+            <RefreshCw className={`h-4 w-4 ${repairsFetching ? 'animate-spin' : ''}`} />
+          </button>
           <Button onClick={openModal}>
             <Plus className="h-4 w-4" />
             New Repair
@@ -1708,16 +1808,16 @@ export default function RepairsPage() {
             : deviceData.models
           const remaining = (parseFloat(jobData.estimated_cost) || 0) - (parseFloat(jobData.deposit_paid) || 0)
           const pricePending = jobData.price_pending
-          const inp = 'h-8 w-full rounded-md border border-indigo-200 bg-white px-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400/20'
+          const inp = 'h-8 w-full rounded-md border-2 border-indigo-200 bg-white px-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20'
           const sel = `${inp} appearance-none`
-          const lbl = 'mb-0.5 block text-[11px] font-bold uppercase tracking-wide text-outline'
+          const lbl = 'mb-0.5 block text-[11px] font-bold uppercase tracking-wide text-indigo-400'
 
           return (
             <div className="space-y-2.5">
 
               {/* Row A: Device Type | Brand | Model | IMEI */}
               <div>
-                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-outline">
+                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
                   <Smartphone className="h-2.5 w-2.5" /> Device
                 </p>
                 <div className="grid grid-cols-4 gap-2">
@@ -1795,7 +1895,7 @@ export default function RepairsPage() {
 
               {/* REPAIR PARTS */}
               <div>
-                <p className="mb-1.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-outline">
+                <p className="mb-1.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
                   <Wrench className="h-2.5 w-2.5" /> Repair Parts
                 </p>
 
@@ -1841,25 +1941,43 @@ export default function RepairsPage() {
                         ))}
                         {partQuery.trim() && (
                           <li className="border-t border-gray-100">
-                            <div className="flex items-center gap-2 px-3 py-2">
-                              <span className="flex-1 truncate text-xs italic text-gray-500">Add &quot;{partQuery.trim()}&quot;</span>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={quickPartPrice}
-                                onChange={(e) => setQuickPartPrice(e.target.value)}
-                                placeholder="£0.00"
-                                className="h-6 w-20 rounded border border-gray-300 px-2 text-xs"
-                                onMouseDown={(e) => e.stopPropagation()}
-                              />
-                              <button
-                                type="button"
-                                className="shrink-0 rounded bg-gray-900 px-2 py-1 text-xs font-semibold text-white hover:bg-gray-700 transition-colors"
-                                onMouseDown={(e) => { e.preventDefault(); addQuickPart() }}
-                              >
-                                Add
-                              </button>
+                            <div className="flex flex-col gap-1.5 px-3 py-2">
+                              <span className="text-xs italic text-gray-500">Add &quot;{partQuery.trim()}&quot;</span>
+                              <div className="flex items-center gap-2">
+                                <div className="flex flex-1 flex-col gap-0.5">
+                                  <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Cost £</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={quickPartCost}
+                                    onChange={(e) => setQuickPartCost(e.target.value)}
+                                    placeholder="0.00"
+                                    className="h-7 w-full rounded border border-gray-200 bg-gray-50 px-2 text-xs text-gray-900"
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                  />
+                                </div>
+                                <div className="flex flex-1 flex-col gap-0.5">
+                                  <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Price £</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={quickPartPrice}
+                                    onChange={(e) => setQuickPartPrice(e.target.value)}
+                                    placeholder="0.00"
+                                    className="h-7 w-full rounded border border-gray-300 px-2 text-xs text-gray-900"
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  className="mt-4 shrink-0 rounded bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-700 transition-colors"
+                                  onMouseDown={(e) => { e.preventDefault(); addQuickPart() }}
+                                >
+                                  Add
+                                </button>
+                              </div>
                             </div>
                           </li>
                         )}
@@ -1881,7 +1999,8 @@ export default function RepairsPage() {
                         <tr className="bg-gray-50 font-semibold text-gray-500">
                           <th className="px-3 py-1.5 text-left">Part</th>
                           <th className="w-16 px-2 py-1.5 text-center">Qty</th>
-                          <th className="w-20 px-2 py-1.5 text-right">Unit £</th>
+                          <th className="w-20 px-2 py-1.5 text-right text-gray-400">Cost £</th>
+                          <th className="w-20 px-2 py-1.5 text-right">Price £</th>
                           <th className="w-20 px-2 py-1.5 text-right">Total</th>
                           <th className="w-8" />
                         </tr>
@@ -1897,6 +2016,16 @@ export default function RepairsPage() {
                                 value={p.qty}
                                 onChange={(e) => setRepairParts((prev) => prev.map((r) => r.tempId === p.tempId ? { ...r, qty: Math.max(1, parseInt(e.target.value) || 1) } : r))}
                                 className="h-6 w-12 rounded border border-gray-200 px-1 text-center text-xs"
+                              />
+                            </td>
+                            <td className="px-2 py-1.5 text-right">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={p.unit_cost}
+                                onChange={(e) => setRepairParts((prev) => prev.map((r) => r.tempId === p.tempId ? { ...r, unit_cost: parseFloat(e.target.value) || 0 } : r))}
+                                className="h-6 w-16 rounded border border-gray-100 bg-gray-50 px-1 text-right text-xs text-gray-500"
                               />
                             </td>
                             <td className="px-2 py-1.5 text-right">
@@ -1924,7 +2053,7 @@ export default function RepairsPage() {
                       </tbody>
                       <tfoot>
                         <tr className="border-t border-gray-200 bg-gray-50">
-                          <td colSpan={3} className="px-3 py-1.5 text-right text-xs font-bold text-gray-600">Parts Total:</td>
+                          <td colSpan={4} className="px-3 py-1.5 text-right text-xs font-bold text-gray-600">Parts Total:</td>
                           <td className="px-2 py-1.5 text-right text-xs font-bold text-gray-900">
                             £{repairParts.reduce((s, p) => s + p.unit_price * p.qty, 0).toFixed(2)}
                           </td>
@@ -1940,7 +2069,7 @@ export default function RepairsPage() {
 
               {/* Row B: Fault | Due Date | Status | Assigned To */}
               <div>
-                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-outline">
+                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
                   <Wrench className="h-2.5 w-2.5" /> Fault & Assignment
                 </p>
                 <div className="grid grid-cols-4 gap-2">
@@ -1948,7 +2077,23 @@ export default function RepairsPage() {
                     <label className={lbl}>Fault <span className="text-red-400">*</span></label>
                     <MultiComboInput
                       values={jobData.faults}
-                      onAdd={(v) => setJobData((p) => ({ ...p, faults: [...p.faults, v] }))}
+                      onAdd={(v) => {
+                        setJobData((p) => ({ ...p, faults: [...p.faults, v] }))
+                        const isNew = !faults.some((f) => f.name.toLowerCase() === v.toLowerCase())
+                        if (isNew) {
+                          // Optimistically add to cache so it shows instantly in the dropdown
+                          queryClient.setQueryData<RepairMeta>(['repairs-meta', activeBranch?.id], (old) => {
+                            if (!old) return old
+                            const tempFault: RepairFault = { id: `temp-${Date.now()}`, name: v, sort_order: 0, created_at: new Date().toISOString(), business_id: '' }
+                            return { ...old, faults: [...old.faults, tempFault] }
+                          })
+                          fetch('/api/repairs/faults', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: v }),
+                          }).then((r) => r.ok && queryClient.invalidateQueries({ queryKey: ['repairs-meta', activeBranch?.id] })).catch(() => {})
+                        }
+                      }}
                       onRemove={(v) => setJobData((p) => ({ ...p, faults: p.faults.filter((f) => f !== v) }))}
                       options={faults.map((f) => f.name)}
                       placeholder="Select or type fault…"
@@ -1978,7 +2123,7 @@ export default function RepairsPage() {
 
               {/* Row C: Total | Deposit | Remaining | Assigned To */}
               <div>
-                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-outline">
+                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
                   <DollarSign className="h-2.5 w-2.5" /> Financials & Assignment
                 </p>
                 {/* Price Pending toggle */}
@@ -1995,7 +2140,30 @@ export default function RepairsPage() {
                     ) : 'No fault found / Price TBD'}
                   </span>
                 </label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-5 gap-2">
+                  {/* Job Fee (labour) */}
+                  <div>
+                    <label className={lbl}>Job Fee (Labour)</label>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">£</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        disabled={pricePending}
+                        value={jobData.job_fee}
+                        onChange={(e) => {
+                          const fee = e.target.value
+                          const partsTotal = repairParts.reduce((s, p) => s + p.unit_price * p.qty, 0)
+                          const total = (parseFloat(fee) || 0) + partsTotal
+                          setJobData((p) => ({ ...p, job_fee: fee, estimated_cost: total.toFixed(2) }))
+                        }}
+                        placeholder="0.00"
+                        className={`${inp} pl-6 ${pricePending ? 'opacity-40 cursor-not-allowed' : ''}`}
+                      />
+                    </div>
+                  </div>
+                  {/* Total Charges = job fee + parts */}
                   <div>
                     <label className={lbl}>Total Charges {!pricePending && <span className="text-red-400">*</span>}</label>
                     <div className="relative">
@@ -2063,7 +2231,7 @@ export default function RepairsPage() {
 
               {/* Row D: Lock / Passcode / Pattern */}
               <div>
-                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-outline">
+                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
                   <Lock className="h-2.5 w-2.5" /> Device Lock
                 </p>
                 <div className="flex items-center gap-2 mb-2">
@@ -2115,7 +2283,7 @@ export default function RepairsPage() {
 
               {/* Row E: Customer Note | Staff Note */}
               <div>
-                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-outline">
+                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
                   <StickyNote className="h-2.5 w-2.5" /> Notes
                 </p>
                 <div className="grid grid-cols-2 gap-2">
@@ -2232,12 +2400,21 @@ export default function RepairsPage() {
                   className={`${inp} ${editErrors.deposit_paid ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20' : ''}`}
                 />
                 {editErrors.deposit_paid && <p className="mt-1 text-xs text-red-500">{editErrors.deposit_paid}</p>}
+                {remaining > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setEditData((p) => ({ ...p, deposit_paid: String(total) }))}
+                    className="mt-1.5 w-full rounded-md border border-green-300 bg-green-50 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100 transition-colors"
+                  >
+                    Mark as Fully Paid (£{total.toFixed(2)})
+                  </button>
+                )}
               </div>
 
               {/* Remaining Charges */}
               <div>
                 <label className={lbl}>Remaining Charges <span className="text-red-500">*</span></label>
-                <input readOnly value={remaining.toFixed(2)} placeholder="Enter Remaining Charges" className="h-10 w-full rounded-lg border border-gray-200 bg-gray-100 px-3 text-sm text-gray-500 cursor-not-allowed" />
+                <input readOnly value={remaining.toFixed(2)} placeholder="Enter Remaining Charges" className={`h-10 w-full rounded-lg border px-3 text-sm cursor-not-allowed ${remaining > 0 ? 'border-orange-200 bg-orange-50 text-orange-600' : 'border-green-200 bg-green-50 text-green-700 font-semibold'}`} />
               </div>
 
               {/* Payment Method */}

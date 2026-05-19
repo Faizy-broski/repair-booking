@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+@keyframes progress-bar {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
 body {
   font-family: var(--font-poppins), 'Poppins', sans-serif;
 }

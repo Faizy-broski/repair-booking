@@ -38,4 +38,4 @@ export const POST = withMiddleware(async (req, ctx) => {
   } catch (err) {
     return serverError('Failed to create fault', err)
   }
-}, { requiredRole: 'branch_manager' })
+}, { requiredRole: 'cashier' })

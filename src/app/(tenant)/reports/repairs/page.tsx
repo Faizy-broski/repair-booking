@@ -79,19 +79,26 @@ export default function RepairsReportPage() {
       const res = await fetch(`/api/reports?${params}`)
       const json = await res.json()
 
+      // Same terminal detection as stats card & dashboard
+      const TERMINAL_EXACT    = new Set(['repaired', 'collected', 'unrepairable'])
+      const TERMINAL_KEYWORDS = ['complet', 'done', 'fixed', 'pick', 'closed', 'resolv', 'finish', 'collect', 'handover']
+      const isTerminal = (k: string) => TERMINAL_EXACT.has(k) || TERMINAL_KEYWORDS.some(kw => k.includes(kw))
+
       // Normalize + group: "In Progress" and "in_progress" → same bucket
       const grouped: Record<string, { name: string; count: number; value: number }> = {}
       for (const r of json.data ?? []) {
         const key = normalizeKey(r.status ?? 'unknown')
-        // Keep the first seen display name (prefer title-case custom statuses)
         if (!grouped[key]) grouped[key] = { name: toLabel(r.status ?? key), count: 0, value: 0 }
         grouped[key].count += 1
-        // Report shows repair VALUE not collected revenue:
-        //   refunded  → refund_amount (how much was refunded out)
-        //   all else  → actual_cost ?? estimated_cost (what the repair is/was worth)
-        const cost   = r.actual_cost ?? r.estimated_cost ?? 0
-        const refund = r.refund_amount ?? 0
-        grouped[key].value += key === 'refunded' ? refund : cost
+        // Identical revenue logic to stats card — report totals now match for same date range
+        const deposit  = r.deposit_paid  ?? 0
+        const fullCost = r.actual_cost   ?? r.estimated_cost ?? 0
+        const refund   = r.refund_amount ?? 0
+        let revenue = 0
+        if (isTerminal(key))         revenue = fullCost
+        else if (key === 'refunded') revenue = Math.max(0, deposit - refund)
+        else                         revenue = deposit
+        grouped[key].value += revenue
       }
 
       return Object.entries(grouped).map(([key, { name, count, value }]) => ({
@@ -150,7 +157,7 @@ export default function RepairsReportPage() {
           <p className="mt-1 text-2xl font-bold text-on-surface sm:text-3xl">{totalRepairs}</p>
         </div>
         <div className="rounded-xl border border-outline-variant bg-surface p-4">
-          <p className="text-sm text-on-surface-variant">Total Repair Value</p>
+          <p className="text-sm text-on-surface-variant">Total Revenue</p>
           <p className="mt-1 text-2xl font-bold text-green-600 sm:text-3xl">{formatCurrency(totalValue)}</p>
         </div>
       </div>

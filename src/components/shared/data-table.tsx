@@ -105,8 +105,8 @@ export function DataTable<T>({
               rows.map((row, i) => (
                 <tr
                   key={row.id}
-                  className={`border-t border-outline-variant/30 transition-colors hover:bg-primary-container/20 ${
-                    i % 2 === 0 ? 'bg-white' : 'bg-surface-container-low/60'
+                  className={`border-t border-gray-100 transition-colors hover:bg-teal-50 ${
+                    i % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                   }`}
                 >
                   {row.getVisibleCells().map((cell) => (

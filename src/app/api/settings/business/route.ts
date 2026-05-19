@@ -12,6 +12,7 @@ const schema = z.object({
   country: z.string().optional(),
   currency: z.string().optional(),
   timezone: z.string().optional(),
+  reply_to_email: z.string().email().optional().or(z.literal('')).nullable(),
 })
 
 async function getHandler(_request: NextRequest, ctx: RequestContext) {
@@ -19,7 +20,7 @@ async function getHandler(_request: NextRequest, ctx: RequestContext) {
   try {
     const { data: business, error: err } = await supabase
       .from('businesses')
-      .select('id, name, email, phone, country, currency, timezone')
+      .select('id, name, email, phone, country, currency, timezone, reply_to_email')
       .eq('id', ctx.auth.businessId)
       .single()
     if (err) throw err

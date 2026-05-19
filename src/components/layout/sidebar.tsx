@@ -107,8 +107,8 @@ function buildGroups(items: NavItem[]): NavGroup[] {
 export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; onClose?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { profile, activeBranch, clear, subscriptionStatus } = useAuthStore()
-  const { isModuleEnabled, configs, isLoading, invalidate: invalidateConfigs } = useModuleConfigStore()
+  const { profile, activeBranch, clear, subscriptionStatus, isLoading: authLoading } = useAuthStore()
+  const { isModuleEnabled, configs, isLoading: configsLoading, invalidate: invalidateConfigs } = useModuleConfigStore()
   const hasSubscriptionAccess = subscriptionStatus === null || subscriptionStatus.hasAccess
 
   // Set of parent hrefs whose children are visible
@@ -135,15 +135,17 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
     })
   }
 
-  // configsReady = we have data to show (may be slightly stale — that's fine,
-  // the store revalidates in background). Only false on the very first ever load
-  // when localStorage has no data at all (isLoading=true AND configs=null).
+  // navReady = profile is loaded (real role known) AND module configs are available.
+  // authLoading stays true from mount until setLoading(false) fires at the end of
+  // loadSession(), which is after setProfile() — so we never render with a stale
+  // null/cashier-defaulted profile that causes items to pop in.
   const configsReady = configs !== null
+  const navReady = !authLoading && configsReady
 
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (!hasAccess(profile?.role ?? 'cashier', item.requiredRole)) return false
     if (item.module == null) return true
-    if (!configsReady) return false
+    if (!navReady) return false
     return isModuleEnabled(item.module)
   })
 
@@ -151,7 +153,7 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
 
   // Auto-expand any group that contains the currently active path
   useEffect(() => {
-    if (!configsReady) return
+    if (!navReady) return
     setExpanded((prev) => {
       const next = new Set(prev)
       for (const { parent, children } of groups) {
@@ -163,7 +165,7 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
       }
       return next
     })
-  }, [pathname, configsReady]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pathname, navReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <aside
@@ -188,12 +190,10 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-2 px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {/* Loading skeletons — only shown on the very first load when there is
-            no cached data in localStorage. On subsequent page loads the persisted
-            store supplies configs instantly and this block never renders. */}
-        {!configsReady && isLoading && (
+        {/* Skeletons while profile or module configs are still loading */}
+        {!navReady && (
           <div className="space-y-1 px-1">
-            {Array.from({ length: 6 }).map((_, i) => (
+            {Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
                 className={cn(
@@ -205,7 +205,7 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
           </div>
         )}
 
-        {configsReady && groups.map(({ parent, children }) => {
+        {navReady && groups.map(({ parent, children }) => {
           const hasChildren    = children.length > 0
           const isOpen         = expanded.has(parent.href)
           const isDisabled     = !hasSubscriptionAccess && parent.href !== '/account'
