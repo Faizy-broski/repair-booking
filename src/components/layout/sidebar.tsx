@@ -14,7 +14,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import { useModuleConfigStore } from '@/store/module-config.store'
-import { createClient } from '@/lib/supabase/client'
+import { performSignOut } from '@/lib/sign-out'
 import { useRouter } from 'next/navigation'
 import { BranchSwitcher } from './branch-switcher'
 import type { Role } from '@/backend/config/constants'
@@ -107,7 +107,7 @@ function buildGroups(items: NavItem[]): NavGroup[] {
 export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; onClose?: () => void }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { profile, activeBranch, clear, subscriptionStatus, isLoading: authLoading } = useAuthStore()
+  const { profile, activeBranch, subscriptionStatus, isLoading: authLoading } = useAuthStore()
   const { isModuleEnabled, configs, isLoading: configsLoading, invalidate: invalidateConfigs } = useModuleConfigStore()
   const hasSubscriptionAccess = subscriptionStatus === null || subscriptionStatus.hasAccess
 
@@ -115,14 +115,7 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   async function handleLogout() {
-    const supabase = createClient()
-    await supabase.auth.signOut({ scope: 'local' })
-    clear()
-    // Do NOT invalidateConfigs() here — clearing the persisted config cache causes
-    // sidebar skeletons on the very next login. Instead, keep the stale cache in
-    // localStorage; the next session's fetchConfigs() will detect the TTL has
-    // expired (or branchId changed) and silently refresh without showing skeletons.
-    window.location.replace('/login')
+    await performSignOut()
   }
 
   function toggleSection(href: string, e: React.MouseEvent) {

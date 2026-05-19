@@ -4,14 +4,12 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  // Allow images from Supabase Storage
+  // Allow images from any HTTPS host.
+  // Product/brand/model images are user-supplied URLs — we can't enumerate all origins.
+  // Supabase storage images still go through Next.js optimization (WebP, resizing, lazy).
   images: {
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '*.supabase.co',
-        pathname: '/storage/v1/object/public/**',
-      },
+      { protocol: 'https', hostname: '**' },
     ],
   },
 

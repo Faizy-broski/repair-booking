@@ -1,9 +1,7 @@
 'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
-import { useAuthStore } from '@/store/auth.store'
+import { performSignOut } from '@/lib/sign-out'
 
 interface SignOutButtonProps {
   /** Where to redirect after sign-out. Defaults to '/login'. */
@@ -19,19 +17,11 @@ export function SignOutButton({
   iconClassName = 'h-4 w-4',
   label = 'Sign Out',
 }: SignOutButtonProps) {
-  const router = useRouter()
-  const clear = useAuthStore((s) => s.clear)
   const [loading, setLoading] = useState(false)
 
   async function handleSignOut() {
     setLoading(true)
-    const supabase = createClient()
-    // Signs out from Supabase AND clears the SSR cookie via the browser client
-    await supabase.auth.signOut({ scope: 'local' })
-    // Clear Zustand persisted state so stale profile doesn't flash on next login
-    clear()
-    router.push(redirectTo)
-    router.refresh()
+    await performSignOut(redirectTo)
   }
 
   return (

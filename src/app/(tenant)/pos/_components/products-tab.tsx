@@ -1,10 +1,11 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, memo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   Search, Plus, X, Package, ShoppingBag, Tag, Phone,
   Layers, ChevronRight, Check, ShieldCheck, ExternalLink, ArrowLeft,
 } from 'lucide-react'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
@@ -17,6 +18,71 @@ import type {
   ProductWithStock, ProductVariant,
   CatLevel, PartLevel, ProductsView,
 } from '../_types'
+
+// ── Extracted & memoized so it isn't recreated on every ProductsTab render ──
+const ProductCard = memo(function ProductCard({
+  product,
+  size = 'md',
+  onAdd,
+  onVariantSelect,
+}: {
+  product: ProductWithStock
+  size?: 'sm' | 'md'
+  onAdd: (product: ProductWithStock) => void
+  onVariantSelect: (product: ProductWithStock) => void
+}) {
+  const hasVariants = product.has_variants || (product.variant_count ?? 0) > 0
+  const outOfStock = !product.is_service && !hasVariants && product.on_hand !== undefined && (product.on_hand ?? 0) <= 0
+  return (
+    <button
+      disabled={outOfStock}
+      onClick={() => hasVariants ? onVariantSelect(product) : onAdd(product)}
+      className={`relative flex w-full flex-col overflow-hidden rounded-xl border bg-white p-3 text-left transition-all ${
+        outOfStock
+          ? 'border-gray-100 opacity-50 cursor-not-allowed'
+          : 'border-gray-200 hover:border-brand-teal hover:shadow-sm cursor-pointer'
+      }`}
+    >
+      {outOfStock && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/60">
+          <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-600">Out of Stock</span>
+        </div>
+      )}
+      {product.image_url ? (
+        <div className="relative mb-3 w-full overflow-hidden rounded-xl bg-gray-50 aspect-[4/3]">
+          <Image
+            src={product.image_url}
+            alt={product.name}
+            fill
+            sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, 25vw"
+            className="object-cover"
+          />
+        </div>
+      ) : (
+        <div className="mb-3 flex w-full items-center justify-center rounded-xl bg-gray-100 aspect-[4/3]">
+          {(product as any).item_type === 'part' ? <Package className="h-8 w-8 text-gray-300" /> : <ShoppingBag className="h-8 w-8 text-gray-300" />}
+        </div>
+      )}
+
+      <div className="flex flex-1 flex-col justify-between gap-2">
+        <div>
+          <span className="block text-sm font-semibold text-gray-900 line-clamp-2 leading-tight">{product.name}</span>
+          {product.sku && <span className="mt-1 block text-xs text-gray-400 font-mono truncate">{product.sku}</span>}
+        </div>
+
+        <div className="space-y-1">
+          <span className="text-sm font-bold text-brand-teal">{formatCurrency(product.selling_price)}</span>
+          {product.on_hand !== undefined && !product.is_service && (
+            <span className={`block text-xs font-medium ${(product.on_hand ?? 0) > 0 ? 'text-gray-400' : 'text-red-500'}`}>
+              {(product.on_hand ?? 0) > 0 ? `${product.on_hand} on hand` : 'Out of stock'}
+            </span>
+          )}
+          {hasVariants && <span className="block text-xs text-indigo-500 font-medium">Select variant</span>}
+        </div>
+      </div>
+    </button>
+  )
+})
 
 export function ProductsTab() {
   const router = useRouter()
@@ -60,7 +126,7 @@ export function ProductsTab() {
       return j.data ?? []
     },
     enabled: !!activeBranch,
-    staleTime: 10 * 60_000, // categories rarely change
+    staleTime: 30 * 60_000, // categories change very rarely
   })
 
   // All Products — fires once per unique [branchId, search, type, cat]
@@ -76,7 +142,7 @@ export function ProductsTab() {
       return j.data ?? []
     },
     enabled: !!activeBranch && productsView === 'all_products',
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
     placeholderData: (prev) => prev, // keep previous data while fetching
   })
 
@@ -305,55 +371,6 @@ export function ProductsTab() {
     setWarrantyClaimSubmitting(false); runWarrantySearch()
   }
 
-  // ── Product card renderer ──────────────────────────────────────────────────
-  function ProductCard({ product, size = 'md' }: { product: ProductWithStock; size?: 'sm' | 'md' }) {
-    const hasVariants = product.has_variants || (product.variant_count ?? 0) > 0
-    const outOfStock = !product.is_service && !hasVariants && product.on_hand !== undefined && (product.on_hand ?? 0) <= 0
-    return (
-      <button
-        disabled={outOfStock}
-        onClick={() => hasVariants ? openVariantSelect(product) : pos.addToCart(product as unknown as Product)}
-        className={`relative flex w-full flex-col overflow-hidden rounded-xl border bg-white p-3 text-left transition-all ${
-          outOfStock
-            ? 'border-gray-100 opacity-50 cursor-not-allowed'
-            : 'border-gray-200 hover:border-brand-teal hover:shadow-sm cursor-pointer'
-        }`}
-      >
-        {outOfStock && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/60">
-            <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-600">Out of Stock</span>
-          </div>
-        )}
-        {product.image_url ? (
-          <div className="mb-3 w-full overflow-hidden rounded-xl bg-gray-50 aspect-[4/3]">
-            <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
-          </div>
-        ) : (
-          <div className="mb-3 flex w-full items-center justify-center rounded-xl bg-gray-100 aspect-[4/3]">
-            {(product as any).item_type === 'part' ? <Package className="h-8 w-8 text-gray-300" /> : <ShoppingBag className="h-8 w-8 text-gray-300" />}
-          </div>
-        )}
-
-        <div className="flex flex-1 flex-col justify-between gap-2">
-          <div>
-            <span className="block text-sm font-semibold text-gray-900 line-clamp-2 leading-tight">{product.name}</span>
-            {product.sku && <span className="mt-1 block text-xs text-gray-400 font-mono truncate">{product.sku}</span>}
-          </div>
-
-          <div className="space-y-1">
-            <span className="text-sm font-bold text-brand-teal">{formatCurrency(product.selling_price)}</span>
-            {product.on_hand !== undefined && !product.is_service && (
-              <span className={`block text-xs font-medium ${(product.on_hand ?? 0) > 0 ? 'text-gray-400' : 'text-red-500'}`}>
-                {(product.on_hand ?? 0) > 0 ? `${product.on_hand} on hand` : 'Out of stock'}
-              </span>
-            )}
-            {hasVariants && <span className="block text-xs text-indigo-500 font-medium">Select variant</span>}
-          </div>
-        </div>
-      </button>
-    )
-  }
-
   return (
     <div className="flex h-full flex-col">
       {/* Toggle bar */}
@@ -437,7 +454,7 @@ export function ProductsTab() {
               </div>
             ) : allProductsList.length > 0 ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                {allProductsList.map(product => <ProductCard key={product.id} product={product} />)}
+                {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={openVariantSelect} />)}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -474,7 +491,9 @@ export function ProductsTab() {
                   {catItems.map(item => (
                     <button key={item.id} onClick={() => selectCatItem(item)} className="flex flex-col w-full overflow-hidden rounded-xl border border-gray-200 bg-white hover:border-brand-teal hover:shadow-sm transition-all text-center min-h-[140px]">
                       {item.image_url ? (
-                        <img src={item.image_url} alt={item.name} className="w-full h-24 object-contain border-b border-gray-100 bg-white" />
+                        <div className="relative w-full h-24 border-b border-gray-100 bg-white">
+                          <Image src={item.image_url} alt={item.name} fill sizes="(max-width: 640px) 50vw, 33vw" className="object-contain" />
+                        </div>
                       ) : (
                         <div className="flex w-full h-24 items-center justify-center bg-gray-50 border-b border-gray-100">
                           {catLevel === 'device_types' && <Layers className="h-8 w-8 text-gray-400" />}
@@ -502,7 +521,7 @@ export function ProductsTab() {
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}</div>
                 ) : categoryProducts.length > 0 ? (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                    {categoryProducts.map(product => <ProductCard key={product.id} product={product} size="sm" />)}
+                    {categoryProducts.map(product => <ProductCard key={product.id} product={product} size="sm" onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={openVariantSelect} />)}
                   </div>
                 ) : (
                   <p className="py-4 text-center text-sm text-gray-400">No products for this model</p>
@@ -548,8 +567,8 @@ export function ProductsTab() {
                           </div>
                         )}
                         {product.image_url ? (
-                          <div className="mb-2 w-full h-28 flex items-center justify-center rounded-lg bg-gray-50">
-                            <img src={product.image_url} alt={product.name} className="h-full w-full object-contain rounded-lg" />
+                          <div className="relative mb-2 w-full h-28 rounded-lg bg-gray-50 overflow-hidden">
+                            <Image src={product.image_url} alt={product.name} fill sizes="(max-width: 640px) 50vw, 33vw" className="object-contain" />
                           </div>
                         ) : (
                           <div className="mb-2 flex h-28 w-full items-center justify-center rounded-lg bg-gray-100"><Package className="h-8 w-8 text-gray-300" /></div>
@@ -573,7 +592,9 @@ export function ProductsTab() {
                 {partItems.map(item => (
                   <button key={item.id} onClick={() => selectPartItem(item)} className="flex flex-col w-full overflow-hidden rounded-xl border border-gray-200 bg-white hover:border-brand-teal hover:shadow-sm transition-all cursor-pointer text-center min-h-[140px]">
                     {item.image_url ? (
-                      <img src={item.image_url} alt={item.name} className="w-full h-24 object-contain border-b border-gray-100 bg-white" />
+                      <div className="relative w-full h-24 border-b border-gray-100 bg-white">
+                        <Image src={item.image_url} alt={item.name} fill sizes="(max-width: 640px) 50vw, 33vw" className="object-contain" />
+                      </div>
                     ) : (
                       <div className="flex w-full h-24 items-center justify-center bg-gray-50 border-b border-gray-100">
                         {partLevel === 'device_types' && <Layers className="h-8 w-8 text-gray-400" />}
@@ -709,7 +730,7 @@ export function ProductsTab() {
                         <tr key={p.id} className="hover:bg-gray-50">
                           <td className="py-2">
                             <div className="flex items-center gap-2">
-                              {p.image_url ? <img src={p.image_url} alt={p.name} className="h-9 w-9 rounded object-contain border border-gray-100" /> : <div className="flex h-9 w-9 items-center justify-center rounded bg-gray-100"><ShoppingBag className="h-4 w-4 text-gray-300" /></div>}
+                              {p.image_url ? <div className="relative h-9 w-9 shrink-0 rounded border border-gray-100 overflow-hidden"><Image src={p.image_url} alt={p.name} fill sizes="36px" className="object-contain" /></div> : <div className="flex h-9 w-9 items-center justify-center rounded bg-gray-100"><ShoppingBag className="h-4 w-4 text-gray-300" /></div>}
                               <div className="min-w-0">
                                 <p className="line-clamp-1 text-xs font-medium text-gray-900">{p.name}</p>
                                 {p.is_serialized && <span className="inline-block rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">Serialized</span>}

@@ -8,8 +8,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { formatDateTime } from '@/lib/utils'
-import { createClient } from '@/lib/supabase/client'
-import { queryClient } from '@/lib/query-client'
+import { performSignOut } from '@/lib/sign-out'
 import type { SystemBroadcast } from '@/backend/services/broadcast.service'
 
 interface TopbarProps {
@@ -52,10 +51,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   async function handleSignOut() {
     setSigningOut(true)
     setUserOpen(false)
-    const supabase = createClient()
-    await supabase.auth.signOut({ scope: 'local' })
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL
-    window.location.href = appUrl ? `${appUrl}/login` : '/login'
+    await performSignOut()
   }
 
   // Close dropdowns on outside click
@@ -79,8 +75,8 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   return (
     <header className="relative flex h-14 shrink-0 items-center gap-3 border-b border-outline-variant bg-surface-container-lowest px-4 shadow-sm">
       {signingOut && (
-        <div className="absolute inset-x-0 top-0 h-0.5 overflow-hidden">
-          <div className="h-full w-full animate-[progress-bar_1.4s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-primary to-transparent" />
+        <div className="absolute inset-x-0 top-0 h-1.5 overflow-hidden bg-amber-100">
+          <div className="h-full w-full animate-[progress-bar_1.4s_ease-in-out_infinite] bg-gradient-to-r from-amber-300 via-amber-500 to-amber-300" />
         </div>
       )}
       {/* Mobile menu toggle */}
