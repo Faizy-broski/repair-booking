@@ -5,7 +5,7 @@ import {
   ArrowLeft, Building2, User, CreditCard, GitBranch, Package,
   Wrench, Users, DollarSign, ShieldAlert, ShieldCheck, KeyRound,
   Eye, EyeOff, Check, Globe, Phone, Mail, MapPin, Calendar, ExternalLink,
-  CheckCircle2, XCircle, Loader2,
+  CheckCircle2, XCircle, Loader2, AlertTriangle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -280,6 +280,15 @@ export default function BusinessDetailPage({ params }: { params: Promise<{ id: s
             )}
           </Button>
         </div>
+      </div>
+
+      {/* ── Live data warning ──────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+        <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+        <p className="text-sm font-medium text-amber-800">
+          You are viewing <span className="font-bold">{business.name}</span> as superadmin —{' '}
+          all actions (suspend, password reset, impersonate) affect live production data immediately.
+        </p>
       </div>
 
       {/* ── Stats row ──────────────────────────────────────────────────────── */}

@@ -73,10 +73,6 @@ export function QuickCreateModal({ open, onClose, barcode, branchId, onCreated, 
         body: JSON.stringify(body),
       })
 
-      if (res.status === 409) {
-        toast.error('A product with this barcode already exists')
-        return
-      }
       if (!res.ok) {
         const json = await res.json().catch(() => ({}))
         toast.error(json?.error ?? 'Failed to create product')
@@ -135,11 +131,12 @@ export function QuickCreateModal({ open, onClose, barcode, branchId, onCreated, 
           <label className="mb-1.5 block text-xs font-medium text-gray-500">Item Type</label>
           <div className="flex overflow-hidden rounded-lg border border-gray-200">
             {(['product', 'part'] as const).map((type) => (
-              <label key={type} className="flex flex-1 cursor-pointer items-center justify-center">
+              <label
+                key={type}
+                className="flex flex-1 cursor-pointer items-center justify-center py-2 text-sm font-medium transition-colors has-[:checked]:bg-brand-teal has-[:checked]:text-white text-gray-600 hover:bg-gray-50"
+              >
                 <input type="radio" value={type} {...register('item_type')} className="sr-only" />
-                <span className="w-full py-2 text-center text-sm font-medium has-[:checked]:bg-brand-teal has-[:checked]:text-white text-gray-600 hover:bg-gray-50 transition-colors">
-                  {type === 'product' ? 'Product' : 'Part'}
-                </span>
+                {type === 'product' ? 'Product' : 'Part'}
               </label>
             ))}
           </div>

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, memo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Search, Plus, X, Package, ShoppingBag, Tag, Phone,
   Layers, ChevronRight, Check, ShieldCheck, ExternalLink, ArrowLeft,
@@ -92,6 +92,7 @@ export function ProductsTab() {
   const router = useRouter()
   const { activeBranch } = useAuthStore()
   const pos = usePosStore()
+  const queryClient = useQueryClient()
   const prevBranchIdRef = useRef<string | null>(null)
 
   // ── Clear stale product lists immediately on branch switch ─────────────────
@@ -918,6 +919,9 @@ export function ProductsTab() {
         onClose={() => setScannerOpen(false)}
         mode="pos"
         branchId={activeBranch?.id ?? null}
+        onProductCreated={() => {
+          queryClient.invalidateQueries({ queryKey: ['pos-products'] })
+        }}
         onAddToCart={(scanned: ScannedProduct) => {
           const product = scanned as unknown as ProductWithStock
           if (product.has_variants || (product as any).variant_count > 0) {
