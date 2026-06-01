@@ -257,29 +257,80 @@ export const BusinessService = {
     return { email: business.email, tempPassword, fixed: true }
   },
 
-  /** Sends a password-reset link for the business owner via Supabase Auth admin API.
-   *  Returns the action link so the superadmin can copy it if email is not configured. */
-  async resetOwnerPassword(businessId: string) {
+  async createImpersonationSession(businessId: string, superadminId: string, ip: string | null) {
+    const { data: business } = await adminSupabase
+      .from('businesses')
+      .select('subdomain')
+      .eq('id', businessId)
+      .single()
+    if (!business) throw new Error('Business not found')
+
     const { data: owner } = await adminSupabase
       .from('profiles')
-      .select('id, email')
+      .select('id, role, branch_id')
       .eq('business_id', businessId)
       .eq('role', 'business_owner')
       .maybeSingle()
+    if (!owner) throw new Error('Business owner not found')
 
-    if (!owner?.email) throw new Error('Owner email not found')
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000) // 5 minutes
 
-    const { data, error } = await adminSupabase.auth.admin.generateLink({
-      type: 'recovery',
-      email: owner.email,
-    })
+    const { data: session, error } = await adminSupabase
+      .from('impersonation_sessions' as any)
+      .insert({
+        business_id: businessId,
+        target_user_id: owner.id,
+        created_by: superadminId,
+        expires_at: expiresAt.toISOString(),
+        ip_address: ip,
+      })
+      .select('id')
+      .single()
     if (error) throw error
 
-    return {
-      email: owner.email,
-      // Return the link so the admin can copy it or send it manually
-      actionLink: (data as any)?.properties?.action_link ?? null,
+    return { token: (session as any).id as string, subdomain: business.subdomain, targetUserId: owner.id }
+  },
+
+  async listUsers(businessId: string) {
+    const { data, error } = await adminSupabase
+      .from('profiles')
+      .select('id, full_name, email, role, is_active, branches(id, name)')
+      .eq('business_id', businessId)
+      .order('role', { ascending: true })
+    if (error) throw error
+    return data ?? []
+  },
+
+  async resetUserPassword(businessId: string, newPassword: string, userId?: string) {
+    let targetId: string
+    let targetEmail: string | null
+
+    if (userId) {
+      const { data: profile } = await adminSupabase
+        .from('profiles')
+        .select('id, email')
+        .eq('id', userId)
+        .eq('business_id', businessId)
+        .maybeSingle()
+      if (!profile?.id) throw new Error('User not found in this business')
+      targetId = profile.id
+      targetEmail = profile.email
+    } else {
+      const { data: owner } = await adminSupabase
+        .from('profiles')
+        .select('id, email')
+        .eq('business_id', businessId)
+        .eq('role', 'business_owner')
+        .maybeSingle()
+      if (!owner?.id) throw new Error('Owner not found')
+      targetId = owner.id
+      targetEmail = owner.email
     }
+
+    const { error } = await adminSupabase.auth.admin.updateUserById(targetId, { password: newPassword })
+    if (error) throw error
+
+    return { email: targetEmail }
   },
 
   async getStats() {

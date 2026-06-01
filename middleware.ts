@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { verifyImpersonationJwt } from '@/lib/impersonation'
 
 const PUBLIC_PATHS = ['/api/auth/', '/api/webhooks/', '/api/public/', '/book/', '/_next/', '/favicon.ico', '/images/', '/api/google-reviews/oauth/callback']
 const SUPERADMIN_SUBDOMAIN = 'admin'
@@ -57,9 +58,18 @@ export async function middleware(request: NextRequest) {
   // Respect the original host passed by reverse proxies in production
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || ''
 
+  // ── Strip headers that must only be set by this middleware ───────────────
+  // Prevents clients from forging impersonation or tenant context headers.
+  // We build a mutable copy here and use it for all downstream NextResponse.next() calls.
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.delete('x-imp-user-id')
+  requestHeaders.delete('x-is-impersonating')
+  requestHeaders.delete('x-business-id')
+  requestHeaders.delete('x-subdomain')
+
   // ── Skip static / public API paths ──────────────────────────────────────
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
-    return NextResponse.next()
+    return NextResponse.next({ request: { headers: requestHeaders } })
   }
 
   // ── Build Supabase client ────────────────────────────────────────────────
@@ -243,6 +253,25 @@ export async function middleware(request: NextRequest) {
       return forwardAuthCookies(supabaseResponse, NextResponse.next({ request }))
     }
 
+    // ── Impersonation session check ──────────────────────────────────────────
+    // Checked BEFORE normal auth so superadmin can access tenant dashboard
+    // without their shared-domain session being overwritten.
+    const impCookie = request.cookies.get('sb-imp-session')?.value
+    if (impCookie) {
+      const impPayload = await verifyImpersonationJwt(impCookie)
+      if (impPayload && impPayload.subdomain === subdomain && impPayload.businessId === business.id) {
+        const impHeaders = new Headers(requestHeaders)
+        impHeaders.set('x-business-id', business.id)
+        impHeaders.set('x-subdomain', subdomain)
+        impHeaders.set('x-imp-user-id', impPayload.targetUserId)
+        impHeaders.set('x-is-impersonating', 'true')
+        return noStore(
+          forwardAuthCookies(supabaseResponse, NextResponse.next({ request: { headers: impHeaders } }))
+        )
+      }
+      // Invalid or expired JWT — fall through to normal auth
+    }
+
     // All other routes require authentication
     if (!user) return redirectToLogin('/login')
 
@@ -325,11 +354,11 @@ export async function middleware(request: NextRequest) {
       )
     }
 
-    // Inject tenant context into request headers.
+    // Inject tenant context into request headers (build on the already-stripped headers).
     // Read by tenantMiddleware via request.headers.get('x-business-id').
-    const requestHeaders = new Headers(request.headers)
-    requestHeaders.set('x-business-id', business.id)
-    requestHeaders.set('x-subdomain', subdomain)
+    const tenantHeaders = new Headers(requestHeaders)
+    tenantHeaders.set('x-business-id', business.id)
+    tenantHeaders.set('x-subdomain', subdomain)
 
     // ── NO REWRITE — pages are now at (tenant)/dashboard etc. ──────────────
     // The (tenant) route group serves /dashboard, /repairs, etc. directly.
@@ -339,7 +368,7 @@ export async function middleware(request: NextRequest) {
     return noStore(
       forwardAuthCookies(
         supabaseResponse,
-        NextResponse.next({ request: { headers: requestHeaders } })
+        NextResponse.next({ request: { headers: tenantHeaders } })
       )
     )
   }

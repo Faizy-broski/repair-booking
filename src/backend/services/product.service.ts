@@ -164,9 +164,11 @@ export const ProductService = {
 
     if (hardDeleteError) {
       if (hardDeleteError.code === '23503') {
+        // Null out barcode and SKU so their unique constraints don't block
+        // future products with the same values.
         const { error: softDeleteError } = await adminSupabase
           .from('products')
-          .update({ is_active: false })
+          .update({ is_active: false, barcode: null, sku: null })
           .eq('id', id)
           .eq('business_id', businessId)
         if (softDeleteError) throw softDeleteError
@@ -348,14 +350,14 @@ export const ProductService = {
     const result = { skuExists: false, barcodeExists: false }
 
     if (sku) {
-      let q = adminSupabase.from('products').select('id', { count: 'exact', head: true }).eq('business_id', businessId).eq('sku', sku)
+      let q = adminSupabase.from('products').select('id', { count: 'exact', head: true }).eq('business_id', businessId).eq('sku', sku).eq('is_active', true)
       if (excludeId) q = q.neq('id', excludeId)
       const { count } = await q
       result.skuExists = (count ?? 0) > 0
     }
 
     if (barcode) {
-      let q = adminSupabase.from('products').select('id', { count: 'exact', head: true }).eq('business_id', businessId).eq('barcode', barcode)
+      let q = adminSupabase.from('products').select('id', { count: 'exact', head: true }).eq('business_id', businessId).eq('barcode', barcode).eq('is_active', true)
       if (excludeId) q = q.neq('id', excludeId)
       const { count } = await q
       result.barcodeExists = (count ?? 0) > 0

@@ -13,11 +13,15 @@ import { useAuthStore } from '@/store/auth.store'
 import { usePosStore } from '@/store/pos.store'
 import { formatCurrency } from '@/lib/utils'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import type { Product } from '@/types/database'
 import type {
   ProductWithStock, ProductVariant,
   CatLevel, PartLevel, ProductsView,
 } from '../_types'
+import { ScanButton } from '@/components/scanner/scan-button'
+import { ScannerModal } from '@/components/scanner/scanner-modal'
+import type { ProductWithStock as ScannedProduct } from '@/hooks/use-barcode-lookup'
 
 // ── Extracted & memoized so it isn't recreated on every ProductsTab render ──
 const ProductCard = memo(function ProductCard({
@@ -165,6 +169,9 @@ export function ProductsTab() {
   // ── Custom item ────────────────────────────────────────────────────────────
   const [miscName, setMiscName]   = useState('')
   const [miscPrice, setMiscPrice] = useState('')
+
+  // ── Scanner ────────────────────────────────────────────────────────────────
+  const [scannerOpen, setScannerOpen] = useState(false)
 
   // ── Variant modal ──────────────────────────────────────────────────────────
   const [variantProduct, setVariantProduct]       = useState<ProductWithStock | null>(null)
@@ -405,6 +412,7 @@ export function ProductsTab() {
           <span className="hidden rounded bg-gray-100 px-1 text-[10px] font-mono text-gray-500 sm:inline">Ctrl S</span>
           <span className="hidden sm:inline">Advance Search</span>
         </button>
+        <ScanButton onClick={() => setScannerOpen(true)} className="text-xs py-1.5" />
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -904,6 +912,23 @@ export function ProductsTab() {
           </div>
         )}
       </Modal>
+
+      <ScannerModal
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        mode="pos"
+        branchId={activeBranch?.id ?? null}
+        onAddToCart={(scanned: ScannedProduct) => {
+          const product = scanned as unknown as ProductWithStock
+          if (product.has_variants || (product as any).variant_count > 0) {
+            setVariantProduct(product)
+          } else {
+            pos.addToCart(product as unknown as Product)
+            toast.success(`${product.name} added to cart`)
+          }
+          setScannerOpen(false)
+        }}
+      />
     </div>
   )
 }

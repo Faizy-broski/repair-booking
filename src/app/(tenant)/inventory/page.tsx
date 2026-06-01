@@ -12,6 +12,8 @@ import type { ColumnDef } from '@tanstack/react-table'
 import Link from 'next/link'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { ScanButton } from '@/components/scanner/scan-button'
+import { ScannerModal } from '@/components/scanner/scanner-modal'
 
 interface ProductRow {
   id: string
@@ -58,6 +60,7 @@ export default function InventoryPage() {
   // the layout refreshes the activeBranch object reference but the ID is the same.
   const branchId = activeBranch?.id ?? null
   const prevBranchIdRef = useRef<string | null>(null)
+  const [scannerOpen, setScannerOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -418,6 +421,7 @@ export default function InventoryPage() {
           <Button size="sm" className="flex-1 sm:flex-none" onClick={() => router.push('/inventory/new')}>
             <Plus className="h-4 w-4" /> Add Item
           </Button>
+          <ScanButton onClick={() => setScannerOpen(true)} label="Scan" />
           <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['inventory'] }); queryClient.invalidateQueries({ queryKey: ['inventory-stats'] }) }} title="Refresh data">
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -717,6 +721,17 @@ export default function InventoryPage() {
         </div>
       )}
 
+      <ScannerModal
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        mode="inventory"
+        branchId={branchId}
+        onProductCreated={() => {
+          queryClient.invalidateQueries({ queryKey: ['inventory'] })
+          queryClient.invalidateQueries({ queryKey: ['inventory-stats'] })
+          setScannerOpen(false)
+        }}
+      />
     </div>
   )
 }

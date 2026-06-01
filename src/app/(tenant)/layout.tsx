@@ -6,6 +6,7 @@ import { NotificationToasts } from '@/components/layout/notification-toasts'
 import { MessageBadge } from '@/components/layout/message-badge'
 import { BroadcastBanner } from '@/components/layout/broadcast-banner'
 import { TourGuide } from '@/components/shared/tour-guide'
+import { ImpersonationBanner } from '@/components/shared/impersonation-banner'
 import { useAuthStore } from '@/store/auth.store'
 import { useModuleConfigStore } from '@/store/module-config.store'
 import { useBroadcastsStore } from '@/store/broadcasts.store'
@@ -18,9 +19,16 @@ import type { SubscriptionStatus } from '@/store/auth.store'
 import type { SystemBroadcast } from '@/backend/services/broadcast.service'
 import Providers from '@/components/providers'
 
+function getImpersonationBusinessName(): string | null {
+  if (typeof document === 'undefined') return null
+  const match = document.cookie.match(/(?:^|;\s*)sb-imp-ui=([^;]*)/)
+  return match ? match[1] : null
+}
+
 export default function TenantLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+  const [impersonatingBusiness, setImpersonatingBusiness] = useState<string | null>(null)
 
   // Lock body scroll when mobile sidebar is open
   useEffect(() => {
@@ -66,6 +74,40 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
       // 1. Manually rehydrate the store using the subdomain-scoped key
       await useAuthStore.persist.rehydrate()
       setIsHydrated(true)
+
+      // ── Impersonation mode ────────────────────────────────────────────────
+      // If the sb-imp-ui cookie is present, the superadmin is viewing this
+      // business dashboard. Skip the real Supabase session check (which would
+      // fail since no owner session is in the shared sb-* cookie) and fetch
+      // the profile via API (all API routes use the server-side impersonation context).
+      const impBusiness = getImpersonationBusinessName()
+      if (impBusiness) {
+        setImpersonatingBusiness(impBusiness)
+        const res = await fetch('/api/account/profile').catch(() => null)
+        if (res?.ok) {
+          const json = await res.json()
+          const profile = json.data as Profile | null
+          if (profile) {
+            setProfile(profile)
+            if (profile.business_id) {
+              const branchRes = await fetch('/api/settings/branches').catch(() => null)
+              if (branchRes?.ok) {
+                const branchJson = await branchRes.json()
+                const branches = branchJson.data as Branch[] | null
+                if (branches?.length) {
+                  setBranches(branches)
+                  const main = branches.find((b) => b.is_main) ?? branches[0]
+                  setActiveBranch(main)
+                  fetchConfigs(main.id)
+                }
+              }
+            }
+          }
+        }
+        setSessionVerified(true)
+        setLoading(false)
+        return
+      }
 
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
@@ -230,6 +272,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
         )}
 
         <div className="flex flex-1 flex-col overflow-hidden">
+          {impersonatingBusiness && <ImpersonationBanner businessName={impersonatingBusiness} />}
           <Topbar onMenuClick={() => setSidebarOpen(true)} />
           <BroadcastBanner />
           <main className="flex-1 overflow-y-auto p-6">

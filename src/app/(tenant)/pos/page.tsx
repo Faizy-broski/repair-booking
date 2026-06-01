@@ -14,6 +14,10 @@ import { RepairsTab } from './_components/repairs-tab'
 import { ProductsTab } from './_components/products-tab'
 import { CloseRegisterModal } from './_components/modals/close-register-modal'
 import { CashMovementModal } from './_components/modals/cash-movement-modal'
+import { useHidScanner } from '@/hooks/use-hid-scanner'
+import { useBarcodeLookup } from '@/hooks/use-barcode-lookup'
+import { toast } from 'sonner'
+import type { Product } from '@/types/database'
 
 type PosTab = 'repairs' | 'products'
 
@@ -56,6 +60,35 @@ export default function PosPage() {
   const [cashMovementAmount, setCashMovementAmount] = useState('')
   const [cashMovementNotes, setCashMovementNotes] = useState('')
   const [cashMovementSaving, setCashMovementSaving] = useState(false)
+
+  // ── Global POS Scanner (Instant HID support) ──────────────────────────────────
+  const { lookup } = useBarcodeLookup(activeBranch?.id ?? null)
+  
+  useHidScanner({
+    // Only accept root level HID scans if the modal isn't open or we aren't inputting something specific
+    // Since we don't have a direct modal-open state here easily, HID will fire and add to cart when focused on body
+    onScan: async (code) => {
+      // Don't scan if user isn't focused on body (eg. inputting notes)
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return
+      
+      const res = await lookup(code)
+      if (res.status === 'found' && res.product) {
+        // If it's a variant, let the user know they need to select one via product tab
+        if (res.product.has_variants || (res.product.variant_count ?? 0) > 0) {
+          toast.info(`Scanned ${res.product.name}. Please select variant from products menu.`)
+          return
+        }
+        
+        pos.addToCart(res.product as unknown as Product)
+        toast.success(`Scanned: ${res.product.name}`)
+      } else if (res.status === 'not_found') {
+        toast.error(`Barcode not found: ${code}`)
+      } else if (res.status === 'error' && res.error?.includes('misread')) {
+        toast.warning(`Scanner misread — try again`)
+      }
+    },
+    enabled: true
+  })
 
   // ── Session fetch ─────────────────────────────────────────────────────────────
 

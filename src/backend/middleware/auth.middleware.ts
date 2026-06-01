@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { unauthorized } from '@/backend/utils/api-response'
 import { adminSupabase } from '@/backend/config/supabase'
+import { verifyImpersonationJwt } from '@/lib/impersonation'
 
 export interface AuthContext {
   userId: string
@@ -30,6 +31,35 @@ export function invalidateProfileCache(userId: string) {
 export async function authMiddleware(
   request: NextRequest
 ): Promise<{ context: AuthContext; error: null } | { context: null; error: ReturnType<typeof unauthorized> }> {
+  // ── Impersonation short-circuit ──────────────────────────────────────────
+  // Primary path: x-imp-user-id injected by middleware.ts after JWT verification.
+  // Fallback path: read sb-imp-session cookie directly (Node.js route handlers
+  // can read httpOnly cookies; this is resilient to any Edge→Node header forwarding gaps).
+  const impUserId = request.headers.get('x-imp-user-id')
+    ?? await (async () => {
+      const cookie = request.cookies.get('sb-imp-session')?.value
+      if (!cookie) return null
+      const payload = await verifyImpersonationJwt(cookie)
+      return payload?.targetUserId ?? null
+    })()
+
+  if (impUserId) {
+    const now = Date.now()
+    const cached = profileCache.get(impUserId)
+    if (cached && cached.expires > now) {
+      return { context: { userId: impUserId, ...cached.ctx }, error: null }
+    }
+    const { data: profile } = await adminSupabase
+      .from('profiles')
+      .select('role, business_id, branch_id')
+      .eq('id', impUserId)
+      .single()
+    if (!profile) return { context: null, error: unauthorized('Impersonation target not found') }
+    const ctx = { role: profile.role, businessId: profile.business_id, branchId: profile.branch_id }
+    profileCache.set(impUserId, { ctx, expires: now + PROFILE_TTL_MS })
+    return { context: { userId: impUserId, ...ctx }, error: null }
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

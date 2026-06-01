@@ -6,6 +6,7 @@ import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { PdfCacheService } from '@/backend/services/pdf-cache.service'
 
 const lineItemSchema = z.object({
   description: z.string().min(1),
@@ -26,7 +27,7 @@ const createSchema = z.object({
 })
 
 const updateStatusSchema = z.object({
-  status: z.enum(['issued', 'paid', 'void', 'unpaid', 'partial', 'refunded']),
+  status: z.enum(['issued', 'paid', 'unpaid', 'partial', 'refunded']),
 })
 
 const recordPaymentSchema = z.object({
@@ -76,6 +77,8 @@ export const InvoiceController = {
     const branchId = ctx.auth.branchId ?? null
     try {
       const invoice = await InvoiceService.updateStatus(id, branchId, data.status)
+      // Status change affects the PDF watermark/stamp — invalidate cached copy.
+      PdfCacheService.invalidate('invoices', id).catch(() => {})
       return ok(invoice)
     } catch (err) {
       return serverError('Failed to update invoice status', err)
@@ -88,6 +91,8 @@ export const InvoiceController = {
     const branchId = ctx.auth.branchId ?? null
     try {
       const invoice = await InvoiceService.recordPayment(id, branchId, data.amount)
+      // Amount paid changes — invalidate cached PDF.
+      PdfCacheService.invalidate('invoices', id).catch(() => {})
       return ok(invoice)
     } catch (err) {
       return serverError('Failed to record payment', err)
@@ -106,12 +111,26 @@ export const InvoiceController = {
 
   async generatePdf(request: NextRequest, ctx: RequestContext, id: string) {
     try {
+      const cachePath = PdfCacheService.cachePath('invoices', id)
+      // Filename placeholder — real invoice_number fetched inside generatePdf if needed.
+      const filename = `invoice-${id.slice(-8)}.pdf`
+
+      // Single round-trip: createSignedUrl validates existence + produces URL.
+      // Cache is invalidated via invalidate() whenever the invoice is mutated.
+      const cachedUrl = await PdfCacheService.getSignedUrl(cachePath, filename)
+      if (cachedUrl) return NextResponse.redirect(cachedUrl, { status: 302 })
+
+      // Cache miss — generate full PDF (includes invoice_number in output)
       const buffer = await InvoiceService.generatePdf(id, ctx.businessId ?? undefined)
+      const signedUrl = await PdfCacheService.store(cachePath, buffer, filename)
+
+      if (signedUrl) return NextResponse.redirect(signedUrl, { status: 302 })
+
       return new NextResponse(buffer, {
         status: 200,
         headers: {
           'Content-Type': 'application/pdf',
-          'Content-Disposition': `attachment; filename="invoice-${id}.pdf"`,
+          'Content-Disposition': `attachment; filename="${filename}"`,
         },
       })
     } catch (err) {

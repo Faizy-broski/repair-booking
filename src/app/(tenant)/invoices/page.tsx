@@ -40,10 +40,10 @@ interface StatusSummary {
 
 const STATUS_VARIANTS: Record<string, 'default' | 'success' | 'warning' | 'destructive'> = {
   issued: 'warning', unpaid: 'destructive', partial: 'warning',
-  paid: 'success', refunded: 'default', void: 'destructive',
+  paid: 'success', refunded: 'default',
 }
 
-const INVOICE_STATUSES = ['issued', 'unpaid', 'partial', 'paid', 'refunded', 'void'] as const
+const INVOICE_STATUSES = ['issued', 'unpaid', 'partial', 'paid', 'refunded'] as const
 
 const lineItemSchema = z.object({
   description: z.string().min(1),
@@ -178,20 +178,32 @@ export default function InvoicesPage() {
     setRecordingPayment(false)
   }
 
+  function prefetchPdf(url: string) {
+    fetch(url, { redirect: 'manual' } as RequestInit).catch(() => {})
+  }
+
   async function downloadPdf(invoiceId: string) {
     setDownloadingId(invoiceId)
+    // Only show the toast if it takes longer than 400ms (i.e. cache miss / first generation).
+    // Cache hits resolve in ~100–200ms so the toast never fires for them.
+    const slowTimer = setTimeout(() => toast.info('Generating PDF, please wait…'), 400)
     try {
+      // fetch() follows the 302 → Supabase Storage CDN redirect automatically.
       const res = await fetch(`/api/invoices/${invoiceId}/pdf`)
-      if (res.ok) {
-        const blob = await res.blob()
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `invoice-${invoiceId}.pdf`
-        a.click()
-        URL.revokeObjectURL(url)
-      }
+      if (!res.ok) { toast.error('Failed to generate PDF'); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `invoice-${invoiceId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Failed to download PDF')
     } finally {
+      clearTimeout(slowTimer)
       setDownloadingId(null)
     }
   }
@@ -276,6 +288,8 @@ export default function InvoicesPage() {
               size="sm"
               variant="ghost"
               onClick={() => downloadPdf(row.original.id)}
+              onMouseEnter={() => prefetchPdf(`/api/invoices/${row.original.id}/pdf`)}
+              onFocus={() => prefetchPdf(`/api/invoices/${row.original.id}/pdf`)}
               disabled={downloadingId === row.original.id}
               title="Download PDF"
             >

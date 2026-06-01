@@ -7,8 +7,7 @@ import { DataTable } from '@/components/shared/data-table'
 import { Modal } from '@/components/ui/modal'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
-import { pdf } from '@react-pdf/renderer'
-import { SaleReceiptPdf } from '@/components/pdf/sale-receipt-pdf'
+import { toast } from 'sonner'
 import type { ColumnDef } from '@tanstack/react-table'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -82,16 +81,6 @@ export default function SalesPage() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [downloadingDetail, setDownloadingDetail] = useState(false)
 
-  const { data: invoiceSettings = null } = useQuery({
-    queryKey: ['invoice-settings', activeBranch?.id],
-    queryFn: async () => {
-      const res = await fetch(`/api/settings/invoice?branch_id=${activeBranch!.id}`)
-      if (!res.ok) return null
-      const json = await res.json()
-      return json.data
-    },
-    enabled: !!activeBranch
-  })
 
   const { data: salesData, isLoading: loading } = useQuery({
     queryKey: ['sales', activeBranch?.id, page, dateFrom, dateTo, statusFilter],
@@ -147,56 +136,42 @@ export default function SalesPage() {
     setDetailOpen(true)
   }
 
-  async function downloadReceipt(sale: SaleDetail, fromDetail = false) {
-    if (fromDetail) setDownloadingDetail(true)
-    const blob = await pdf(
-      <SaleReceiptPdf
-        saleId={sale.id}
-        date={formatDateTime(sale.created_at)}
-        customerName={customerName(sale.customers)}
-        cashierName={sale.profiles?.full_name ?? '—'}
-        paymentMethod={sale.payment_method}
-        paymentStatus={sale.payment_status}
-        items={(sale.sale_items ?? []).map(i => ({
-          name: i.name, quantity: i.quantity,
-          unit_price: Number(i.unit_price), discount: Number(i.discount), total: Number(i.total),
-        }))}
-        subtotal={Number(sale.subtotal)}
-        discount={Number(sale.discount)}
-        tax={Number(sale.tax)}
-        total={Number(sale.total)}
-        isRefund={sale.is_refund}
-        refundReason={sale.refund_reason}
-        paymentSplits={sale.payment_splits}
-        notes={sale.notes}
-        branchName={activeBranch?.name}
-        branchAddress={activeBranch?.address ?? undefined}
-        branchPhone={activeBranch?.phone ?? undefined}
-        branchEmail={activeBranch?.email ?? undefined}
-        logoUrl={activeBranch?.logo_url ?? undefined}
-        currency="£"
-        settings={invoiceSettings ?? undefined}
-      />
-    ).toBlob()
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `receipt-${sale.id.slice(-8)}.pdf`
-    a.click()
-    URL.revokeObjectURL(url)
-    if (fromDetail) setDownloadingDetail(false)
+  // Hover over the download button starts server-side PDF generation in the background.
+  // Uses redirect:'manual' so only the 302 response is received — the PDF body is NOT
+  // downloaded, which means no wasted bandwidth. By click time the cache is usually warm.
+  function prefetchPdf(url: string) {
+    fetch(url, { redirect: 'manual' } as RequestInit).catch(() => {})
   }
 
-  async function fetchAndDownloadReceipt(id: string) {
-    setDownloadingId(id)
+  async function triggerReceiptDownload(saleId: string, setLoading: (v: boolean) => void) {
+    setLoading(true)
+    const slowTimer = setTimeout(() => toast.info('Generating receipt, please wait…'), 400)
     try {
-      const res = await fetch(`/api/pos/sales/${id}`)
-      if (!res.ok) return
-      const json = await res.json()
-      if (json.data) await downloadReceipt(json.data)
+      const res = await fetch(`/api/pos/sales/${saleId}/pdf`)
+      if (!res.ok) { toast.error('Failed to generate receipt'); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `receipt-${saleId.slice(-8)}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Failed to download receipt')
     } finally {
-      setDownloadingId(null)
+      clearTimeout(slowTimer)
+      setLoading(false)
     }
+  }
+
+  function downloadReceipt(sale: SaleDetail, fromDetail = false) {
+    triggerReceiptDownload(sale.id, fromDetail ? setDownloadingDetail : () => {})
+  }
+
+  function fetchAndDownloadReceipt(id: string) {
+    triggerReceiptDownload(id, (v) => { if (!v) setDownloadingId(null); else setDownloadingId(id) })
   }
 
   // ── Columns ──────────────────────────────────────────────────────────────
@@ -272,6 +247,8 @@ export default function SalesPage() {
             variant="ghost"
             size="sm"
             onClick={() => fetchAndDownloadReceipt(row.original.id)}
+            onMouseEnter={() => prefetchPdf(`/api/pos/sales/${row.original.id}/pdf`)}
+            onFocus={() => prefetchPdf(`/api/pos/sales/${row.original.id}/pdf`)}
             disabled={downloadingId === row.original.id}
             title="Download receipt"
           >
