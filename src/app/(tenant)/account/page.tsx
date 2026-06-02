@@ -257,8 +257,11 @@ export default function AccountPage() {
   const currentPrice = plan?.price_monthly ?? 0
   // True when the expired subscription was a trial (not a paid recurring subscription)
   const wasFreeTrial = isExpired && !!sub?.trial_ends_at
-  // When expired/canceled and a plan exists, show it as the primary resubscribe option
-  const resubscribePlan = isExpired && plan ? plans.find((p) => p.id === plan.id) ?? null : null
+  // When expired/canceled and a plan exists, show it as the primary resubscribe option.
+  // Fall back to the plan from the subscription itself in case it's inactive in the plans list.
+  const resubscribePlan = isExpired && plan
+    ? (plans.find((p) => p.id === plan.id) ?? plan)
+    : null
   const upgradablePlans = isPastDue
     ? []
     : isActive

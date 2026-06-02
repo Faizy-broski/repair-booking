@@ -133,7 +133,9 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
   // loadSession(), which is after setProfile() — so we never render with a stale
   // null/cashier-defaulted profile that causes items to pop in.
   const configsReady = configs !== null
-  const navReady = !authLoading && configsReady
+  // When subscription is expired all nav items are disabled anyway — no need to
+  // wait for module configs which may never load for an inactive account.
+  const navReady = !authLoading && (configsReady || !hasSubscriptionAccess)
 
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (!hasAccess(profile?.role ?? 'cashier', item.requiredRole)) return false

@@ -281,6 +281,7 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith('/account') ||
       pathname.startsWith('/api/account/') ||
       pathname.startsWith('/api/stripe/') ||
+      pathname.startsWith('/api/modules/') ||
       pathname.startsWith('/upgrade')
 
     // ── Parallel fetch: tenant isolation + subscription enforcement ───────────
@@ -329,14 +330,18 @@ export async function middleware(request: NextRequest) {
       const sub = subResult.data
       const planType = (sub?.plans as { plan_type?: string } | null)?.plan_type
 
+      // Free trial expired: free-typed plan whose trial_ends_at has passed
       const freeTrialExpired =
         planType === 'free' &&
         sub?.trial_ends_at &&
         new Date(sub.trial_ends_at) < new Date()
 
+      // Paid subscription inactive: ANY plan (including free-typed plans the user
+      // has paid for) where the subscription status is not active/trialing.
+      // trial_ends_at being null means it's a paid resubscription, not a trial.
       const paidSubInactive =
-        planType === 'paid' &&
         sub?.status &&
+        !sub.trial_ends_at &&
         !['active', 'trialing'].includes(sub.status)
 
       if (freeTrialExpired || paidSubInactive) {
