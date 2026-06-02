@@ -282,6 +282,7 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith('/api/account/') ||
       pathname.startsWith('/api/stripe/') ||
       pathname.startsWith('/api/modules/') ||
+      pathname.startsWith('/api/plans') ||
       pathname.startsWith('/upgrade')
 
     // ── Parallel fetch: tenant isolation + subscription enforcement ───────────
