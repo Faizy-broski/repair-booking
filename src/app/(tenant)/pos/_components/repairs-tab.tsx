@@ -459,7 +459,7 @@ export function RepairsTab() {
                       value={repairDetails.assigned_to}
                       onChange={(id) => setRepairDetails(d => ({ ...d, assigned_to: id }))}
                       label=""
-                      placeholder="— Search employee —"
+                      placeholder="Search employee..."
                     />
                   )}
                 </div>

@@ -33,8 +33,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify session with Stripe
+    // 'paid' = immediate charge succeeded
+    // 'no_payment_required' = subscription started with a trial period (£0 due today)
+    // Both are valid — the subscription is confirmed either way
     const session = await stripe.checkout.sessions.retrieve(sessionId)
-    if (session.payment_status !== 'paid') {
+    const validPaymentStatus = session.payment_status === 'paid' || session.payment_status === 'no_payment_required'
+    if (!validPaymentStatus || session.mode !== 'subscription') {
       return NextResponse.json({ error: { message: 'Payment not completed' } }, { status: 400 })
     }
 
@@ -65,11 +69,12 @@ export async function POST(request: NextRequest) {
     let periodEnd: string | null = null
     if (stripeSubId) {
       try {
-        const stripeSub = await stripe.subscriptions.retrieve(stripeSubId)
-        periodStart = stripeSub.current_period_start
-          ? new Date(stripeSub.current_period_start * 1000).toISOString() : null
-        periodEnd = stripeSub.current_period_end
-          ? new Date(stripeSub.current_period_end * 1000).toISOString() : null
+        const stripeSub = await stripe.subscriptions.retrieve(stripeSubId, { expand: ['items'] })
+        const item = stripeSub.items?.data?.[0] as any
+        const rawStart = (stripeSub as any).current_period_start ?? item?.current_period_start
+        const rawEnd   = (stripeSub as any).current_period_end   ?? item?.current_period_end
+        periodStart = rawStart ? new Date(rawStart * 1000).toISOString() : null
+        periodEnd   = rawEnd   ? new Date(rawEnd   * 1000).toISOString() : null
       } catch { /* non-fatal */ }
     }
 

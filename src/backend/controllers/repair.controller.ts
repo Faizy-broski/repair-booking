@@ -84,66 +84,83 @@ export const RepairController = {
 
       // Save repair items (parts) if any
       if (parts && parts.length > 0 && repair) {
-        // For quick-add parts (product_id === null), auto-create a product in the catalog
-        // so the part appears in future inventory searches for this branch.
-        const resolvedParts = await Promise.all(
-          parts.map(async (p) => {
-            if (p.product_id) return p
+        const knownParts   = parts.filter(p => p.product_id)
+        const quickAddParts = parts.filter(p => !p.product_id)
 
-            // Check if a part with the same name already exists for this business
-            const { data: existing } = await adminSupabase
+        // Resolve quick-add parts: single batch lookup instead of N sequential queries
+        const resolvedQuickAdd: typeof parts = []
+        if (quickAddParts.length > 0) {
+          const names = quickAddParts.map(p => p.name.trim())
+
+          // 1 query: fetch all existing parts matching any of the names (case-insensitive)
+          const { data: existingProducts } = await adminSupabase
+            .from('products')
+            .select('id, name')
+            .eq('business_id', ctx.businessId)
+            .eq('item_type', 'part')
+            .or(names.map(n => `name.ilike.${n.replace(/[,()]/g, '')}`).join(','))
+
+          const existingMap = new Map(
+            (existingProducts ?? []).map(p => [p.name.toLowerCase(), p.id])
+          )
+
+          const toCreate = quickAddParts.filter(p => !existingMap.has(p.name.trim().toLowerCase()))
+
+          // 1 query: batch insert all new products
+          let newProductMap = new Map<string, string>()
+          if (toCreate.length > 0) {
+            const { data: created } = await adminSupabase
               .from('products')
-              .select('id')
-              .eq('business_id', ctx.businessId)
-              .ilike('name', p.name.trim())
-              .eq('item_type', 'part')
-              .maybeSingle()
+              .insert(toCreate.map(p => ({
+                business_id:   ctx.businessId,
+                name:          p.name.trim(),
+                item_type:     'part',
+                is_service:    false,
+                cost_price:    p.unit_cost ?? 0,
+                selling_price: p.unit_price ?? 0,
+              })))
+              .select('id, name')
 
-            let productId: string
-            if (existing) {
-              productId = existing.id
-            } else {
-              const { data: newProduct, error: prodErr } = await adminSupabase
-                .from('products')
-                .insert({
-                  business_id: ctx.businessId,
-                  name: p.name.trim(),
-                  item_type: 'part',
-                  is_service: false,
-                  cost_price: p.unit_cost ?? 0,
-                  selling_price: p.unit_price ?? 0,
-                })
-                .select('id')
-                .single()
-              if (prodErr || !newProduct) return { ...p, product_id: null }
-              productId = newProduct.id
+            newProductMap = new Map((created ?? []).map(p => [p.name.toLowerCase(), p.id]))
 
-              // Seed inventory row (qty 0 — parts are consumed, not pre-stocked)
-              await adminSupabase.from('inventory').insert({
-                branch_id: data.branch_id,
-                product_id: productId,
-                variant_id: null,
-                quantity: 0,
-                low_stock_alert: 5,
-              })
+            // 1 query: batch seed inventory rows for all new products
+            const inventoryRows = (created ?? []).map(p => ({
+              branch_id:       data.branch_id,
+              product_id:      p.id,
+              variant_id:      null,
+              quantity:        0,
+              low_stock_alert: 5,
+            }))
+            if (inventoryRows.length > 0) {
+              await adminSupabase.from('inventory').insert(inventoryRows)
             }
+          }
 
-            // Ensure the product is visible in this branch's catalog
-            await adminSupabase.from('branch_products').upsert(
-              { branch_id: data.branch_id, product_id: productId, is_enabled: true },
-              { onConflict: 'branch_id,product_id' }
-            )
+          // Build resolved list
+          for (const p of quickAddParts) {
+            const key = p.name.trim().toLowerCase()
+            const productId = existingMap.get(key) ?? newProductMap.get(key) ?? null
+            resolvedQuickAdd.push({ ...p, product_id: productId })
+          }
 
-            return { ...p, product_id: productId }
-          })
-        )
+          // 1 query: batch upsert branch_products visibility for all resolved parts
+          const branchProductRows = resolvedQuickAdd
+            .filter(p => p.product_id)
+            .map(p => ({ branch_id: data.branch_id, product_id: p.product_id!, is_enabled: true }))
+          if (branchProductRows.length > 0) {
+            await adminSupabase
+              .from('branch_products')
+              .upsert(branchProductRows, { onConflict: 'branch_id,product_id' })
+          }
+        }
 
-        const items = resolvedParts.map(p => ({
-          repair_id: repair.id,
+        const allResolved = [...knownParts, ...resolvedQuickAdd]
+        const items = allResolved.map(p => ({
+          repair_id:  repair.id,
           product_id: p.product_id,
-          name: p.name,
-          quantity: p.quantity,
-          unit_cost: p.unit_cost,
+          name:       p.name,
+          quantity:   p.quantity,
+          unit_cost:  p.unit_cost,
           unit_price: p.unit_price,
         }))
         await adminSupabase.from('repair_items').insert(items)

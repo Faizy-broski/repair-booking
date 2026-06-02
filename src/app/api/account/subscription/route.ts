@@ -85,8 +85,8 @@ export async function GET() {
               stripe_customer_id:   typeof stripeSub.customer === 'string' ? stripeSub.customer : stripeSub.customer?.id ?? null,
               status:               stripeSub.status,
               billing_cycle:        'monthly',
-              current_period_start: new Date(stripeSub.current_period_start * 1000).toISOString(),
-              current_period_end:   new Date(stripeSub.current_period_end * 1000).toISOString(),
+              current_period_start: (() => { const v = (stripeSub as any).current_period_start ?? stripeSub.items?.data?.[0]?.current_period_start; return v ? new Date(v * 1000).toISOString() : null })(),
+              current_period_end:   (() => { const v = (stripeSub as any).current_period_end   ?? stripeSub.items?.data?.[0]?.current_period_end;   return v ? new Date(v * 1000).toISOString() : null })(),
               trial_ends_at:        stripeSub.trial_end ? new Date(stripeSub.trial_end * 1000).toISOString() : null,
             }
 
@@ -130,20 +130,18 @@ export async function GET() {
     }
 
     // ── If DB row has no period dates, sync them from Stripe now ─────────────
-    // This happens when verify-upgrade ran but the Stripe subscription retrieval
-    // failed silently, or when the row was written before period dates were tracked.
-    // Use stripe_sub_id from the sub row first, fall back to businesses table.
     const fallbackStripeSubId =
       (sub?.stripe_sub_id as string | null) ??
       (business?.stripe_subscription_id as string | null) ?? null
 
     if (sub && !sub.current_period_end && fallbackStripeSubId) {
       try {
-        const stripeSub = await stripe.subscriptions.retrieve(fallbackStripeSubId)
-        const patchedStart = stripeSub.current_period_start
-          ? new Date(stripeSub.current_period_start * 1000).toISOString() : null
-        const patchedEnd = stripeSub.current_period_end
-          ? new Date(stripeSub.current_period_end * 1000).toISOString() : null
+        const stripeSub = await stripe.subscriptions.retrieve(fallbackStripeSubId, { expand: ['items'] })
+        const item = stripeSub.items?.data?.[0] as any
+        const rawStart = (stripeSub as any).current_period_start ?? item?.current_period_start
+        const rawEnd   = (stripeSub as any).current_period_end   ?? item?.current_period_end
+        const patchedStart = rawStart ? new Date(rawStart * 1000).toISOString() : null
+        const patchedEnd   = rawEnd   ? new Date(rawEnd   * 1000).toISOString() : null
 
         if (patchedEnd) {
           await (supabase as any)

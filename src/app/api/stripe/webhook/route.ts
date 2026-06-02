@@ -17,6 +17,17 @@ function ts(unix: number | null | undefined): string | null {
   return unix ? new Date(unix * 1000).toISOString() : null
 }
 
+// In Stripe API >= 2026-02-25 (Clover), current_period_start/end moved from
+// the subscription root to each subscription item. Read both locations.
+function subPeriod(stripeSub: Stripe.Subscription): { start: string | null; end: string | null } {
+  const rootStart = (stripeSub as any).current_period_start as number | undefined
+  const rootEnd   = (stripeSub as any).current_period_end   as number | undefined
+  const item = stripeSub.items?.data?.[0] as any
+  const start = rootStart ?? item?.current_period_start ?? null
+  const end   = rootEnd   ?? item?.current_period_end   ?? null
+  return { start: ts(start), end: ts(end) }
+}
+
 // ── Webhook handler ───────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
@@ -69,8 +80,9 @@ export async function POST(request: NextRequest) {
       if (stripeSubId) {
         try {
           const stripeSub = await stripe.subscriptions.retrieve(stripeSubId)
-          periodStart = ts(stripeSub.current_period_start)
-          periodEnd   = ts(stripeSub.current_period_end)
+          const period = subPeriod(stripeSub)
+          periodStart = period.start
+          periodEnd   = period.end
         } catch { /* non-fatal */ }
       }
 
@@ -151,7 +163,7 @@ export async function POST(request: NextRequest) {
           stripeSubId,
           stripeCustomerId: typeof session.customer === 'string' ? session.customer : null,
           status:           'trialing',
-          trialEndsAt:      new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+          trialEndsAt:      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         })
       }
     }
@@ -213,8 +225,8 @@ export async function POST(request: NextRequest) {
       stripeCustomerId: typeof stripeSub.customer === 'string' ? stripeSub.customer : null,
       status:           dbStatus,
       trialEndsAt:      stripeSub.trial_end ? new Date(stripeSub.trial_end * 1000).toISOString() : null,
-      currentPeriodStart: ts(stripeSub.current_period_start),
-      currentPeriodEnd:   ts(stripeSub.current_period_end),
+      currentPeriodStart: subPeriod(stripeSub).start,
+      currentPeriodEnd:   subPeriod(stripeSub).end,
     })
 
     await invalidateBusinessCache(businessId)

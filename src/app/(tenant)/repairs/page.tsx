@@ -2220,7 +2220,7 @@ export default function RepairsPage() {
                         value={jobData.assigned_to ?? ''}
                         onChange={(id) => setJobData((p) => ({ ...p, assigned_to: id }))}
                         label=""
-                        placeholder="— Search employee —"
+                        placeholder="Search employee..."
                       />
                     )}
                   </div>

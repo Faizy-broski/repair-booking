@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye, Trash2, Wrench } from 'lucide-react'
+import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/data-table'
@@ -238,8 +238,6 @@ export default function BusinessesPage() {
   const [modulesBusiness, setModulesBusiness] = useState<BusinessRow | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
-  const [fixingAuthId, setFixingAuthId] = useState<string | null>(null)
-  const [fixAuthResult, setFixAuthResult] = useState<{ email: string; tempPassword: string | null; actionLink?: string | null } | null>(null)
 
   useEffect(() => {
     async function fetch_() {
@@ -254,17 +252,6 @@ export default function BusinessesPage() {
     }
     fetch_()
   }, [page, search])
-
-  async function fixAuth(id: string) {
-    setFixingAuthId(id)
-    try {
-      const res = await fetch(`/api/admin/businesses/${id}/fix-auth`, { method: 'POST' })
-      const json = await res.json()
-      setFixAuthResult(json.data ?? null)
-    } finally {
-      setFixingAuthId(null)
-    }
-  }
 
   async function deleteBusiness(id: string) {
     setDeleting(true)
@@ -388,18 +375,6 @@ export default function BusinessesPage() {
               )}
             </Button>
 
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => fixAuth(biz.id)}
-              disabled={fixingAuthId === biz.id}
-              title="Create missing auth user (fixes SQL-created businesses)"
-              className="text-orange-500 hover:text-orange-700 hover:bg-orange-50"
-            >
-              <Wrench className="h-3.5 w-3.5 mr-1" />
-              {fixingAuthId === biz.id ? 'Fixing…' : 'Fix Auth'}
-            </Button>
-
             {isConfirming ? (
               <div className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1">
                 <span className="text-xs font-medium text-red-700 whitespace-nowrap">Delete?</span>
@@ -473,42 +448,6 @@ export default function BusinessesPage() {
         onClose={() => setModulesBusiness(null)}
       />
 
-      {/* Fix Auth result modal */}
-      {fixAuthResult && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-            <h2 className="mb-1 text-lg font-semibold text-gray-900">Auth User Fixed</h2>
-            <p className="mb-4 text-sm text-gray-500">
-              Share these credentials with the business owner — the password is shown once.
-            </p>
-            <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4 font-mono text-sm">
-              <div>
-                <span className="text-xs text-gray-400 uppercase tracking-wide">Email</span>
-                <p className="mt-0.5 text-gray-800 break-all">{fixAuthResult.email}</p>
-              </div>
-              {fixAuthResult.tempPassword ? (
-                <div>
-                  <span className="text-xs text-gray-400 uppercase tracking-wide">Temp Password</span>
-                  <p className="mt-0.5 text-gray-800 font-bold tracking-wider">{fixAuthResult.tempPassword}</p>
-                </div>
-              ) : fixAuthResult.actionLink ? (
-                <div>
-                  <span className="text-xs text-gray-400 uppercase tracking-wide">Password Reset Link</span>
-                  <p className="mt-0.5 text-blue-600 break-all text-xs">{fixAuthResult.actionLink}</p>
-                </div>
-              ) : (
-                <p className="text-gray-500 text-xs">Auth user already existed — password was reset.</p>
-              )}
-            </div>
-            <button
-              onClick={() => setFixAuthResult(null)}
-              className="mt-4 w-full rounded-lg bg-gray-900 py-2 text-sm font-medium text-white hover:bg-gray-700"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

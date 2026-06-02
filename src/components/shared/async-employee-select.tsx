@@ -97,24 +97,24 @@ export function AsyncEmployeeSelect({
   return (
     <div ref={containerRef} className={`relative w-full ${className ?? ''}`}>
       {label && (
-        <label className="mb-1 block text-sm font-medium text-gray-700">
+        <label className="mb-1 block text-sm font-medium text-on-surface">
           {label}
         </label>
       )}
 
       {selected ? (
-        <div className="flex h-9 items-center justify-between rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900">
+        <div className="flex h-9 items-center justify-between rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface">
           <span>
             {selected.first_name} {selected.last_name ?? ''}
-            {selected.role ? <span className="ml-1.5 text-xs text-gray-400">· {selected.role}</span> : null}
+            {selected.role ? <span className="ml-1.5 text-xs text-on-surface-variant">· {selected.role}</span> : null}
           </span>
-          <button type="button" onClick={clear} className="ml-2 text-gray-400 hover:text-gray-600">
+          <button type="button" onClick={clear} className="ml-2 text-on-surface-variant hover:text-on-surface transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
       ) : (
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
           <input
             type="text"
             placeholder={placeholder}
@@ -122,24 +122,26 @@ export function AsyncEmployeeSelect({
             onChange={e => { setQuery(e.target.value); setOpen(true) }}
             onFocus={() => setOpen(true)}
             className={[
-              'h-9 w-full rounded-lg border pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/20',
+              'h-9 w-full rounded-lg border bg-surface pl-9 pr-8 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-brand-teal/20 transition-colors',
               error
-                ? 'border-red-500 focus:border-red-500'
-                : 'border-gray-300 focus:border-brand-teal',
+                ? 'border-error focus:border-error'
+                : 'border-outline-variant focus:border-brand-teal',
             ].join(' ')}
           />
           {isFetching && (
             <span className="absolute right-3 top-1/2 -translate-y-1/2">
-              <span className="block h-4 w-4 animate-spin rounded-full border-2 border-brand-teal border-t-transparent" />
+              <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand-teal border-t-transparent" />
             </span>
           )}
         </div>
       )}
 
       {open && !selected && (
-        <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-52 overflow-y-auto">
+        <div className="absolute z-50 mt-1 w-full rounded-lg border border-outline-variant bg-surface shadow-lg max-h-52 overflow-y-auto">
           {results.length === 0 && !isFetching ? (
-            <p className="px-3 py-2.5 text-sm text-gray-400">No employees found</p>
+            <p className="px-3 py-2.5 text-sm text-on-surface-variant">
+              {query.length === 0 ? 'Type to search employees' : 'No employees found'}
+            </p>
           ) : (
             results.map(emp => (
               <button
@@ -147,19 +149,19 @@ export function AsyncEmployeeSelect({
                 type="button"
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => selectEmployee(emp)}
-                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-gray-50"
+                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-surface-container-low transition-colors"
               >
-                <span className="font-medium text-gray-900">
+                <span className="font-medium text-on-surface">
                   {emp.first_name} {emp.last_name ?? ''}
                 </span>
-                {emp.role && <span className="text-xs text-gray-400">· {emp.role}</span>}
+                {emp.role && <span className="text-xs text-on-surface-variant capitalize">· {emp.role.replace(/_/g, ' ')}</span>}
               </button>
             ))
           )}
         </div>
       )}
 
-      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+      {error && <p className="mt-1 text-xs text-error">{error}</p>}
     </div>
   )
 }

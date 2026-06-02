@@ -196,8 +196,10 @@ export default function AccountPage() {
       fetch('/api/plans')
         .then((r) => r.json())
         .then(({ data }) => {
-          const paid = (data ?? []).filter((p: Plan & { plan_type?: string }) => p.plan_type === 'paid')
-          setPlans(paid)
+          // All plans are eligible (starter/growth/professional all have 30-day trials)
+          // Filter out enterprise plans which require manual setup
+          const subscribable = (data ?? []).filter((p: Plan & { plan_type?: string }) => p.plan_type !== 'enterprise')
+          setPlans(subscribable)
         })
     }
   }, [tab])
@@ -253,11 +255,16 @@ export default function AccountPage() {
   // - active: only plans more expensive (genuine upgrade)
   // - expired/canceled/no sub: all paid plans (resubscribe)
   const currentPrice = plan?.price_monthly ?? 0
+  // True when the expired subscription was a trial (not a paid recurring subscription)
+  const wasFreeTrial = isExpired && !!sub?.trial_ends_at
+  // When expired/canceled and a plan exists, show it as the primary resubscribe option
+  const resubscribePlan = isExpired && plan ? plans.find((p) => p.id === plan.id) ?? null : null
   const upgradablePlans = isPastDue
     ? []
     : isActive
       ? plans.filter((p) => p.price_monthly > currentPrice)
-      : plans
+      // exclude current plan from the grid — it gets its own prominent resubscribe card
+      : plans.filter((p) => p.id !== resubscribePlan?.id)
 
   const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: 'account',      label: 'Account',                icon: User       },
@@ -298,9 +305,13 @@ export default function AccountPage() {
         <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
           <div>
-            <p className="text-sm font-semibold text-red-300">Your subscription has expired</p>
+            <p className="text-sm font-semibold text-red-300">
+              {wasFreeTrial ? 'Your free trial has ended' : 'Your subscription has expired'}
+            </p>
             <p className="text-xs text-red-400/80 mt-0.5">
-              All features are locked. Resubscribe below to restore full access.
+              {wasFreeTrial
+                ? 'All features are locked. Subscribe to a paid plan below to continue.'
+                : 'All features are locked. Resubscribe below to restore full access.'}
             </p>
           </div>
         </div>
@@ -458,7 +469,7 @@ export default function AccountPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-4 gap-x-6 text-sm">
                     <InfoRow label="Plan"       value={plan?.name ?? subscriptionStatus?.planName ?? 'Standard'} />
                     <InfoRow label="Billing"    value={
-                      (plan?.plan_type ?? subscriptionStatus?.planType) === 'free'
+                      isTrialing
                         ? 'Free trial'
                         : plan?.price_monthly
                           ? `£${plan.price_monthly}/month`
@@ -530,19 +541,15 @@ export default function AccountPage() {
                 </div>
               )}
 
-              {/* Resubscribe / upgrade section — only when there are relevant plans */}
-              {upgradablePlans.length > 0 && (
-                <div className="rounded-2xl border border-brand-teal/30 bg-brand-teal/5 p-6">
+              {/* Resubscribe to same plan — prominently shown when previous plan was paid */}
+              {resubscribePlan && (
+                <div className="rounded-2xl border border-brand-teal bg-brand-teal/10 p-6">
                   <div className="flex items-center gap-2 mb-1">
                     <Zap className="h-5 w-5 text-brand-teal" />
-                    <h3 className="text-base font-semibold text-on-surface">
-                      {isExpired ? 'Resubscribe to continue' : 'Upgrade your plan'}
-                    </h3>
+                    <h3 className="text-base font-semibold text-on-surface">Resubscribe to continue</h3>
                   </div>
                   <p className="text-sm text-on-surface-variant mb-5">
-                    {isExpired
-                      ? 'Your subscription has ended. Choose a plan below to restore full access to all features.'
-                      : 'Unlock more features and capacity by moving to a higher plan.'}
+                    Restore access by resubscribing to your previous plan.
                   </p>
 
                   {errorMsg && (
@@ -551,9 +558,79 @@ export default function AccountPage() {
                     </p>
                   )}
 
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-xl border border-brand-teal/40 bg-surface-container-lowest p-5">
+                    <div>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="text-sm font-bold text-on-surface uppercase tracking-wide">{resubscribePlan.name}</p>
+                        <span className="rounded-full bg-brand-teal/20 border border-brand-teal/40 px-2 py-0.5 text-[10px] font-semibold text-brand-teal">
+                          Your previous plan
+                        </span>
+                      </div>
+                      <p className="text-2xl font-black text-on-surface">
+                        £{resubscribePlan.price_monthly}<span className="text-sm font-normal text-on-surface-variant">/mo</span>
+                      </p>
+                      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                        {parseFeatures(resubscribePlan.features).map((f) => (
+                          <li key={f} className="flex items-center gap-1.5 text-xs text-on-surface-variant">
+                            <CheckCircle2 className="h-3 w-3 shrink-0 text-brand-teal" />
+                            <span className="capitalize">{f.replace(/_/g, ' ')}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <Button
+                      onClick={() => handleResubscribe(resubscribePlan.id)}
+                      disabled={upgrading === resubscribePlan.id}
+                      className="shrink-0 bg-brand-teal text-white hover:bg-brand-teal/90 font-semibold gap-2 px-6"
+                    >
+                      {upgrading === resubscribePlan.id
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : <><Zap className="h-4 w-4" /> Resubscribe</>
+                      }
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Upgrade section — higher-tier plans */}
+              {(upgradablePlans.length > 0) && (
+                <div className={cn(
+                  'rounded-2xl border p-6',
+                  resubscribePlan
+                    ? 'border-outline-variant bg-surface-container-lowest'
+                    : 'border-brand-teal/30 bg-brand-teal/5'
+                )}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Zap className={cn('h-5 w-5', resubscribePlan ? 'text-on-surface-variant' : 'text-brand-teal')} />
+                    <h3 className="text-base font-semibold text-on-surface">
+                      {resubscribePlan
+                        ? 'Or switch to a different plan'
+                        : wasFreeTrial
+                          ? 'Subscribe to continue'
+                          : isExpired
+                            ? 'Resubscribe to continue'
+                            : 'Upgrade your plan'}
+                    </h3>
+                  </div>
+                  <p className="text-sm text-on-surface-variant mb-5">
+                    {resubscribePlan
+                      ? 'Or choose a different plan below.'
+                      : wasFreeTrial
+                        ? 'Your free trial has ended. Subscribe to continue using all features.'
+                        : isExpired
+                          ? 'Your subscription has ended. Choose a plan below to restore full access to all features.'
+                          : 'Unlock more features and capacity by moving to a higher plan.'}
+                  </p>
+
+                  {!resubscribePlan && errorMsg && (
+                    <p className="mb-4 text-sm text-red-400 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
+                      {errorMsg}
+                    </p>
+                  )}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {upgradablePlans.map((p, i) => {
-                      const highlighted = upgradablePlans.length >= 2 && i === Math.floor(upgradablePlans.length / 2)
+                      const highlighted = !resubscribePlan && upgradablePlans.length >= 2 && i === Math.floor(upgradablePlans.length / 2)
                       return (
                         <div
                           key={p.id}
@@ -594,10 +671,8 @@ export default function AccountPage() {
                           >
                             {upgrading === p.id ? (
                               <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                            ) : isExpired ? (
-                              'Resubscribe'
                             ) : (
-                              'Upgrade now'
+                              'Upgrade'
                             )}
                           </Button>
                         </div>
