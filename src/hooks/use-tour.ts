@@ -1,10 +1,10 @@
 'use client'
 import { useEffect, useCallback } from 'react'
 import { create } from 'zustand'
+import { useAuthStore } from '@/store/auth.store'
 import type { ModuleName } from '@/types/module-config'
 import type { Role } from '@/backend/config/constants'
 
-const TOUR_STORAGE_KEY = (profileId: string) => `tour_done_${profileId}`
 
 export interface TourStep {
   id: string
@@ -268,26 +268,35 @@ const useTourStore = create<TourStore>((set) => ({
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
-export function useTour(profileId: string | null) {
-  const { isActive, stepIndex, setActive, setStepIndex, resetStep } = useTourStore()
+async function markTourComplete() {
+  await fetch('/api/account/profile', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tour_completed: true }),
+  })
+}
 
-  // Show tour automatically for new users (no localStorage entry)
+// profileId param kept for backwards-compatibility with existing call sites
+export function useTour(_profileId?: string | null) {
+  const { isActive, stepIndex, setActive, setStepIndex, resetStep } = useTourStore()
+  const { profile, setProfile, subscriptionStatus } = useAuthStore()
+
+  // Auto-show for new users only when they have active access
   useEffect(() => {
-    if (!profileId) return
-    const done = localStorage.getItem(TOUR_STORAGE_KEY(profileId))
-    if (!done) {
-      const timer = setTimeout(() => setActive(true), 1800)
-      return () => clearTimeout(timer)
-    }
-  }, [profileId]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!profile) return
+    const hasAccess = subscriptionStatus === null || subscriptionStatus.hasAccess
+    if (!hasAccess) return
+    if ((profile as any).tour_completed) return
+    const timer = setTimeout(() => setActive(true), 1800)
+    return () => clearTimeout(timer)
+  }, [profile?.id, subscriptionStatus?.hasAccess]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const finish = useCallback(() => {
-    if (profileId) {
-      localStorage.setItem(TOUR_STORAGE_KEY(profileId), '1')
-    }
     setActive(false)
     resetStep()
-  }, [profileId]) // eslint-disable-line react-hooks/exhaustive-deps
+    markTourComplete()
+    if (profile) setProfile({ ...profile, tour_completed: true } as any)
+  }, [profile]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const next = useCallback((totalSteps: number) => {
     setStepIndex((i) => Math.min(i + 1, totalSteps - 1))
@@ -299,12 +308,9 @@ export function useTour(profileId: string | null) {
 
   /** Called from Account Settings "Replay tour" button */
   const restart = useCallback(() => {
-    if (profileId) {
-      localStorage.removeItem(TOUR_STORAGE_KEY(profileId))
-    }
     resetStep()
     setActive(true)
-  }, [profileId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return { isActive, stepIndex, next, back, finish, restart }
 }
