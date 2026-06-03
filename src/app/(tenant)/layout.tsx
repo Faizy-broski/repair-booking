@@ -180,7 +180,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
 
         supabase
           .from('subscriptions')
-          .select('status, trial_ends_at, current_period_end, plans(name, plan_type)')
+          .select('status, trial_ends_at, current_period_end, stripe_sub_id, plans(name, plan_type)')
           .eq('business_id', profile.business_id)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -190,15 +190,18 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
             const planType = (plans?.plan_type ?? null) as SubscriptionStatus['planType']
             const planName = plans?.name ?? null
             const trialEndsAt = sub?.trial_ends_at ?? null
+            const currentPeriodEnd = (sub as any)?.current_period_end ?? null
             const freeTrialExpired = planType === 'free' && trialEndsAt && new Date(trialEndsAt) < new Date()
             const paidSubInactive = planType === 'paid' && sub?.status && !['active', 'trialing'].includes(sub.status)
+            // Manual subscriptions (no Stripe) expire when current_period_end passes
+            const manualSubExpired = !(sub as any)?.stripe_sub_id && currentPeriodEnd && new Date(currentPeriodEnd) < new Date()
             setSubscriptionStatus({
               status: sub?.status ?? null,
               planType,
               planName,
               trialEndsAt,
-              currentPeriodEnd: (sub as any)?.current_period_end ?? null,
-              hasAccess: !freeTrialExpired && !paidSubInactive,
+              currentPeriodEnd,
+              hasAccess: !freeTrialExpired && !paidSubInactive && !manualSubExpired,
             })
           })
       }

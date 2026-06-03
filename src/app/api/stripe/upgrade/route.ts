@@ -92,9 +92,26 @@ export async function POST(request: NextRequest) {
       .single()
 
     const business = bizRow as { stripe_customer_id?: string | null; subdomain?: string } | null
-    const customerParam: Stripe.Checkout.SessionCreateParams = business?.stripe_customer_id
-      ? { customer: business.stripe_customer_id }
-      : { customer_email: user.email }
+
+    // Validate the stored customer ID against the current Stripe mode (test vs live).
+    // A test-mode customer ID silently breaks when live keys are used, so we verify
+    // first and fall back to email — clearing the stale ID so it doesn't re-poison future calls.
+    let customerParam: Stripe.Checkout.SessionCreateParams
+    if (business?.stripe_customer_id) {
+      try {
+        const existing = await stripe.customers.retrieve(business.stripe_customer_id)
+        if ((existing as Stripe.DeletedCustomer).deleted) throw new Error('deleted')
+        customerParam = { customer: business.stripe_customer_id }
+      } catch {
+        await (supabase as any)
+          .from('businesses')
+          .update({ stripe_customer_id: null })
+          .eq('id', businessId)
+        customerParam = { customer_email: user.email }
+      }
+    } else {
+      customerParam = { customer_email: user.email }
+    }
 
     const subdomain = business?.subdomain ?? ''
     const appUrlObj = new URL(APP_URL)

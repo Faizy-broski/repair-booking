@@ -53,6 +53,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'No billing account found. Please contact support.' }, { status: 404 })
   }
 
+  // Validate the stored customer ID — a test-mode ID will fail with live keys.
+  // If stale, clear it and tell the user to resubscribe so a live customer gets created.
+  try {
+    const existing = await stripe.customers.retrieve(stripeCustomerId)
+    if ((existing as any).deleted) {
+      throw new Error('Customer deleted')
+    }
+  } catch {
+    await adminSupa
+      .from('businesses')
+      .update({ stripe_customer_id: null })
+      .eq('id', profile.business_id)
+    await adminSupa
+      .from('subscriptions')
+      .update({ stripe_customer_id: null })
+      .eq('business_id', profile.business_id)
+    return NextResponse.json(
+      { error: 'Your billing account could not be found in the current payment environment. Please resubscribe to restore access.' },
+      { status: 404 }
+    )
+  }
+
   // Build return URL from the incoming request host so it works on any subdomain
   const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http'
   const host = request.headers.get('host') ?? ''
