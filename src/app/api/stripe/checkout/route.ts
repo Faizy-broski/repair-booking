@@ -110,13 +110,20 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Create Stripe Checkout session
+    // trial_period_days means Stripe shows £0.00 today, links the card, and
+    // only charges after the trial ends. No money is taken at this step.
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer_email: email,
       line_items: [{ price: stripePriceId, quantity: 1 }],
       subscription_data: {
-        trial_period_days: 14,
+        trial_period_days: 30,
+        trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
         metadata: { pendingId: pending.id },
+      },
+      payment_method_collection: 'always',
+      custom_text: {
+        submit: { message: 'Your card will not be charged today. Your 30-day free trial starts now — you\'ll only be billed after it ends.' },
       },
       metadata: { pendingId: pending.id },
       success_url: `${APP_URL}/register/success?session_id={CHECKOUT_SESSION_ID}`,

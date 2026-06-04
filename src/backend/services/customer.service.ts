@@ -79,12 +79,31 @@ export const CustomerService = {
   },
 
   async create(payload: InsertTables<'customers'>) {
+    if (payload.email) {
+      const { data: existing } = await adminSupabase
+        .from('customers')
+        .select('id')
+        .eq('business_id', payload.business_id)
+        .eq('email', payload.email.toLowerCase().trim())
+        .maybeSingle()
+      if (existing) throw new Error('A customer with this email address already exists.')
+    }
     const { data, error } = await adminSupabase.from('customers').insert(payload).select().single()
     if (error) throw error
     return data
   },
 
   async update(id: string, businessId: string, payload: UpdateTables<'customers'>) {
+    if (payload.email) {
+      const { data: existing } = await adminSupabase
+        .from('customers')
+        .select('id')
+        .eq('business_id', businessId)
+        .eq('email', (payload.email as string).toLowerCase().trim())
+        .neq('id', id)
+        .maybeSingle()
+      if (existing) throw new Error('A customer with this email address already exists.')
+    }
     const { data, error } = await adminSupabase
       .from('customers')
       .update(payload)

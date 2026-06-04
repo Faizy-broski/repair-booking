@@ -343,13 +343,19 @@ export const BusinessService = {
   },
 
   async delete(id: string) {
-    // 1. Collect all auth user IDs for this business so we can remove them from
-    //    Supabase Auth after the DB rows are gone.
+    // 1. Collect auth user IDs + business email before deleting rows
     const { data: profiles } = await adminSupabase
       .from('profiles')
       .select('id')
       .eq('business_id', id)
     const authUserIds = (profiles ?? []).map((p: { id: string }) => p.id)
+
+    const { data: biz } = await (adminSupabase as any)
+      .from('businesses')
+      .select('email')
+      .eq('id', id)
+      .single()
+    const businessEmail: string | null = biz?.email ?? null
 
     // 2. Delete the business row — DB-level CASCADE removes branches, profiles,
     //    subscriptions, and all other child rows automatically.
@@ -359,10 +365,24 @@ export const BusinessService = {
       .eq('id', id)
     if (error) throw error
 
-    // 3. Remove the auth identities; fire-and-forget any individual failures so
-    //    a missing auth record doesn't abort the whole operation.
-    await Promise.allSettled(
+    // 3. Clean up pending_registrations for this email so the address can be reused
+    if (businessEmail) {
+      await (adminSupabase as any)
+        .from('pending_registrations')
+        .delete()
+        .eq('email', businessEmail.toLowerCase())
+    }
+
+    // 4. Remove the auth identities. Log failures but don't throw — a missing
+    //    auth record doesn't need to block the DB deletion. The register flow
+    //    handles orphaned auth users defensively on next signup attempt.
+    const results = await Promise.allSettled(
       authUserIds.map((uid: string) => adminSupabase.auth.admin.deleteUser(uid))
     )
+    results.forEach((r, i) => {
+      if (r.status === 'rejected') {
+        console.error(`[BusinessService.delete] Failed to delete auth user ${authUserIds[i]}:`, r.reason)
+      }
+    })
   },
 }

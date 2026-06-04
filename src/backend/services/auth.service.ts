@@ -35,11 +35,12 @@ export const AuthService = {
       .eq('email', email.toLowerCase())
       .maybeSingle()
     if (biz) return false
-    // Also check pending_registrations (payment started but not yet completed)
+    // Also check pending_registrations — only active (non-expired) ones block re-registration
     const { data: pending } = await (supabase as any)
       .from('pending_registrations')
       .select('id')
       .eq('email', email.toLowerCase())
+      .gt('expires_at', new Date().toISOString())
       .maybeSingle()
     return !pending
   },
@@ -52,13 +53,43 @@ export const AuthService = {
     const available = await AuthService.checkSubdomainAvailable(subdomain)
     if (!available) throw new Error('Subdomain is already taken')
 
-    // 1. Create Supabase auth user
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    // 1. Create Supabase auth user.
+    // If the email is already taken in Supabase Auth but has no business in our DB,
+    // the auth user is orphaned (e.g. a previous account was deleted but auth cleanup
+    // failed silently). Delete the stale auth user and retry once.
+    let { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: payload.email,
       password: payload.password,
       email_confirm: true,
       user_metadata: { full_name: payload.fullName, role: 'business_owner' },
     })
+
+    if (authError && authError.message.toLowerCase().includes('already been registered')) {
+      const { data: existingBiz } = await (supabase as any)
+        .from('businesses')
+        .select('id')
+        .eq('email', payload.email.toLowerCase())
+        .maybeSingle()
+
+      if (existingBiz) {
+        // A real active account exists — surface the conflict clearly
+        throw new Error('A user with this email address has already been registered')
+      }
+
+      // Orphaned auth user — find and delete it, then recreate
+      const { data: { users } } = await supabase.auth.admin.listUsers()
+      const stale = users.find((u) => u.email?.toLowerCase() === payload.email.toLowerCase())
+      if (stale) await supabase.auth.admin.deleteUser(stale.id)
+
+      const retry = await supabase.auth.admin.createUser({
+        email: payload.email,
+        password: payload.password,
+        email_confirm: true,
+        user_metadata: { full_name: payload.fullName, role: 'business_owner' },
+      })
+      authData  = retry.data
+      authError = retry.error
+    }
 
     if (authError || !authData.user) {
       throw new Error(authError?.message ?? 'Failed to create user')

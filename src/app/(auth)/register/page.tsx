@@ -390,30 +390,49 @@ export default function RegisterPage() {
     if (!step1Data || !step2Data || !selectedPlan) return
     setServerError('')
     setProceeding(true)
-    const payload = {
-      ...step1Data,
-      ...step2Data,
-      planId: selectedPlan.id,
-      ...(selectedTemplate ? { verticalTemplateSlug: selectedTemplate.slug } : {}),
+
+    // Free plan — no card needed, register directly
+    if (isFreePlan) {
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...step1Data, ...step2Data, planId: selectedPlan.id,
+            ...(selectedTemplate ? { verticalTemplateSlug: selectedTemplate.slug } : {}),
+          }),
+        })
+        const json = await res.json()
+        if (!res.ok || json.error) {
+          setServerError(json.error?.message ?? 'Registration failed. Please try again.')
+          setProceeding(false)
+          return
+        }
+        window.location.href = `/register/success?subdomain=${encodeURIComponent(step1Data.subdomain.toLowerCase())}`
+      } catch {
+        setServerError('Something went wrong. Please try again.')
+        setProceeding(false)
+      }
+      return
     }
+
+    // Paid plan — go through Stripe checkout (card linked now, £0 charged today,
+    // auto-billed after 30-day trial ends)
     try {
-      // Send ALL plans to backend register to start their 30-day free trial.
-      // Card is not required upfront. Stripe setup will happen in the dashboard later.
-      const regRes = await fetch('/api/auth/register', {
+      const res = await fetch('/api/stripe/checkout', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ...step1Data, ...step2Data,
+          planId: selectedPlan.id,
+          ...(selectedTemplate ? { verticalTemplateSlug: selectedTemplate.slug } : {}),
+        }),
       })
-      const regJson = await regRes.json()
-      
-      if (!regRes.ok || regJson.error) {
-        setServerError(regJson.error?.message ?? 'Registration failed. Please try again.')
+      const json = await res.json()
+      if (!res.ok || json.error) {
+        setServerError(json.error?.message ?? 'Failed to start checkout. Please try again.')
         setProceeding(false)
         return
       }
-
-      // Redirect to the success screen so they see the instructions before logging in
-      const subdomain = step1Data.subdomain.toLowerCase()
-      window.location.href = `/register/success?subdomain=${encodeURIComponent(subdomain)}`
+      window.location.href = json.data.url
     } catch {
       setServerError('Something went wrong. Please try again.')
       setProceeding(false)

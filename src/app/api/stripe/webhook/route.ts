@@ -157,13 +157,21 @@ export async function POST(request: NextRequest) {
         .eq('id', newBusinessId)
 
       if (pending.plan_id) {
+        // Read the actual trial_end from Stripe so our DB matches exactly
+        let trialEndsAt: string | null = null
+        if (stripeSubId) {
+          try {
+            const stripeSub = await stripe.subscriptions.retrieve(stripeSubId)
+            trialEndsAt = stripeSub.trial_end ? new Date(stripeSub.trial_end * 1000).toISOString() : null
+          } catch { /* non-fatal */ }
+        }
         await SubscriptionSyncService.upsert({
           businessId:       newBusinessId,
           planId:           pending.plan_id,
           stripeSubId,
           stripeCustomerId: typeof session.customer === 'string' ? session.customer : null,
           status:           'trialing',
-          trialEndsAt:      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          trialEndsAt,
         })
       }
     }

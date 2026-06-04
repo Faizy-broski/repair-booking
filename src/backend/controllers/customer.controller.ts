@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { CustomerService } from '@/backend/services/customer.service'
-import { ok, created, notFound, forbidden, serverError } from '@/backend/utils/api-response'
+import { ok, created, notFound, forbidden, serverError, conflict } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
 import { PlanLimitService } from '@/backend/services/plan-limit.service'
@@ -69,6 +69,8 @@ export const CustomerController = {
       })
       return created(customer)
     } catch (err) {
+      const msg = err instanceof Error ? err.message : ''
+      if (msg.includes('already exists')) return conflict(msg)
       return serverError('Failed to create customer', err)
     }
   },
@@ -83,6 +85,8 @@ export const CustomerController = {
       })
       return ok(customer)
     } catch (err) {
+      const msg = err instanceof Error ? err.message : ''
+      if (msg.includes('already exists')) return conflict(msg)
       return serverError('Failed to update customer', err)
     }
   },
