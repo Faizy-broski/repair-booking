@@ -390,49 +390,21 @@ export default function RegisterPage() {
     if (!step1Data || !step2Data || !selectedPlan) return
     setServerError('')
     setProceeding(true)
-
-    // Free plan — no card needed, register directly
-    if (isFreePlan) {
-      try {
-        const res = await fetch('/api/auth/register', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...step1Data, ...step2Data, planId: selectedPlan.id,
-            ...(selectedTemplate ? { verticalTemplateSlug: selectedTemplate.slug } : {}),
-          }),
-        })
-        const json = await res.json()
-        if (!res.ok || json.error) {
-          setServerError(json.error?.message ?? 'Registration failed. Please try again.')
-          setProceeding(false)
-          return
-        }
-        window.location.href = `/register/success?subdomain=${encodeURIComponent(step1Data.subdomain.toLowerCase())}`
-      } catch {
-        setServerError('Something went wrong. Please try again.')
-        setProceeding(false)
-      }
-      return
-    }
-
-    // Paid plan — go through Stripe checkout (card linked now, £0 charged today,
-    // auto-billed after 30-day trial ends)
     try {
-      const res = await fetch('/api/stripe/checkout', {
+      const res = await fetch('/api/auth/register', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...step1Data, ...step2Data,
-          planId: selectedPlan.id,
+          ...step1Data, ...step2Data, planId: selectedPlan.id,
           ...(selectedTemplate ? { verticalTemplateSlug: selectedTemplate.slug } : {}),
         }),
       })
       const json = await res.json()
       if (!res.ok || json.error) {
-        setServerError(json.error?.message ?? 'Failed to start checkout. Please try again.')
+        setServerError(json.error?.message ?? 'Registration failed. Please try again.')
         setProceeding(false)
         return
       }
-      window.location.href = json.data.url
+      window.location.href = `/register/success?subdomain=${encodeURIComponent(step1Data.subdomain.toLowerCase())}`
     } catch {
       setServerError('Something went wrong. Please try again.')
       setProceeding(false)

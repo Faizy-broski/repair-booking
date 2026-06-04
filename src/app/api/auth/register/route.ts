@@ -76,11 +76,13 @@ export async function POST(request: NextRequest) {
       await (supabase as any)
         .from('subscriptions')
         .insert({
-          business_id:   result.business.id,
-          plan_id:       data.planId,
-          status:        'trialing',
-          billing_cycle: data.billingCycle,
-          trial_ends_at: trialEndsAt,
+          business_id:          result.business.id,
+          plan_id:              data.planId,
+          status:               'trialing',
+          billing_cycle:        data.billingCycle,
+          trial_ends_at:        trialEndsAt,
+          current_period_start: new Date().toISOString(),
+          current_period_end:   trialEndsAt,
         })
 
       // Set trial_ends_at on business too for quick middleware check
