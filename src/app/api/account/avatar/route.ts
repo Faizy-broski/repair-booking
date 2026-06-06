@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/backend/config/supabase'
+import { getEffectiveUserId } from '@/lib/auth/get-effective-user'
 
 const BUCKET = 'avatars'
 const MAX_SIZE_BYTES = 2 * 1024 * 1024 // 2 MB
@@ -8,9 +8,8 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authErr } = await supabase.auth.getUser()
-    if (authErr || !user) {
+    const userId = await getEffectiveUserId()
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
     }
 
@@ -40,7 +39,7 @@ export async function POST(request: NextRequest) {
     const { data: profile } = await (admin as any)
       .from('profiles')
       .select('avatar_url')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single()
 
     if (profile?.avatar_url) {
@@ -52,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     // Upload new avatar — scoped per user
     const ext = (file.name.split('.').pop() ?? 'jpg').toLowerCase()
-    const path = `${user.id}/avatar.${ext}`
+    const path = `${userId}/avatar.${ext}`
     const bytes = await file.arrayBuffer()
 
     const { error: uploadErr } = await admin.storage
@@ -76,7 +75,7 @@ export async function POST(request: NextRequest) {
     const { error: updateErr } = await (admin as any)
       .from('profiles')
       .update({ avatar_url: avatarUrl })
-      .eq('id', user.id)
+      .eq('id', userId)
 
     if (updateErr) {
       console.error('[account/avatar] Profile update error:', updateErr.message)
@@ -92,9 +91,8 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE() {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authErr } = await supabase.auth.getUser()
-    if (authErr || !user) {
+    const userId = await getEffectiveUserId()
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
     }
 
@@ -103,7 +101,7 @@ export async function DELETE() {
     const { data: profile } = await (admin as any)
       .from('profiles')
       .select('avatar_url')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single()
 
     if (profile?.avatar_url) {
@@ -116,7 +114,7 @@ export async function DELETE() {
     const { error: updateErr } = await (admin as any)
       .from('profiles')
       .update({ avatar_url: null })
-      .eq('id', user.id)
+      .eq('id', userId)
 
     if (updateErr) {
       console.error('[account/avatar] Profile update error:', updateErr.message)

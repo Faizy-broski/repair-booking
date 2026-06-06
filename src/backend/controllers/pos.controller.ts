@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { unstable_after as after } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { PosService } from '@/backend/services/pos.service'
 import { CommissionService } from '@/backend/services/payroll.service'
@@ -101,19 +100,6 @@ export const PosController = {
     try {
       const saleId = await PosService.processSale(data)
       CommissionService.recordForSale(ctx.businessId, data.cashier_id, saleId, data.total).catch(() => {})
-
-      // After the response is sent, pre-generate and cache the receipt PDF so the
-      // first download from the sales list is instant rather than waiting 4s.
-      after(async () => {
-        try {
-          const result = await buildReceiptBuffer(saleId, data.branch_id, ctx.businessId)
-          if (!result) return
-          const cachePath = PdfCacheService.cachePath('sales', saleId)
-          const filename = `receipt-${saleId.slice(-8)}.pdf`
-          await PdfCacheService.store(cachePath, result.buffer, filename)
-        } catch { /* non-critical */ }
-      })
-
       return created({ sale_id: saleId })
     } catch (err: any) {
       if (err?.code === 'P0001' && err?.message) return badRequest(err.message, 'STOCK_ERROR')

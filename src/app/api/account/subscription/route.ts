@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/backend/config/supabase'
+import { getEffectiveUserId } from '@/lib/auth/get-effective-user'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', { apiVersion: '2026-02-25.clover' })
 
 export async function GET() {
   try {
-    const supabaseUser = await createClient()
-    const { data: { user }, error: authErr } = await supabaseUser.auth.getUser()
-    if (authErr || !user) {
+    const userId = await getEffectiveUserId()
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
     }
 
@@ -18,7 +17,7 @@ export async function GET() {
     const { data: profile } = await (supabase as any)
       .from('profiles')
       .select('business_id, full_name, email')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single()
 
     if (!profile?.business_id) {
@@ -185,8 +184,8 @@ export async function GET() {
     return NextResponse.json({
       data: {
         user: {
-          id:        user.id,
-          email:     user.email,
+          id:        userId,
+          email:     profile.email,
           full_name: profile.full_name,
         },
         business: {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/backend/config/supabase'
+import { getEffectiveUserId } from '@/lib/auth/get-effective-user'
 
 const BUCKET = 'message-attachments'
 const MAX_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
@@ -22,9 +22,8 @@ const ALLOWED_TYPES: Record<string, string> = {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user }, error: authErr } = await supabase.auth.getUser()
-    if (authErr || !user) {
+    const userId = await getEffectiveUserId()
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
     }
 
@@ -32,7 +31,7 @@ export async function POST(request: NextRequest) {
     const { data: profile } = await (admin as any)
       .from('profiles')
       .select('business_id')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single()
 
     if (!profile?.business_id) {
