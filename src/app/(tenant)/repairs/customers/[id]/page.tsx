@@ -51,6 +51,7 @@ export default function RepairCustomerDetailPage() {
   const [repairs, setRepairs] = useState<RepairRow[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(25)
   const [loading, setLoading] = useState(true)
   const [businessName, setBusinessName] = useState('')
   const [customStatuses, setCustomStatuses] = useState<{ name: string; color: string }[]>([])
@@ -73,13 +74,13 @@ export default function RepairCustomerDetailPage() {
   const fetchRepairs = useCallback(async () => {
     if (!activeBranch) return
     setLoading(true)
-    const params = new URLSearchParams({ branch_id: activeBranch.id, customer_id: id, page: String(page + 1), limit: '25' })
+    const params = new URLSearchParams({ branch_id: activeBranch.id, customer_id: id, page: String(page + 1), limit: String(pageSize) })
     const res = await fetch(`/api/repairs?${params}`)
     const json = await res.json()
     setRepairs(json.data ?? [])
     setTotal(json.meta?.total ?? 0)
     setLoading(false)
-  }, [activeBranch, id, page])
+  }, [activeBranch, id, page, pageSize])
 
   useEffect(() => { fetchRepairs() }, [fetchRepairs])
 
@@ -215,16 +216,16 @@ export default function RepairCustomerDetailPage() {
 
       {/* Export Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
-        <button onClick={exportCSV} className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors">
+        <button onClick={exportCSV} className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-700 hover:bg-emerald-100 transition-colors">
           <FileDown className="h-3.5 w-3.5" /> Export CSV
         </button>
-        <button onClick={exportExcel} className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors">
+        <button onClick={exportExcel} className="flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs text-green-700 hover:bg-green-100 transition-colors">
           <FileSpreadsheet className="h-3.5 w-3.5" /> Export Excel
         </button>
-        <button onClick={exportPDF} className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors">
+        <button onClick={exportPDF} className="flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs text-sky-700 hover:bg-sky-100 transition-colors">
           <Printer className="h-3.5 w-3.5" /> Print
         </button>
-        <button onClick={exportPDF} className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors">
+        <button onClick={exportPDF} className="flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs text-orange-700 hover:bg-orange-100 transition-colors">
           <FileText className="h-3.5 w-3.5" /> Export PDF
         </button>
       </div>
@@ -235,8 +236,9 @@ export default function RepairCustomerDetailPage() {
         isLoading={loading}
         totalCount={total}
         pageIndex={page}
-        pageSize={25}
+        pageSize={pageSize}
         onPageChange={setPage}
+        onPageSizeChange={(s) => { setPageSize(s); setPage(0) }}
         emptyMessage="No repairs found for this customer."
       />
     </div>

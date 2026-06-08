@@ -33,6 +33,7 @@ export default function GiftCardsPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [qrCard, setQrCard] = useState<GiftCardRow | null>(null)
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(20)
 
   // Form state
   const [formValue, setFormValue] = useState('')
@@ -44,9 +45,9 @@ export default function GiftCardsPage() {
   const [custSearch, setCustSearch] = useState('')
 
   const { data: giftCardsData, isLoading } = useQuery({
-    queryKey: ['gift-cards', activeBranch?.id, page],
+    queryKey: ['gift-cards', activeBranch?.id, page, pageSize],
     queryFn: async () => {
-      const params = new URLSearchParams({ branch_id: activeBranch!.id, page: String(page + 1), limit: '20' })
+      const params = new URLSearchParams({ branch_id: activeBranch!.id, page: String(page + 1), limit: String(pageSize) })
       const res = await fetch(`/api/gift-cards?${params}`)
       const json = await res.json()
       return { rows: (json.data ?? []) as GiftCardRow[], total: json.meta?.total ?? 0 }
@@ -240,8 +241,9 @@ export default function GiftCardsPage() {
         isLoading={isLoading}
         totalCount={totalCards}
         pageIndex={page}
-        pageSize={20}
+        pageSize={pageSize}
         onPageChange={setPage}
+        onPageSizeChange={(s) => { setPageSize(s); setPage(0) }}
         emptyMessage="No gift cards issued yet."
       />
 

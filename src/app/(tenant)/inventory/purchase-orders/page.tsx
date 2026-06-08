@@ -34,6 +34,7 @@ export default function PurchaseOrdersPage() {
   const [orders,    setOrders]    = useState<PORow[]>([])
   const [total,     setTotal]     = useState(0)
   const [page,      setPage]      = useState(0)
+  const [pageSize,  setPageSize]  = useState(20)
   const [loading,   setLoading]   = useState(true)
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -49,7 +50,7 @@ export default function PurchaseOrdersPage() {
   const fetchData = useCallback(async () => {
     if (!activeBranch) return
     setLoading(true)
-    const params = new URLSearchParams({ branch_id: activeBranch.id, page: String(page + 1) })
+    const params = new URLSearchParams({ branch_id: activeBranch.id, page: String(page + 1), limit: String(pageSize) })
     if (statusFilter) params.set('status', statusFilter)
     const [poRes, supRes] = await Promise.all([
       fetch(`/api/purchase-orders?${params}`),
@@ -60,7 +61,7 @@ export default function PurchaseOrdersPage() {
     setTotal(poJson.meta?.total ?? 0)
     setSuppliers(supJson.data ?? [])
     setLoading(false)
-  }, [activeBranch, page, statusFilter])
+  }, [activeBranch, page, pageSize, statusFilter])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -186,8 +187,9 @@ export default function PurchaseOrdersPage() {
         isLoading={loading}
         totalCount={total}
         pageIndex={page}
-        pageSize={20}
+        pageSize={pageSize}
         onPageChange={setPage}
+        onPageSizeChange={(s) => { setPageSize(s); setPage(0) }}
         emptyMessage="No purchase orders yet."
       />
 

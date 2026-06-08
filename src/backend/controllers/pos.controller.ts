@@ -118,10 +118,27 @@ export const PosController = {
         from: searchParams.get('from') ?? undefined,
         to: searchParams.get('to') ?? undefined,
         status: searchParams.get('status') ?? undefined,
+        search: searchParams.get('search') ?? undefined,
       })
       return ok(data, { page, limit, total: count ?? 0 })
     } catch (err) {
       return serverError('Failed to fetch sales', err)
+    }
+  },
+
+  async getSalesStats(request: NextRequest, ctx: RequestContext) {
+    const { searchParams } = request.nextUrl
+    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
+    if (!branchId) return badRequest('branch_id required')
+    try {
+      const stats = await PosService.getSalesStats(branchId, {
+        from: searchParams.get('from') ?? undefined,
+        to: searchParams.get('to') ?? undefined,
+        status: searchParams.get('status') ?? undefined,
+      })
+      return ok(stats)
+    } catch (err) {
+      return serverError('Failed to fetch sales stats', err)
     }
   },
 
@@ -161,6 +178,17 @@ export const PosController = {
       })
     } catch (err) {
       return serverError('Failed to generate receipt PDF', err)
+    }
+  },
+
+  async deleteSale(_request: NextRequest, _ctx: RequestContext, id: string) {
+    try {
+      await PosService.deleteSale(id)
+      return ok({ deleted: true })
+    } catch (err: any) {
+      if (err?.message?.includes('not found')) return notFound('Sale not found')
+      if (err?.message?.includes('Cannot delete a refund')) return badRequest(err.message)
+      return serverError('Failed to delete sale', err)
     }
   },
 

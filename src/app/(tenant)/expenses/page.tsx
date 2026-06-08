@@ -39,6 +39,7 @@ export default function ExpensesPage() {
   const { activeBranch } = useAuthStore()
   const queryClient = useQueryClient()
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(20)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('expenses')
   const [creatingCategory, setCreatingCategory] = useState(false)
@@ -51,9 +52,9 @@ export default function ExpensesPage() {
   })
 
   const { data: expensesData, isLoading: loadingExpenses } = useQuery({
-    queryKey: ['expenses', activeBranch?.id, page],
+    queryKey: ['expenses', activeBranch?.id, page, pageSize],
     queryFn: async () => {
-      const res = await fetch(`/api/expenses?branch_id=${activeBranch!.id}&page=${page + 1}`)
+      const res = await fetch(`/api/expenses?branch_id=${activeBranch!.id}&page=${page + 1}&limit=${pageSize}`)
       const json = await res.json()
       return { expenses: (json.data ?? []) as ExpenseRow[], total: json.meta?.total ?? 0 }
     },
@@ -185,7 +186,7 @@ export default function ExpensesPage() {
         </Tabs.List>
 
         <Tabs.Content value="expenses" className="mt-4">
-          <DataTable data={expenses} columns={expenseColumns} isLoading={loadingExpenses} totalCount={totalExp} pageIndex={page} pageSize={20} onPageChange={setPage} />
+          <DataTable data={expenses} columns={expenseColumns} isLoading={loadingExpenses} totalCount={totalExp} pageIndex={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(0) }} />
         </Tabs.Content>
 
         <Tabs.Content value="salaries" className="mt-4">

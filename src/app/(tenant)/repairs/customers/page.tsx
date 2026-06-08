@@ -57,6 +57,7 @@ export default function RepairCustomersPage() {
   const { activeBranch } = useAuthStore()
   const router = useRouter()
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(25)
   const [search, setSearch] = useState('')
   const queryClient = useQueryClient()
 
@@ -71,9 +72,9 @@ export default function RepairCustomersPage() {
   const editForm = useForm<FormData>({ resolver: zodResolver(schema) })
 
   const { data: customerResponse, isLoading: loading } = useQuery({
-    queryKey: ['repair-customers', activeBranch?.id, page, search],
+    queryKey: ['repair-customers', activeBranch?.id, page, pageSize, search],
     queryFn: async () => {
-      const params = new URLSearchParams({ branch_id: activeBranch!.id, page: String(page + 1), limit: '25' })
+      const params = new URLSearchParams({ branch_id: activeBranch!.id, page: String(page + 1), limit: String(pageSize) })
       if (search) params.set('search', search)
       const res = await fetch(`/api/customers?${params}`)
       return res.json()
@@ -178,17 +179,17 @@ export default function RepairCustomersPage() {
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
-        <button onClick={() => exportCSV(customers)} className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors">
+        <button onClick={() => exportCSV(customers)} className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-700 hover:bg-emerald-100 transition-colors">
           <FileDown className="h-3.5 w-3.5" /> Export CSV
         </button>
-        <button onClick={() => exportExcel(customers)} className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors">
+        <button onClick={() => exportExcel(customers)} className="flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs text-green-700 hover:bg-green-100 transition-colors">
           <FileSpreadsheet className="h-3.5 w-3.5" /> Export Excel
         </button>
-        <button onClick={() => window.print()} className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors">
+        <button onClick={() => window.print()} className="flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs text-sky-700 hover:bg-sky-100 transition-colors">
           <Printer className="h-3.5 w-3.5" /> Print
         </button>
         <div className="relative" ref={colMenuRef}>
-          <button onClick={() => setColMenuOpen((v) => !v)} className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors">
+          <button onClick={() => setColMenuOpen((v) => !v)} className="flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs text-violet-700 hover:bg-violet-100 transition-colors">
             <Columns className="h-3.5 w-3.5" /> Column visibility
           </button>
           {colMenuOpen && (
@@ -213,7 +214,7 @@ export default function RepairCustomersPage() {
         </div>
       </div>
 
-      <DataTable data={customers} columns={visibleColumns} isLoading={loading} totalCount={total} pageIndex={page} pageSize={25} onPageChange={setPage} emptyMessage="No customers with repairs found." />
+      <DataTable data={customers} columns={visibleColumns} isLoading={loading} totalCount={total} pageIndex={page} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={(s) => { setPageSize(s); setPage(0) }} emptyMessage="No customers with repairs found." />
 
       {/* Edit Sheet */}
       <InlineFormSheet open={editSheetOpen} onClose={() => { setEditSheetOpen(false); setEditError(null) }} title="Edit Customer">

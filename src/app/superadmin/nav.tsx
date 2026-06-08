@@ -11,7 +11,7 @@ const NAV = [
   { href: '/superadmin/templates',           label: 'Mod Templates', icon: Layers },
   { href: '/superadmin/vertical-templates',  label: 'Verticals',     icon: Store },
   { href: '/superadmin/broadcasts',          label: 'Broadcasts',    icon: Megaphone },
-  { href: '/superadmin/analytics',           label: 'Analytics',     icon: BarChart3 },
+  { href: '/superadmin/analytics',           label: 'Reports',       icon: BarChart3 },
 ]
 
 export function SuperAdminNav({ onNavClick }: { onNavClick?: () => void }) {

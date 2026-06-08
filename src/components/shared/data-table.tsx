@@ -8,6 +8,8 @@ import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } fro
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
+
 interface DataTableProps<T> {
   data: T[]
   columns: ColumnDef<T, unknown>[]
@@ -16,11 +18,12 @@ interface DataTableProps<T> {
   pageIndex?: number
   pageSize?: number
   onPageChange?: (page: number) => void
+  onPageSizeChange?: (size: number) => void
   emptyMessage?: string
 }
 
 export function DataTable<T>({
-  data, columns, isLoading, totalCount, pageIndex = 0, pageSize = 20, onPageChange, emptyMessage = 'No records found.',
+  data, columns, isLoading, totalCount, pageIndex = 0, pageSize = 20, onPageChange, onPageSizeChange, emptyMessage = 'No records found.',
 }: DataTableProps<T>) {
   const [sorting, setSorting] = useState<SortingState>([])
 
@@ -122,41 +125,59 @@ export function DataTable<T>({
       </div>
 
       {/* Pagination */}
-      {(totalCount ?? 0) > pageSize && (
+      {!!onPageChange && (
         <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 px-1">
-          <div className="text-sm font-medium text-outline">
-            Showing <span className="text-on-surface">{pageIndex * pageSize + 1}</span>–
-            <span className="text-on-surface">{Math.min((pageIndex + 1) * pageSize, totalCount ?? 0)}</span> of 
-            <span className="text-on-surface"> {totalCount}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-outline">
+              Showing <span className="text-on-surface">{pageIndex * pageSize + 1}</span>–
+              <span className="text-on-surface">{Math.min((pageIndex + 1) * pageSize, totalCount ?? 0)}</span> of
+              <span className="text-on-surface"> {totalCount ?? 0}</span>
+            </span>
+            {onPageSizeChange && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-400">Rows:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => { onPageChange(0); onPageSizeChange(Number(e.target.value)) }}
+                  className="h-7 rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-700 focus:border-primary focus:outline-none"
+                >
+                  {PAGE_SIZE_OPTIONS.map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
-          
-          <div className="flex items-center gap-2">
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => onPageChange?.(pageIndex - 1)}
-              disabled={pageIndex === 0}
-              className="h-9 px-4 flex items-center gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm transition-all disabled:bg-gray-200 disabled:text-gray-400 disabled:opacity-100"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              <span className="font-medium">Previous</span>
-            </Button>
-            
-            <div className="flex items-center justify-center min-w-[2.5rem] h-9 rounded-lg border border-outline-variant bg-surface-container-lowest text-sm font-bold text-primary shadow-sm">
-              {pageIndex + 1}
+
+          {(totalCount ?? 0) > pageSize && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => onPageChange(pageIndex - 1)}
+                disabled={pageIndex === 0}
+                className="h-9 px-4 flex items-center gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm transition-all disabled:bg-gray-200 disabled:text-gray-400 disabled:opacity-100"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span className="font-medium">Previous</span>
+              </Button>
+
+              <div className="flex items-center justify-center min-w-[2.5rem] h-9 rounded-lg border border-outline-variant bg-surface-container-lowest text-sm font-bold text-primary shadow-sm">
+                {pageIndex + 1}
+              </div>
+
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => onPageChange(pageIndex + 1)}
+                disabled={pageIndex + 1 >= totalPages}
+                className="h-9 px-4 flex items-center gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm transition-all disabled:bg-gray-200 disabled:text-gray-400 disabled:opacity-100"
+              >
+                <span className="font-medium">Next</span>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
-            
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => onPageChange?.(pageIndex + 1)}
-              disabled={pageIndex + 1 >= totalPages}
-              className="h-9 px-4 flex items-center gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm transition-all disabled:bg-gray-200 disabled:text-gray-400 disabled:opacity-100"
-            >
-              <span className="font-medium">Next</span>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+          )}
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Search, Plus, Minus, Trash2, UserPlus, X, AlertTriangle,
   Gift, Phone, Mail, ExternalLink, CheckCircle2, DollarSign,
@@ -28,6 +28,7 @@ export function CartPanel({ mobileView }: Props) {
   const router = useRouter()
   const { activeBranch, profile } = useAuthStore()
   const pos = usePosStore()
+  const queryClient = useQueryClient()
 
   // ── Customer state ─────────────────────────────────────────────────────────
   const [customerSearch, setCustomerSearch]         = useState('')
@@ -219,6 +220,8 @@ export function CartPanel({ mobileView }: Props) {
     if (res.ok) {
       const saleJson = await res.json()
       setSuccess(true)
+      queryClient.invalidateQueries({ queryKey: ['sales'] })
+      queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
       await printReceipt(saleJson.data?.sale_id ?? 'unknown', pos.paymentMethod, paymentSplits)
       pos.clearCart(); setCashTendered('')
       setTimeout(() => { setSuccess(false); setPaymentOpen(false) }, 2500)
@@ -253,6 +256,8 @@ export function CartPanel({ mobileView }: Props) {
     if (res.ok) {
       const saleJson = await res.json()
       setSuccess(true)
+      queryClient.invalidateQueries({ queryKey: ['sales'] })
+      queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
       await printReceipt(saleJson.data?.sale_id ?? 'unknown', 'cash')
       pos.clearCart(); setCashTendered('')
       setTimeout(() => setSuccess(false), 2500)
@@ -410,11 +415,11 @@ export function CartPanel({ mobileView }: Props) {
                   <tr key={`${item.product.id}-${item.variant?.id}`} className="bg-white hover:bg-gray-50">
                     <td className="px-1 py-2">
                       <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity - 1)} className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded bg-gray-100 hover:bg-gray-200 transition-colors">
+                        <button onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity - 1)} className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded bg-red-100 hover:bg-red-200 text-red-600 transition-colors">
                           <Minus className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                         </button>
                         <span className="w-5 sm:w-7 text-center text-sm font-bold text-gray-900">{item.quantity}</span>
-                        <button onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity + 1)} className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded bg-gray-100 hover:bg-gray-200 transition-colors">
+                        <button onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity + 1)} className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded bg-green-100 hover:bg-green-200 text-green-600 transition-colors">
                           <Plus className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                         </button>
                       </div>
@@ -434,7 +439,7 @@ export function CartPanel({ mobileView }: Props) {
                     </td>
                     <td className="px-1 py-2.5 text-right font-bold text-gray-900 text-xs sm:text-sm">{formatCurrency(lineTotal)}</td>
                     <td className="pr-1 py-2.5">
-                      <button onClick={() => pos.removeFromCart(item.product.id, item.variant?.id ?? null)} className="text-gray-300 hover:text-red-500 transition-colors">
+                      <button onClick={() => pos.removeFromCart(item.product.id, item.variant?.id ?? null)} className="text-red-400 hover:text-red-600 transition-colors">
                         <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </button>
                     </td>

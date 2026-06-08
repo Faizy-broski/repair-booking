@@ -1,6 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
-import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye, Trash2 } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye, Trash2, MoreVertical, Users, Wrench, Package, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/data-table'
@@ -26,6 +26,14 @@ const MODULE_LABELS: Record<string, string> = {
   phone:          'Phone',
 }
 
+interface BusinessStats {
+  salesRevenue: number
+  repairRevenue: number
+  repairs: number
+  inventory: number
+  customers: number
+}
+
 interface BusinessRow {
   id: string
   name: string
@@ -33,16 +41,22 @@ interface BusinessRow {
   email: string | null
   is_active: boolean
   created_at: string
-  subscriptions?: Array<{ status: string; plans?: { name: string; features: string[] } | null }> | null
+  subscriptions?: Array<{
+    status: string
+    current_period_end: string | null
+    trial_ends_at: string | null
+    plans?: { name: string; features: string[] } | null
+  }> | null
+  stats?: BusinessStats
 }
 
 /** Shape returned by GET /api/admin/businesses/[id]/modules */
 interface ModuleSummaryRow {
   module: string
-  is_enabled: boolean   // resolved (plan + overrides)
+  is_enabled: boolean
   access: {
     is_enabled: boolean
-    plan_override: boolean | null  // null = respect plan, true = force-grant, false = force-deny
+    plan_override: boolean | null
     template_name: string | null
   } | null
   has_override: boolean
@@ -54,6 +68,71 @@ function OverrideLabel({ override }: { override: boolean | null }) {
   if (override === true)  return <span className="text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded">Force ON</span>
   if (override === false) return <span className="text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded">Force OFF</span>
   return <span className="text-[10px] text-gray-400">Plan default</span>
+}
+
+// ── 3-dot action menu ─────────────────────────────────────────────────────────
+
+function ActionMenu({
+  biz,
+  onViewDetails,
+  onModules,
+  onToggleSuspend,
+  onDelete,
+}: {
+  biz: BusinessRow
+  onViewDetails: () => void
+  onModules: () => void
+  onToggleSuspend: () => void
+  onDelete: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    if (open) document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const item = (label: string, icon: React.ReactNode, onClick: () => void, danger = false) => (
+    <button
+      onClick={() => { onClick(); setOpen(false) }}
+      className={`flex w-full items-center gap-2.5 px-3 py-2 text-sm hover:bg-gray-50 ${danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-700'}`}
+    >
+      {icon}
+      {label}
+    </button>
+  )
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+      >
+        <MoreVertical className="h-4 w-4" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+          {item('View Details', <Eye className="h-3.5 w-3.5" />, onViewDetails)}
+          {item('Modules', <Settings2 className="h-3.5 w-3.5" />, onModules)}
+          {item(
+            biz.is_active ? 'Suspend' : 'Activate',
+            biz.is_active
+              ? <ShieldAlert className="h-3.5 w-3.5" />
+              : <ShieldCheck className="h-3.5 w-3.5" />,
+            onToggleSuspend,
+            biz.is_active,
+          )}
+          <div className="my-1 border-t border-gray-100" />
+          {item('Delete', <Trash2 className="h-3.5 w-3.5" />, onDelete, true)}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── Per-business module management sheet ─────────────────────────────────────
@@ -98,7 +177,6 @@ function ModuleSheet({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ plan_override: value }),
       })
-      // Refresh
       await fetchModules()
     } finally {
       setSaving(null)
@@ -115,7 +193,6 @@ function ModuleSheet({
       title={`Module Access — ${business?.name ?? ''}`}
     >
       <div className="space-y-4">
-        {/* Plan info header */}
         <div className="rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-800">{planName}</p>
@@ -159,13 +236,11 @@ function ModuleSheet({
                   key={mod}
                   className="flex items-center gap-3 rounded-lg border border-gray-100 bg-white px-4 py-3"
                 >
-                  {/* Status icon */}
                   {resolvedEnabled
                     ? <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500" />
                     : <XCircle className="h-4 w-4 shrink-0 text-gray-300" />
                   }
 
-                  {/* Module name + plan membership */}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-800">{MODULE_LABELS[mod] ?? mod}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
@@ -177,7 +252,6 @@ function ModuleSheet({
                     </div>
                   </div>
 
-                  {/* Override controls */}
                   <div className="flex items-center gap-1 shrink-0">
                     <button
                       title="Force ON — grant regardless of plan"
@@ -226,6 +300,41 @@ function ModuleSheet({
   )
 }
 
+// ── Delete confirm inline widget ──────────────────────────────────────────────
+
+function DeleteConfirm({ onConfirm, onCancel, deleting }: { onConfirm: () => void; onCancel: () => void; deleting: boolean }) {
+  return (
+    <div className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1">
+      <span className="text-xs font-medium text-red-700 whitespace-nowrap">Delete?</span>
+      <button
+        disabled={deleting}
+        onClick={onConfirm}
+        className="rounded px-2 py-0.5 text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+      >
+        {deleting ? '…' : 'Yes'}
+      </button>
+      <button
+        disabled={deleting}
+        onClick={onCancel}
+        className="rounded px-2 py-0.5 text-xs font-semibold bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+      >
+        No
+      </button>
+    </div>
+  )
+}
+
+// ── Stat pill ─────────────────────────────────────────────────────────────────
+
+function StatPill({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
+  return (
+    <span title={label} className="inline-flex items-center gap-1 text-sm text-gray-700">
+      <span className="text-gray-400">{icon}</span>
+      {value.toLocaleString()}
+    </span>
+  )
+}
+
 // ── Main businesses page ──────────────────────────────────────────────────────
 
 export default function BusinessesPage() {
@@ -233,6 +342,7 @@ export default function BusinessesPage() {
   const [businesses, setBusinesses] = useState<BusinessRow[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(20)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [modulesBusiness, setModulesBusiness] = useState<BusinessRow | null>(null)
@@ -240,18 +350,25 @@ export default function BusinessesPage() {
   const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
+    const controller = new AbortController()
     async function fetch_() {
       setLoading(true)
-      const params = new URLSearchParams({ page: String(page + 1), limit: '20' })
-      if (search) params.set('search', search)
-      const res = await fetch(`/api/businesses?${params}`)
-      const json = await res.json()
-      setBusinesses(json.data ?? [])
-      setTotal(json.meta?.total ?? 0)
-      setLoading(false)
+      try {
+        const params = new URLSearchParams({ page: String(page + 1), limit: String(pageSize) })
+        if (search) params.set('search', search)
+        const res = await fetch(`/api/businesses?${params}`, { signal: controller.signal })
+        const json = await res.json()
+        setBusinesses(json.data ?? [])
+        setTotal(json.meta?.total ?? 0)
+      } catch (e: any) {
+        if (e?.name !== 'AbortError') throw e
+      } finally {
+        if (!controller.signal.aborted) setLoading(false)
+      }
     }
     fetch_()
-  }, [page, search])
+    return () => controller.abort()
+  }, [page, search, pageSize])
 
   async function deleteBusiness(id: string) {
     setDeleting(true)
@@ -267,9 +384,6 @@ export default function BusinessesPage() {
 
   async function toggleSuspend(biz: BusinessRow) {
     const suspending = biz.is_active
-    // Always update BOTH fields atomically so middleware checks stay consistent:
-    //   is_active=false + is_suspended=true  → blocked
-    //   is_active=true  + is_suspended=false → allowed
     await fetch(`/api/businesses/${biz.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -291,7 +405,12 @@ export default function BusinessesPage() {
       header: 'Business',
       cell: ({ getValue, row }) => (
         <div>
-          <p className="font-medium text-gray-900">{getValue() as string}</p>
+          <button
+            onClick={() => router.push(`/superadmin/businesses/${row.original.id}`)}
+            className="font-medium text-teal-700 hover:text-teal-900 hover:underline text-left"
+          >
+            {getValue() as string}
+          </button>
           <p className="text-xs text-gray-400 font-mono">{row.original.subdomain}.repairbooking.co.uk</p>
         </div>
       ),
@@ -338,73 +457,89 @@ export default function BusinessesPage() {
       cell: ({ getValue }) => formatDate(getValue() as string),
     },
     {
+      id: 'expiry',
+      header: 'Expires',
+      cell: ({ row }) => {
+        const sub = row.original.subscriptions?.[0]
+        if (!sub) return <span className="text-gray-400 text-sm">—</span>
+        const date = sub.current_period_end ?? sub.trial_ends_at
+        if (!date) return <span className="text-gray-400 text-sm">—</span>
+        const expired = new Date(date) < new Date()
+        return (
+          <span className={`text-sm ${expired ? 'text-red-600 font-medium' : 'text-gray-700'}`}>
+            {formatDate(date)}
+          </span>
+        )
+      },
+    },
+    {
+      id: 'salesRevenue',
+      header: 'Sales Rev.',
+      cell: ({ row }) => {
+        const v = row.original.stats?.salesRevenue ?? 0
+        return (
+          <span className="text-sm font-medium text-gray-800">
+            £{v.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+          </span>
+        )
+      },
+    },
+    {
+      id: 'repairRevenue',
+      header: 'Repair Rev.',
+      cell: ({ row }) => {
+        const v = row.original.stats?.repairRevenue ?? 0
+        return (
+          <span className="text-sm font-medium text-gray-800">
+            £{v.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+          </span>
+        )
+      },
+    },
+    {
+      id: 'customers',
+      header: 'Customers',
+      cell: ({ row }) => (
+        <StatPill icon={<Users className="h-3.5 w-3.5" />} value={row.original.stats?.customers ?? 0} label="Customers" />
+      ),
+    },
+    {
+      id: 'inventory',
+      header: 'Inventory',
+      cell: ({ row }) => (
+        <StatPill icon={<Package className="h-3.5 w-3.5" />} value={row.original.stats?.inventory ?? 0} label="Inventory items" />
+      ),
+    },
+    {
+      id: 'repairs',
+      header: 'Repairs',
+      cell: ({ row }) => (
+        <StatPill icon={<Wrench className="h-3.5 w-3.5" />} value={row.original.stats?.repairs ?? 0} label="Repairs" />
+      ),
+    },
+    {
       id: 'actions',
       header: '',
       cell: ({ row }) => {
         const biz = row.original
         const isConfirming = confirmDeleteId === biz.id
+        if (isConfirming) {
+          return (
+            <DeleteConfirm
+              onConfirm={() => deleteBusiness(biz.id)}
+              onCancel={() => setConfirmDeleteId(null)}
+              deleting={deleting}
+            />
+          )
+        }
         return (
-          <div className="flex gap-1 items-center">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => router.push(`/superadmin/businesses/${biz.id}`)}
-              title="View full business details"
-              className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-            >
-              <Eye className="h-3.5 w-3.5 mr-1" /> View Details
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setModulesBusiness(biz)}
-              title="Manage module access"
-            >
-              <Settings2 className="h-3.5 w-3.5 mr-1" /> Modules
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => toggleSuspend(biz)}
-              className={biz.is_active ? 'text-red-500 hover:text-red-700' : 'text-green-600 hover:text-green-700'}
-            >
-              {biz.is_active ? (
-                <><ShieldAlert className="h-3.5 w-3.5" /> Suspend</>
-              ) : (
-                <><ShieldCheck className="h-3.5 w-3.5" /> Activate</>
-              )}
-            </Button>
-
-            {isConfirming ? (
-              <div className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1">
-                <span className="text-xs font-medium text-red-700 whitespace-nowrap">Delete?</span>
-                <button
-                  disabled={deleting}
-                  onClick={() => deleteBusiness(biz.id)}
-                  className="rounded px-2 py-0.5 text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
-                >
-                  {deleting ? '…' : 'Yes'}
-                </button>
-                <button
-                  disabled={deleting}
-                  onClick={() => setConfirmDeleteId(null)}
-                  className="rounded px-2 py-0.5 text-xs font-semibold bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  No
-                </button>
-              </div>
-            ) : (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setConfirmDeleteId(biz.id)}
-                className="text-red-400 hover:text-red-600 hover:bg-red-50"
-                title="Permanently delete this business"
-              >
-                <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
-              </Button>
-            )}
-          </div>
+          <ActionMenu
+            biz={biz}
+            onViewDetails={() => router.push(`/superadmin/businesses/${biz.id}`)}
+            onModules={() => setModulesBusiness(biz)}
+            onToggleSuspend={() => toggleSuspend(biz)}
+            onDelete={() => setConfirmDeleteId(biz.id)}
+          />
         )
       },
     },
@@ -420,14 +555,22 @@ export default function BusinessesPage() {
       </div>
 
       <div className="relative max-w-xs">
-        <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
         <input
-          type="search"
+          type="text"
           placeholder="Search businesses..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
+          onChange={(e) => { setSearch(e.target.value); setPage(0) }}
+          className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-8 pr-8 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500/30 transition-colors"
         />
+        {search && (
+          <button
+            onClick={() => { setSearch(''); setPage(0) }}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
       <DataTable
@@ -436,18 +579,17 @@ export default function BusinessesPage() {
         isLoading={loading}
         totalCount={total}
         pageIndex={page}
-        pageSize={20}
+        pageSize={pageSize}
         onPageChange={setPage}
+        onPageSizeChange={(s) => { setPageSize(s); setPage(0) }}
         emptyMessage="No businesses found."
       />
 
-      {/* Per-business module management sheet */}
       <ModuleSheet
         business={modulesBusiness}
         open={modulesBusiness !== null}
         onClose={() => setModulesBusiness(null)}
       />
-
     </div>
   )
 }

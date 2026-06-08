@@ -15,24 +15,82 @@ export const BusinessService = {
     const { data, error, count } = await q
     if (error) throw error
 
-    // Attach subscriptions via direct query to avoid PostgREST FK-inference issues
     const businesses = data ?? []
-    if (businesses.length > 0) {
-      const ids = businesses.map((b: any) => b.id)
-      const { data: subs } = await adminSupabase
+    if (businesses.length === 0) return { data: businesses, count }
+
+    const ids = businesses.map((b: any) => b.id)
+
+    // Subscriptions + branches + stats all in parallel
+    const [{ data: subs }, { data: branches }] = await Promise.all([
+      adminSupabase
         .from('subscriptions')
         .select('*, plans(id, name, plan_type, features, price_monthly, price_yearly)')
         .in('business_id', ids)
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false }),
+      adminSupabase
+        .from('branches')
+        .select('id, business_id')
+        .in('business_id', ids),
+    ])
 
-      const subsByBusiness: Record<string, any[]> = {}
-      for (const s of subs ?? []) {
-        if (!subsByBusiness[s.business_id]) subsByBusiness[s.business_id] = []
-        subsByBusiness[s.business_id].push(s)
+    // Map subscriptions to businesses
+    const subsByBusiness: Record<string, any[]> = {}
+    for (const s of subs ?? []) {
+      if (!subsByBusiness[s.business_id]) subsByBusiness[s.business_id] = []
+      subsByBusiness[s.business_id].push(s)
+    }
+
+    // Map branches to businesses
+    const branchToBusinessMap: Record<string, string> = {}
+    for (const b of branches ?? []) {
+      branchToBusinessMap[b.id] = b.business_id
+    }
+    const allBranchIds = (branches ?? []).map((b: any) => b.id)
+
+    // Per-business stats
+    const statsMap: Record<string, { salesRevenue: number; repairRevenue: number; repairs: number; inventory: number; customers: number }> = {}
+    const initStat = () => ({ salesRevenue: 0, repairRevenue: 0, repairs: 0, inventory: 0, customers: 0 })
+
+    if (allBranchIds.length > 0) {
+      const [
+        { data: salesData },
+        { data: repairsData },
+        { data: productsData },
+        { data: customersData },
+      ] = await Promise.all([
+        adminSupabase.from('sales').select('branch_id, total').in('branch_id', allBranchIds),
+        adminSupabase.from('repairs').select('branch_id, actual_cost').in('branch_id', allBranchIds),
+        adminSupabase.from('branch_products').select('branch_id').in('branch_id', allBranchIds).eq('is_enabled', true),
+        adminSupabase.from('customers').select('branch_id').in('branch_id', allBranchIds),
+      ])
+
+      for (const s of salesData ?? []) {
+        const bizId = branchToBusinessMap[s.branch_id]; if (!bizId) continue
+        if (!statsMap[bizId]) statsMap[bizId] = initStat()
+        statsMap[bizId].salesRevenue += s.total ?? 0
       }
-      for (const biz of businesses as any[]) {
-        biz.subscriptions = subsByBusiness[biz.id] ?? []
+      for (const r of repairsData ?? []) {
+        const bizId = branchToBusinessMap[r.branch_id]; if (!bizId) continue
+        if (!statsMap[bizId]) statsMap[bizId] = initStat()
+        statsMap[bizId].repairs++
+        statsMap[bizId].repairRevenue += r.actual_cost ?? 0
       }
+      for (const p of productsData ?? []) {
+        const bizId = branchToBusinessMap[p.branch_id]; if (!bizId) continue
+        if (!statsMap[bizId]) statsMap[bizId] = initStat()
+        statsMap[bizId].inventory++
+      }
+      for (const c of customersData ?? []) {
+        if (!c.branch_id) continue
+        const bizId = branchToBusinessMap[c.branch_id]; if (!bizId) continue
+        if (!statsMap[bizId]) statsMap[bizId] = initStat()
+        statsMap[bizId].customers++
+      }
+    }
+
+    for (const biz of businesses as any[]) {
+      biz.subscriptions = subsByBusiness[biz.id] ?? []
+      biz.stats = statsMap[biz.id] ?? initStat()
     }
 
     return { data: businesses, count }

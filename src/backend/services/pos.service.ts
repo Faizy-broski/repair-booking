@@ -40,8 +40,8 @@ export const PosService = {
     return data as string
   },
 
-  async getSales(branchId: string, params: { page?: number; limit?: number; from?: string; to?: string; status?: string }) {
-    const { page = 1, limit = 20, from, to, status } = params
+  async getSales(branchId: string, params: { page?: number; limit?: number; from?: string; to?: string; status?: string; search?: string }) {
+    const { page = 1, limit = 20, from, to, status, search } = params
     let q = adminSupabase
       .from('sales')
       .select('*, customers(first_name,last_name), profiles!cashier_id(full_name)', { count: 'exact' })
@@ -52,10 +52,52 @@ export const PosService = {
     if (from) q = q.gte('created_at', from)
     if (to) q = q.lte('created_at', to)
     if (status) q = q.eq('payment_status', status)
+    if (search) {
+      const term = `%${search}%`
+      // Resolve customer IDs matching the name first (PostgREST can't filter
+      // on foreign table columns inside .or())
+      const { data: matched } = await adminSupabase
+        .from('customers')
+        .select('id')
+        .or(`first_name.ilike.${term},last_name.ilike.${term}`)
+      const customerIds = (matched ?? []).map((c: { id: string }) => c.id)
+
+      // sale_number is a generated TEXT column (last 8 chars of UUID, uppercase)
+      if (customerIds.length > 0) {
+        q = q.or(`sale_number.ilike.${term},customer_id.in.(${customerIds.join(',')})`)
+      } else {
+        q = q.ilike('sale_number', term)
+      }
+    }
 
     const { data, error, count } = await q
     if (error) throw error
     return { data, count }
+  },
+
+  async getSalesStats(branchId: string, params: { from?: string; to?: string; status?: string }) {
+    const { from, to, status } = params
+    let q = adminSupabase
+      .from('sales')
+      .select('total, is_refund')
+      .eq('branch_id', branchId)
+
+    if (from) q = q.gte('created_at', from)
+    if (to) q = q.lte('created_at', to)
+    if (status) q = q.eq('payment_status', status)
+
+    const { data, error } = await q
+    if (error) throw error
+
+    const rows = data ?? []
+    const sales = rows.filter(r => !r.is_refund)
+    const refunds = rows.filter(r => r.is_refund)
+    return {
+      sales_count: sales.length,
+      revenue: sales.reduce((s, r) => s + Number(r.total), 0),
+      refund_count: refunds.length,
+      refund_amount: refunds.reduce((s, r) => s + Number(r.total), 0),
+    }
   },
 
   async getSaleById(id: string, branchId: string | null) {
@@ -66,7 +108,20 @@ export const PosService = {
     if (branchId) q = q.eq('branch_id', branchId)
     const { data, error } = await q.single()
     if (error) throw error
-    return data
+
+    // Fetch refund records separately to avoid unreliable self-join
+    const { data: refundRecords } = await adminSupabase
+      .from('sales')
+      .select('id, is_refund, sale_items(name, quantity)')
+      .eq('original_sale_id', id)
+      .eq('is_refund', true)
+
+    return { ...data, refund_records: refundRecords ?? [] }
+  },
+
+  async deleteSale(saleId: string): Promise<void> {
+    const { error } = await adminSupabase.rpc('delete_sale', { p_sale_id: saleId })
+    if (error) throw error
   },
 
   async processRefund(payload: {

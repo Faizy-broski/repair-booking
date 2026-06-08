@@ -117,6 +117,7 @@ export default function CustomersPage() {
   const queryClient = useQueryClient()
 
   const [search, setSearch] = useState('')
+  const [pageSize, setPageSize] = useState(20)
 
   // URL-based page state
   const page = parseInt(searchParams.get('page') || '0', 10)
@@ -149,12 +150,12 @@ export default function CustomersPage() {
   const editForm = useForm<FormData>({ resolver: zodResolver(schema) })
 
   const { data: customerData, isLoading: loading } = useQuery({
-    queryKey: ['customers', activeBranch?.id, page, search],
+    queryKey: ['customers', activeBranch?.id, page, pageSize, search],
     queryFn: async () => {
       const params = new URLSearchParams({
         branch_id: activeBranch!.id,
         page: String(page + 1),
-        limit: '20',
+        limit: String(pageSize),
       })
       if (search) params.set('search', search)
       const res = await fetch(`/api/customers?${params}`)
@@ -339,26 +340,26 @@ export default function CustomersPage() {
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => exportCSV(customers)}
-          className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+          className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-700 hover:bg-emerald-100 transition-colors"
         >
           <FileDown className="h-3.5 w-3.5" /> Export CSV
         </button>
         <button
           onClick={() => exportExcel(customers)}
-          className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+          className="flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs text-green-700 hover:bg-green-100 transition-colors"
         >
           <FileSpreadsheet className="h-3.5 w-3.5" /> Export Excel
         </button>
         <button
           onClick={() => exportPDF(customers)}
-          className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+          className="flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs text-sky-700 hover:bg-sky-100 transition-colors"
         >
           <Printer className="h-3.5 w-3.5" /> Print
         </button>
         <div className="relative" ref={colMenuRef}>
           <button
             onClick={() => setColMenuOpen((v) => !v)}
-            className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs text-violet-700 hover:bg-violet-100 transition-colors"
           >
             <Columns className="h-3.5 w-3.5" /> Column visibility
           </button>
@@ -403,8 +404,9 @@ export default function CustomersPage() {
         isLoading={loading}
         totalCount={total}
         pageIndex={page}
-        pageSize={20}
+        pageSize={pageSize}
         onPageChange={setPage}
+        onPageSizeChange={(s) => { setPageSize(s); setPage(0) }}
         emptyMessage="No customers yet."
       />
 

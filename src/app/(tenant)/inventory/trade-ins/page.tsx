@@ -33,6 +33,7 @@ export default function TradeInsPage() {
   const [tradeIns,  setTradeIns]  = useState<TradeIn[]>([])
   const [total,     setTotal]     = useState(0)
   const [page,      setPage]      = useState(0)
+  const [pageSize,  setPageSize]  = useState(20)
   const [products,  setProducts]  = useState<ProductOption[]>([])
   const [loading,   setLoading]   = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -43,7 +44,7 @@ export default function TradeInsPage() {
     if (!activeBranch) return
     setLoading(true)
     const [tiRes, pRes] = await Promise.all([
-      fetch(`/api/inventory/trade-ins?branch_id=${activeBranch.id}&page=${page + 1}`),
+      fetch(`/api/inventory/trade-ins?branch_id=${activeBranch.id}&page=${page + 1}&limit=${pageSize}`),
       fetch(`/api/products?limit=200`),
     ])
     const [tiJson, pJson] = await Promise.all([tiRes.json(), pRes.json()])
@@ -51,7 +52,7 @@ export default function TradeInsPage() {
     setTotal(tiJson.meta?.total ?? 0)
     setProducts(pJson.data ?? [])
     setLoading(false)
-  }, [activeBranch, page])
+  }, [activeBranch, page, pageSize])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -136,8 +137,9 @@ export default function TradeInsPage() {
         isLoading={loading}
         totalCount={total}
         pageIndex={page}
-        pageSize={20}
+        pageSize={pageSize}
         onPageChange={setPage}
+        onPageSizeChange={(s) => { setPageSize(s); setPage(0) }}
         emptyMessage="No trade-in transactions yet."
       />
 

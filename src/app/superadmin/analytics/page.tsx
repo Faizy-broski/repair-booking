@@ -208,7 +208,7 @@ export default async function AnalyticsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Platform Analytics</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Platform Reports</h1>
         <p className="text-sm text-gray-500">Revenue, growth and subscription metrics across all tenants</p>
       </div>
 

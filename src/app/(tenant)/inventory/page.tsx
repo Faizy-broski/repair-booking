@@ -77,6 +77,7 @@ export default function InventoryPage() {
   // Start in loading state — stays true until branchId is known and first
   // fetch completes. Prevents the DataTable from briefly rendering products
   // with on_hand=0 before the branch-aware fetch returns.
+  const [pageSize, setPageSize] = useState(20)
   const [deleteTarget, setDeleteTarget] = useState<ProductRow | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
@@ -113,9 +114,9 @@ export default function InventoryPage() {
 
   // ── Products Query — fires immediately, table shows as soon as this returns ──
   const { data: productResponse, isLoading: loading } = useQuery({
-    queryKey: ['inventory', branchId, page, search, categoryFilter, brandFilter, supplierFilter, valuationFilter, hideOutOfStock, typeFilter],
+    queryKey: ['inventory', branchId, page, pageSize, search, categoryFilter, brandFilter, supplierFilter, valuationFilter, hideOutOfStock, typeFilter],
     queryFn: async () => {
-      const params = new URLSearchParams({ page: String(page + 1), limit: '20', branch_id: branchId! })
+      const params = new URLSearchParams({ page: String(page + 1), limit: String(pageSize), branch_id: branchId! })
       if (search) params.set('search', search)
       if (categoryFilter) params.set('category_id', categoryFilter)
       if (brandFilter) params.set('brand_id', brandFilter)
@@ -612,8 +613,9 @@ export default function InventoryPage() {
         isLoading={loading}
         totalCount={total}
         pageIndex={page}
-        pageSize={20}
+        pageSize={pageSize}
         onPageChange={setPage}
+        onPageSizeChange={(s) => { setPageSize(s); setPage(0) }}
         emptyMessage="No products yet. Click Add Product to get started!"
       />
 

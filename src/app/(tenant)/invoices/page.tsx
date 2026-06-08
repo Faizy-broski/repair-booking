@@ -64,6 +64,7 @@ export default function InvoicesPage() {
   const router = useRouter()
   const { activeBranch } = useAuthStore()
   const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(20)
   const [statusFilter, setStatusFilter] = useState('')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [lineItems, setLineItems] = useState([{ description: '', quantity: 1, unit_price: 0 }])
@@ -78,12 +79,12 @@ export default function InvoicesPage() {
   })
 
   const queryClient = useQueryClient()
-  const invoiceQueryKey = ['invoices', activeBranch?.id, page, statusFilter]
+  const invoiceQueryKey = ['invoices', activeBranch?.id, page, pageSize, statusFilter]
 
   const { data: invoiceData, isLoading: loading } = useQuery({
     queryKey: invoiceQueryKey,
     queryFn: async () => {
-      const invParams = new URLSearchParams({ branch_id: activeBranch!.id, page: String(page + 1) })
+      const invParams = new URLSearchParams({ branch_id: activeBranch!.id, page: String(page + 1), limit: String(pageSize) })
       if (statusFilter) invParams.set('status', statusFilter)
       const [invRes, custRes, sumRes] = await Promise.all([
         fetch(`/api/invoices?${invParams}`),
@@ -349,8 +350,9 @@ export default function InvoicesPage() {
         isLoading={loading}
         totalCount={total}
         pageIndex={page}
-        pageSize={20}
+        pageSize={pageSize}
         onPageChange={setPage}
+        onPageSizeChange={(s) => { setPageSize(s); setPage(0) }}
         emptyMessage="No invoices yet."
       />
 

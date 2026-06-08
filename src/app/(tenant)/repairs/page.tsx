@@ -316,6 +316,7 @@ export default function RepairsPage() {
   
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [pageSize, setPageSize] = useState(20)
   const [statsPeriod, setStatsPeriod] = useState<'month' | '3months' | '6months' | 'year'>('month')
 
   // URL-based state
@@ -404,7 +405,7 @@ export default function RepairsPage() {
   }, [])
 
   const queryClient = useQueryClient()
-  const repairsQueryKey     = ['repairs', activeBranch?.id, page, search, statusFilter, view] as const
+  const repairsQueryKey     = ['repairs', activeBranch?.id, page, pageSize, search, statusFilter, view] as const
   const repairsBaseKey      = ['repairs', activeBranch?.id] as const
 
   // ── Repairs Query — fires immediately, table shows as soon as this returns ──
@@ -414,7 +415,7 @@ export default function RepairsPage() {
       const params = new URLSearchParams({
         branch_id: activeBranch!.id,
         page: String(view === 'kanban' ? 1 : page + 1),
-        limit: view === 'kanban' ? '200' : '20',
+        limit: view === 'kanban' ? '200' : String(pageSize),
       })
       if (search) params.set('search', search)
       if (statusFilter && view === 'list') params.set('status', statusFilter)
@@ -472,7 +473,7 @@ export default function RepairsPage() {
       return json.data ?? null
     },
     enabled: !!activeBranch,
-    staleTime: 60 * 1000,
+    staleTime: 0,
     select: (d: any) => {
       if (!d) return null
       return {
@@ -541,38 +542,13 @@ export default function RepairsPage() {
   }
 
   async function handleStatusChange(repairId: string, newStatus: string) {
-    const previousData  = queryClient.getQueryData<RepairListResponse>(repairsQueryKey)
-    const previousStats = queryClient.getQueryData<any>(['repairs-stats', activeBranch?.id, statsPeriod])
-    const repair        = previousData?.data?.find((r: RepairRow) => r.id === repairId)
-    const oldStatus     = (repair?.status ?? '').toLowerCase()
-    const newStatusLo   = newStatus.toLowerCase()
+    const previousData = queryClient.getQueryData<RepairListResponse>(repairsQueryKey)
 
-    const TERM_EXACT = new Set(['repaired', 'collected', 'unrepairable'])
-    const TERM_KW    = ['complet', 'done', 'fixed', 'pick', 'closed', 'resolv', 'finish', 'collect', 'handover']
-    const isTerm = (s: string) => TERM_EXACT.has(s) || TERM_KW.some(kw => s.includes(kw))
-
-    // Optimistic: status badge flips instantly.
+    // Optimistic: status badge in the list row flips instantly.
     queryClient.setQueryData<RepairListResponse>(repairsQueryKey, (old) => {
       if (!old?.data) return old
       return { ...old, data: old.data.map((r: RepairRow) => r.id === repairId ? { ...r, status: newStatus } : r) }
     })
-
-    // Optimistic: revenue and counts flip instantly (profit waits for real refetch — needs parts data).
-    if (repair && previousStats) {
-      const deposit  = (repair as any).deposit_paid  ?? 0
-      const fullCost = (repair as any).actual_cost   ?? (repair as any).estimated_cost ?? 0
-      const refund   = (repair as any).refund_amount ?? 0
-      const calcRev  = (s: string) => isTerm(s) ? fullCost : s === 'refunded' ? Math.max(0, deposit - refund) : deposit
-      const revDelta = calcRev(newStatusLo) - calcRev(oldStatus)
-      const wasOpen  = !isTerm(oldStatus)  && oldStatus  !== 'refunded'
-      const isNowOpen = !isTerm(newStatusLo) && newStatusLo !== 'refunded'
-      queryClient.setQueryData(['repairs-stats', activeBranch?.id, statsPeriod], (old: any) => ({
-        ...old,
-        repairs_revenue:   (old.repairs_revenue  ?? 0) + revDelta,
-        repairs_completed: (old.repairs_completed ?? 0) + (isTerm(newStatusLo) ? 1 : 0) - (isTerm(oldStatus) ? 1 : 0),
-        repairs_open:      (old.repairs_open      ?? 0) + (isNowOpen ? 1 : 0) - (wasOpen ? 1 : 0),
-      }))
-    }
 
     const res = await fetch(`/api/repairs/${repairId}/status`, {
       method: 'PATCH',
@@ -581,8 +557,7 @@ export default function RepairsPage() {
     })
 
     if (!res.ok) {
-      if (previousData)  queryClient.setQueryData(repairsQueryKey, previousData)
-      if (previousStats) queryClient.setQueryData(['repairs-stats', activeBranch?.id, statsPeriod], previousStats)
+      if (previousData) queryClient.setQueryData(repairsQueryKey, previousData)
       queryClient.invalidateQueries({ queryKey: repairsBaseKey })
       if (res.status === 403) {
         toast.error("Permission Denied: You don't have permission to update repair status.")
@@ -1328,8 +1303,7 @@ export default function RepairsPage() {
           </div>
           {repairStats ? (
             <p className="mt-3 flex items-center gap-1 text-xs font-medium text-[#b45309]">
-              <Clock className="h-3 w-3" />
-              Avg. 2h turnaround
+              All currently active jobs
             </p>
           ) : (
             <div className="mt-3 h-4 w-36 rounded bg-surface-container animate-pulse" />
@@ -1438,26 +1412,26 @@ export default function RepairsPage() {
 
           <button
             onClick={() => exportCSV(repairs)}
-            className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-700 hover:bg-emerald-100 transition-colors"
           >
             <FileDown className="h-3.5 w-3.5" /> Export CSV
           </button>
           <button
             onClick={() => exportExcel(repairs)}
-            className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs text-green-700 hover:bg-green-100 transition-colors"
           >
             <FileSpreadsheet className="h-3.5 w-3.5" /> Export Excel
           </button>
           <button
             onClick={() => exportPDF(repairs)}
-            className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs text-sky-700 hover:bg-sky-100 transition-colors"
           >
             <Printer className="h-3.5 w-3.5" /> Print
           </button>
           <div className="relative" ref={colMenuRef}>
             <button
               onClick={() => setColMenuOpen((v) => !v)}
-              className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs text-violet-700 hover:bg-violet-100 transition-colors"
             >
               <Columns className="h-3.5 w-3.5" /> Columns
             </button>
@@ -1496,8 +1470,9 @@ export default function RepairsPage() {
           isLoading={loading}
           totalCount={total}
           pageIndex={page}
-          pageSize={20}
+          pageSize={pageSize}
           onPageChange={setPage}
+          onPageSizeChange={(s) => { setPageSize(s); setPage(0) }}
           emptyMessage="No repair jobs found. Create your first one!"
         />
       ) : (
@@ -2091,7 +2066,7 @@ export default function RepairsPage() {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ name: v }),
-                          }).then((r) => r.ok && queryClient.invalidateQueries({ queryKey: ['repairs-meta', activeBranch?.id] })).catch(() => {})
+                          }).then((r) => { if (r.ok) queryClient.invalidateQueries({ queryKey: ['repairs-meta', activeBranch?.id] }) }).catch(() => {})
                         }
                       }}
                       onRemove={(v) => setJobData((p) => ({ ...p, faults: p.faults.filter((f) => f !== v) }))}

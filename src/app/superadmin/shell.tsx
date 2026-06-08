@@ -27,8 +27,12 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
         )}
       </div>
       <SuperAdminNav onNavClick={onClose} />
-      <div className="border-t border-white/10 p-2">
-        <SignOutButton redirectTo="/login" />
+      <div className="border-t border-white/10 p-3">
+        <SignOutButton
+          redirectTo="/login"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-500/15 px-3 py-2 text-sm font-medium text-red-400 hover:bg-red-500/25 hover:text-red-300 transition-colors"
+          iconClassName="h-4 w-4"
+        />
       </div>
     </aside>
   )

@@ -109,11 +109,12 @@ export default function EmployeesPage() {
 
   // ── Step 1: employees first — show this tab instantly ─────────────────────
   const [empPage, setEmpPage] = useState(0)
+  const [empPageSize, setEmpPageSize] = useState(20)
 
   const { data: employeesData, isLoading: loadingEmployees, isSuccess: employeesLoaded } = useQuery({
-    queryKey: ['employees-list', activeBranch?.id, empPage],
+    queryKey: ['employees-list', activeBranch?.id, empPage, empPageSize],
     queryFn: async () => {
-      const params = new URLSearchParams({ branch_id: activeBranch!.id, page: String(empPage + 1), limit: '20' })
+      const params = new URLSearchParams({ branch_id: activeBranch!.id, page: String(empPage + 1), limit: String(empPageSize) })
       const res = await fetch(`/api/employees?${params}`)
       const json = await res.json()
       return { data: (json.data ?? []) as EmployeeRow[], total: json.meta?.total ?? 0 }
@@ -481,7 +482,7 @@ export default function EmployeesPage() {
 
         {/* ── Employees ── */}
         <Tabs.Content value="employees" className="mt-4">
-          <DataTable data={employees} columns={empColumns} isLoading={loadingEmployees} totalCount={totalEmployees} pageIndex={empPage} pageSize={20} onPageChange={setEmpPage} emptyMessage="No employees yet." />
+          <DataTable data={employees} columns={empColumns} isLoading={loadingEmployees} totalCount={totalEmployees} pageIndex={empPage} pageSize={empPageSize} onPageChange={setEmpPage} onPageSizeChange={(s) => { setEmpPageSize(s); setEmpPage(0) }} emptyMessage="No employees yet." />
         </Tabs.Content>
 
         {/* ── Clock In/Out ── */}
