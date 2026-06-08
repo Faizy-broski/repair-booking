@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { Plus, Eye, X, CheckCircle, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -135,9 +136,9 @@ export default function PurchaseOrdersPage() {
       header: '',
       cell: ({ row }) => (
         <div className="flex gap-1">
-          <Button size="sm" variant="ghost" onClick={() => router.push(`/inventory/purchase-orders/${row.original.id}`)}>
+          <Link href={`/inventory/purchase-orders/${row.original.id}`} className="inline-flex items-center justify-center rounded-md p-1.5 text-sm text-on-surface-variant hover:bg-surface-container transition-colors">
             <Eye className="h-3.5 w-3.5" />
-          </Button>
+          </Link>
           <Button size="sm" variant="ghost" title="Clone" onClick={async () => {
             if (!activeBranch) return
             const res = await fetch(`/api/purchase-orders/${row.original.id}/clone?branch_id=${activeBranch.id}`, { method: 'POST' })

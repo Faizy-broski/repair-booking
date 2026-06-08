@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { confirmToast } from '@/lib/confirm-toast'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useAuthStore } from '@/store/auth.store'
 import { Eye, Pencil, Trash2, Search, FileDown, FileSpreadsheet, Printer, FileText, Columns } from 'lucide-react'
 import { DataTable } from '@/components/shared/data-table'
@@ -148,10 +149,10 @@ export default function RepairCustomersPage() {
       id: 'actions', header: 'Action', size: 160,
       cell: ({ row }) => (
         <div className="flex items-center gap-1.5">
-          <button onClick={() => router.push(`/repairs/customers/${row.original.id}`)}
+          <Link href={`/repairs/customers/${row.original.id}`}
             className="flex items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-xs font-medium text-cyan-600 hover:bg-cyan-100 transition-colors">
             <Eye className="h-3 w-3" /> Details
-          </button>
+          </Link>
           <button onClick={() => openEdit(row.original)}
             className="flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-100 transition-colors">
             <Pencil className="h-3 w-3" /> Edit

@@ -10,12 +10,12 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "RepairBooking — POS & Repair Management for Modern Shops",
+  title: "RepairBooking POS & Repair Management for Modern Shops",
   description:
     "All-in-one cloud POS and repair booking platform for repair shops, electronics stores, and multi-branch retail. Manage repairs, inventory, staff, invoices and more.",
   keywords: "repair shop software, POS system, repair booking, inventory management, multi-branch POS",
   openGraph: {
-    title: "RepairBooking — POS & Repair Management",
+    title: "RepairBooking POS & Repair Management",
     description: "All-in-one cloud POS and repair booking platform for modern repair shops.",
     type: "website",
   },

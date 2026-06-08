@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Link from 'next/link'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Plus, Search, LayoutGrid, List, Wrench, DollarSign, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -1131,12 +1132,12 @@ export default function RepairsPage() {
         const r = row.original
         return (
           <div className="flex flex-col gap-1.5">
-            <button
-              onClick={() => router.push(`/repairs/${r.id}`)}
+            <Link
+              href={`/repairs/${r.id}`}
               className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 py-1.5 text-xs font-bold text-cyan-700 hover:bg-cyan-100 transition-all shadow-sm active:scale-95"
             >
               <Eye className="h-3.5 w-3.5" /> DETAILS
-            </button>
+            </Link>
             <ActionsMenu
               onEdit={() => openEdit(r)}
               onSlip={() => setSlipRepair(r)}

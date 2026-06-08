@@ -3,7 +3,7 @@ import { createAdminClient } from '@/backend/config/supabase'
 import { getEffectiveUserId } from '@/lib/auth/get-effective-user'
 
 const BUCKET = 'product-images'
-const MAX_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB
+const MAX_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
 
 export async function POST(request: NextRequest) {
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     // Validate size
     if (file.size > MAX_SIZE_BYTES) {
       return NextResponse.json(
-        { error: 'File too large. Maximum size is 5 MB.' },
+        { error: 'File too large. Maximum size is 10 MB.' },
         { status: 400 }
       )
     }

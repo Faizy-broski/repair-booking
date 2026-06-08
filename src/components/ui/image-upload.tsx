@@ -31,11 +31,19 @@ export function ImageUpload({ value, onChange, label, compact = false, className
 
   async function handleFile(file: File) {
     setError(null)
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Image is too large — maximum size is 10 MB')
+      return
+    }
     setUploading(true)
     try {
       const form = new FormData()
       form.append('file', file)
       const res = await fetch('/api/upload/image', { method: 'POST', body: form })
+      if (res.status === 413) {
+        setError('Image is too large — please use an image under 5 MB')
+        return
+      }
       const json = await res.json()
       if (!res.ok) {
         setError(json.error ?? 'Upload failed')
@@ -43,7 +51,7 @@ export function ImageUpload({ value, onChange, label, compact = false, className
         onChange(json.url)
       }
     } catch {
-      setError('Network error — please try again')
+      setError('Upload failed — please check your connection and try again')
     } finally {
       setUploading(false)
     }
@@ -213,7 +221,7 @@ export function ImageUpload({ value, onChange, label, compact = false, className
                 Drag & drop or{' '}
                 <span className="text-brand-teal">click to browse</span>
               </p>
-              <p className="text-xs text-gray-400">JPG, PNG, WebP, GIF — max 5 MB</p>
+              <p className="text-xs text-gray-400">JPG, PNG, WebP, GIF — max 10 MB</p>
 
               {/* URL input toggle */}
               {showUrlInput ? (

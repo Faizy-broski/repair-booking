@@ -9,7 +9,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', { apiVersion: '20
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://repairbooking.co.uk'
 
 const schema = z.object({
-  planId: z.string().uuid('planId must be a valid UUID'),
+  planId:       z.string().uuid('planId must be a valid UUID'),
+  billingCycle: z.enum(['monthly', 'yearly']).default('monthly'),
 })
 
 export async function POST(request: NextRequest) {
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { planId } = parsed.data
+    const { planId, billingCycle } = parsed.data
     const supabase = createAdminClient()
 
     // Look up business from user profile
@@ -46,41 +47,54 @@ export async function POST(request: NextRequest) {
 
     const businessId = profile.business_id
 
-    // Look up plan (cast to any — plan_type column added by migration 042)
+    // Look up plan — fetch both monthly and yearly price IDs
     const { data: planRow, error: planErr } = await (supabase as any)
       .from('plans')
-      .select('id, name, stripe_price_id_monthly, plan_type, price_monthly')
+      .select('id, name, stripe_price_id_monthly, stripe_price_id_yearly, plan_type, price_monthly, price_yearly')
       .eq('id', planId)
       .eq('is_active', true)
       .single()
 
-    const plan = planRow as { id: string; name: string; stripe_price_id_monthly: string | null; plan_type: string; price_monthly: number } | null
+    const plan = planRow as {
+      id: string; name: string
+      stripe_price_id_monthly: string | null
+      stripe_price_id_yearly:  string | null
+      plan_type: string
+      price_monthly: number
+      price_yearly:  number | null
+    } | null
     if (planErr || !plan) {
       return NextResponse.json({ error: { message: 'Plan not found' } }, { status: 400 })
     }
 
-    // Auto-create Stripe product + price if not yet configured
-    let stripePriceId = plan.stripe_price_id_monthly
+    const useYearly = billingCycle === 'yearly' && !!plan.price_yearly
+
+    // Auto-create Stripe product + price if not yet configured for this cycle
+    let stripePriceId = useYearly ? plan.stripe_price_id_yearly : plan.stripe_price_id_monthly
     if (!stripePriceId) {
-      if (plan.price_monthly <= 0) {
+      const unitAmount = useYearly ? plan.price_yearly! : plan.price_monthly
+      if (unitAmount <= 0) {
         return NextResponse.json(
-          { error: { message: `Plan "${plan.name}" has no price and no Stripe price ID configured.` } },
+          { error: { message: `Plan "${plan.name}" has no ${billingCycle} price configured.` } },
           { status: 500 }
         )
       }
       const product = await stripe.products.create({ name: plan.name })
       const price = await stripe.prices.create({
         product: product.id,
-        unit_amount: Math.round(plan.price_monthly * 100),
+        unit_amount: Math.round(unitAmount * 100),
         currency: 'gbp',
-        recurring: { interval: 'month' },
+        recurring: { interval: useYearly ? 'year' : 'month' },
       })
       stripePriceId = price.id
 
       // Persist so we don't recreate next time
       await (supabase as any)
         .from('plans')
-        .update({ stripe_price_id_monthly: stripePriceId })
+        .update(useYearly
+          ? { stripe_price_id_yearly: stripePriceId }
+          : { stripe_price_id_monthly: stripePriceId }
+        )
         .eq('id', planId)
     }
 

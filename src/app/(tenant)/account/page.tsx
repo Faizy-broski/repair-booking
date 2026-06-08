@@ -1,6 +1,7 @@
 'use client'
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import Image from 'next/image'
 import {
   User, CreditCard, Receipt, CheckCircle2, AlertTriangle,
@@ -18,6 +19,7 @@ interface Plan {
   id: string
   name: string
   price_monthly: number
+  price_yearly: number | null
   plan_type: 'free' | 'paid' | 'enterprise'
   features: string[] | null
   max_branches: number | null
@@ -105,13 +107,25 @@ function StatusBadge({ status }: { status: string }) {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-export default function AccountPage() {
+function AccountPageInner() {
   const { profile, subscriptionStatus, isOwner, setProfile } = useAuthStore()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { restart: restartTour } = useTour(profile?.id ?? null)
   const hasAccess = subscriptionStatus === null || subscriptionStatus.hasAccess
 
-  const [tab, setTab] = useState<Tab>(hasAccess ? 'account' : 'billing')
+  const tabFromUrl = (searchParams.get('tab') as Tab | null)
+  const [tab, setTab] = useState<Tab>(tabFromUrl ?? (hasAccess ? 'account' : 'billing'))
+
+  // Sync tab when URL param changes (e.g. back/forward navigation)
+  useEffect(() => {
+    if (tabFromUrl) setTab(tabFromUrl)
+  }, [tabFromUrl])
+
+  // subscriptionStatus may load after mount — force billing tab when access is lost
+  useEffect(() => {
+    if (subscriptionStatus && !subscriptionStatus.hasAccess) setTab('billing')
+  }, [subscriptionStatus])
   const [accountData, setAccountData] = useState<AccountData | null>(null)
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loadingAccount, setLoadingAccount] = useState(true)
@@ -323,8 +337,9 @@ export default function AccountPage() {
       {/* Tabs */}
       <div className="flex gap-0 border-b border-outline-variant">
         {TABS.map((t) => (
-          <button
+          <Link
             key={t.id}
+            href={t.id === 'account' ? '/account' : `/account?tab=${t.id}`}
             onClick={() => setTab(t.id)}
             className={cn(
               'flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors -mb-px',
@@ -335,7 +350,7 @@ export default function AccountPage() {
           >
             <t.icon className="h-4 w-4" />
             {t.label}
-          </button>
+          </Link>
         ))}
       </div>
 
@@ -595,93 +610,16 @@ export default function AccountPage() {
                 </div>
               )}
 
-              {/* Upgrade section — higher-tier plans */}
-              {(upgradablePlans.length > 0) && (
-                <div className={cn(
-                  'rounded-2xl border p-6',
-                  resubscribePlan
-                    ? 'border-outline-variant bg-surface-container-lowest'
-                    : 'border-brand-teal/30 bg-brand-teal/5'
-                )}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <Zap className={cn('h-5 w-5', resubscribePlan ? 'text-on-surface-variant' : 'text-brand-teal')} />
-                    <h3 className="text-base font-semibold text-on-surface">
-                      {resubscribePlan
-                        ? 'Or switch to a different plan'
-                        : wasFreeTrial
-                          ? 'Subscribe to continue'
-                          : isExpired
-                            ? 'Resubscribe to continue'
-                            : 'Upgrade your plan'}
-                    </h3>
-                  </div>
-                  <p className="text-sm text-on-surface-variant mb-5">
-                    {resubscribePlan
-                      ? 'Or choose a different plan below.'
-                      : wasFreeTrial
-                        ? 'Your free trial has ended. Subscribe to continue using all features.'
-                        : isExpired
-                          ? 'Your subscription has ended. Choose a plan below to restore full access to all features.'
-                          : 'Unlock more features and capacity by moving to a higher plan.'}
-                  </p>
-
-                  {!resubscribePlan && errorMsg && (
-                    <p className="mb-4 text-sm text-red-400 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
-                      {errorMsg}
-                    </p>
-                  )}
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {upgradablePlans.map((p, i) => {
-                      const highlighted = !resubscribePlan && upgradablePlans.length >= 2 && i === Math.floor(upgradablePlans.length / 2)
-                      return (
-                        <div
-                          key={p.id}
-                          className={cn(
-                            'relative flex flex-col rounded-xl border p-5 transition-all',
-                            highlighted
-                              ? 'border-brand-teal bg-brand-teal/10'
-                              : 'border-outline-variant bg-surface-container-low'
-                          )}
-                        >
-                          {highlighted && (
-                            <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-brand-teal px-2.5 py-0.5 text-[10px] font-bold text-white">
-                              Most popular
-                            </span>
-                          )}
-                          <p className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1">{p.name}</p>
-                          <div className="flex items-end gap-1 mb-3">
-                            <span className="text-3xl font-black text-on-surface">£{p.price_monthly}</span>
-                            <span className="text-sm text-on-surface-variant mb-0.5">/mo</span>
-                          </div>
-                          <ul className="flex-1 space-y-1.5 mb-4">
-                            {parseFeatures(p.features).map((f) => (
-                              <li key={f} className="flex items-center gap-2 text-xs text-on-surface-variant">
-                                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-brand-teal" />
-                                <span className="capitalize">{f.replace(/_/g, ' ')}</span>
-                              </li>
-                            ))}
-                          </ul>
-                          <Button
-                            onClick={() => handleResubscribe(p.id)}
-                            disabled={upgrading === p.id}
-                            className={cn(
-                              'w-full font-semibold',
-                              highlighted
-                                ? 'bg-brand-teal text-white hover:bg-brand-teal/90'
-                                : 'bg-surface-container-highest text-on-surface hover:bg-surface-container-high'
-                            )}
-                          >
-                            {upgrading === p.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                            ) : (
-                              'Upgrade'
-                            )}
-                          </Button>
-                        </div>
-                      )
-                    })}
-                  </div>
+              {/* Explore plans button */}
+              {upgradablePlans.length > 0 && (
+                <div className="flex justify-center pt-2">
+                  <Button
+                    onClick={() => router.push('/account/plans')}
+                    className="gap-2 bg-brand-teal text-white hover:bg-brand-teal/90 font-semibold px-8"
+                  >
+                    <Zap className="h-4 w-4" />
+                    Explore More Plans
+                  </Button>
                 </div>
               )}
 
@@ -795,6 +733,14 @@ export default function AccountPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function AccountPage() {
+  return (
+    <Suspense>
+      <AccountPageInner />
+    </Suspense>
   )
 }
 

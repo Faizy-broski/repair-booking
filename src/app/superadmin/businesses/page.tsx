@@ -1,5 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import Link from 'next/link'
 import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye, Trash2, MoreVertical, Users, Wrench, Package, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -86,15 +88,27 @@ function ActionMenu({
   onDelete: () => void
 }) {
   const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (
+        btnRef.current && !btnRef.current.contains(e.target as Node) &&
+        menuRef.current && !menuRef.current.contains(e.target as Node)
+      ) setOpen(false)
     }
     if (open) document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
+
+  function toggle() {
+    if (!btnRef.current) return
+    const r = btnRef.current.getBoundingClientRect()
+    setPos({ top: r.bottom + window.scrollY + 4, left: r.right + window.scrollX - 176 })
+    setOpen((v) => !v)
+  }
 
   const item = (label: string, icon: React.ReactNode, onClick: () => void, danger = false) => (
     <button
@@ -107,16 +121,21 @@ function ActionMenu({
   )
 
   return (
-    <div ref={ref} className="relative">
+    <div>
       <button
-        onClick={() => setOpen((v) => !v)}
+        ref={btnRef}
+        onClick={toggle}
         className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700"
       >
         <MoreVertical className="h-4 w-4" />
       </button>
 
-      {open && (
-        <div className="absolute right-0 z-50 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+      {open && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'absolute', top: pos.top, left: pos.left, zIndex: 9999 }}
+          className="w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+        >
           {item('View Details', <Eye className="h-3.5 w-3.5" />, onViewDetails)}
           {item('Modules', <Settings2 className="h-3.5 w-3.5" />, onModules)}
           {item(
@@ -129,7 +148,8 @@ function ActionMenu({
           )}
           <div className="my-1 border-t border-gray-100" />
           {item('Delete', <Trash2 className="h-3.5 w-3.5" />, onDelete, true)}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
@@ -405,12 +425,12 @@ export default function BusinessesPage() {
       header: 'Business',
       cell: ({ getValue, row }) => (
         <div>
-          <button
-            onClick={() => router.push(`/superadmin/businesses/${row.original.id}`)}
+          <Link
+            href={`/superadmin/businesses/${row.original.id}`}
             className="font-medium text-teal-700 hover:text-teal-900 hover:underline text-left"
           >
             {getValue() as string}
-          </button>
+          </Link>
           <p className="text-xs text-gray-400 font-mono">{row.original.subdomain}.repairbooking.co.uk</p>
         </div>
       ),
