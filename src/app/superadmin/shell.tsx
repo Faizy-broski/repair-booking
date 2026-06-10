@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { Wrench, Menu, X } from 'lucide-react'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { queryClient } from '@/lib/query-client'
 import { SignOutButton } from '@/components/layout/sign-out-button'
 import { SuperAdminNav } from './nav'
 
@@ -48,6 +50,7 @@ export function SuperAdminShell({ children }: { children: React.ReactNode }) {
   }, [sidebarOpen])
 
   return (
+    <QueryClientProvider client={queryClient}>
     <div className="flex h-screen overflow-hidden bg-surface-container-low">
       {/* Desktop sidebar — always visible */}
       <div className="hidden lg:flex">
@@ -91,5 +94,6 @@ export function SuperAdminShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
     </div>
+    </QueryClientProvider>
   )
 }

@@ -67,7 +67,7 @@ export function CartPanel({ mobileView }: Props) {
       return json.data ?? null
     },
     enabled: !!activeBranch,
-    staleTime: 5 * 60_000,
+    staleTime: 0,
   })
 
   // ── Computed totals ────────────────────────────────────────────────────────

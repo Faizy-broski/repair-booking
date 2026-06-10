@@ -53,7 +53,7 @@ export function ScannerModal({
 
   const { lookup, isLooking } = useBarcodeLookup(branchId)
 
-  const handleScan = useCallback(async (code: string) => {
+  const handleScan = useCallback(async (code: string, format = 'hid') => {
     // Guard against concurrent lookups (dedup at the orchestration level)
     if (isProcessing.current || !open) return
     isProcessing.current = true
@@ -63,7 +63,7 @@ export function ScannerModal({
     setFoundProduct(null)
     setPrefill(undefined)
 
-    const result = await lookup(code)
+    const result = await lookup(code, format)
 
     // Use the display barcode from the parsed result (e.g. SKU extracted from JSON)
     if (result.barcode !== code) setLastBarcode(result.barcode)

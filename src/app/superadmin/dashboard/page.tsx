@@ -15,13 +15,16 @@ async function getDashboardStats() {
     supabase.from('businesses').select('*', { count: 'exact', head: true }),
     supabase.from('businesses').select('*', { count: 'exact', head: true }).eq('is_active', true),
     supabase.from('profiles').select('*', { count: 'exact', head: true }),
-    supabase.from('subscriptions').select('plan_id, billing_cycle, plans(price_monthly, price_yearly)').eq('status', 'active'),
+    supabase.from('subscriptions').select('plan_id, billing_cycle, plans(price_monthly, price_yearly)').eq('status', 'active').eq('livemode', true),
   ])
 
   const mrr = (subscriptions ?? []).reduce((sum: number, sub: any) => {
     const plan = sub.plans
     if (!plan) return sum
-    return sum + (sub.billing_cycle === 'monthly' ? plan.price_monthly : plan.price_yearly / 12)
+    const amount = sub.billing_cycle === 'yearly'
+      ? (plan.price_yearly ?? plan.price_monthly * 12) / 12
+      : Number(plan.price_monthly ?? 0)
+    return sum + amount
   }, 0)
 
   return { totalBusinesses, activeBusinesses, totalUsers, mrr }
@@ -44,7 +47,7 @@ export default async function SuperAdminDashboard() {
     { label: 'Total Businesses',  value: stats.totalBusinesses ?? 0,   icon: <Building2 className="h-5 w-5" />, color: 'blue'   as const, subtitle: 'registered' },
     { label: 'Active Businesses', value: stats.activeBusinesses ?? 0,  icon: <TrendingUp className="h-5 w-5" />, color: 'green'  as const, subtitle: 'currently active' },
     { label: 'Total Users',       value: stats.totalUsers ?? 0,        icon: <Users className="h-5 w-5" />,     color: 'purple' as const, subtitle: 'across all tenants' },
-    { label: 'MRR',               value: formatCurrencyCompact(stats.mrr, 'USD'), icon: <CreditCard className="h-5 w-5" />, color: 'yellow' as const, subtitle: 'monthly recurring' },
+    { label: 'MRR',               value: formatCurrencyCompact(stats.mrr, 'GBP'), icon: <CreditCard className="h-5 w-5" />, color: 'yellow' as const, subtitle: 'monthly recurring' },
   ]
 
   return (

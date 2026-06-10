@@ -7,7 +7,6 @@ import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
 import { z } from 'zod'
 import { adminSupabase } from '@/backend/config/supabase'
-import { PdfCacheService } from '@/backend/services/pdf-cache.service'
 
 // ── Shared receipt PDF generator (used by both on-demand and background warm) ──
 async function buildReceiptBuffer(saleId: string, branchId: string | null, businessId: string | null) {
@@ -154,21 +153,12 @@ export const PosController = {
 
   async generateReceiptPdf(_request: NextRequest, ctx: RequestContext, id: string) {
     try {
-      const filename = `receipt-${id.slice(-8)}.pdf`
-      const cachePath = PdfCacheService.cachePath('sales', id)
-
-      // Sales are immutable — no freshness check needed.
-      // Single createSignedUrl() call: existence check + URL in one round-trip.
-      const cachedUrl = await PdfCacheService.getSignedUrl(cachePath, filename)
-      if (cachedUrl) return NextResponse.redirect(cachedUrl, { status: 302 })
-
-      // Cache miss — build PDF using the shared helper (all I/O parallelised internally)
+      // Always regenerate — PDF content depends on invoice design settings which can
+      // change at any time, so a cached copy would silently ignore setting updates.
       const result = await buildReceiptBuffer(id, ctx.auth.branchId ?? null, ctx.businessId)
       if (!result) return notFound()
 
-      const signedUrl = await PdfCacheService.store(cachePath, result.buffer, filename)
-      if (signedUrl) return NextResponse.redirect(signedUrl, { status: 302 })
-
+      const filename = `receipt-${id.slice(-8)}.pdf`
       return new NextResponse(result.buffer, {
         status: 200,
         headers: {

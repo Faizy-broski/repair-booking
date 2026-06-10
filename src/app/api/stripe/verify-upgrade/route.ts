@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/backend/config/supabase'
 import { SubscriptionSyncService } from '@/backend/services/subscription-sync.service'
 import { invalidateBusinessCache } from '@/backend/services/module-config.service'
+import { SubscriptionEmailService } from '@/backend/services/subscription-email.service'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', { apiVersion: '2026-02-25.clover' })
 
@@ -99,6 +100,7 @@ export async function POST(request: NextRequest) {
       trialEndsAt: null,
       currentPeriodStart: periodStart,
       currentPeriodEnd:   periodEnd,
+      livemode: session.livemode,
     })
 
     // Bust Next.js data cache so module configs serve the new plan immediately
@@ -109,6 +111,10 @@ export async function POST(request: NextRequest) {
       .select('name, plan_type, features')
       .eq('id', planId)
       .single()
+
+    // Fire subscription confirmation emails (owner + super-admin).
+    // Intentionally NOT awaited — email delivery must never block the UI response.
+    SubscriptionEmailService.sendNewSubscriptionEmails(businessId, planId, periodEnd)
 
     return NextResponse.json({ data: { success: true, plan } })
   } catch (err) {

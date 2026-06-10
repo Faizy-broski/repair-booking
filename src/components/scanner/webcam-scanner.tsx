@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { CameraOff, RefreshCw, MonitorSpeaker, Zap } from 'lucide-react'
 
 interface Props {
-  onResult: (code: string) => void
+  onResult: (code: string, format: string) => void
   active: boolean
 }
 
@@ -30,10 +30,17 @@ export function WebcamScanner({ onResult, active }: Props) {
     let cancelled = false
     let stream: MediaStream | null = null
 
-    function emitResult(text: string) {
-      if (text === lastResult.current) return
+    function emitResult(text: string, format: string, fromNative: boolean) {
+      console.debug(`[WEBCAM] emitResult — src=${fromNative ? 'native' : 'zxing'} format=${format} text=${JSON.stringify(text)}`)
+
+      if (text === lastResult.current) {
+        console.debug('[WEBCAM]   → SKIPPED (dedup)')
+        return
+      }
+
       lastResult.current = text
-      onResultRef.current(text)
+      console.debug('[WEBCAM]   → FIRING')
+      onResultRef.current(text, format)
       setTimeout(() => { lastResult.current = null }, 1500)
     }
 
@@ -117,6 +124,14 @@ export function WebcamScanner({ onResult, active }: Props) {
         let canvas: HTMLCanvasElement | null = null
         let ctx: CanvasRenderingContext2D | null = null
 
+        // Shared format name map used in both init log and per-decode log
+        const FMT_MAP_INIT: Record<number, string> = {
+          0: 'aztec', 1: 'codabar', 2: 'code_39', 3: 'code_93', 4: 'code_128',
+          5: 'data_matrix', 6: 'ean_8', 7: 'ean_13', 8: 'itf', 9: 'maxicode',
+          10: 'pdf417', 11: 'qr_code', 12: 'rss_14', 13: 'rss_expanded',
+          14: 'upc_a', 15: 'upc_e', 16: 'upc_ean_extension',
+        }
+
         if (!nativeDetectorAll) {
           // ZXing handles 1D barcodes (and QR if native unavailable)
           const [
@@ -128,16 +143,22 @@ export function WebcamScanner({ onResult, active }: Props) {
           ])
           if (cancelled) return
 
-          // When running alongside native QR, restrict ZXing to 1D only to avoid redundant QR work
+          // When running alongside native QR, restrict ZXing to 1D only
           const formats = nativeDetectorQR
             ? [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
-               BarcodeFormat.CODE_128, BarcodeFormat.CODE_39, BarcodeFormat.DATA_MATRIX]
+               BarcodeFormat.CODE_128, BarcodeFormat.CODE_39, BarcodeFormat.ITF,
+               BarcodeFormat.CODABAR, BarcodeFormat.DATA_MATRIX]
             : [BarcodeFormat.QR_CODE, BarcodeFormat.EAN_13, BarcodeFormat.EAN_8,
                BarcodeFormat.UPC_A, BarcodeFormat.UPC_E, BarcodeFormat.CODE_128,
-               BarcodeFormat.CODE_39, BarcodeFormat.DATA_MATRIX]
+               BarcodeFormat.CODE_39, BarcodeFormat.ITF, BarcodeFormat.CODABAR,
+               BarcodeFormat.DATA_MATRIX]
 
           const hints = new Map<number, any>([
-            [DecodeHintType.POSSIBLE_FORMATS, formats]
+            [DecodeHintType.POSSIBLE_FORMATS, formats],
+            // TRY_HARDER makes ZXing do exhaustive row/column scanning instead of
+            // a quick centre-row pass. Critical for 1D barcodes — without it ZXing
+            // only samples the middle row and misses any barcode not perfectly centred.
+            [DecodeHintType.TRY_HARDER, true],
           ])
 
           const mr = new MultiFormatReader()
@@ -146,7 +167,57 @@ export function WebcamScanner({ onResult, active }: Props) {
 
           canvas = document.createElement('canvas')
           ctx    = canvas.getContext('2d', { willReadFrequently: true })!
-          console.debug('[Scanner] ZXing ready, formats:', formats.length, nativeDetectorQR ? '(1D only, QR handled by native)' : '(all formats)')
+          console.debug('[Scanner] ZXing ready — TRY_HARDER ON — formats:', formats.map(f => FMT_MAP_INIT[f] ?? f).join(', '), nativeDetectorQR ? '(1D only)' : '(all formats)')
+        }
+
+        // ── Debug counters (reset every 3 s so the log stays readable) ──────
+        let dbg_zxingAttempts   = 0
+        let dbg_zxingNotFound   = 0
+        let dbg_zxingSuccess    = 0
+        let dbg_zxingOtherErr   = 0
+        let dbg_nativeAttempts  = 0
+        let dbg_nativeFound     = 0
+        let dbg_lastReportTime  = Date.now()
+        const DBG_REPORT_MS     = 3000
+
+        function dbgReport() {
+          const now = Date.now()
+          if (now - dbg_lastReportTime < DBG_REPORT_MS) return
+          dbg_lastReportTime = now
+
+          console.group(`[WEBCAM DEBUG] ── ${new Date().toLocaleTimeString()} ──────────────────`)
+          console.debug(`  engine         : ${engine ?? 'loading'}`)
+          console.debug(`  ZXing attempts : ${dbg_zxingAttempts}  (every ~150 ms)`)
+          console.debug(`  ZXing ✅ found : ${dbg_zxingSuccess}`)
+          console.debug(`  ZXing ❌ notFound (no barcode in frame): ${dbg_zxingNotFound}`)
+          console.debug(`  ZXing ⚠ other errors: ${dbg_zxingOtherErr}`)
+          console.debug(`  Native attempts: ${dbg_nativeAttempts}`)
+          console.debug(`  Native ✅ found: ${dbg_nativeFound}`)
+
+          if (dbg_zxingAttempts > 0) {
+            const hitRate = ((dbg_zxingSuccess / dbg_zxingAttempts) * 100).toFixed(1)
+            console.debug(`  ZXing hit rate : ${hitRate}%`)
+            if (dbg_zxingSuccess === 0) {
+              console.warn('  ⚠ ZXing NEVER decoded anything — barcode likely out of frame, too small, blurry, or unsupported format')
+            }
+          }
+
+          // Reset counters
+          dbg_zxingAttempts = dbg_zxingNotFound = dbg_zxingSuccess = dbg_zxingOtherErr = 0
+          dbg_nativeAttempts = dbg_nativeFound = 0
+          console.groupEnd()
+        }
+
+        // ── Brightness sampler — helps diagnose lighting issues ─────────────
+        function sampleBrightness(imageData: ImageData): { avg: number; min: number; max: number } {
+          const d = imageData.data
+          let sum = 0, min = 255, max = 0
+          // Sample every 40th pixel (fast approximation)
+          for (let i = 0; i < d.length; i += 160) {
+            const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
+            sum += lum; if (lum < min) min = lum; if (lum > max) max = lum
+          }
+          return { avg: Math.round(sum / (d.length / 160)), min: Math.round(min), max: Math.round(max) }
         }
 
         // ── Unified RAF loop: native (async, fire-and-forget) + ZXing (sync) ──
@@ -161,44 +232,109 @@ export function WebcamScanner({ onResult, active }: Props) {
           if (videoRef.current.readyState >= 2) {
             const now = Date.now()
 
+            // Emit periodic debug report
+            dbgReport()
+
             // Native path: fire async, guard against stacking
             const detector = nativeDetectorAll ?? nativeDetectorQR
             if (detector && !nativePending) {
               nativePending = true
+              dbg_nativeAttempts++
               detector.detect(video)
                 .then((results: any[]) => {
                   nativePending = false
-                  if (results.length > 0) emitResult(results[0].rawValue)
+                  if (results.length > 0) {
+                    dbg_nativeFound++
+                    console.debug('[WEBCAM] Native BarcodeDetector results:', results.map(r => ({ format: r.format, rawValue: JSON.stringify(r.rawValue) })))
+                    emitResult(results[0].rawValue, results[0].format, true)
+                  }
                 })
-                .catch(() => { nativePending = false })
+                .catch((err: any) => {
+                  console.debug('[WEBCAM] Native BarcodeDetector error:', err)
+                  nativePending = false
+                })
             }
 
             // ZXing path: sync decode from canvas frame
             if (zxingReader && canvas && ctx && !zxingPending && (now - lastZxingTime > ZXING_INTERVAL)) {
               zxingPending = true
               lastZxingTime = now
-              
-              // Simplest, lightest approach. Scale down to a standard 640x480.
-              // ZXing was built to decode perfectly at VGA resolutions.
-              const W = 640
-              const H = 480
-              canvas.width = W
+              dbg_zxingAttempts++
+
+              // Use native video resolution — scaling down to 640x480 made bars
+              // sub-pixel thin for 1D barcodes. Cap at 1920x1080 for performance.
+              const vW = video.videoWidth  || 1280
+              const vH = video.videoHeight || 720
+              const scale = Math.min(1, 1920 / vW, 1080 / vH)
+              const W = Math.round(vW * scale)
+              const H = Math.round(vH * scale)
+
+              canvas.width  = W
               canvas.height = H
               ctx.drawImage(video, 0, 0, W, H)
-              
-              // Run the decode on the next tick so we don't drop frames
+
+              // Also prepare a second canvas: a 2× zoomed centre crop so ZXing
+              // sees bigger bars when the barcode is small in the frame.
+              // The viewfinder brackets cover ~60% w × 55% h of the video area.
+              const cropX = Math.round(W * 0.20)
+              const cropY = Math.round(H * 0.22)
+              const cropW = Math.round(W * 0.60)
+              const cropH = Math.round(H * 0.55)
+              const cropCanvas = document.createElement('canvas')
+              cropCanvas.width  = Math.min(cropW * 2, 1920)
+              cropCanvas.height = Math.min(cropH * 2, 1080)
+              const cropCtx = cropCanvas.getContext('2d', { willReadFrequently: true })!
+              cropCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropCanvas.width, cropCanvas.height)
+
+              // Brightness sample from the cropped centre region
+              const centreStrip = cropCtx.getImageData(0, 0, cropCanvas.width, cropCanvas.height)
+              const brightness  = sampleBrightness(centreStrip)
+
+              console.debug(
+                `[WEBCAM] ZXing attempt — fullFrame: ${W}×${H}  crop: ${cropCanvas.width}×${cropCanvas.height}`,
+                `| brightness avg=${brightness.avg} min=${brightness.min} max=${brightness.max}`
+              )
+
+              function zxingDecode(src: HTMLCanvasElement, label: string): { text: string; format: string } | null {
+                try {
+                  const lum    = new zxingReader.LumClass(src)
+                  const bmp    = new zxingReader.BinaryBitmap(new zxingReader.HybridBinarizer(lum))
+                  const result = zxingReader.mr.decode(bmp)
+                  const text    = result.getText()
+                  const fmtEnum = result.getBarcodeFormat?.()
+                  const format  = (fmtEnum != null && FMT_MAP_INIT[fmtEnum]) ? FMT_MAP_INIT[fmtEnum] : 'unknown'
+                  console.debug(`[WEBCAM] ZXing ✅ [${label}] format=${format}(${fmtEnum}) text=${JSON.stringify(text)}`)
+                  return { text, format }
+                } catch (e: any) {
+                  const name = e?.name ?? ''
+                  if (name === 'NotFoundException' || e?.message?.includes('No MultiFormat Readers')) {
+                    console.debug(`[WEBCAM] ZXing ❌ [${label}] NotFoundException`)
+                    return null
+                  }
+                  console.warn(`[WEBCAM] ZXing ⚠ [${label}] ${e?.name}: ${e?.message}`)
+                  return null
+                }
+              }
+
+              // Run decode on next tick so we don't block the animation frame
               setTimeout(() => {
                 if (cancelled) return
                 try {
-                  const lum    = new zxingReader.LumClass(canvas)
-                  const bmp    = new zxingReader.BinaryBitmap(new zxingReader.HybridBinarizer(lum))
-                  const result = zxingReader.mr.decode(bmp)
-                  
-                  emitResult(result.getText())
-                } catch (e: any) {
-                  const name = e?.name ?? ''
-                  if (name !== 'NotFoundException' && !e?.message?.includes('No MultiFormat Readers')) {
-                    // Ignore background scan failed errors silently
+                  // Try full-frame first, then the zoomed crop as fallback
+                  const hit = zxingDecode(canvas, `full ${W}×${H}`) ?? zxingDecode(cropCanvas, `crop ${cropCanvas.width}×${cropCanvas.height}`)
+
+                  if (hit) {
+                    dbg_zxingSuccess++
+                    emitResult(hit.text, hit.format, false)
+                  } else {
+                    dbg_zxingNotFound++
+                    if (dbg_zxingNotFound % 10 === 1) {
+                      console.debug(
+                        `[WEBCAM] ZXing ❌ NotFoundException #${dbg_zxingNotFound} (both passes failed)`,
+                        `| brightness avg=${brightness.avg} min=${brightness.min} max=${brightness.max}`,
+                        '| tip: avg<30=too dark  avg>220=overexposed  max-min<50=low contrast  0%=barcode out of viewfinder'
+                      )
+                    }
                   }
                 } finally {
                   zxingPending = false

@@ -20,8 +20,8 @@ export const BusinessService = {
 
     const ids = businesses.map((b: any) => b.id)
 
-    // Subscriptions + branches + stats all in parallel
-    const [{ data: subs }, { data: branches }] = await Promise.all([
+    // Subscriptions + branches + owner profiles — all in parallel
+    const [{ data: subs }, { data: branches }, { data: owners }] = await Promise.all([
       adminSupabase
         .from('subscriptions')
         .select('*, plans(id, name, plan_type, features, price_monthly, price_yearly)')
@@ -31,6 +31,12 @@ export const BusinessService = {
         .from('branches')
         .select('id, business_id')
         .in('business_id', ids),
+      adminSupabase
+        .from('profiles')
+        .select('business_id, full_name')
+        .in('business_id', ids)
+        .eq('role', 'business_owner')
+        .limit(ids.length),
     ])
 
     // Map subscriptions to businesses
@@ -88,9 +94,18 @@ export const BusinessService = {
       }
     }
 
+    // Build a quick owner name lookup: business_id → full_name
+    const ownerNameByBusiness: Record<string, string | null> = {}
+    for (const o of owners ?? []) {
+      if (o.business_id && !ownerNameByBusiness[o.business_id]) {
+        ownerNameByBusiness[o.business_id] = o.full_name ?? null
+      }
+    }
+
     for (const biz of businesses as any[]) {
       biz.subscriptions = subsByBusiness[biz.id] ?? []
       biz.stats = statsMap[biz.id] ?? initStat()
+      biz.owner_name = ownerNameByBusiness[biz.id] ?? null
     }
 
     return { data: businesses, count }

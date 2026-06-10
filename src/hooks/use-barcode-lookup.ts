@@ -48,9 +48,11 @@ interface ParsedScan {
 
 function parseScannedCode(raw: string): ParsedScan {
   const trimmed = raw.trim()
+  console.debug('[LOOKUP] parseScannedCode — raw:', JSON.stringify(raw), '→ trimmed:', JSON.stringify(trimmed))
 
   // ── JSON QR code ─────────────────────────────────────────────────────────
   if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    console.debug('[LOOKUP] Detected JSON QR code, attempting parse…')
     try {
       const obj = JSON.parse(trimmed)
       if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
@@ -61,15 +63,15 @@ function parseScannedCode(raw: string): ParsedScan {
         const brand  = obj.brand ?? obj.manufacturer ?? undefined
         const image  = obj.image ?? obj.image_url ?? obj.photo ?? undefined
 
-        // Use sku or embedded barcode as the lookup key; fall back to raw
         const lookupKey    = sku ?? barcode ?? trimmed
         const displayLabel = sku ?? barcode ?? `[QR: ${(name as string | undefined)?.slice(0, 30) ?? 'JSON'}]`
 
-        // Price may be in subunits (pence, paisa) or major units — pass as-is
-        // and let the user verify. Don't auto-convert across currencies.
         const parsedPrice = typeof price === 'number'
           ? price
           : typeof price === 'string' ? parseFloat(price) || undefined : undefined
+
+        console.debug('[LOOKUP] JSON parse OK — extracted:', { name, sku, price: parsedPrice, barcode, brand })
+        console.debug('[LOOKUP] lookupKey:', JSON.stringify(lookupKey), 'displayLabel:', JSON.stringify(displayLabel))
 
         return {
           lookupKey,
@@ -85,24 +87,24 @@ function parseScannedCode(raw: string): ParsedScan {
           },
         }
       }
-    } catch {
-      // Not valid JSON — fall through to plain barcode
+      console.debug('[LOOKUP] JSON parsed but not a plain object — falling through')
+    } catch (e) {
+      console.debug('[LOOKUP] JSON parse failed:', e, '— treating as plain barcode')
     }
   }
 
   // ── URL QR code ───────────────────────────────────────────────────────────
-  // Sending a URL to Supabase ilike crashes with PGRST100 (newlines in
-  // encoded chars break the PostgREST filter parser). Treat as not-found
-  // immediately without querying the DB.
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    console.debug('[LOOKUP] Detected URL QR code — skipping DB lookup:', trimmed)
     return {
-      lookupKey: '',           // empty = skip DB lookup
+      lookupKey: '',
       displayBarcode: trimmed,
       type: 'url',
     }
   }
 
   // ── Plain barcode / SKU string ────────────────────────────────────────────
+  console.debug('[LOOKUP] Plain barcode/SKU — lookupKey:', JSON.stringify(trimmed))
   return {
     lookupKey: trimmed,
     displayBarcode: trimmed,
@@ -111,19 +113,6 @@ function parseScannedCode(raw: string): ParsedScan {
 }
 
 
-// Validate EAN-8 / EAN-13 / UPC-A checksum so scanner misreads are dropped.
-// Non-numeric or unknown-length codes pass through unchanged.
-function isValidBarcode(code: string): boolean {
-  if (!/^\d+$/.test(code)) return true
-  if (code.length !== 8 && code.length !== 12 && code.length !== 13) return true
-  const digits = code.split('').map(Number)
-  const check = digits.pop()!
-  const sum = digits.reduce((acc, d, i) => {
-    const weight = code.length === 8 ? (i % 2 === 0 ? 3 : 1) : (i % 2 === 0 ? 1 : 3)
-    return acc + d * weight
-  }, 0)
-  return (10 - (sum % 10)) % 10 === check
-}
 
 // ── Main hook ─────────────────────────────────────────────────────────────
 export function useBarcodeLookup(branchId: string | null) {
@@ -131,8 +120,29 @@ export function useBarcodeLookup(branchId: string | null) {
   // Cache successful lookups so repeat scans skip the API round-trip entirely.
   const cache = useRef<Map<string, ScanLookupResult>>(new Map())
 
-  async function lookup(rawCode: string): Promise<ScanLookupResult> {
+  // EAN/UPC formats always have their own checksum — misreads produce wrong digits.
+  // QR codes have built-in error correction and must never be checksum-filtered.
+  // HID (physical scanner) has its own error correction — skip checksum for those too.
+  const EAN_UPC_FORMATS = new Set(['ean_13', 'ean_8', 'upc_a', 'upc_e'])
+
+  function isValidEanChecksum(code: string): boolean {
+    const digits = code.split('').map(Number)
+    const check = digits.pop()!
+    const sum = digits.reduce((acc, d, i) => {
+      const weight = code.length === 8 ? (i % 2 === 0 ? 3 : 1) : (i % 2 === 0 ? 1 : 3)
+      return acc + d * weight
+    }, 0)
+    const expected = (10 - (sum % 10)) % 10
+    console.debug('[LOOKUP] EAN checksum: sum=', sum, 'expected=', expected, 'actual=', check, 'valid=', expected === check)
+    return expected === check
+  }
+
+  async function lookup(rawCode: string, format = 'hid'): Promise<ScanLookupResult> {
+    console.debug('[LOOKUP] ════════════════════════════════════════')
+    console.debug('[LOOKUP] lookup() called — raw:', JSON.stringify(rawCode), 'format:', format)
+
     if (!branchId) {
+      console.warn('[LOOKUP] No branchId — aborting')
       return { status: 'error', barcode: rawCode, lookupKey: '', error: 'No branch selected' }
     }
 
@@ -140,40 +150,58 @@ export function useBarcodeLookup(branchId: string | null) {
     try {
       const parsed = parseScannedCode(rawCode)
       const { lookupKey, displayBarcode, type, prefill } = parsed
+      console.debug('[LOOKUP] parsed →', { lookupKey, displayBarcode, type, prefill })
 
-      // URLs and empty keys: skip DB lookup, go straight to not_found + prefill
       if (!lookupKey || type === 'url') {
+        console.debug('[LOOKUP] Skipping DB lookup — URL or empty key → not_found')
         return { status: 'not_found', barcode: displayBarcode, lookupKey: '', prefill }
       }
 
-      // Reject numeric barcodes that fail their EAN/UPC checksum — scanner misread
-      if (!isValidBarcode(lookupKey)) {
-        return { status: 'error', barcode: displayBarcode, lookupKey, error: 'Invalid barcode (scanner misread)' }
+      // EAN/UPC checksum: only reject when ZXing explicitly tagged the result as
+      // ean_13/ean_8/upc_a/upc_e AND the digit count matches AND checksum fails.
+      // This catches ZXing misreads (e.g. CODE-128 mis-identified as EAN) while
+      // letting through custom numeric barcodes, QR codes, and HID scans.
+      // We do NOT reject on checksum failure alone — we log it and let it through,
+      // because a CODE-128 barcode that encodes 13 custom digits will look like an
+      // EAN-13 to ZXing but won't have a valid EAN check digit.
+      if (EAN_UPC_FORMATS.has(format) && /^\d+$/.test(lookupKey) &&
+          (lookupKey.length === 8 || lookupKey.length === 12 || lookupKey.length === 13)) {
+        const valid = isValidEanChecksum(lookupKey)
+        console.debug('[LOOKUP] EAN/UPC format — checksum', valid ? '✅ PASS' : '⚠ FAIL (still passing through — may be CODE-128 with custom digits)')
+      } else {
+        console.debug('[LOOKUP] Skipping EAN checksum — format:', format)
       }
 
-      // Return cached result instantly if we've seen this barcode before
       const cacheKey = `${branchId}:${lookupKey}`
       if (cache.current.has(cacheKey)) {
-        return cache.current.get(cacheKey)!
+        const cached = cache.current.get(cacheKey)!
+        console.debug('[LOOKUP] Cache HIT for', JSON.stringify(cacheKey), '→', cached.status)
+        return cached
       }
+      console.debug('[LOOKUP] Cache MISS for', JSON.stringify(cacheKey))
 
-      // ── DB lookup ──────────────────────────────────────────────────────
       const params = new URLSearchParams({
         search:    lookupKey,
         branch_id: branchId,
         limit:     '10',
       })
-      const res = await fetch(`/api/products?${params}`)
+      const url = `/api/products?${params}`
+      console.debug('[LOOKUP] Fetching:', url)
+      const res = await fetch(url)
+      console.debug('[LOOKUP] Response status:', res.status, res.statusText)
 
       if (!res.ok) {
-        // API error (e.g. if somehow an unsafe string gets through)
+        console.warn('[LOOKUP] API error', res.status, '— returning not_found')
         return { status: 'not_found', barcode: displayBarcode, lookupKey, prefill }
       }
 
       const json = await res.json()
       const products: ProductWithStock[] = json.data ?? []
+      console.debug('[LOOKUP] Products returned from API:', products.length)
+      products.forEach((p, i) => {
+        console.debug(`[LOOKUP]   [${i}] id=${p.id} barcode=${JSON.stringify(p.barcode)} sku=${JSON.stringify(p.sku)} name=${JSON.stringify(p.name)}`)
+      })
 
-      // Exact match: barcode field first, then sku
       const exact = products.find(
         (p) =>
           p.barcode === lookupKey ||
@@ -181,25 +209,26 @@ export function useBarcodeLookup(branchId: string | null) {
           p.barcode === displayBarcode ||
           p.sku     === displayBarcode
       )
+      console.debug('[LOOKUP] Exact match found?', !!exact, exact ? `id=${exact.id}` : '')
+      console.debug('[LOOKUP] Matching against lookupKey=', JSON.stringify(lookupKey), 'displayBarcode=', JSON.stringify(displayBarcode))
 
       if (exact) {
         const hit: ScanLookupResult = { status: 'found', product: exact, barcode: displayBarcode, lookupKey }
         cache.current.set(cacheKey, hit)
+        console.debug('[LOOKUP] ✅ FOUND product:', exact.name)
         return hit
       }
 
-      const miss: ScanLookupResult = {
-        status: 'not_found',
-        barcode: displayBarcode,
-        lookupKey,
-        prefill,
-      }
+      const miss: ScanLookupResult = { status: 'not_found', barcode: displayBarcode, lookupKey, prefill }
       cache.current.set(cacheKey, miss)
+      console.debug('[LOOKUP] ❌ NOT FOUND')
       return miss
-    } catch {
+    } catch (err) {
+      console.error('[LOOKUP] Network/unexpected error:', err)
       return { status: 'error', barcode: rawCode, lookupKey: '', error: 'Network error' }
     } finally {
       setIsLooking(false)
+      console.debug('[LOOKUP] ════════════════════════════════════════')
     }
   }
 

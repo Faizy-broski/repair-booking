@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
         trialEndsAt: null,
         currentPeriodStart: periodStart,
         currentPeriodEnd:   periodEnd,
+        livemode: event.livemode,
       })
 
       // Bust Next.js data cache so module configs reflect the new plan immediately
@@ -172,6 +173,7 @@ export async function POST(request: NextRequest) {
           stripeCustomerId: typeof session.customer === 'string' ? session.customer : null,
           status:           'trialing',
           trialEndsAt,
+          livemode:         event.livemode,
         })
       }
     }
@@ -235,6 +237,7 @@ export async function POST(request: NextRequest) {
       trialEndsAt:      stripeSub.trial_end ? new Date(stripeSub.trial_end * 1000).toISOString() : null,
       currentPeriodStart: subPeriod(stripeSub).start,
       currentPeriodEnd:   subPeriod(stripeSub).end,
+      livemode:         event.livemode,
     })
 
     await invalidateBusinessCache(businessId)

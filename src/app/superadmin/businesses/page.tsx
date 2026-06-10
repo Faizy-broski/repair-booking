@@ -2,8 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye, Trash2, MoreVertical, Users, Wrench, Package, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye, Trash2, MoreVertical, Users, Wrench, Package, X, Download, ChevronDown } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/data-table'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
@@ -11,6 +10,7 @@ import { formatDate } from '@/lib/utils'
 import type { ColumnDef } from '@tanstack/react-table'
 import { MODULES } from '@/backend/config/constants'
 import { useRouter } from 'next/navigation'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 const MODULE_LABELS: Record<string, string> = {
   pos:            'POS',
@@ -41,6 +41,7 @@ interface BusinessRow {
   name: string
   subdomain: string
   email: string | null
+  owner_name: string | null
   is_active: boolean
   created_at: string
   subscriptions?: Array<{
@@ -355,47 +356,133 @@ function StatPill({ icon, value, label }: { icon: React.ReactNode; value: number
   )
 }
 
+// ── Export dropdown ───────────────────────────────────────────────────────────
+
+function ExportMenu() {
+  const [open, setOpen]         = useState(false)
+  const [downloading, setDownloading] = useState<string | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const btnRef  = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (
+        menuRef.current && !menuRef.current.contains(e.target as Node) &&
+        btnRef.current  && !btnRef.current.contains(e.target as Node)
+      ) setOpen(false)
+    }
+    if (open) document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  async function download(endpoint: string, label: string) {
+    setDownloading(label)
+    setOpen(false)
+    try {
+      const res = await fetch(endpoint)
+      if (!res.ok) throw new Error(await res.text())
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href     = url
+      // Get filename from Content-Disposition header
+      const cd   = res.headers.get('Content-Disposition') ?? ''
+      const match = cd.match(/filename="([^"]+)"/)
+      a.download  = match?.[1] ?? `${label}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Export failed', err)
+    } finally {
+      setDownloading(null)
+    }
+  }
+
+  const isDownloading = downloading !== null
+
+  return (
+    <div className="relative">
+      <button
+        ref={btnRef}
+        onClick={() => setOpen((v) => !v)}
+        disabled={isDownloading}
+        className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-teal-700 active:bg-teal-800 transition-colors disabled:opacity-60 shadow-sm"
+      >
+        <Download className={`h-4 w-4 ${isDownloading ? 'animate-bounce' : ''}`} />
+        {isDownloading ? `Exporting ${downloading}…` : 'Export'}
+        {!isDownloading && <ChevronDown className="h-3.5 w-3.5 opacity-75" />}
+      </button>
+
+      {open && (
+        <div
+          ref={menuRef}
+          className="absolute right-0 top-full mt-1.5 z-30 w-56 rounded-xl border border-gray-200 bg-white py-1.5 shadow-xl ring-1 ring-black/5"
+        >
+          <p className="px-3 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+            Download as Excel
+          </p>
+          <button
+            onClick={() => download('/api/admin/export/businesses', 'Businesses')}
+            className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <Download className="h-4 w-4 text-teal-600" />
+            <span>
+              <span className="font-medium">Businesses</span>
+              <span className="block text-xs text-gray-400">All businesses + stats</span>
+            </span>
+          </button>
+          <button
+            onClick={() => download('/api/admin/export/users', 'Users')}
+            className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <Download className="h-4 w-4 text-violet-600" />
+            <span>
+              <span className="font-medium">Users</span>
+              <span className="block text-xs text-gray-400">All staff across all businesses</span>
+            </span>
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main businesses page ──────────────────────────────────────────────────────
 
 export default function BusinessesPage() {
   const router = useRouter()
-  const [businesses, setBusinesses] = useState<BusinessRow[]>([])
-  const [total, setTotal] = useState(0)
+  const queryClient = useQueryClient()
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(20)
   const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
   const [modulesBusiness, setModulesBusiness] = useState<BusinessRow | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  useEffect(() => {
-    const controller = new AbortController()
-    async function fetch_() {
-      setLoading(true)
-      try {
-        const params = new URLSearchParams({ page: String(page + 1), limit: String(pageSize) })
-        if (search) params.set('search', search)
-        const res = await fetch(`/api/businesses?${params}`, { signal: controller.signal })
-        const json = await res.json()
-        setBusinesses(json.data ?? [])
-        setTotal(json.meta?.total ?? 0)
-      } catch (e: any) {
-        if (e?.name !== 'AbortError') throw e
-      } finally {
-        if (!controller.signal.aborted) setLoading(false)
-      }
-    }
-    fetch_()
-    return () => controller.abort()
-  }, [page, search, pageSize])
+  const queryKey = ['superadmin-businesses', page, pageSize, search]
+
+  const { data, isLoading: loading } = useQuery({
+    queryKey,
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: String(page + 1), limit: String(pageSize) })
+      if (search) params.set('search', search)
+      const res = await fetch(`/api/businesses?${params}`)
+      if (!res.ok) throw new Error('Failed to load businesses')
+      return res.json()
+    },
+    placeholderData: (prev) => prev,
+  })
+
+  const businesses: BusinessRow[] = data?.data ?? []
+  const total: number = data?.meta?.total ?? 0
 
   async function deleteBusiness(id: string) {
     setDeleting(true)
     try {
       await fetch(`/api/businesses/${id}`, { method: 'DELETE' })
-      setBusinesses((b) => b.filter((x) => x.id !== id))
-      setTotal((t) => t - 1)
+      queryClient.invalidateQueries({ queryKey: ['superadmin-businesses'] })
     } finally {
       setDeleting(false)
       setConfirmDeleteId(null)
@@ -412,11 +499,16 @@ export default function BusinessesPage() {
         is_suspended:  suspending,
       }),
     })
-    setBusinesses((b) =>
-      b.map((x) =>
-        x.id === biz.id ? { ...x, is_active: !suspending } : x
-      )
-    )
+    // Optimistic update in cache
+    queryClient.setQueryData(queryKey, (old: any) => {
+      if (!old) return old
+      return {
+        ...old,
+        data: old.data.map((x: BusinessRow) =>
+          x.id === biz.id ? { ...x, is_active: !suspending } : x
+        ),
+      }
+    })
   }
 
   const columns: ColumnDef<BusinessRow>[] = [
@@ -436,9 +528,22 @@ export default function BusinessesPage() {
       ),
     },
     {
-      accessorKey: 'email',
-      header: 'Email',
-      cell: ({ getValue }) => (getValue() as string) || '—',
+      accessorKey: 'owner_name',
+      header: 'Owner',
+      cell: ({ getValue, row }) => {
+        const name = getValue() as string | null
+        const email = row.original.email
+        return name ? (
+          <div>
+            <p className="text-sm font-medium text-gray-800">{name}</p>
+            {email && <p className="text-xs text-gray-400">{email}</p>}
+          </div>
+        ) : email ? (
+          <p className="text-sm text-gray-600">{email}</p>
+        ) : (
+          <span className="text-gray-400 text-sm">—</span>
+        )
+      },
     },
     {
       accessorKey: 'subscriptions',
@@ -567,11 +672,12 @@ export default function BusinessesPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Businesses</h1>
           <p className="text-sm text-gray-500">{total} registered businesses</p>
         </div>
+        <ExportMenu />
       </div>
 
       <div className="relative max-w-xs">

@@ -135,7 +135,6 @@ function InvoicePreview({ s, businessName, branchName }: {
               <span>{item.desc}</span>
               <span>£{(item.qty * item.price).toFixed(2)}</span>
             </div>
-            <div style={{ color: '#9ca3af', fontSize: 7 }}>x{item.qty} @ £{item.price.toFixed(2)}</div>
           </div>
         ))}
         <hr style={{ border: 'none', borderTop: '1px dashed #d1d5db', margin: '6px 0' }} />

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Save, Plus, Lock } from 'lucide-react'
+import { ChevronLeft, Save, Plus, Lock, Trash2, RefreshCw, Layers } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -18,6 +18,34 @@ interface Brand       { id: string; name: string; category_id?: string | null }
 interface Supplier    { id: string; name: string }
 interface ServiceDevice { id: string; name: string; brand_id?: string | null }
 
+interface AttrDef { id: string; name: string; valuesRaw: string }
+interface VariantRow {
+  key: string
+  name: string
+  attributes: Record<string, string>
+  sku: string
+  barcode: string
+  costPrice: string
+  sellingPrice: string
+  stock: string
+}
+
+function uid() { return Math.random().toString(36).slice(2) }
+
+function cartesian(attrs: { name: string; values: string[] }[]): Record<string, string>[] {
+  let combos: Record<string, string>[] = [{}]
+  for (const attr of attrs) {
+    const next: Record<string, string>[] = []
+    for (const combo of combos) {
+      for (const val of attr.values) {
+        next.push({ ...combo, [attr.name]: val })
+      }
+    }
+    combos = next
+  }
+  return combos
+}
+
 export default function NewProductPage() {
   const { activeBranch, branches } = useAuthStore()
   const router = useRouter()
@@ -30,6 +58,7 @@ export default function NewProductPage() {
   const [suppliers, setSuppliers]     = useState<Supplier[]>([])
   const [allDevices, setAllDevices]   = useState<ServiceDevice[]>([])
 
+  // ── Core fields ───────────────────────────────────────────────────────────
   const [name, setName]                   = useState('')
   const [categoryId, setCategoryId]       = useState('')
   const [brandId, setBrandId]             = useState('')
@@ -49,6 +78,11 @@ export default function NewProductPage() {
   const [loyaltyEnabled, setLoyaltyEnabled]       = useState(true)
   const [skuConflict, setSkuConflict]       = useState(false)
   const [barcodeConflict, setBarcodeConflict] = useState(false)
+
+  // ── Variants ──────────────────────────────────────────────────────────────
+  const [hasVariants, setHasVariants] = useState(false)
+  const [attrDefs, setAttrDefs] = useState<AttrDef[]>([{ id: uid(), name: '', valuesRaw: '' }])
+  const [variantRows, setVariantRows] = useState<VariantRow[]>([])
 
   useEffect(() => {
     fetch('/api/categories').then(r => r.json()).then(j => setCategories(j.data ?? [])).catch(() => {})
@@ -111,11 +145,56 @@ export default function NewProductPage() {
     setSuppliers(p => [...p, created]); setSupplierId(created.id)
   }
 
+  // ── Variant helpers ───────────────────────────────────────────────────────
+
+  function updateAttr(id: string, field: 'name' | 'valuesRaw', val: string) {
+    setAttrDefs(prev => prev.map(a => a.id === id ? { ...a, [field]: val } : a))
+  }
+
+  function removeAttr(id: string) {
+    setAttrDefs(prev => prev.length > 1 ? prev.filter(a => a.id !== id) : prev)
+  }
+
+  function addAttr() {
+    setAttrDefs(prev => [...prev, { id: uid(), name: '', valuesRaw: '' }])
+  }
+
+  function generateVariants() {
+    const valid = attrDefs.filter(a => a.name.trim() && a.valuesRaw.trim())
+    if (!valid.length) { toast.error('Add at least one attribute with values.'); return }
+    const parsed = valid.map(a => ({
+      name: a.name.trim(),
+      values: a.valuesRaw.split(',').map(v => v.trim()).filter(Boolean),
+    }))
+    const combos = cartesian(parsed)
+    const base = { costPrice, sellingPrice }
+    setVariantRows(combos.map((attrs, i) => ({
+      key: `${uid()}-${i}`,
+      name: Object.values(attrs).join(' / '),
+      attributes: attrs,
+      sku: '',
+      barcode: '',
+      costPrice: base.costPrice,
+      sellingPrice: base.sellingPrice,
+      stock: '0',
+    })))
+    toast.success(`${combos.length} variant${combos.length !== 1 ? 's' : ''} generated.`)
+  }
+
+  function updateVariantRow(key: string, field: keyof Omit<VariantRow, 'key' | 'name' | 'attributes'>, val: string) {
+    setVariantRows(prev => prev.map(r => r.key === key ? { ...r, [field]: val } : r))
+  }
+
+  function removeVariantRow(key: string) {
+    setVariantRows(prev => prev.filter(r => r.key !== key))
+  }
+
   function resetForm() {
     setName(''); setCategoryId(''); setBrandId(''); setModelId('')
     setSku(''); setBarcode(''); setImageUrl(''); setCostPrice(''); setSellingPrice('')
     setInitialStock('0'); setLowStockAlert('5'); setSupplierId(''); setPhysicalLocation('')
     setCommissionEnabled(false); setCommissionType('percentage'); setCommissionRate(''); setLoyaltyEnabled(true)
+    setHasVariants(false); setAttrDefs([{ id: uid(), name: '', valuesRaw: '' }]); setVariantRows([])
   }
 
   async function handleSave(andNew = false) {
@@ -123,7 +202,10 @@ export default function NewProductPage() {
     if (!categoryId) { toast.error('Please select a Device Type.'); return }
     if (!brandId) { toast.error('Please select a Brand.'); return }
     if (!modelId) { toast.error('Please select a Model.'); return }
-    if (!sellingPrice) { toast.error('Please enter a selling price.'); return }
+    if (!hasVariants && !sellingPrice) { toast.error('Please enter a selling price.'); return }
+    if (hasVariants && variantRows.length === 0) { toast.error('Generate variants before saving.'); return }
+    if (hasVariants && variantRows.some(v => !v.sellingPrice)) { toast.error('All variants must have a selling price.'); return }
+
     setSaving(true); setSaveAndNew(andNew); setSaveError(null)
 
     const res = await fetch('/api/products', {
@@ -134,9 +216,12 @@ export default function NewProductPage() {
         category_id: categoryId || null, brand_id: brandId || null, model_id: modelId || null,
         sku: sku || null, barcode: barcode || null, image_url: imageUrl || null,
         is_service: false, part_type: null,
-        cost_price: parseFloat(costPrice) || 0, selling_price: parseFloat(sellingPrice) || 0,
+        has_variants: hasVariants,
+        cost_price: parseFloat(costPrice) || 0,
+        selling_price: hasVariants ? (parseFloat(sellingPrice) || 0) : (parseFloat(sellingPrice) || 0),
         supplier_id: supplierId || null, track_inventory: true,
-        low_stock_alert: parseInt(lowStockAlert) || 0, initial_stock: parseInt(initialStock) || 0,
+        low_stock_alert: parseInt(lowStockAlert) || 0,
+        initial_stock: hasVariants ? 0 : (parseInt(initialStock) || 0),
         branch_id: activeBranch?.id ?? null, physical_location: physicalLocation || null,
         commission_enabled: commissionEnabled, commission_type: commissionType,
         commission_rate: parseFloat(commissionRate) || 0, loyalty_enabled: loyaltyEnabled,
@@ -146,9 +231,32 @@ export default function NewProductPage() {
     if (res.ok) {
       const json = await res.json()
       const newProduct = json.data ?? json
+
+      if (hasVariants && variantRows.length > 0 && newProduct?.id) {
+        const varRes = await fetch(`/api/products/${newProduct.id}/variants`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            variants: variantRows.map(v => ({
+              name: v.name,
+              sku: v.sku || null,
+              barcode: v.barcode || null,
+              selling_price: parseFloat(v.sellingPrice) || 0,
+              cost_price: parseFloat(v.costPrice) || 0,
+              attributes: v.attributes,
+            })),
+          }),
+        })
+        if (!varRes.ok) {
+          const vj = await varRes.json().catch(() => ({}))
+          toast.warning(`Product saved but variants failed: ${vj?.message || 'Unknown error'}`)
+        }
+      }
+
       if (newProduct?.id) queryClient.setQueryData(['product', newProduct.id], newProduct)
       queryClient.invalidateQueries({ queryKey: ['inventory'] })
       queryClient.invalidateQueries({ queryKey: ['inventory-stats'] })
+
       if (andNew) {
         resetForm()
         toast.success('Product saved! Add another.')
@@ -168,6 +276,7 @@ export default function NewProductPage() {
 
   const cost = parseFloat(costPrice); const sell = parseFloat(sellingPrice)
   const hasMargin = !isNaN(cost) && !isNaN(sell) && cost > 0 && sell > 0
+  const hasConflict = skuConflict || barcodeConflict
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -180,10 +289,10 @@ export default function NewProductPage() {
           <span className="text-sm font-medium text-gray-900">Add New Product</span>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => handleSave(true)} loading={saving && saveAndNew} disabled={skuConflict || barcodeConflict}>
+          <Button variant="outline" onClick={() => handleSave(true)} loading={saving && saveAndNew} disabled={hasConflict}>
             <Plus className="h-4 w-4" /> Save &amp; Add New
           </Button>
-          <Button onClick={() => handleSave(false)} loading={saving && !saveAndNew} disabled={skuConflict || barcodeConflict}>
+          <Button onClick={() => handleSave(false)} loading={saving && !saveAndNew} disabled={hasConflict}>
             <Save className="h-4 w-4" /> Save Product
           </Button>
         </div>
@@ -237,15 +346,138 @@ export default function NewProductPage() {
             </div>
           </section>
 
+          {/* Variants */}
+          <section>
+            <div className="mb-4 border-b border-gray-200 pb-2 flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Variants</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Optional — define sizes, colours, storage options, etc.</p>
+              </div>
+              <label className="relative inline-flex cursor-pointer items-center gap-2">
+                <span className={`text-sm font-medium ${hasVariants ? 'text-blue-600' : 'text-gray-400'}`}>{hasVariants ? 'Enabled' : 'Disabled'}</span>
+                <input type="checkbox" className="sr-only peer" checked={hasVariants} onChange={e => { setHasVariants(e.target.checked); if (!e.target.checked) setVariantRows([]) }} />
+                <div className="relative peer h-6 w-11 rounded-full bg-gray-300 transition-colors after:absolute after:left-[3px] after:top-[3px] after:h-[18px] after:w-[18px] after:rounded-full after:bg-white after:shadow-sm after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-5" />
+              </label>
+            </div>
+
+            {hasVariants && (
+              <div className="space-y-4">
+                {/* Attribute definitions */}
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+                  <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Define Attributes</p>
+                  {attrDefs.map((attr, idx) => (
+                    <div key={attr.id} className="flex items-center gap-2">
+                      <div className="w-36 shrink-0">
+                        <input
+                          type="text"
+                          placeholder={`Attribute ${idx + 1}`}
+                          value={attr.name}
+                          onChange={e => updateAttr(attr.id, 'name', e.target.value)}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          placeholder="Values, comma-separated (e.g. Black, White, Silver)"
+                          value={attr.valuesRaw}
+                          onChange={e => updateAttr(attr.id, 'valuesRaw', e.target.value)}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeAttr(attr.id)}
+                        disabled={attrDefs.length === 1}
+                        className="p-1.5 text-gray-400 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-3 pt-1">
+                    <button type="button" onClick={addAttr} className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium">
+                      <Plus className="h-3.5 w-3.5" /> Add attribute
+                    </button>
+                    <Button size="sm" variant="outline" onClick={generateVariants} className="ml-auto">
+                      <RefreshCw className="h-3.5 w-3.5" /> Generate Variants
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Generated variants table */}
+                {variantRows.length > 0 && (
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+                        <Layers className="h-4 w-4 text-gray-400" /> {variantRows.length} variant{variantRows.length !== 1 ? 's' : ''}
+                      </p>
+                      <button type="button" onClick={generateVariants} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                        <RefreshCw className="h-3 w-3" /> Regenerate
+                      </button>
+                    </div>
+                    <div className="overflow-x-auto rounded-lg border border-gray-200">
+                      <table className="min-w-full divide-y divide-gray-100 text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Variant</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">SKU</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Barcode</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Cost (£)</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Price (£) *</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Stock</th>
+                            <th className="px-3 py-2" />
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 bg-white">
+                          {variantRows.map(row => (
+                            <tr key={row.key} className="hover:bg-gray-50">
+                              <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">{row.name}</td>
+                              <td className="px-3 py-2">
+                                <input type="text" value={row.sku} onChange={e => updateVariantRow(row.key, 'sku', e.target.value)} placeholder="Optional" className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                              </td>
+                              <td className="px-3 py-2">
+                                <input type="text" value={row.barcode} onChange={e => updateVariantRow(row.key, 'barcode', e.target.value)} placeholder="Optional" className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                              </td>
+                              <td className="px-3 py-2">
+                                <input type="number" min="0" step="0.01" value={row.costPrice} onChange={e => updateVariantRow(row.key, 'costPrice', e.target.value)} placeholder="0.00" className="w-20 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                              </td>
+                              <td className="px-3 py-2">
+                                <input type="number" min="0" step="0.01" value={row.sellingPrice} onChange={e => updateVariantRow(row.key, 'sellingPrice', e.target.value)} placeholder="0.00" className={`w-20 rounded border px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 ${!row.sellingPrice ? 'border-red-300 bg-red-50' : 'border-gray-200'}`} />
+                              </td>
+                              <td className="px-3 py-2">
+                                <input type="number" min="0" value={row.stock} onChange={e => updateVariantRow(row.key, 'stock', e.target.value)} className="w-16 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                              </td>
+                              <td className="px-3 py-2">
+                                <button type="button" onClick={() => removeVariantRow(row.key)} className="text-gray-400 hover:text-red-500">
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
           {/* Pricing */}
           <section>
             <div className="mb-4 border-b border-gray-200 pb-2">
-              <h2 className="text-base font-semibold text-gray-900">Pricing</h2>
+              <h2 className="text-base font-semibold text-gray-900">
+                {hasVariants ? 'Default Pricing' : 'Pricing'}
+              </h2>
+              {hasVariants && (
+                <p className="text-xs text-gray-500 mt-0.5">These defaults are pre-filled into generated variants — you can override each one above.</p>
+              )}
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <Input label="Cost Price (£)" type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
-                <Input label="Selling Price (£)" type="number" step="0.01" min="0" placeholder="0.00" required value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
+                <Input label="Selling Price (£)" type="number" step="0.01" min="0" placeholder="0.00" required={!hasVariants} value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
               </div>
               {hasMargin && (
                 <div className="rounded-lg bg-green-50 border border-green-100 px-4 py-2.5 flex items-center gap-4 text-sm">
@@ -264,9 +496,16 @@ export default function NewProductPage() {
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Opening Stock" type="number" min="0" value={initialStock} onChange={e => setInitialStock(e.target.value)} />
+                {!hasVariants && (
+                  <Input label="Opening Stock" type="number" min="0" value={initialStock} onChange={e => setInitialStock(e.target.value)} />
+                )}
                 <Input label="Low Stock Alert" type="number" min="0" value={lowStockAlert} onChange={e => setLowStockAlert(e.target.value)} />
               </div>
+              {hasVariants && (
+                <p className="text-xs text-gray-500 rounded-lg border border-dashed border-gray-200 px-3 py-2">
+                  Opening stock is set per-variant in the table above.
+                </p>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Stock Location</label>
                 <Select options={[{ value: '', label: 'Select location...' }, { value: 'warehouse', label: 'Warehouse (Main Stock)' }, ...branches.map(b => ({ value: b.name, label: b.name + (b.is_main ? ' (Main Branch)' : '') }))]} value={physicalLocation} onValueChange={setPhysicalLocation} />
@@ -320,10 +559,10 @@ export default function NewProductPage() {
 
           <div className="flex flex-col sm:flex-row items-center justify-end gap-3 py-6 border-t border-gray-200">
             <Link href="/inventory" className="w-full sm:w-auto"><Button variant="outline" className="w-full">Cancel</Button></Link>
-            <Button variant="outline" className="w-full sm:w-auto" onClick={() => handleSave(true)} loading={saving && saveAndNew} disabled={skuConflict || barcodeConflict}>
+            <Button variant="outline" className="w-full sm:w-auto" onClick={() => handleSave(true)} loading={saving && saveAndNew} disabled={hasConflict}>
               <Plus className="h-4 w-4" /> Save &amp; New
             </Button>
-            <Button className="w-full sm:w-auto" onClick={() => handleSave(false)} loading={saving && !saveAndNew} disabled={skuConflict || barcodeConflict}>
+            <Button className="w-full sm:w-auto" onClick={() => handleSave(false)} loading={saving && !saveAndNew} disabled={hasConflict}>
               <Save className="h-4 w-4" /> Save Product
             </Button>
           </div>

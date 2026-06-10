@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef } from 'react'
 
-const HID_CHAR_INTERVAL_MS = 80 // chars arriving faster than this = scanner (80ms safe: humans type >150ms/char, scanners <20ms/char)
+const HID_CHAR_INTERVAL_MS = 200 // chars arriving faster than this = scanner (200ms safe: humans avg ~200ms/char, scanners <30ms/char)
 const HID_MIN_LENGTH = 4        // ignore strings shorter than this
 const HID_DEDUP_MS = 2000       // prevent re-firing same code within this window
 
@@ -16,12 +16,15 @@ export function useHidScanner({ onScan, enabled = true }: UseHidScannerOptions) 
   const isScanning = useRef(false)
   const lastCode = useRef<string | null>(null)
   const dedupTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Keep a stable ref to the callback so the effect never re-runs on re-renders
   const onScanRef = useRef(onScan)
   useEffect(() => { onScanRef.current = onScan }, [onScan])
 
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled) {
+      console.debug('[HID] Hook disabled')
+      return
+    }
+    console.debug('[HID] Hook enabled, interval threshold:', HID_CHAR_INTERVAL_MS, 'ms')
 
     function onKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement
@@ -36,47 +39,65 @@ export function useHidScanner({ onScan, enabled = true }: UseHidScannerOptions) 
 
       if (e.key === 'Enter') {
         const code = buffer.current.trim()
+        const prevBuffer = buffer.current
         buffer.current = ''
         isScanning.current = false
 
+        console.debug('[HID] ── ENTER received ──────────────────────')
+        console.debug('[HID]   raw buffer  :', JSON.stringify(prevBuffer))
+        console.debug('[HID]   trimmed code:', JSON.stringify(code))
+        console.debug('[HID]   length      :', code.length, '(min:', HID_MIN_LENGTH, ')')
+        console.debug('[HID]   lastCode    :', JSON.stringify(lastCode.current))
+        console.debug('[HID]   will fire?  :', code.length >= HID_MIN_LENGTH && code !== lastCode.current)
+
         if (code.length >= HID_MIN_LENGTH && code !== lastCode.current) {
           lastCode.current = code
+          console.debug('[HID] >>> FIRING onScan with:', JSON.stringify(code))
           onScanRef.current(code)
-          // Allow same barcode to re-trigger after dedup window
           if (dedupTimer.current) clearTimeout(dedupTimer.current)
           dedupTimer.current = setTimeout(() => {
+            console.debug('[HID] Dedup window expired, same code can fire again')
             lastCode.current = null
           }, HID_DEDUP_MS)
+        } else if (code.length < HID_MIN_LENGTH) {
+          console.debug('[HID] DROPPED — too short (', code.length, '<', HID_MIN_LENGTH, ')')
+        } else {
+          console.debug('[HID] DROPPED — duplicate within dedup window')
         }
         return
       }
 
       if (e.key?.length === 1) {
+        const path = gap < HID_CHAR_INTERVAL_MS ? 'FAST' : isScanning.current ? 'SLOW-IN-SCAN' : 'SLOW-RESET'
+        console.debug(
+          `[HID] key=${JSON.stringify(e.key)} gap=${gap}ms path=${path} isScanning=${isScanning.current} inField=${inField} bufferBefore=${JSON.stringify(buffer.current)}`
+        )
+
         if (gap < HID_CHAR_INTERVAL_MS) {
-          // Fast keystroke — definitively a scanner.
-          // If a form field is focused, prevent the char from landing in it.
-          // Human typing never sustains sub-30ms intervals, so this is safe.
-          if (inField) {
-            e.preventDefault()
-            e.stopPropagation()
-          }
+          if (inField) { e.preventDefault(); e.stopPropagation() }
           isScanning.current = true
           buffer.current += e.key
+        } else if (isScanning.current) {
+          // Slightly slow char while already in scan mode — scanners sometimes
+          // introduce a brief delay before special characters (e.g. hyphen).
+          if (inField) { e.preventDefault(); e.stopPropagation() }
+          buffer.current += e.key
         } else {
-          // Slow keystroke — could be first character of a new scan or human typing.
-          // Always reset buffer so the first character of every scan is captured.
-          // (Previously guarded by isScanning check, which caused the very first
-          // character to be dropped on each fresh scan since lastCharTime starts at 0.)
+          // Slow keystroke, not scanning — reset to this char.
           buffer.current = e.key
           isScanning.current = false
         }
+
+        console.debug(`[HID]   bufferAfter=${JSON.stringify(buffer.current)}`)
+      } else if (e.key !== 'Shift' && e.key !== 'Control' && e.key !== 'Alt' && e.key !== 'Meta') {
+        // Log non-printable keys that might be interfering (but skip common modifiers)
+        console.debug(`[HID] NON-PRINTABLE key: ${JSON.stringify(e.key)} gap=${gap}ms code=${e.code} — NOT added to buffer`)
       }
     }
 
-    // Capture phase ensures we intercept before React synthetic events and
-    // before the browser dispatches into focused input elements.
     window.addEventListener('keydown', onKeyDown, true)
     return () => {
+      console.debug('[HID] Hook cleanup (disabled or unmounted)')
       window.removeEventListener('keydown', onKeyDown, true)
       buffer.current = ''
       isScanning.current = false

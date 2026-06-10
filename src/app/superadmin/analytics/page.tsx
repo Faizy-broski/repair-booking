@@ -29,6 +29,7 @@ async function fetchAnalyticsData() {
     supabase
       .from('subscriptions')
       .select('id, status, billing_cycle, created_at, current_period_start, plan_id, plans(id, name, price_monthly, price_yearly)')
+      .eq('livemode', true)
       .order('created_at', { ascending: true }),
     supabase
       .from('plans')

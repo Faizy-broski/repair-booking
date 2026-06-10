@@ -17,6 +17,8 @@ interface SubscriptionPayload {
   trialEndsAt?: string | null
   currentPeriodStart?: string | null
   currentPeriodEnd?: string | null
+  /** Set from Stripe event.livemode. False = test-mode data that should be excluded from real stats. */
+  livemode?: boolean
 }
 
 export const SubscriptionSyncService = {
@@ -41,6 +43,7 @@ export const SubscriptionSyncService = {
           trial_ends_at:         payload.trialEndsAt ?? null,
           current_period_start:  payload.currentPeriodStart ?? null,
           current_period_end:    payload.currentPeriodEnd ?? null,
+          livemode:              payload.livemode ?? false,
         },
         { onConflict: 'business_id' }
       )

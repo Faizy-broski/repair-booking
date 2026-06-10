@@ -22,7 +22,7 @@ export const ProductService = {
       .from('products')
       .select(inventorySelect, { count: 'exact' })
       .eq('business_id', businessId)
-      .order('name')
+      .order('created_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1)
 
     if (!includeInactive) q = q.eq('is_active', true)

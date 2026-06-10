@@ -27,8 +27,73 @@ const PAPER_SIZES: Record<string, string | [number, number]> = {
   A4: 'A4',
   A5: 'A5',
   Letter: 'LETTER',
-  Receipt80: [227, 841],   // 80mm wide, variable height (points)
-  Receipt58: [165, 841],   // 58mm wide
+  // Heights are computed dynamically for thermal receipts — see calcReceiptPageHeight()
+  Receipt80: [227, 841],
+  Receipt58: [165, 841],
+}
+
+// Calculates the minimum page height (in points) needed for a thermal receipt
+// so the printer doesn't advance blank paper. Values are calibrated to the
+// font sizes and margins defined in ReceiptPdf's StyleSheet below.
+function calcReceiptPageHeight(opts: {
+  showLogo: boolean
+  showBusinessName: boolean
+  showBranchName: boolean
+  showAddress: boolean
+  showPhone: boolean
+  items: { description: string }[]
+  hasDiscount: boolean
+  showTax: boolean
+  hasPaid: boolean
+  hasBalanceDue: boolean
+  hasThankYou: boolean
+  footerLineCount: number
+  hasSocialLinks: boolean
+  hasPolicy: boolean
+}): number {
+  let h = 20 // page padding top (10) + bottom (10)
+
+  // Header
+  if (opts.showLogo)         h += 60  // image 48h + marginBottom 6 + line height
+  if (opts.showBusinessName) h += 18  // fontSize 12 bold + line spacing
+  if (opts.showBranchName)   h += 13  // fontSize 8 + marginBottom 1
+  if (opts.showAddress)      h += 12  // detail text
+  if (opts.showPhone)        h += 12  // detail text
+
+  h += 14 // first divider (marginVertical 6 × 2 + 2 border)
+  h += 16 // invoice number (fontSize 9 bold + marginBottom 2)
+  h += 13 // date row
+  h += 13 // customer row
+  h += 13 // status row
+
+  h += 14 // second divider
+  let itemsHeight = 0
+  for (const item of opts.items) {
+    const descLen = item.description ? item.description.length : 0
+    // roughly 24 characters per line on a 58mm/80mm receipt before wrapping
+    const extraLines = Math.max(0, Math.ceil(descLen / 24) - 1)
+    itemsHeight += 30 + (extraLines * 10)
+  }
+  h += itemsHeight
+  h += 14 // third divider
+
+  h += 14 // subtotal row
+  if (opts.hasDiscount) h += 12
+  if (opts.showTax)     h += 12
+
+  h += 14 // fourth divider
+  h += 24 // grand total (fontSize 11 bold, marginTop 3)
+  if (opts.hasPaid)       h += 12 // paid row
+  if (opts.hasBalanceDue) h += 30 // balance-due colored row (padding 6, borderRadius 3, marginTop 4)
+
+  h += 14 // fifth divider (before footer)
+  if (opts.hasThankYou) h += 18
+  h += opts.footerLineCount * 12
+  if (opts.hasSocialLinks) h += opts.footerLineCount > 0 ? 12 : 0 // social links
+  if (opts.hasPolicy)      h += 26 // border-top + padding + fontSize 6
+
+  h += 16 // bottom breathing room
+  return Math.max(h, 150)
 }
 
 // ── Font ───────────────────────────────────────────────────────────────────────
@@ -454,6 +519,24 @@ function ReceiptPdf({
   const uniqueFooterLines = [settings.footer_line_1, settings.footer_line_2, settings.footer_line_3]
     .filter((line): line is string => !!line && line !== settings.thank_you_message)
 
+  // Compute the exact page height so the thermal printer doesn't advance blank paper
+  const dynamicPageHeight = calcReceiptPageHeight({
+    showLogo:         !!(settings.show_logo && settings.logo_url),
+    showBusinessName: settings.show_business_name !== false,
+    showBranchName:   !!(settings.show_branch_name && branchName),
+    showAddress:      !!(settings.show_address && branchAddress),
+    showPhone:        !!(settings.show_phone && branchPhone),
+    items:            items,
+    hasDiscount:      discount > 0,
+    showTax:          !!(settings.show_tax_breakdown && tax > 0),
+    hasPaid:          amountPaid > 0,
+    hasBalanceDue:    balanceDue > 0,
+    hasThankYou:      !!settings.thank_you_message,
+    footerLineCount:  uniqueFooterLines.length,
+    hasSocialLinks:   socialEntries.length > 0,
+    hasPolicy:        !!settings.policy_text,
+  })
+
   const s = StyleSheet.create({
     page: { fontFamily: family, backgroundColor: '#ffffff', padding: 10 },
     center: { textAlign: 'center' },
@@ -467,7 +550,7 @@ function ReceiptPdf({
     dateValue: { fontSize: 7.5, color: '#000000', fontFamily: bold },
     // Item rows: desc wraps in flex column; amount stays right-aligned at fixed width
     itemRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 },
-    itemDesc: { fontSize: 8, color: '#000000', flex: 1, paddingRight: 4 },
+    itemDesc: { fontSize: 8, color: '#000000' },
     itemAmt: { fontSize: 8, color: '#000000', textAlign: 'right', width: amtWidth, flexShrink: 0 },
     itemQty: { fontSize: 7, color: '#6b7280', marginTop: 1 },
     totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 1.5 },
@@ -486,7 +569,7 @@ function ReceiptPdf({
 
   return (
     <Document>
-      <Page size={[pageWidth, 841]} style={s.page}>
+      <Page size={[pageWidth, dynamicPageHeight]} style={s.page}>
         {settings.show_logo && settings.logo_url && (
           <Image src={settings.logo_url} style={{ width: 48, height: 48, objectFit: 'contain', alignSelf: 'center', marginBottom: 6 }} />
         )}
@@ -515,7 +598,6 @@ function ReceiptPdf({
           <View key={i} style={s.itemRow}>
             <View style={{ flex: 1, paddingRight: 4 }}>
               <Text style={s.itemDesc}>{item.description}</Text>
-              <Text style={s.itemQty}>x{item.quantity} @ {fmt(item.unit_price)}</Text>
             </View>
             <Text style={s.itemAmt}>{fmt(item.quantity * item.unit_price)}</Text>
           </View>
