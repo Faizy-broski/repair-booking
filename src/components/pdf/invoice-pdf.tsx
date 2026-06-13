@@ -48,7 +48,7 @@ function calcReceiptPageHeight(opts: {
   hasBalanceDue: boolean
   hasThankYou: boolean
   footerLineCount: number
-  hasSocialLinks: boolean
+  socialLinkCount: number
   hasPolicy: boolean
 }): number {
   let h = 20 // page padding top (10) + bottom (10)
@@ -89,10 +89,10 @@ function calcReceiptPageHeight(opts: {
   h += 14 // fifth divider (before footer)
   if (opts.hasThankYou) h += 18
   h += opts.footerLineCount * 12
-  if (opts.hasSocialLinks) h += opts.footerLineCount > 0 ? 12 : 0 // social links
+  h += opts.socialLinkCount * 10 // each social entry is ~fontSize 7 + marginTop 1.5
   if (opts.hasPolicy)      h += 26 // border-top + padding + fontSize 6
 
-  h += 16 // bottom breathing room
+  h += 40 // bottom breathing room — generous buffer so printer never clips footer
   return Math.max(h, 150)
 }
 
@@ -533,7 +533,7 @@ function ReceiptPdf({
     hasBalanceDue:    balanceDue > 0,
     hasThankYou:      !!settings.thank_you_message,
     footerLineCount:  uniqueFooterLines.length,
-    hasSocialLinks:   socialEntries.length > 0,
+    socialLinkCount:  socialEntries.length,
     hasPolicy:        !!settings.policy_text,
   })
 

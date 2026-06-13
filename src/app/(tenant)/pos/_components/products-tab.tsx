@@ -29,17 +29,20 @@ const ProductCard = memo(function ProductCard({
   size = 'md',
   onAdd,
   onVariantSelect,
+  onVariantHover,
 }: {
   product: ProductWithStock
   size?: 'sm' | 'md'
   onAdd: (product: ProductWithStock) => void
   onVariantSelect: (product: ProductWithStock) => void
+  onVariantHover?: (product: ProductWithStock) => void
 }) {
   const hasVariants = product.has_variants || (product.variant_count ?? 0) > 0
   const outOfStock = !product.is_service && !hasVariants && product.on_hand !== undefined && (product.on_hand ?? 0) <= 0
   return (
     <button
       disabled={outOfStock}
+      onMouseEnter={() => hasVariants && onVariantHover?.(product)}
       onClick={() => hasVariants ? onVariantSelect(product) : onAdd(product)}
       className={`relative flex w-full flex-col overflow-hidden rounded-xl border bg-white p-3 text-left transition-all ${
         outOfStock
@@ -76,7 +79,7 @@ const ProductCard = memo(function ProductCard({
 
         <div className="space-y-1">
           <span className="text-sm font-bold text-brand-teal">{formatCurrency(product.selling_price)}</span>
-          {product.on_hand !== undefined && !product.is_service && (
+          {product.on_hand !== undefined && !product.is_service && !hasVariants && (
             <span className={`block text-xs font-medium ${(product.on_hand ?? 0) > 0 ? 'text-gray-400' : 'text-red-500'}`}>
               {(product.on_hand ?? 0) > 0 ? `${product.on_hand} on hand` : 'Out of stock'}
             </span>
@@ -176,9 +179,19 @@ export function ProductsTab() {
 
   // ── Variant modal ──────────────────────────────────────────────────────────
   const [variantProduct, setVariantProduct]       = useState<ProductWithStock | null>(null)
-  const [variantList, setVariantList]             = useState<ProductVariant[]>([])
-  const [variantLoading, setVariantLoading]       = useState(false)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
+
+  const { data: variantData, isFetching: variantLoading } = useQuery<ProductVariant[]>({
+    queryKey: ['pos-variants', variantProduct?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/products/${variantProduct!.id}/variants`)
+      const j = await res.json()
+      return j.data ?? []
+    },
+    enabled: !!variantProduct?.id,
+    staleTime: 5 * 60_000,
+  })
+  const variantList = variantData ?? []
 
   // ── Advanced search ────────────────────────────────────────────────────────
   const [advSearchOpen, setAdvSearchOpen]       = useState(false)
@@ -199,12 +212,21 @@ export function ProductsTab() {
   const [warrantyClaimSubmitting, setWarrantyClaimSubmitting] = useState(false)
 
   // ── Helpers ────────────────────────────────────────────────────────────────
-  async function openVariantSelect(product: ProductWithStock) {
-    setVariantProduct(product); setSelectedVariantId(null); setVariantLoading(true); setVariantList([])
-    const res = await fetch(`/api/products/${product.id}/variants`)
-    const j = await res.json()
-    setVariantList(j.data ?? [])
-    setVariantLoading(false)
+  function openVariantSelect(product: ProductWithStock) {
+    setVariantProduct(product)
+    setSelectedVariantId(null)
+  }
+
+  function prefetchVariants(product: ProductWithStock) {
+    queryClient.prefetchQuery({
+      queryKey: ['pos-variants', product.id],
+      queryFn: async () => {
+        const res = await fetch(`/api/products/${product.id}/variants`)
+        const j = await res.json()
+        return j.data ?? []
+      },
+      staleTime: 5 * 60_000,
+    })
   }
 
   function addVariantToCart() {
@@ -463,7 +485,7 @@ export function ProductsTab() {
               </div>
             ) : allProductsList.length > 0 ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={openVariantSelect} />)}
+                {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={openVariantSelect} onVariantHover={prefetchVariants} />)}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -530,7 +552,7 @@ export function ProductsTab() {
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}</div>
                 ) : categoryProducts.length > 0 ? (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                    {categoryProducts.map(product => <ProductCard key={product.id} product={product} size="sm" onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={openVariantSelect} />)}
+                    {categoryProducts.map(product => <ProductCard key={product.id} product={product} size="sm" onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={openVariantSelect} onVariantHover={prefetchVariants} />)}
                   </div>
                 ) : (
                   <p className="py-4 text-center text-sm text-gray-400">No products for this model</p>

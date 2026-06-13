@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Search, AlertTriangle, Upload, Download, CheckCircle2, Package, Boxes, TrendingDown, ShoppingCart, Edit2, Trash2, Layers, X, ExternalLink, Filter, ChevronDown, RefreshCw } from 'lucide-react'
+import { Plus, Search, AlertTriangle, Upload, Download, CheckCircle2, Package, Boxes, TrendingDown, ShoppingCart, Edit2, Trash2, Layers, X, ExternalLink, Filter, ChevronDown, RefreshCw, Barcode } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/ui/modal'
@@ -14,6 +14,7 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ScanButton } from '@/components/scanner/scan-button'
 import { ScannerModal } from '@/components/scanner/scanner-modal'
+import { BarcodeModal } from '@/components/inventory/barcode-modal'
 
 interface ProductRow {
   id: string
@@ -79,6 +80,7 @@ export default function InventoryPage() {
   // with on_hand=0 before the branch-aware fetch returns.
   const [pageSize, setPageSize] = useState(20)
   const [deleteTarget, setDeleteTarget] = useState<ProductRow | null>(null)
+  const [barcodeTarget, setBarcodeTarget] = useState<ProductRow | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
 
@@ -367,6 +369,13 @@ export default function InventoryPage() {
       header: '',
       cell: ({ row }) => (
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => setBarcodeTarget(row.original)}
+            className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            title="Generate or Print Barcode"
+          >
+            <Barcode className="h-3.5 w-3.5" />
+          </button>
           <Link
             href={`/inventory/${row.original.id}`}
             className="rounded p-1.5 text-blue-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
@@ -733,6 +742,11 @@ export default function InventoryPage() {
           queryClient.invalidateQueries({ queryKey: ['inventory-stats'] })
           setScannerOpen(false)
         }}
+      />
+
+      <BarcodeModal
+        product={barcodeTarget}
+        onClose={() => setBarcodeTarget(null)}
       />
     </div>
   )

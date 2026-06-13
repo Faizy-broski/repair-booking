@@ -102,6 +102,18 @@ function LoginForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // When on a tenant subdomain, the register link must go to the root domain.
+  // Computed client-side after onRoot is determined (null = SSR/loading, defaults to relative).
+  const registerHref = onRoot === false && typeof window !== 'undefined'
+    ? (() => {
+        const { protocol, hostname, port } = window.location
+        const rootDomain = (process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'repairbooking.co.uk').split(':')[0]
+        const isLocalhost = hostname === 'localhost' || hostname.endsWith('.localhost')
+        const baseHost = isLocalhost ? (port ? `localhost:${port}` : 'localhost') : rootDomain
+        return `${protocol}//${baseHost}/register`
+      })()
+    : '/register'
+
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { email: prefilledEmail },
@@ -359,9 +371,9 @@ function LoginForm() {
         {!isAdminSubdomain && (
           <p className="mt-4 text-center text-sm text-on-surface-variant">
             Don&apos;t have an account?{' '}
-            <Link href="/register" className="font-medium text-primary hover:underline">
+            <a href={registerHref} className="font-medium text-primary hover:underline">
               Start free trial
-            </Link>
+            </a>
           </p>
         )}
       </CardContent>

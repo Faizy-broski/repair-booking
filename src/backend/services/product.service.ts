@@ -10,9 +10,11 @@ export const ProductService = {
     branchId?: string; includeInactive?: boolean
     brandId?: string; supplierId?: string; valuation?: string
     hideOutOfStock?: boolean; itemType?: string; modelId?: string; partType?: string
+    barcode?: string  // exact match on barcode or sku — used by scanner (not ilike)
   }) {
     const { page = 1, limit = 20, search, categoryId, branchId, includeInactive,
-            brandId, supplierId, valuation, hideOutOfStock, itemType, modelId, partType } = params
+            brandId, supplierId, valuation, hideOutOfStock, itemType, modelId, partType,
+            barcode } = params
 
     const inventorySelect = branchId
       ? `*, categories(name), brands(name), inventory!left(quantity, low_stock_alert, branch_id, variant_id), product_variants(id), suppliers(name), service_devices(name), branch_products!inner(is_enabled)`
@@ -34,7 +36,12 @@ export const ProductService = {
         .eq('branch_products.branch_id', branchId)
         .eq('branch_products.is_enabled', true)
     }
-    if (search) q = q.or(`name.ilike.%${search}%,sku.ilike.%${search}%,barcode.ilike.%${search}%,imei.ilike.%${search}%`)
+    if (barcode) {
+      // Exact identifier match for scanner — barcode takes priority over search
+      q = q.or(`barcode.eq.${barcode},sku.eq.${barcode}`)
+    } else if (search) {
+      q = q.or(`name.ilike.%${search}%,sku.ilike.%${search}%,barcode.ilike.%${search}%,imei.ilike.%${search}%`)
+    }
     if (categoryId) q = q.eq('category_id', categoryId)
     if (brandId) q = q.eq('brand_id', brandId)
     if (supplierId) q = q.eq('supplier_id', supplierId)
@@ -106,12 +113,18 @@ export const ProductService = {
   },
 
   async create(payload: InsertTables<'products'>) {
+    if (!payload.barcode) {
+      payload.barcode = Math.floor(100000000000 + Math.random() * 900000000000).toString()
+    }
     const { data, error } = await adminSupabase.from('products').insert(payload).select().single()
     if (error) throw error
     return data
   },
 
   async update(id: string, businessId: string, payload: UpdateTables<'products'>) {
+    if ('barcode' in payload && !payload.barcode) {
+      payload.barcode = Math.floor(100000000000 + Math.random() * 900000000000).toString()
+    }
     const { data, error } = await adminSupabase
       .from('products')
       .update(payload)
@@ -249,14 +262,23 @@ export const ProductService = {
     let stockCostValue   = 0
     let lowStockCount    = 0
 
-    // Run inventory and PO count queries in parallel
-    const [invResult, poResult] = await Promise.all([
+    // Run all three queries in parallel
+    const [invResult, variantInvResult, poResult] = await Promise.all([
+      // Base product rows (variant_id IS NULL) — includes has_variants so we can skip those below
       branchId
         ? adminSupabase
             .from('inventory')
-            .select('quantity, low_stock_alert, product_id, products!inner(selling_price, cost_price, is_service, is_active)')
+            .select('quantity, low_stock_alert, product_id, products!inner(selling_price, cost_price, is_service, is_active, has_variants)')
             .eq('branch_id', branchId)
             .is('variant_id', null)
+        : Promise.resolve({ data: null }),
+      // Variant rows — use each variant's own selling_price/cost_price, not the parent's
+      branchId
+        ? adminSupabase
+            .from('inventory')
+            .select('quantity, low_stock_alert, product_variants!inner(selling_price, cost_price, products!inner(is_service, is_active))')
+            .eq('branch_id', branchId)
+            .not('variant_id', 'is', null)
         : Promise.resolve({ data: null }),
       adminSupabase
         .from('purchase_order_items')
@@ -267,13 +289,27 @@ export const ProductService = {
     ])
 
     if (branchId && invResult.data) {
-      // Only count base-product rows (variant_id IS NULL) to avoid double-counting
-      // stock when a product has variant-level inventory rows alongside a base row.
+      // Base product rows — skip products that have variants; those are counted
+      // separately below using each variant's own price to avoid double-counting
+      // and to get the correct per-variant selling/cost price.
       ;(invResult.data as any[]).forEach((row: any) => {
         const p = row.products
-        if (!p?.is_active || p?.is_service) return
+        if (!p?.is_active || p?.is_service || p?.has_variants) return
         stockRetailValue += (p.selling_price ?? 0) * row.quantity
         stockCostValue   += (p.cost_price   ?? 0) * row.quantity
+        const threshold = row.low_stock_alert ?? 5
+        if (row.quantity <= threshold) lowStockCount++
+      })
+    }
+
+    if (branchId && variantInvResult.data) {
+      // Variant rows — each variant has its own price (e.g. black=£40, blue=£50, white=£80)
+      ;(variantInvResult.data as any[]).forEach((row: any) => {
+        const v = row.product_variants
+        const p = v?.products
+        if (!p?.is_active || p?.is_service) return
+        stockRetailValue += (v.selling_price ?? 0) * row.quantity
+        stockCostValue   += (v.cost_price   ?? 0) * row.quantity
         const threshold = row.low_stock_alert ?? 5
         if (row.quantity <= threshold) lowStockCount++
       })
@@ -286,27 +322,32 @@ export const ProductService = {
 
   // ── Variants ──────────────────────────────────────────────────────────────
 
-  async listVariants(productId: string, businessId: string) {
+  async listVariants(productId: string, businessId: string, branchId?: string) {
     const { data: product, error: prodErr } = await adminSupabase
       .from('products').select('id').eq('id', productId).eq('business_id', businessId).single()
     if (prodErr || !product) throw new Error('Product not found')
 
     const { data, error } = await adminSupabase
-      .from('product_variants').select('*').eq('product_id', productId).order('name', { ascending: true })
+      .from('product_variants').select('*, inventory!left(quantity, branch_id)').eq('product_id', productId).order('name', { ascending: true })
     if (error) throw error
-    return data ?? []
+    
+    return (data ?? []).map((v: any) => {
+      const inv = branchId ? v.inventory?.find((i: any) => i.branch_id === branchId) : null
+      return { ...v, stock: inv?.quantity ?? 0, inventory: undefined }
+    })
   },
 
   async createVariants(productId: string, businessId: string, variants: Array<{
     name: string; sku?: string | null; barcode?: string | null
     selling_price: number; cost_price?: number | null; attributes?: Record<string, string>
-  }>) {
+    stock?: number
+  }>, branchId?: string) {
     const { data: product, error: prodErr } = await adminSupabase
       .from('products').select('id').eq('id', productId).eq('business_id', businessId).single()
     if (prodErr || !product) throw new Error('Product not found')
 
     const rows = variants.map(v => ({
-      product_id: productId, name: v.name, sku: v.sku ?? null, barcode: v.barcode ?? null,
+      product_id: productId, name: v.name, sku: v.sku ?? null, barcode: v.barcode || Math.floor(100000000000 + Math.random() * 900000000000).toString(),
       selling_price: v.selling_price, cost_price: v.cost_price ?? null, attributes: v.attributes ?? {},
     }))
 
@@ -314,20 +355,53 @@ export const ProductService = {
     if (error) throw error
 
     await adminSupabase.from('products').update({ has_variants: true }).eq('id', productId)
+
+    // Handle stock
+    if (branchId && data) {
+      for (const [idx, inserted] of data.entries()) {
+        const stock = variants[idx].stock ?? 0
+        const { data: existingInv } = await adminSupabase.from('inventory')
+          .select('id').eq('branch_id', branchId).eq('product_id', productId).eq('variant_id', inserted.id).maybeSingle()
+        if (existingInv) {
+          await adminSupabase.from('inventory').update({ quantity: stock }).eq('id', existingInv.id)
+        } else {
+          await adminSupabase.from('inventory').insert({ branch_id: branchId, product_id: productId, variant_id: inserted.id, quantity: stock, low_stock_alert: 5 })
+        }
+      }
+    }
+
     return data ?? []
   },
 
   async updateVariant(variantId: string, productId: string, businessId: string, payload: {
     name?: string; sku?: string | null; barcode?: string | null
     selling_price?: number; cost_price?: number | null; attributes?: Record<string, string>
-  }) {
+    stock?: number
+  }, branchId?: string) {
+    const { stock, ...variantPayload } = payload
     const { data: product, error: prodErr } = await adminSupabase
       .from('products').select('id').eq('id', productId).eq('business_id', businessId).single()
     if (prodErr || !product) throw new Error('Product not found')
 
+    if ('barcode' in variantPayload && !variantPayload.barcode) {
+      variantPayload.barcode = Math.floor(100000000000 + Math.random() * 900000000000).toString()
+    }
+
     const { data, error } = await adminSupabase
-      .from('product_variants').update(payload).eq('id', variantId).eq('product_id', productId).select().single()
+      .from('product_variants').update(variantPayload).eq('id', variantId).eq('product_id', productId).select().single()
     if (error) throw error
+
+    // Handle stock
+    if (stock !== undefined && branchId) {
+      const { data: existingInv } = await adminSupabase.from('inventory')
+        .select('id').eq('branch_id', branchId).eq('product_id', productId).eq('variant_id', variantId).maybeSingle()
+      if (existingInv) {
+        await adminSupabase.from('inventory').update({ quantity: stock }).eq('id', existingInv.id)
+      } else {
+        await adminSupabase.from('inventory').insert({ branch_id: branchId, product_id: productId, variant_id: variantId, quantity: stock, low_stock_alert: 5 })
+      }
+    }
+
     return data
   },
 

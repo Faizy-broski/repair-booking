@@ -21,21 +21,25 @@ export async function POST(request: NextRequest) {
     case 'invoice.paid': {
       const invoice = event.data.object as Stripe.Invoice
       if (invoice.subscription) {
+        // Mark subscription active and live (real payment confirms live mode)
         await adminSupabase
           .from('subscriptions')
-          .update({ status: 'active' })
+          .update({ status: 'active', livemode: true })
           .eq('stripe_sub_id', invoice.subscription)
 
-        // Activate business
-        await adminSupabase
-          .from('businesses')
-          .update({ is_active: true })
-          .in('id',
-            adminSupabase
-              .from('subscriptions')
-              .select('business_id')
-              .eq('stripe_sub_id', invoice.subscription as string) as unknown as string[]
-          )
+        // Resolve the business_id first, then activate the business
+        const { data: subRow } = await adminSupabase
+          .from('subscriptions')
+          .select('business_id')
+          .eq('stripe_sub_id', invoice.subscription as string)
+          .maybeSingle()
+
+        if (subRow?.business_id) {
+          await adminSupabase
+            .from('businesses')
+            .update({ is_active: true })
+            .eq('id', subRow.business_id)
+        }
       }
       break
     }

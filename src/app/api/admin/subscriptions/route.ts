@@ -140,6 +140,7 @@ async function handler(request: NextRequest, _ctx: RequestContext) {
     .order('created_at', { ascending: false })
     .range(from, to)
 
+  q = q.eq('livemode', true)
   if (statusFilter)     q = q.eq('status', statusFilter)
   if (hasSearchFilter)  q = q.in('business_id', businessIdFilter)
 

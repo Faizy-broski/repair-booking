@@ -62,6 +62,7 @@ export const ProductController = {
         page,
         limit,
         search: searchParams.get('search') ?? undefined,
+        barcode: searchParams.get('barcode') ?? undefined,
         categoryId: searchParams.get('category_id') ?? undefined,
         branchId: searchParams.get('branch_id') ?? ctx.auth.branchId ?? undefined,
         includeInactive: searchParams.get('include_inactive') === 'true',
@@ -295,9 +296,10 @@ export const ProductController = {
 
   // ── Variant endpoints ─────────────────────────────────────────────────────
 
-  async listVariants(_request: NextRequest, ctx: RequestContext, productId: string) {
+  async listVariants(request: NextRequest, ctx: RequestContext, productId: string) {
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? undefined
     try {
-      const data = await ProductService.listVariants(productId, ctx.businessId)
+      const data = await ProductService.listVariants(productId, ctx.businessId, branchId)
       return ok(data)
     } catch (err) {
       return serverError('Failed to fetch variants', err)
@@ -313,12 +315,14 @@ export const ProductController = {
         selling_price: z.number().min(0),
         cost_price: z.number().min(0).optional().nullable(),
         attributes: z.record(z.string(), z.string()).optional(),
+        stock: z.number().optional()
       })).min(1),
+      branch_id: z.string().optional()
     })
     const { data, error } = await validateBody(request, variantSchema)
     if (error) return error
     try {
-      const result = await ProductService.createVariants(productId, ctx.businessId, data.variants)
+      const result = await ProductService.createVariants(productId, ctx.businessId, data.variants, data.branch_id)
       return created(result)
     } catch (err) {
       return serverError('Failed to create variants', err)
@@ -333,11 +337,14 @@ export const ProductController = {
       selling_price: z.number().min(0).optional(),
       cost_price: z.number().min(0).optional().nullable(),
       attributes: z.record(z.string(), z.string()).optional(),
+      stock: z.number().optional(),
+      branch_id: z.string().optional()
     })
     const { data, error } = await validateBody(request, updateVariantSchema)
     if (error) return error
     try {
-      const result = await ProductService.updateVariant(variantId, productId, ctx.businessId, data)
+      const { branch_id, ...payload } = data
+      const result = await ProductService.updateVariant(variantId, productId, ctx.businessId, payload, branch_id)
       return ok(result)
     } catch (err) {
       return serverError('Failed to update variant', err)

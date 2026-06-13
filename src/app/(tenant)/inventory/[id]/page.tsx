@@ -3,7 +3,7 @@ import { useState, useEffect, use } from 'react'
 import { toast } from 'sonner'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Save, Trash2, Store, Plus, RefreshCw, Layers } from 'lucide-react'
+import { ChevronLeft, Save, Trash2, Store, Plus, RefreshCw, Layers, Barcode } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -12,6 +12,7 @@ import { ImageUpload } from '@/components/ui/image-upload'
 import { formatCurrency } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import Link from 'next/link'
+import { BarcodeModal } from '@/components/inventory/barcode-modal'
 
 interface BranchAvailability {
   branch_id: string
@@ -44,6 +45,7 @@ interface DBVariant {
   sku: string | null; barcode: string | null
   selling_price: number; cost_price: number | null
   attributes: Record<string, string>
+  stock?: number
 }
 
 interface EditVariantRow {
@@ -54,6 +56,7 @@ interface EditVariantRow {
   costPrice: string
   sellingPrice: string
   attributes: Record<string, string>
+  stock: string
   dirty: boolean
 }
 
@@ -97,6 +100,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [product, setProduct] = useState<Product | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleteModal, setDeleteModal] = useState(false)
+  const [barcodeModalOpen, setBarcodeModalOpen] = useState(false)
+  const [variantBarcodeTarget, setVariantBarcodeTarget] = useState<{ id: string; name: string; barcode: string } | null>(null)
 
   // ── Reference data ────────────────────────────────────────────────────────
   const { data: categories = [] } = useQuery<Category[]>({
@@ -178,9 +183,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   // ── Variants fetch ────────────────────────────────────────────────────────
   const { data: variantsData } = useQuery<DBVariant[]>({
-    queryKey: ['inv-product-variants', id],
+    queryKey: ['inv-product-variants', id, activeBranch?.id],
     queryFn: async () => {
-      const res = await fetch(`/api/products/${id}/variants`)
+      const branchParam = activeBranch ? `?branch_id=${activeBranch.id}` : ''
+      const res = await fetch(`/api/products/${id}/variants${branchParam}`)
       const json = await res.json()
       return json.data ?? []
     },
@@ -224,6 +230,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       costPrice: v.cost_price != null ? String(v.cost_price) : '',
       sellingPrice: String(v.selling_price),
       attributes: v.attributes ?? {},
+      stock: v.stock != null ? String(v.stock) : '0',
       dirty: false,
     })))
   }, [variantsData])
@@ -435,6 +442,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             selling_price: parseFloat(v.sellingPrice) || 0,
             cost_price: parseFloat(v.costPrice) || 0,
             attributes: v.attributes,
+            stock: parseInt(v.stock) || 0,
+            branch_id: activeBranch?.id
           }),
         })
       ))
@@ -453,11 +462,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            branch_id: activeBranch?.id,
             variants: validNew.map(v => ({
               name: v.name, sku: v.sku || null, barcode: v.barcode || null,
               selling_price: parseFloat(v.sellingPrice) || 0,
               cost_price: parseFloat(v.costPrice) || 0,
               attributes: v.attributes,
+              stock: parseInt(v.stock) || 0,
             })),
           }),
         })
@@ -591,7 +602,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <Input label="SKU" value={sku} onChange={e => setSku(e.target.value)} error={skuConflict ? 'This SKU is already in use' : undefined} />
-                <Input label="Barcode / UPC" value={barcode} onChange={e => setBarcode(e.target.value)} error={barcodeConflict ? 'This Barcode is already in use' : undefined} />
+                <div className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <Input label="Barcode / UPC" value={barcode} onChange={e => setBarcode(e.target.value)} error={barcodeConflict ? 'This Barcode is already in use' : undefined} />
+                  </div>
+                  <Button type="button" variant="outline" className="mb-0.5 h-10 px-3 shrink-0 border-gray-300" onClick={() => setBarcodeModalOpen(true)} title="Generate or Print Barcode" disabled={!product}>
+                    <Barcode className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           </section>
@@ -628,6 +646,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Barcode</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Cost (£)</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Price (£)</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Stock</th>
                       <th className="px-3 py-2" />
                     </tr>
                   </thead>
@@ -642,13 +661,26 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                           <input type="text" value={row.sku} onChange={e => updateExistingVariant(row.id, 'sku', e.target.value)} placeholder="Optional" className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
                         </td>
                         <td className="px-3 py-2">
-                          <input type="text" value={row.barcode} onChange={e => updateExistingVariant(row.id, 'barcode', e.target.value)} placeholder="Optional" className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                          <div className="flex gap-1 items-center">
+                            <input type="text" value={row.barcode} onChange={e => updateExistingVariant(row.id, 'barcode', e.target.value)} placeholder="Optional" className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                            <button type="button" onClick={() => updateExistingVariant(row.id, 'barcode', Math.floor(100000000000 + Math.random() * 900000000000).toString())} className="p-1 text-gray-400 hover:text-blue-500 transition-colors bg-gray-50 rounded shrink-0" title="Generate Barcode">
+                              <RefreshCw className="h-3 w-3" />
+                            </button>
+                            {row.barcode && (
+                              <button type="button" onClick={() => setVariantBarcodeTarget({ id: row.id, name: `${product?.name} - ${row.name}`, barcode: row.barcode })} className="p-1 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100 transition-colors bg-indigo-50 rounded shrink-0" title="Print Barcode">
+                                <Barcode className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                         <td className="px-3 py-2">
                           <input type="number" min="0" step="0.01" value={row.costPrice} onChange={e => updateExistingVariant(row.id, 'costPrice', e.target.value)} placeholder="0.00" className="w-20 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
                         </td>
                         <td className="px-3 py-2">
                           <input type="number" min="0" step="0.01" value={row.sellingPrice} onChange={e => updateExistingVariant(row.id, 'sellingPrice', e.target.value)} placeholder="0.00" className="w-20 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input type="number" min="0" value={row.stock} onChange={e => updateExistingVariant(row.id, 'stock', e.target.value)} className="w-16 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
                         </td>
                         <td className="px-3 py-2">
                           <button
@@ -749,7 +781,17 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                                 <input type="text" value={row.sku} onChange={e => updateNewVariantRow(row.key, 'sku', e.target.value)} placeholder="Optional" className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
                               </td>
                               <td className="px-3 py-2">
-                                <input type="text" value={row.barcode} onChange={e => updateNewVariantRow(row.key, 'barcode', e.target.value)} placeholder="Optional" className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                                <div className="flex gap-1 items-center">
+                                  <input type="text" value={row.barcode} onChange={e => updateNewVariantRow(row.key, 'barcode', e.target.value)} placeholder="Optional" className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                                  <button type="button" onClick={() => updateNewVariantRow(row.key, 'barcode', Math.floor(100000000000 + Math.random() * 900000000000).toString())} className="p-1 text-gray-400 hover:text-blue-500 transition-colors bg-gray-50 rounded shrink-0" title="Generate Barcode">
+                                    <RefreshCw className="h-3 w-3" />
+                                  </button>
+                                  {row.barcode && (
+                                    <button type="button" onClick={() => setVariantBarcodeTarget({ id: row.key, name: `${product?.name} - ${row.name}`, barcode: row.barcode })} className="p-1 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100 transition-colors bg-indigo-50 rounded shrink-0" title="Print Barcode">
+                                      <Barcode className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                </div>
                               </td>
                               <td className="px-3 py-2">
                                 <input type="number" min="0" step="0.01" value={row.costPrice} onChange={e => updateNewVariantRow(row.key, 'costPrice', e.target.value)} placeholder="0.00" className="w-20 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
@@ -968,6 +1010,22 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           </div>
         </div>
       </Modal>
+
+      {product && barcodeModalOpen && (
+        <BarcodeModal
+          product={{ id: product.id, name: product.name, barcode: product.barcode }}
+          onClose={() => {
+            setBarcodeModalOpen(false)
+            qc.invalidateQueries({ queryKey: ['inv-product', id, activeBranch?.id] })
+          }}
+        />
+      )}
+      {variantBarcodeTarget && (
+        <BarcodeModal
+          product={{ id: variantBarcodeTarget.id, name: variantBarcodeTarget.name, barcode: variantBarcodeTarget.barcode }}
+          onClose={() => setVariantBarcodeTarget(null)}
+        />
+      )}
     </div>
   )
 }

@@ -114,11 +114,14 @@ function parseScannedCode(raw: string): ParsedScan {
 
 
 
+const CACHE_TTL_MS = 60_000 // 1 minute — enough to avoid duplicate round-trips, short enough that price changes take effect quickly
+
 // ── Main hook ─────────────────────────────────────────────────────────────
 export function useBarcodeLookup(branchId: string | null) {
   const [isLooking, setIsLooking] = useState(false)
-  // Cache successful lookups so repeat scans skip the API round-trip entirely.
-  const cache = useRef<Map<string, ScanLookupResult>>(new Map())
+  // Only cache FOUND results with a TTL so stale prices/names are refreshed.
+  // not_found results are never cached — the product might be added to inventory moments later.
+  const cache = useRef<Map<string, { result: ScanLookupResult; ts: number }>>(new Map())
 
   // EAN/UPC formats always have their own checksum — misreads produce wrong digits.
   // QR codes have built-in error correction and must never be checksum-filtered.
@@ -173,17 +176,19 @@ export function useBarcodeLookup(branchId: string | null) {
       }
 
       const cacheKey = `${branchId}:${lookupKey}`
-      if (cache.current.has(cacheKey)) {
-        const cached = cache.current.get(cacheKey)!
-        console.debug('[LOOKUP] Cache HIT for', JSON.stringify(cacheKey), '→', cached.status)
-        return cached
+      const cached = cache.current.get(cacheKey)
+      if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+        console.debug('[LOOKUP] Cache HIT for', JSON.stringify(cacheKey), '→', cached.result.status)
+        return cached.result
       }
       console.debug('[LOOKUP] Cache MISS for', JSON.stringify(cacheKey))
 
+      // Use barcode= (exact eq match on barcode/sku) instead of search= (fuzzy ilike)
+      // so the API returns only the product with that exact barcode/sku.
       const params = new URLSearchParams({
-        search:    lookupKey,
+        barcode:   lookupKey,
         branch_id: branchId,
-        limit:     '10',
+        limit:     '5',
       })
       const url = `/api/products?${params}`
       console.debug('[LOOKUP] Fetching:', url)
@@ -202,27 +207,30 @@ export function useBarcodeLookup(branchId: string | null) {
         console.debug(`[LOOKUP]   [${i}] id=${p.id} barcode=${JSON.stringify(p.barcode)} sku=${JSON.stringify(p.sku)} name=${JSON.stringify(p.name)}`)
       })
 
+      // Case-insensitive comparison — barcodes stored inconsistently in some DBs
+      const lk = lookupKey.toLowerCase()
+      const db = displayBarcode.toLowerCase()
       const exact = products.find(
         (p) =>
-          p.barcode === lookupKey ||
-          p.sku     === lookupKey ||
-          p.barcode === displayBarcode ||
-          p.sku     === displayBarcode
+          (p.barcode?.toLowerCase() === lk) ||
+          (p.sku?.toLowerCase()     === lk) ||
+          (p.barcode?.toLowerCase() === db) ||
+          (p.sku?.toLowerCase()     === db)
       )
       console.debug('[LOOKUP] Exact match found?', !!exact, exact ? `id=${exact.id}` : '')
       console.debug('[LOOKUP] Matching against lookupKey=', JSON.stringify(lookupKey), 'displayBarcode=', JSON.stringify(displayBarcode))
 
       if (exact) {
         const hit: ScanLookupResult = { status: 'found', product: exact, barcode: displayBarcode, lookupKey }
-        cache.current.set(cacheKey, hit)
+        // Only cache found results, with a TTL so price/name changes are picked up
+        cache.current.set(cacheKey, { result: hit, ts: Date.now() })
         console.debug('[LOOKUP] ✅ FOUND product:', exact.name)
         return hit
       }
 
-      const miss: ScanLookupResult = { status: 'not_found', barcode: displayBarcode, lookupKey, prefill }
-      cache.current.set(cacheKey, miss)
+      // Never cache not_found — the product may be added to inventory right after
       console.debug('[LOOKUP] ❌ NOT FOUND')
-      return miss
+      return { status: 'not_found', barcode: displayBarcode, lookupKey, prefill }
     } catch (err) {
       console.error('[LOOKUP] Network/unexpected error:', err)
       return { status: 'error', barcode: rawCode, lookupKey: '', error: 'Network error' }

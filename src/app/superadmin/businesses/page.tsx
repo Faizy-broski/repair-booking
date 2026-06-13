@@ -2,7 +2,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye, Trash2, MoreVertical, Users, Wrench, Package, X, Download, ChevronDown } from 'lucide-react'
+import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye, Trash2, MoreVertical, Users, Wrench, Package, X, Download, ChevronDown, CreditCard } from 'lucide-react'
+import { EditSubscriptionModal } from '@/components/superadmin/edit-subscription-modal'
+import type { PlanOption } from '@/components/superadmin/edit-subscription-modal'
+import type { SubscriptionRow } from '@/app/api/admin/subscriptions/route'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/data-table'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
@@ -45,10 +48,13 @@ interface BusinessRow {
   is_active: boolean
   created_at: string
   subscriptions?: Array<{
+    id: string | null
     status: string
+    billing_cycle: string | null
+    plan_id: string | null
     current_period_end: string | null
     trial_ends_at: string | null
-    plans?: { name: string; features: string[] } | null
+    plans?: { id: string; name: string; features: string[]; price_monthly: number; price_yearly: number } | null
   }> | null
   stats?: BusinessStats
 }
@@ -79,12 +85,14 @@ function ActionMenu({
   biz,
   onViewDetails,
   onModules,
+  onEditSubscription,
   onToggleSuspend,
   onDelete,
 }: {
   biz: BusinessRow
   onViewDetails: () => void
   onModules: () => void
+  onEditSubscription: () => void
   onToggleSuspend: () => void
   onDelete: () => void
 }) {
@@ -139,6 +147,7 @@ function ActionMenu({
         >
           {item('View Details', <Eye className="h-3.5 w-3.5" />, onViewDetails)}
           {item('Modules', <Settings2 className="h-3.5 w-3.5" />, onModules)}
+          {item('Edit Subscription', <CreditCard className="h-3.5 w-3.5" />, onEditSubscription)}
           {item(
             biz.is_active ? 'Suspend' : 'Activate',
             biz.is_active
@@ -460,6 +469,18 @@ export default function BusinessesPage() {
   const [modulesBusiness, setModulesBusiness] = useState<BusinessRow | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [editSubRow, setEditSubRow] = useState<SubscriptionRow | null>(null)
+
+  const { data: plansData } = useQuery({
+    queryKey: ['superadmin-plans'],
+    queryFn: async () => {
+      const res = await fetch('/api/plans?all=true')
+      if (!res.ok) throw new Error('Failed to load plans')
+      return res.json()
+    },
+    staleTime: 10 * 60 * 1000,
+  })
+  const plans: PlanOption[] = plansData?.data ?? []
 
   const queryKey = ['superadmin-businesses', page, pageSize, search]
 
@@ -487,6 +508,28 @@ export default function BusinessesPage() {
       setDeleting(false)
       setConfirmDeleteId(null)
     }
+  }
+
+  function openEditSubscription(biz: BusinessRow) {
+    const sub = biz.subscriptions?.[0]
+    const row: SubscriptionRow = {
+      business_id:        biz.id,
+      business_name:      biz.name,
+      subdomain:          biz.subdomain,
+      stripe_customer_id: null,
+      subscription_id:    sub?.id ?? null,
+      status:             sub?.status ?? 'active',
+      billing_cycle:      sub?.billing_cycle ?? 'monthly',
+      plan_id:            sub?.plan_id ?? sub?.plans?.id ?? null,
+      plan_name:          sub?.plans?.name ?? null,
+      plan_price_monthly: sub?.plans?.price_monthly ?? null,
+      plan_price_yearly:  sub?.plans?.price_yearly ?? null,
+      current_period_end: sub?.current_period_end ?? null,
+      trial_ends_at:      sub?.trial_ends_at ?? null,
+      canceled_at:        null,
+      is_active:          biz.is_active,
+    }
+    setEditSubRow(row)
   }
 
   async function toggleSuspend(biz: BusinessRow) {
@@ -662,6 +705,7 @@ export default function BusinessesPage() {
             biz={biz}
             onViewDetails={() => router.push(`/superadmin/businesses/${biz.id}`)}
             onModules={() => setModulesBusiness(biz)}
+            onEditSubscription={() => openEditSubscription(biz)}
             onToggleSuspend={() => toggleSuspend(biz)}
             onDelete={() => setConfirmDeleteId(biz.id)}
           />
@@ -716,6 +760,18 @@ export default function BusinessesPage() {
         open={modulesBusiness !== null}
         onClose={() => setModulesBusiness(null)}
       />
+
+      {editSubRow && (
+        <EditSubscriptionModal
+          row={editSubRow}
+          plans={plans}
+          onClose={() => setEditSubRow(null)}
+          onSaved={() => {
+            setEditSubRow(null)
+            queryClient.invalidateQueries({ queryKey: ['superadmin-businesses'] })
+          }}
+        />
+      )}
     </div>
   )
 }
