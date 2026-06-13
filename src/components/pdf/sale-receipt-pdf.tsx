@@ -45,9 +45,10 @@ function calcSaleReceiptPageHeight(opts: {
   hasPaymentSplits: boolean
   hasNotes: boolean
   hasThankYou: boolean
-  footerLineCount: number
+  footerLines: string[]
   hasSocialLinks: boolean
-  hasPolicy: boolean
+  policyText: string | null | undefined
+  pageWidth: number
 }): number {
   let h = 0
 
@@ -96,9 +97,16 @@ function calcSaleReceiptPageHeight(opts: {
   // Footer: marginTop 24 + borderTop 0.5 + paddingTop 12
   h += 40 // footer container
   if (opts.hasThankYou) h += 16
-  h += opts.footerLineCount * 12
+  const footerCharsPerLine = opts.pageWidth < 200 ? 26 : 36
+  for (const line of opts.footerLines) {
+    const wrappedLines = Math.max(1, Math.ceil(line.length / footerCharsPerLine))
+    h += wrappedLines * 10 + 3
+  }
   if (opts.hasSocialLinks) h += 20
-  if (opts.hasPolicy) h += 26
+  if (opts.policyText) {
+    const policyWrappedLines = Math.max(2, Math.ceil(opts.policyText.length / footerCharsPerLine))
+    h += 15 + policyWrappedLines * 8
+  }
 
   h += 16 // bottom breathing room
   return Math.max(h, 200)
@@ -205,9 +213,10 @@ export function SaleReceiptPdf({
         hasPaymentSplits: !!(settings.show_payment_method && paymentMethod === 'split' && paymentSplits?.length),
         hasNotes: !!notes,
         hasThankYou: !!settings.thank_you_message,
-        footerLineCount: uniqueFooterLines.length,
+        footerLines: uniqueFooterLines,
         hasSocialLinks: !!(settings.social_links && Object.values(settings.social_links).some(Boolean)),
-        hasPolicy: !!settings.policy_text,
+        policyText: settings.policy_text,
+        pageWidth,
       }),
     ]
     : PAPER_SIZES[paperSizeKey]

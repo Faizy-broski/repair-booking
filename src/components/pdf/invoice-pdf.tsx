@@ -47,9 +47,10 @@ function calcReceiptPageHeight(opts: {
   hasPaid: boolean
   hasBalanceDue: boolean
   hasThankYou: boolean
-  footerLineCount: number
+  footerLines: string[]
   socialLinkCount: number
-  hasPolicy: boolean
+  policyText: string | null | undefined
+  pageWidth: number
 }): number {
   let h = 20 // page padding top (10) + bottom (10)
 
@@ -88,9 +89,17 @@ function calcReceiptPageHeight(opts: {
 
   h += 14 // fifth divider (before footer)
   if (opts.hasThankYou) h += 18
-  h += opts.footerLineCount * 12
-  h += opts.socialLinkCount * 10 // each social entry is ~fontSize 7 + marginTop 1.5
-  if (opts.hasPolicy)      h += 26 // border-top + padding + fontSize 6
+  // Use page width to estimate chars per line at fontSize 7 — accounts for text wrapping
+  const footerCharsPerLine = opts.pageWidth < 200 ? 26 : 36
+  for (const line of opts.footerLines) {
+    const wrappedLines = Math.max(1, Math.ceil(line.length / footerCharsPerLine))
+    h += wrappedLines * 10 + 3 // 10pt per wrapped line + 1.5 marginTop each side
+  }
+  h += opts.socialLinkCount * 10
+  if (opts.policyText) {
+    const policyWrappedLines = Math.max(2, Math.ceil(opts.policyText.length / footerCharsPerLine))
+    h += 15 + policyWrappedLines * 8 // border-top + padding + fontSize 6 text
+  }
 
   h += 40 // bottom breathing room — generous buffer so printer never clips footer
   return Math.max(h, 150)
@@ -532,9 +541,10 @@ function ReceiptPdf({
     hasPaid:          amountPaid > 0,
     hasBalanceDue:    balanceDue > 0,
     hasThankYou:      !!settings.thank_you_message,
-    footerLineCount:  uniqueFooterLines.length,
+    footerLines:      uniqueFooterLines,
     socialLinkCount:  socialEntries.length,
-    hasPolicy:        !!settings.policy_text,
+    policyText:       settings.policy_text,
+    pageWidth,
   })
 
   const s = StyleSheet.create({
