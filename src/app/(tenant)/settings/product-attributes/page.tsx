@@ -147,6 +147,9 @@ export default function ProductAttributesPage() {
                       ? <ChevronDown className="h-4 w-4" />
                       : <ChevronRight className="h-4 w-4" />}
                   </button>
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100">
+                    <Tag className="h-4 w-4 text-violet-500" />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-gray-900 text-sm">{attr.name}</span>

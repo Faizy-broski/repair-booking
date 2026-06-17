@@ -20,7 +20,7 @@ async function getServicePrices(req: NextRequest): Promise<NextResponse> {
   // Resolve business
   const { data: biz } = await adminSupabase
     .from('businesses')
-    .select('id, name, currency')
+    .select('id, name, currency, brand_color')
     .eq('subdomain', subdomain)
     .eq('is_active', true)
     .single()
@@ -50,7 +50,7 @@ async function getServicePrices(req: NextRequest): Promise<NextResponse> {
 
   return NextResponse.json({
     data: {
-      business: { name: biz.name, currency: biz.currency ?? 'GBP' },
+      business: { name: biz.name, currency: biz.currency ?? 'GBP', brand_color: biz.brand_color },
       categories: categories ?? [],
       problems: (problems ?? []).map((p: any) => ({
         id:           p.id,

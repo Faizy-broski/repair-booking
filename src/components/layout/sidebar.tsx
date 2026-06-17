@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, ShoppingCart, Wrench, Package, Users, Calendar,
@@ -9,7 +9,8 @@ import {
   Phone, Settings, UserCheck, LogOut, Receipt, X, UploadCloud,
   CreditCard, AlertCircle, Smartphone, BookOpen, TrendingUp, PieChart,
   ChevronDown, Bell, Server, Clock, Activity, Mail, Users2,
-  Store, GitBranch, Sliders, Layers, Settings2, PackagePlus, Cpu,
+  Store, GitBranch, Sliders, Layers, Settings2, PackagePlus, Cpu, Tag,
+  CalendarDays, LogIn, Palette,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
@@ -26,8 +27,13 @@ interface NavItem {
   icon: React.ElementType
   requiredRole: Role
   module?: ModuleName
+  // Additional modules that must ALSO be enabled (all of them), for items that
+  // depend on more than one module — e.g. "Add Part" needs inventory AND repairs.
+  requiredModules?: ModuleName[]
   badge?: string
   subItem?: boolean
+  retailOnly?: boolean   // only show for retail-store vertical
+  hideForRetail?: boolean // hide for retail-store vertical
 }
 
 interface NavGroup {
@@ -46,15 +52,23 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Repair Settings',   href: '/repairs/settings',          icon: Settings, requiredRole: 'branch_manager', module: 'repairs', subItem: true },
   { label: 'Inventory',      href: '/inventory',                  icon: Package,      requiredRole: 'staff',          module: 'inventory' },
   { label: 'Add Product',    href: '/inventory/new/product',     icon: PackagePlus,  requiredRole: 'staff',          module: 'inventory', subItem: true },
-  { label: 'Add Part',       href: '/inventory/new/part',        icon: Cpu,          requiredRole: 'staff',          module: 'inventory', subItem: true },
+  { label: 'Add Part',       href: '/inventory/new/part',        icon: Cpu,          requiredRole: 'staff',          module: 'inventory', requiredModules: ['repairs'], subItem: true, hideForRetail: true },
   { label: 'Bulk Upload',    href: '/inventory/bulk-upload',     icon: UploadCloud,  requiredRole: 'branch_manager', module: 'inventory', subItem: true },
-  { label: 'Catalogue',      href: '/inventory/catalogue',       icon: Smartphone,   requiredRole: 'branch_manager', module: 'inventory', subItem: true },
+  { label: 'Catalogue',      href: '/inventory/catalogue',       icon: Smartphone,   requiredRole: 'branch_manager', module: 'inventory', subItem: true, hideForRetail: true },
+  { label: 'Categories',     href: '/inventory/categories',      icon: Layers,       requiredRole: 'staff',          module: 'inventory', subItem: true, retailOnly: true },
+  { label: 'Attributes',     href: '/inventory/attributes',      icon: Tag,          requiredRole: 'branch_manager', module: 'inventory', subItem: true, retailOnly: true },
   { label: 'Customers',      href: '/customers',       icon: Users,           requiredRole: 'staff',          module: 'customers' },
   { label: 'Appointments',   href: '/appointments',    icon: Calendar,        requiredRole: 'staff',          module: 'appointments' },
   { label: 'Invoices',       href: '/invoices',        icon: FileText,        requiredRole: 'staff',          module: 'invoices' },
   { label: 'Gift Cards',     href: '/gift-cards',      icon: Gift,            requiredRole: 'staff',          module: 'gift_cards' },
   { label: 'Expenses',       href: '/expenses',        icon: DollarSign,      requiredRole: 'branch_manager', module: 'expenses' },
-  { label: 'Employees',      href: '/employees',       icon: UserCheck,       requiredRole: 'branch_manager', module: 'employees' },
+  { label: 'Employees',        href: '/employees',                        icon: UserCheck,     requiredRole: 'branch_manager', module: 'employees' },
+  { label: 'Employees List',   href: '/employees?tab=employees',          icon: Users,         requiredRole: 'branch_manager', module: 'employees', subItem: true },
+  { label: 'Clock In/Out',     href: '/employees?tab=clock',              icon: LogIn,         requiredRole: 'branch_manager', module: 'employees', subItem: true },
+  { label: 'Shifts',           href: '/employees?tab=shifts',             icon: CalendarDays,  requiredRole: 'branch_manager', module: 'employees', subItem: true },
+  { label: 'Payroll',          href: '/employees?tab=payroll',            icon: DollarSign,    requiredRole: 'branch_manager', module: 'employees', subItem: true },
+  { label: 'Commissions',      href: '/employees?tab=commissions',        icon: TrendingUp,    requiredRole: 'branch_manager', module: 'employees', subItem: true },
+  { label: 'Employee Report',  href: '/employees?tab=employee-report',    icon: BarChart2,     requiredRole: 'branch_manager', module: 'employees', subItem: true },
   { label: 'Reports',        href: '/reports',                       icon: BarChart2,  requiredRole: 'branch_manager', module: 'reports' },
   { label: 'Sales',          href: '/reports/sales',                icon: Receipt,    requiredRole: 'branch_manager', module: 'reports', subItem: true },
   { label: 'P&L',            href: '/reports/profit-loss',          icon: TrendingUp, requiredRole: 'branch_manager', module: 'reports', subItem: true },
@@ -77,6 +91,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Business Information', href: '/settings/general',                    icon: Store,         requiredRole: 'branch_manager', subItem: true },
   { label: 'Branches',         href: '/settings/branches',                       icon: GitBranch,     requiredRole: 'business_owner', subItem: true },
   { label: 'Users',            href: '/settings/users',                          icon: Users,         requiredRole: 'business_owner', subItem: true },
+  { label: 'Branding',         href: '/settings/branding',                       icon: Palette,       requiredRole: 'branch_manager', subItem: true },
   { label: 'Custom Fields',    href: '/settings/custom-fields',                  icon: Sliders,       requiredRole: 'branch_manager', subItem: true },
   { label: 'Invoice Design',   href: '/settings/invoice-design',                 icon: Layers,        requiredRole: 'branch_manager', subItem: true },
   { label: 'Account',          href: '/account',                                 icon: CreditCard,    requiredRole: 'cashier' },
@@ -104,10 +119,21 @@ function buildGroups(items: NavItem[]): NavGroup[] {
   return groups
 }
 
+function isItemActive(href: string, pathname: string, searchString: string): boolean {
+  if (href.includes('?')) {
+    const [hrefPath, hrefQuery] = href.split('?')
+    return pathname === hrefPath && searchString === '?' + hrefQuery
+  }
+  return pathname === href || pathname?.startsWith(href + '/')
+}
+
 export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; onClose?: () => void }) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const searchString = searchParams.size > 0 ? '?' + searchParams.toString() : ''
   const router = useRouter()
-  const { profile, activeBranch, subscriptionStatus, isLoading: authLoading } = useAuthStore()
+  const { profile, activeBranch, subscriptionStatus, isLoading: authLoading, verticalTemplateSlug } = useAuthStore()
+  const isRetail = verticalTemplateSlug === 'retail-store'
   const { isModuleEnabled, configs, isLoading: configsLoading, invalidate: invalidateConfigs } = useModuleConfigStore()
   const hasSubscriptionAccess = subscriptionStatus === null || subscriptionStatus.hasAccess
 
@@ -139,9 +165,13 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
 
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (!hasAccess(profile?.role ?? 'cashier', item.requiredRole)) return false
-    if (item.module == null) return true
+    if (item.retailOnly && !isRetail) return false
+    if (item.hideForRetail && isRetail) return false
+    if (item.module == null && item.requiredModules == null) return true
     if (!navReady) return false
-    return isModuleEnabled(item.module)
+    if (item.module != null && !isModuleEnabled(item.module)) return false
+    if (item.requiredModules && !item.requiredModules.every((m) => isModuleEnabled(m))) return false
+    return true
   })
 
   const groups = buildGroups(visibleItems)
@@ -153,14 +183,12 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
       const next = new Set(prev)
       for (const { parent, children } of groups) {
         if (children.length === 0) continue
-        const childActive = children.some(
-          (c) => pathname === c.href || pathname?.startsWith(c.href + '/')
-        )
+        const childActive = children.some((c) => isItemActive(c.href, pathname, searchString))
         if (childActive) next.add(parent.href)
       }
       return next
     })
-  }, [pathname, navReady]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pathname, searchString, navReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <aside
@@ -204,10 +232,8 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
           const hasChildren    = children.length > 0
           const isOpen         = expanded.has(parent.href)
           const isDisabled     = !hasSubscriptionAccess && parent.href !== '/account'
-          const childIsActive  = hasChildren && children.some(
-            (c) => pathname === c.href || pathname?.startsWith(c.href + '/')
-          )
-          const isParentActive = pathname === parent.href
+          const childIsActive  = hasChildren && children.some((c) => isItemActive(c.href, pathname, searchString))
+          const isParentActive = pathname === parent.href && !searchString
 
           return (
             <div key={parent.href}>
@@ -290,7 +316,7 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
               {!collapsed && hasChildren && isOpen && (
                 <div className="ml-3 mb-1 border-l border-white/10 pl-1 space-y-0.5">
                   {children.map((child) => {
-                    const isChildActive = pathname === child.href || pathname?.startsWith(child.href + '/')
+                    const isChildActive = isItemActive(child.href, pathname, searchString)
                     const isChildDisabled = !hasSubscriptionAccess && child.href !== '/account'
 
                     if (isChildDisabled) {

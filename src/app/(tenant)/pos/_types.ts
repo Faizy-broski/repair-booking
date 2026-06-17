@@ -3,7 +3,7 @@ import type { Product } from '@/types/database'
 // ── Tab / level types ──────────────────────────────────────────────────────────
 export type PosTab = 'repairs' | 'products'
 export type RepairLevel = 'categories' | 'brands' | 'devices' | 'problems' | 'details'
-export type ProductsView = 'all_products' | 'by_products' | 'by_parts' | 'custom_item'
+export type ProductsView = 'all_products' | 'by_products' | 'by_parts' | 'by_category' | 'custom_item'
 export type CatLevel = 'device_types' | 'brands' | 'models' | 'products'
 export type PartLevel = 'device_types' | 'brands' | 'models' | 'part_types' | 'parts'
 
@@ -12,7 +12,7 @@ export interface ServiceCategory  { id: string; name: string; image_url?: string
 export interface ServiceBrand     { id: string; name: string; logo_url?: string | null }
 export interface ServiceDevice    { id: string; name: string; image_url?: string | null; manufacturer_id: string }
 export interface ServiceProblem   { id: string; name: string; price: number; cost: number; warranty_days: number }
-export interface ProductVariant   { id: string; name: string; sku: string | null; selling_price: number; cost_price: number | null; attributes: Record<string, string> }
+export interface ProductVariant   { id: string; name: string; sku: string | null; selling_price: number; cost_price: number | null; attributes: Record<string, string>; image_url?: string | null; stock?: number | null }
 export type ProductWithStock = Product & { on_hand?: number; has_variants?: boolean; variant_count?: number }
 export interface RegisterSession  { id: string; status: 'open' | 'closed'; opening_float: number; opened_at: string; cashier_id: string }
 export interface Employee         { id: string; full_name: string }

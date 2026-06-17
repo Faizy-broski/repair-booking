@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { Plus, Download, CreditCard, RotateCcw, Loader2 } from 'lucide-react'
+import { Plus, Download, CreditCard, RotateCcw, Loader2, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -10,12 +10,13 @@ import { Modal } from '@/components/ui/modal'
 import { DataTable } from '@/components/shared/data-table'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
 import { useAuthStore } from '@/store/auth.store'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, getCurrencySymbol } from '@/lib/utils'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
 import type { ColumnDef } from '@tanstack/react-table'
 import { toast } from 'sonner'
+import { PhoneInput } from '@/components/ui/phone-input'
 
 interface InvoiceRow {
   id: string
@@ -54,6 +55,8 @@ const lineItemSchema = z.object({
 const schema = z.object({
   customer_id: z.string().uuid().optional().or(z.literal('')),
   tax_rate: z.coerce.number().min(0).max(100).default(0),
+  discount_value: z.coerce.number().min(0).default(0),
+  discount_type: z.enum(['flat', 'percent']).default('flat'),
   notes: z.string().optional(),
   items: z.array(lineItemSchema).min(1, 'Add at least one item'),
 })
@@ -63,6 +66,7 @@ type FormData = z.infer<typeof schema>
 export default function InvoicesPage() {
   const router = useRouter()
   const { activeBranch } = useAuthStore()
+  const currSymbol = getCurrencySymbol()
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(20)
   const [statusFilter, setStatusFilter] = useState('')
@@ -72,11 +76,37 @@ export default function InvoicesPage() {
   const [paymentAmount, setPaymentAmount] = useState('')
   const [recordingPayment, setRecordingPayment] = useState(false)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [newCustOpen, setNewCustOpen] = useState(false)
+  const [newCustSaving, setNewCustSaving] = useState(false)
+  const [newCust, setNewCust] = useState({ first_name: '', last_name: '', email: '', phone: '', address: '', business_name: '' })
 
-  const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<FormData>({
+  async function createCustomer() {
+    if (!activeBranch || !newCust.first_name.trim()) { toast.error('First name is required'); return }
+    setNewCustSaving(true)
+    const res = await fetch('/api/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...newCust, branch_id: activeBranch.id }),
+    })
+    const json = await res.json()
+    if (res.ok && json.data?.id) {
+      toast.success('Customer created')
+      queryClient.invalidateQueries({ queryKey: ['invoices', activeBranch?.id] })
+      setValue('customer_id', json.data.id)
+      setNewCustOpen(false)
+      setNewCust({ first_name: '', last_name: '', email: '', phone: '', address: '', business_name: '' })
+    } else {
+      toast.error(json.error ?? 'Failed to create customer')
+    }
+    setNewCustSaving(false)
+  }
+
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { tax_rate: 0, items: [{ description: '', quantity: 1, unit_price: 0 }] },
+    defaultValues: { tax_rate: 0, discount_value: 0, discount_type: 'flat', items: [{ description: '', quantity: 1, unit_price: 0 }] },
   })
+  const discountValue = watch('discount_value') ?? 0
+  const discountType  = watch('discount_type') ?? 'flat'
 
   const queryClient = useQueryClient()
   const invoiceQueryKey = ['invoices', activeBranch?.id, page, pageSize, statusFilter]
@@ -137,7 +167,11 @@ export default function InvoicesPage() {
   async function onCreate(data: FormData) {
     if (!activeBranch) return
     const subtotal = data.items.reduce((s, i) => s + i.quantity * i.unit_price, 0)
-    const tax = subtotal * (data.tax_rate / 100)
+    const discountAmt = data.discount_type === 'percent'
+      ? subtotal * (data.discount_value / 100)
+      : (data.discount_value ?? 0)
+    const discounted = Math.max(0, subtotal - discountAmt)
+    const tax = discounted * (data.tax_rate / 100)
     const res = await fetch('/api/invoices', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -146,13 +180,14 @@ export default function InvoicesPage() {
         branch_id: activeBranch.id,
         customer_id: data.customer_id || null,
         subtotal,
+        discount: discountAmt,
         tax,
-        total: subtotal + tax,
+        total: discounted + tax,
         items: data.items,
       }),
     })
     if (res.ok) {
-      reset()
+      reset({ tax_rate: 0, discount_value: 0, discount_type: 'flat', items: [{ description: '', quantity: 1, unit_price: 0 }] })
       setLineItems([{ description: '', quantity: 1, unit_price: 0 }])
       setSheetOpen(false)
       queryClient.invalidateQueries({ queryKey: ['invoices', activeBranch?.id] })
@@ -213,7 +248,15 @@ export default function InvoicesPage() {
     {
       accessorKey: 'invoice_number',
       header: 'Invoice #',
-      cell: ({ getValue }) => <span className="font-mono font-medium">{getValue() as string}</span>,
+      cell: ({ getValue, row }) => (
+        <button
+          type="button"
+          onClick={() => downloadPdf(row.original.id)}
+          className="cursor-pointer font-mono font-medium text-blue-600 hover:underline hover:text-blue-800 whitespace-nowrap transition-colors"
+        >
+          {getValue() as string}
+        </button>
+      ),
     },
     {
       accessorKey: 'customers',
@@ -359,7 +402,16 @@ export default function InvoicesPage() {
       <InlineFormSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="New Invoice" side="right">
         <form onSubmit={handleSubmit(onCreate)} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Customer (optional)</label>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="text-sm font-medium text-gray-700">Customer (optional)</label>
+              <button
+                type="button"
+                onClick={() => setNewCustOpen(true)}
+                className="flex items-center gap-1 text-xs text-brand-teal hover:underline font-medium"
+              >
+                <UserPlus className="h-3 w-3" /> New Customer
+              </button>
+            </div>
             <select
               {...register('customer_id')}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
@@ -455,14 +507,72 @@ export default function InvoicesPage() {
             {errors.items?.root?.message && <p className="mt-1 text-xs text-red-500">{errors.items.root.message}</p>}
           </div>
 
-          <div className="rounded-lg bg-gray-50 p-3 space-y-1 text-sm">
-            <div className="flex justify-between text-gray-500">
-              <span>Subtotal</span>
-              <span>{formatCurrency(lineItemSubtotal)}</span>
+          {/* Discount */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Discount</label>
+            <div className="flex gap-2">
+              <div className="flex rounded-lg border border-gray-200 p-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setValue('discount_type', 'flat')}
+                  className={`rounded px-2.5 py-1 text-sm font-medium transition-colors ${discountType === 'flat' ? 'bg-brand-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  {currSymbol}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setValue('discount_type', 'percent')}
+                  className={`rounded px-2.5 py-1 text-sm font-medium transition-colors ${discountType === 'percent' ? 'bg-brand-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  %
+                </button>
+              </div>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0"
+                {...register('discount_value')}
+                className="h-9 flex-1 rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none"
+              />
             </div>
           </div>
 
           <Input label="Tax Rate (%)" type="number" step="0.1" min="0" max="100" {...register('tax_rate')} />
+
+          {/* Totals summary */}
+          {(() => {
+            const taxRate = watch('tax_rate') ?? 0
+            const discountAmt = discountType === 'percent'
+              ? lineItemSubtotal * (discountValue / 100)
+              : discountValue
+            const discounted = Math.max(0, lineItemSubtotal - discountAmt)
+            const tax = discounted * (taxRate / 100)
+            return (
+              <div className="rounded-lg bg-gray-50 p-3 space-y-1.5 text-sm">
+                <div className="flex justify-between text-gray-500">
+                  <span>Subtotal</span>
+                  <span>{formatCurrency(lineItemSubtotal)}</span>
+                </div>
+                {discountAmt > 0 && (
+                  <div className="flex justify-between text-green-600 font-medium">
+                    <span>Discount</span>
+                    <span>-{formatCurrency(discountAmt)}</span>
+                  </div>
+                )}
+                {taxRate > 0 && (
+                  <div className="flex justify-between text-gray-500">
+                    <span>Tax ({taxRate}%)</span>
+                    <span>{formatCurrency(tax)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-gray-900 border-t border-gray-200 pt-1.5">
+                  <span>Total</span>
+                  <span>{formatCurrency(discounted + tax)}</span>
+                </div>
+              </div>
+            )
+          })()}
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
@@ -472,6 +582,73 @@ export default function InvoicesPage() {
           <Button type="submit" className="w-full" loading={isSubmitting}>Create Invoice</Button>
         </form>
       </InlineFormSheet>
+
+      {/* Create Customer Modal */}
+      <Modal open={newCustOpen} onClose={() => setNewCustOpen(false)} title="Add New Customer" size="sm">
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">First Name <span className="text-red-500">*</span></label>
+              <input
+                value={newCust.first_name}
+                onChange={e => setNewCust(p => ({ ...p, first_name: e.target.value }))}
+                placeholder="First name"
+                className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">Last Name</label>
+              <input
+                value={newCust.last_name}
+                onChange={e => setNewCust(p => ({ ...p, last_name: e.target.value }))}
+                placeholder="Last name"
+                className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">Email</label>
+            <input
+              type="email"
+              value={newCust.email}
+              onChange={e => setNewCust(p => ({ ...p, email: e.target.value }))}
+              placeholder="email@example.com"
+              className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">Phone</label>
+            <PhoneInput
+              value={newCust.phone}
+              onChange={v => setNewCust(p => ({ ...p, phone: v }))}
+              placeholder="Phone number"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">Business Name</label>
+            <input
+              value={newCust.business_name}
+              onChange={e => setNewCust(p => ({ ...p, business_name: e.target.value }))}
+              placeholder="Company / business name"
+              className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-700">Address</label>
+            <textarea
+              value={newCust.address}
+              onChange={e => setNewCust(p => ({ ...p, address: e.target.value }))}
+              placeholder="Full address"
+              rows={2}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none resize-none"
+            />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" className="flex-1" onClick={() => setNewCustOpen(false)}>Cancel</Button>
+            <Button className="flex-1" loading={newCustSaving} onClick={createCustomer}>Create Customer</Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Record Payment Modal */}
       <Modal
@@ -490,7 +667,7 @@ export default function InvoicesPage() {
             </div>
           )}
           <Input
-            label="Amount received (£)"
+            label={`Amount received (${currSymbol})`}
             type="number"
             min="0"
             step="0.01"

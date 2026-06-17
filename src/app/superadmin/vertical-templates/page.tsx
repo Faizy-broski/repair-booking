@@ -273,19 +273,6 @@ export default function VerticalTemplatesPage() {
             </div>
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Default Module Settings (JSON)
-            </label>
-            <textarea
-              value={moduleSettings}
-              onChange={(e) => setModuleSettings(e.target.value)}
-              rows={8}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 font-mono text-xs"
-            />
-            {settingsError && <p className="mt-1 text-xs text-red-600">{settingsError}</p>}
-          </div>
-
           <Button type="submit" className="w-full" loading={isSubmitting}>
             {editItem ? 'Update Template' : 'Create Template'}
           </Button>

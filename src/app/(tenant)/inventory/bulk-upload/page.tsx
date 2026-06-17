@@ -204,7 +204,8 @@ const CHUNK_SIZE = 100
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function BulkUploadPage() {
-  const { activeBranch } = useAuthStore()
+  const { activeBranch, verticalTemplateSlug } = useAuthStore()
+  const isRetail = verticalTemplateSlug === 'retail-store'
   const queryClient = useQueryClient()
   const router = useRouter()
 
@@ -360,7 +361,7 @@ export default function BulkUploadPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-on-surface">Bulk Upload</h1>
-          <p className="text-sm text-on-surface-variant mt-0.5">Import products or parts in bulk from a CSV file</p>
+          <p className="text-sm text-on-surface-variant mt-0.5">{isRetail ? 'Import products in bulk from a CSV file' : 'Import products or parts in bulk from a CSV file'}</p>
         </div>
         <Link href="/inventory">
           <Button size="sm">Back to Inventory</Button>
@@ -369,10 +370,10 @@ export default function BulkUploadPage() {
 
       {/* Tab: Product / Part */}
       <div className="flex gap-1 bg-surface-container-low p-1 rounded-xl w-fit">
-        {(['product', 'part'] as ItemType[]).map((t) => (
+        {(isRetail ? ['product'] : ['product', 'part'] as ItemType[]).map((t) => (
           <button
             key={t}
-            onClick={() => { setItemType(t); clearFile() }}
+            onClick={() => { setItemType(t as ItemType); clearFile() }}
             className={cn(
               'px-5 py-1.5 rounded-lg text-sm font-medium transition-all',
               itemType === t

@@ -129,18 +129,65 @@ export const EmployeeService = {
     return data
   },
 
-  async getTimeLogs(branchId: string, date?: string) {
+  async getTimeLogs(
+    branchId: string,
+    filters?: { date?: string; employeeId?: string; month?: number; year?: number }
+  ) {
     let q = adminSupabase
       .from('time_clocks')
       .select('*, employees(first_name,last_name)')
       .eq('branch_id', branchId)
       .order('clock_in', { ascending: false })
 
-    if (date) {
-      q = q.gte('clock_in', `${date}T00:00:00Z`).lte('clock_in', `${date}T23:59:59Z`)
+    if (filters?.date) {
+      q = q.gte('clock_in', `${filters.date}T00:00:00Z`).lte('clock_in', `${filters.date}T23:59:59Z`)
+    }
+    if (filters?.employeeId) {
+      q = q.eq('employee_id', filters.employeeId)
+    }
+    if (filters?.year) {
+      const month = filters.month ?? null
+      if (month) {
+        const start = new Date(Date.UTC(filters.year, month - 1, 1)).toISOString()
+        const end = new Date(Date.UTC(filters.year, month, 1)).toISOString()
+        q = q.gte('clock_in', start).lt('clock_in', end)
+      } else {
+        const start = new Date(Date.UTC(filters.year, 0, 1)).toISOString()
+        const end = new Date(Date.UTC(filters.year + 1, 0, 1)).toISOString()
+        q = q.gte('clock_in', start).lt('clock_in', end)
+      }
     }
 
     const { data, error } = await q
+    if (error) throw error
+    return data
+  },
+
+  /**
+   * Manually record a completed attendance entry (clock_in + clock_out set
+   * directly). For marking attendance when an employee couldn't clock in
+   * themselves, or for backfilling a missed/forgotten clock-out.
+   */
+  async createManualClockEntry(
+    branchId: string,
+    employeeId: string,
+    clockIn: string,
+    clockOut: string | null,
+    breakMinutes: number,
+    notes: string | null
+  ) {
+    const { data, error } = await adminSupabase
+      .from('time_clocks')
+      .insert({
+        branch_id: branchId,
+        employee_id: employeeId,
+        clock_in: clockIn,
+        clock_out: clockOut,
+        break_minutes: breakMinutes,
+        notes,
+      })
+      .select('*, employees(first_name,last_name)')
+      .single()
     if (error) throw error
     return data
   },

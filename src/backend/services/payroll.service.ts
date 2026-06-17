@@ -35,7 +35,10 @@ export const PayrollService = {
     })
     if (error) throw error
 
-    const result = (data as { total_hours: number; hourly_pay: number; commission_total: number; gross_pay: number }[])[0]
+    const result = (data as {
+      total_hours: number; hourly_pay: number
+      commission_total: number; base_salary: number; gross_pay: number
+    }[])[0]
 
     // Get employee hourly rate
     const { data: emp } = await db('employees').select('hourly_rate').eq('id', employeeId).single()
@@ -44,6 +47,7 @@ export const PayrollService = {
     return {
       total_hours:      result?.total_hours ?? 0,
       hourly_rate:      hourlyRate,
+      base_salary:      result?.base_salary ?? 0,
       hourly_pay:       result?.hourly_pay ?? 0,
       commission_total: result?.commission_total ?? 0,
       gross_pay:        result?.gross_pay ?? 0,
@@ -51,6 +55,21 @@ export const PayrollService = {
   },
 
   async create(businessId: string, branchId: string, employeeId: string, startDate: string, endDate: string, notes?: string) {
+    // Prevent double-pay: block creating a period that overlaps an existing
+    // one for this employee (would double-count hours, commissions, and
+    // base salary for the overlapping days).
+    const { data: overlapping, error: overlapErr } = await db('payroll_periods')
+      .select('id, start_date, end_date')
+      .eq('employee_id', employeeId)
+      .lte('start_date', endDate)
+      .gte('end_date', startDate)
+      .limit(1)
+    if (overlapErr) throw overlapErr
+    if (overlapping && overlapping.length > 0) {
+      const ov = overlapping[0]
+      throw new Error(`This period overlaps an existing payroll period (${ov.start_date} to ${ov.end_date}) for this employee.`)
+    }
+
     const calc = await this.calculate(employeeId, branchId, businessId, startDate, endDate)
 
     const { data, error } = await db('payroll_periods')
@@ -62,6 +81,7 @@ export const PayrollService = {
         end_date:         endDate,
         total_hours:      calc.total_hours,
         hourly_rate:      calc.hourly_rate,
+        base_salary:      calc.base_salary,
         commission_total: calc.commission_total,
         notes:            notes ?? null,
         status:           'draft',
@@ -174,31 +194,147 @@ export const CommissionService = {
     return { data: data ?? [], total: count ?? 0 }
   },
 
-  async listAll(businessId: string, branchId: string, page = 1, limit = 20) {
+  /**
+   * List commissions with optional filters and enriched sale details.
+   * Since employee_commissions.source_id has no FK (it can point to sales OR
+   * repairs), sale details are fetched in a second query and merged in —
+   * PostgREST can't embed a polymorphic relationship directly.
+   */
+  async listAll(
+    businessId: string,
+    branchId: string | undefined,
+    page = 1,
+    limit = 20,
+    filters?: { employeeId?: string; month?: number; year?: number }
+  ) {
     const from = (page - 1) * limit
-    const { data, error, count } = await db('employee_commissions')
+    let q = db('employee_commissions')
       .select(`
         *,
         commission_rules(name, rate_type),
         employees(first_name, last_name)
       `, { count: 'exact' })
       .eq('business_id', businessId)
+
+    if (filters?.employeeId) q = q.eq('employee_id', filters.employeeId)
+
+    if (filters?.year) {
+      const month = filters.month ?? null
+      if (month) {
+        const start = new Date(Date.UTC(filters.year, month - 1, 1)).toISOString()
+        const end = new Date(Date.UTC(filters.year, month, 1)).toISOString()
+        q = q.gte('created_at', start).lt('created_at', end)
+      } else {
+        const start = new Date(Date.UTC(filters.year, 0, 1)).toISOString()
+        const end = new Date(Date.UTC(filters.year + 1, 0, 1)).toISOString()
+        q = q.gte('created_at', start).lt('created_at', end)
+      }
+    }
+
+    const { data, error, count } = await q
       .order('created_at', { ascending: false })
       .range(from, from + limit - 1)
     if (error) throw error
-    return { data: data ?? [], total: count ?? 0 }
+
+    const rows = data ?? []
+
+    // Enrich 'sale' source rows with the underlying sale's total, payment
+    // method, items, and date — so the UI can show full sale context.
+    const saleIds = [...new Set(
+      rows.filter((r: any) => r.source_type === 'sale').map((r: any) => r.source_id)
+    )]
+    let salesById: Record<string, any> = {}
+    if (saleIds.length > 0) {
+      const { data: sales } = await db('sales')
+        .select('id, total, subtotal, discount, tax, payment_method, created_at, customers(first_name, last_name), sale_items(name, quantity, unit_price, total)')
+        .in('id', saleIds)
+      salesById = Object.fromEntries((sales ?? []).map((s: any) => [s.id, s]))
+    }
+
+    const enriched = rows.map((r: any) => ({
+      ...r,
+      sale: r.source_type === 'sale' ? (salesById[r.source_id] ?? null) : null,
+    }))
+
+    return { data: enriched, total: count ?? 0 }
   },
 
   /**
-   * Record a commission after a sale or repair is completed.
-   * Finds the best matching active rule and computes the amount.
+   * Record a commission after a sale is completed.
+   * Routes commission to served_by employee when provided; falls back to cashier.
+   * Cross-tenant security: served_by UUID is verified against the businessId before use.
    */
-  async recordForSale(businessId: string, employeeId: string, sourceId: string, saleTotal: number) {
+  async recordForSale(
+    businessId: string,
+    cashierId: string,
+    sourceId: string,
+    saleTotal: number,
+    options?: {
+      servedByEmployeeId?: string | null
+      productCommission?: { type: 'percentage' | 'flat'; rate: number } | null
+      // Cashier-entered commission for the served_by employee on this specific
+      // sale (retail-store flow). Highest priority — only applies when a valid
+      // served_by employee was resolved; never applied to a cashier fallback.
+      // type 'percentage' → value is a % of saleTotal; 'flat' → value is the £ amount.
+      manualCommission?: { type: 'percentage' | 'flat'; value: number } | null
+    }
+  ) {
+    let servedBy = options?.servedByEmployeeId ?? null
+
+    // Cross-tenant security: verify the served_by employee belongs to this business
+    if (servedBy) {
+      const { data: emp } = await db('employees')
+        .select('id, branches!inner(business_id)')
+        .eq('id', servedBy)
+        .eq('branches.business_id', businessId)
+        .maybeSingle()
+      if (!emp) servedBy = null  // not in this tenant — fall back to cashier
+    }
+
+    const employeeId = servedBy ?? cashierId
+    if (!employeeId) return
+
+    // Cashier-entered manual commission — highest priority, retail-store flow.
+    // Only applies when a specific served_by employee was actually resolved.
+    if (servedBy && options?.manualCommission && options.manualCommission.value > 0) {
+      const amount = options.manualCommission.type === 'percentage'
+        ? parseFloat(((saleTotal * options.manualCommission.value) / 100).toFixed(2))
+        : options.manualCommission.value
+      await db('employee_commissions').insert({
+        business_id: businessId,
+        employee_id: servedBy,
+        source_type: 'sale',
+        source_id:   sourceId,
+        rule_id:     null,
+        amount,
+        status:      'pending',
+      })
+      return
+    }
+
+    // Product-level commission takes precedence over business rules
+    if (options?.productCommission && options.productCommission.rate > 0) {
+      const amount = options.productCommission.type === 'percentage'
+        ? parseFloat(((saleTotal * options.productCommission.rate) / 100).toFixed(2))
+        : options.productCommission.rate
+      await db('employee_commissions').insert({
+        business_id: businessId,
+        employee_id: employeeId,
+        source_type: 'sale',
+        source_id:   sourceId,
+        rule_id:     null,
+        amount,
+        status:      'pending',
+      })
+      return
+    }
+
+    // Fall back to business-wide commission rules
     const rules = await this.listRules(businessId)
     const rule = rules.find(
       (r) => (r.applies_to === 'all' || r.applies_to === 'sales') && saleTotal >= (r.min_amount ?? 0)
     )
-    if (!rule || !employeeId) return
+    if (!rule) return
 
     const amount = rule.rate_type === 'percent'
       ? parseFloat(((saleTotal * rule.rate) / 100).toFixed(2))

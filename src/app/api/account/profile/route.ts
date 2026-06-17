@@ -6,13 +6,16 @@ import type { NextRequest } from 'next/server'
 
 async function getProfile(request: NextRequest, ctx: RequestContext) {
   try {
-    const { data: profile, error } = await adminSupabase
-      .from('profiles')
-      .select('*')
-      .eq('id', ctx.auth.userId)
-      .single()
+    const db = adminSupabase as any
+    const [{ data: profile, error }, { data: bizData }] = await Promise.all([
+      db.from('profiles').select('*').eq('id', ctx.auth.userId).single(),
+      ctx.businessId
+        ? db.from('businesses').select('business_vertical_templates(slug)').eq('id', ctx.businessId).single()
+        : Promise.resolve({ data: null }),
+    ])
     if (error) throw error
-    return ok(profile)
+    const verticalTemplateSlug = (bizData?.business_vertical_templates as { slug?: string } | null)?.slug ?? null
+    return ok({ ...profile, verticalTemplateSlug })
   } catch (err) {
     return serverError('Failed to fetch profile', err)
   }

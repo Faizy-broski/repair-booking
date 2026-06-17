@@ -18,6 +18,8 @@ interface AsyncEmployeeSelectProps {
   error?: string
   label?: string
   placeholder?: string
+  /** Open the dropdown upward instead of downward */
+  openUpward?: boolean
   /** Extra class names on the outer wrapper */
   className?: string
 }
@@ -36,6 +38,7 @@ export function AsyncEmployeeSelect({
   error,
   label = 'Employee',
   placeholder = 'Type to search employees…',
+  openUpward = false,
   className,
 }: AsyncEmployeeSelectProps) {
   const [query, setQuery] = useState('')
@@ -137,7 +140,7 @@ export function AsyncEmployeeSelect({
       )}
 
       {open && !selected && (
-        <div className="absolute z-50 mt-1 w-full rounded-lg border border-outline-variant bg-surface shadow-lg max-h-52 overflow-y-auto">
+        <div className={`absolute z-50 w-full rounded-lg border border-outline-variant bg-surface shadow-lg max-h-52 overflow-y-auto ${openUpward ? 'bottom-full mb-1' : 'mt-1'}`}>
           {results.length === 0 && !isFetching ? (
             <p className="px-3 py-2.5 text-sm text-on-surface-variant">
               {query.length === 0 ? 'Type to search employees' : 'No employees found'}

@@ -22,6 +22,7 @@ const createSchema = z.object({
   valuation_method: z.enum(['weighted_average', 'fifo', 'lifo']).optional(),
   image_url: z.string().optional().nullable(),
   show_on_pos: z.boolean().optional(),
+  is_draft: z.boolean().optional(),
   tax_class: z.string().optional().nullable(),
   // Item type: product or part
   item_type: z.enum(['product', 'part']).optional().default('product'),
@@ -66,6 +67,7 @@ export const ProductController = {
         categoryId: searchParams.get('category_id') ?? undefined,
         branchId: searchParams.get('branch_id') ?? ctx.auth.branchId ?? undefined,
         includeInactive: searchParams.get('include_inactive') === 'true',
+        includeDrafts: searchParams.get('include_drafts') === 'true',
         brandId: searchParams.get('brand_id') ?? undefined,
         supplierId: searchParams.get('supplier_id') ?? undefined,
         valuation: searchParams.get('valuation') ?? undefined,
@@ -163,6 +165,26 @@ export const ProductController = {
         return conflict('A product with this SKU or Barcode already exists in your inventory.')
       }
       return serverError('Failed to create product', err)
+    }
+  },
+
+  async duplicate(request: NextRequest, ctx: RequestContext, id: string) {
+    try {
+      const source = await ProductService.getById(id, ctx.businessId)
+      if (!source) return notFound('Product not found')
+
+      const limitKey = (source as any).is_service ? 'max_services' : 'max_products'
+      const limitCheck = await PlanLimitService.checkLimit(ctx.businessId, limitKey)
+      if (!limitCheck.allowed) {
+        const label = (source as any).is_service ? 'service' : 'product'
+        return forbidden(`${label.charAt(0).toUpperCase() + label.slice(1)} limit reached. Your plan allows ${limitCheck.limit} ${label}s.`)
+      }
+
+      const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? undefined
+      const duplicate = await ProductService.duplicateProduct(id, ctx.businessId, branchId, ctx.auth.userId)
+      return created(duplicate)
+    } catch (err) {
+      return serverError('Failed to duplicate product', err)
     }
   },
 
@@ -315,7 +337,8 @@ export const ProductController = {
         selling_price: z.number().min(0),
         cost_price: z.number().min(0).optional().nullable(),
         attributes: z.record(z.string(), z.string()).optional(),
-        stock: z.number().optional()
+        stock: z.number().optional(),
+        image_url: z.string().optional().nullable(),
       })).min(1),
       branch_id: z.string().optional()
     })
@@ -338,6 +361,7 @@ export const ProductController = {
       cost_price: z.number().min(0).optional().nullable(),
       attributes: z.record(z.string(), z.string()).optional(),
       stock: z.number().optional(),
+      image_url: z.string().optional().nullable(),
       branch_id: z.string().optional()
     })
     const { data, error } = await validateBody(request, updateVariantSchema)

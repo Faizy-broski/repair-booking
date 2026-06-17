@@ -15,6 +15,7 @@ const createSchema = z.object({
   phone: z.string().optional().nullable(),
   role: z.string().optional().nullable(),
   hourly_rate: z.number().min(0).optional().nullable(),
+  base_salary: z.number().min(0).optional().nullable(),
   hire_date: z.string().optional().nullable(),
   access_pin: z.string().regex(/^\d{4,6}$/).optional().nullable().or(z.literal('')),
 })
@@ -24,7 +25,13 @@ const updateSchema = createSchema.partial().omit({ branch_id: true })
 const clockSchema = z.object({
   branch_id: z.string().uuid(),
   employee_id: z.string().uuid(),
-  action: z.enum(['clock_in', 'clock_out']),
+  action: z.enum(['clock_in', 'clock_out', 'manual']),
+  // Only used when action === 'manual' — lets a manager mark attendance
+  // directly (e.g. employee forgot to clock in, or backfilling a past day).
+  clock_in: z.string().datetime().optional(),
+  clock_out: z.string().datetime().optional().nullable(),
+  break_minutes: z.number().min(0).optional(),
+  notes: z.string().optional().nullable(),
 })
 
 export const EmployeeController = {
@@ -131,9 +138,16 @@ export const EmployeeController = {
       if (data.action === 'clock_in') {
         const record = await EmployeeService.clockIn(data.branch_id, data.employee_id)
         return created(record)
-      } else {
+      } else if (data.action === 'clock_out') {
         const record = await EmployeeService.clockOut(data.branch_id, data.employee_id)
         return ok(record)
+      } else {
+        if (!data.clock_in) return badRequest('clock_in is required for manual entries')
+        const record = await EmployeeService.createManualClockEntry(
+          data.branch_id, data.employee_id, data.clock_in,
+          data.clock_out ?? null, data.break_minutes ?? 0, data.notes ?? null
+        )
+        return created(record)
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Clock action failed'
@@ -146,8 +160,13 @@ export const EmployeeController = {
     const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId
     if (!branchId) return ok([])
     const date = searchParams.get('date') ?? undefined
+    const employeeId = searchParams.get('employee_id') ?? undefined
+    const monthParam = searchParams.get('month')
+    const yearParam = searchParams.get('year')
+    const month = monthParam ? parseInt(monthParam, 10) : undefined
+    const year = yearParam ? parseInt(yearParam, 10) : undefined
     try {
-      const data = await EmployeeService.getTimeLogs(branchId, date)
+      const data = await EmployeeService.getTimeLogs(branchId, { date, employeeId, month, year })
       return ok(data)
     } catch (err) {
       return serverError('Failed to fetch time logs', err)

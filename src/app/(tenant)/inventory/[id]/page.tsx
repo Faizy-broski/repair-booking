@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Modal } from '@/components/ui/modal'
 import { ImageUpload } from '@/components/ui/image-upload'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, getCurrencySymbol } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import Link from 'next/link'
 import { BarcodeModal } from '@/components/inventory/barcode-modal'
@@ -46,6 +46,7 @@ interface DBVariant {
   selling_price: number; cost_price: number | null
   attributes: Record<string, string>
   stock?: number
+  image_url?: string | null
 }
 
 interface EditVariantRow {
@@ -57,6 +58,7 @@ interface EditVariantRow {
   sellingPrice: string
   attributes: Record<string, string>
   stock: string
+  imageUrl: string
   dirty: boolean
 }
 
@@ -69,6 +71,7 @@ interface NewVariantRow {
   costPrice: string
   sellingPrice: string
   stock: string
+  imageUrl: string
 }
 
 interface AttrDef { id: string; name: string; valuesRaw: string }
@@ -93,7 +96,11 @@ function cartesian(attrs: { name: string; values: string[] }[]): Record<string, 
 
 export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const { activeBranch, branches } = useAuthStore()
+  const { activeBranch, branches, verticalTemplateSlug } = useAuthStore()
+  const currSymbol = getCurrencySymbol()
+  // Simplified, repair-free product form is specific to the retail-store
+  // vertical template — independent of any module's enabled/disabled state.
+  const hasRepairs = verticalTemplateSlug !== 'retail-store'
   const router = useRouter()
   const qc = useQueryClient()
 
@@ -231,6 +238,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       sellingPrice: String(v.selling_price),
       attributes: v.attributes ?? {},
       stock: v.stock != null ? String(v.stock) : '0',
+      imageUrl: v.image_url ?? '',
       dirty: false,
     })))
   }, [variantsData])
@@ -387,6 +395,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       costPrice: costPrice,
       sellingPrice: sellingPrice,
       stock: '0',
+      imageUrl: '',
     })))
     toast.success(`${combos.length} variant${combos.length !== 1 ? 's' : ''} ready to add.`)
   }
@@ -414,6 +423,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       commission_enabled: commissionEnabled, commission_type: commissionType,
       commission_rate: parseFloat(commissionRate) || 0, loyalty_enabled: loyaltyEnabled,
       has_variants: hasVariants || existingVariants.length > 0 || newVariantRows.length > 0,
+      is_draft: false,
     }
 
     const res = await fetch(`/api/products/${id}`, {
@@ -431,8 +441,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     // 2. PATCH dirty existing variants
     const dirtyVariants = existingVariants.filter(v => v.dirty)
     if (dirtyVariants.length > 0) {
-      await Promise.all(dirtyVariants.map(v =>
-        fetch(`/api/products/${id}/variants/${v.id}`, {
+      const results = await Promise.all(dirtyVariants.map(async (v) => {
+        const res = await fetch(`/api/products/${id}/variants/${v.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -443,11 +453,25 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             cost_price: parseFloat(v.costPrice) || 0,
             attributes: v.attributes,
             stock: parseInt(v.stock) || 0,
+            image_url: v.imageUrl || null,
             branch_id: activeBranch?.id
           }),
         })
-      ))
-      setExistingVariants(prev => prev.map(v => ({ ...v, dirty: false })))
+        return { id: v.id, ok: res.ok, error: res.ok ? null : (await res.json().catch(() => null))?.error?.message }
+      }))
+
+      const failed = results.filter(r => !r.ok)
+      const succeededIds = new Set(results.filter(r => r.ok).map(r => r.id))
+      // Only clear the dirty flag on variants that actually saved — failed ones stay
+      // marked unsaved so the user can see and retry instead of silently losing the edit.
+      setExistingVariants(prev => prev.map(v => succeededIds.has(v.id) ? { ...v, dirty: false } : v))
+      qc.invalidateQueries({ queryKey: ['inv-product-variants', id] })
+
+      if (failed.length > 0) {
+        toast.error(failed[0].error || `Failed to save ${failed.length} variant${failed.length !== 1 ? 's' : ''}.`)
+        setSaving(false)
+        return
+      }
     }
 
     // 3. POST new variants
@@ -469,6 +493,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               cost_price: parseFloat(v.costPrice) || 0,
               attributes: v.attributes,
               stock: parseInt(v.stock) || 0,
+              image_url: v.imageUrl || null,
             })),
           }),
         })
@@ -487,6 +512,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     qc.invalidateQueries({ queryKey: ['inventory-stats'] })
     toast.success('Changes saved.')
     setSaving(false)
+    router.push('/inventory')
   }
 
   async function handleDelete() {
@@ -542,7 +568,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl px-6 py-6 space-y-8">
+        <div className="max-w-5xl px-6 py-6 space-y-8">
 
           {/* Type Toggle */}
           <section>
@@ -572,7 +598,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block text-sm font-medium text-gray-700">Device Type</label>
+                    <label className="block text-sm font-medium text-gray-700">{hasRepairs ? 'Device Type' : 'Category'}</label>
                     <button type="button" onClick={() => setAddingCategory(true)} className="text-xs text-brand-teal hover:underline">+ Add</button>
                   </div>
                   <Select options={[{ value: '', label: 'Select type...' }, ...categories.map(c => ({ value: c.id, label: c.name }))]} value={categoryId} onValueChange={v => { setCategoryId(v); setBrandId(''); setModelId(''); setPartType('') }} />
@@ -585,21 +611,23 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   <Select options={[{ value: '', label: 'Select brand...' }, ...brands.map(b => ({ value: b.id, label: b.name }))]} value={brandId} onValueChange={v => { setBrandId(v); setModelId('') }} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-sm font-medium text-gray-700">Model</label>
-                    <button type="button" onClick={() => setAddingDevice(true)} className="text-xs text-brand-teal hover:underline">+ Add</button>
-                  </div>
-                  <Select options={[{ value: '', label: 'Select model...' }, ...devices.map(d => ({ value: d.id, label: d.name }))]} value={modelId} onValueChange={setModelId} />
-                </div>
-                {itemType === 'part' && (
+              {hasRepairs && (
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Part Type</label>
-                    <Select options={[{ value: '', label: 'Select part type...' }, ...partTypeOptions]} value={partType} onValueChange={setPartType} />
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-sm font-medium text-gray-700">Model</label>
+                      <button type="button" onClick={() => setAddingDevice(true)} className="text-xs text-brand-teal hover:underline">+ Add</button>
+                    </div>
+                    <Select options={[{ value: '', label: 'Select model...' }, ...devices.map(d => ({ value: d.id, label: d.name }))]} value={modelId} onValueChange={setModelId} />
                   </div>
-                )}
-              </div>
+                  {itemType === 'part' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Part Type</label>
+                      <Select options={[{ value: '', label: 'Select part type...' }, ...partTypeOptions]} value={partType} onValueChange={setPartType} />
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <Input label="SKU" value={sku} onChange={e => setSku(e.target.value)} error={skuConflict ? 'This SKU is already in use' : undefined} />
                 <div className="flex items-end gap-2">
@@ -641,56 +669,65 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 <table className="min-w-full divide-y divide-gray-100 text-sm">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Variant</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">SKU</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Barcode</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Cost (£)</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Price (£)</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Stock</th>
-                      <th className="px-3 py-2" />
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Image</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Variant</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">SKU</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Barcode</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Cost ({currSymbol})</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Price ({currSymbol})</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Stock</th>
+                      <th className="px-3 py-2.5" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white">
                     {allVariants.map(row => (
-                      <tr key={row.id} className={`hover:bg-gray-50 ${row.dirty ? 'bg-amber-50' : ''}`}>
-                        <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">
+                      <tr key={row.id} className={`hover:bg-gray-50 transition-colors ${row.dirty ? 'bg-amber-50' : ''}`}>
+                        <td className="px-3 py-2.5">
+                          <ImageUpload
+                            compact
+                            size="lg"
+                            value={row.imageUrl}
+                            onChange={(url) => updateExistingVariant(row.id, 'imageUrl', url)}
+                          />
+                        </td>
+                        <td className="px-3 py-2.5 font-medium text-gray-800 whitespace-nowrap">
                           {row.name}
                           {row.dirty && <span className="ml-1.5 text-[10px] text-amber-600 font-semibold">unsaved</span>}
                         </td>
-                        <td className="px-3 py-2">
-                          <input type="text" value={row.sku} onChange={e => updateExistingVariant(row.id, 'sku', e.target.value)} placeholder="Optional" className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                        <td className="px-3 py-2.5">
+                          <input type="text" value={row.sku} onChange={e => updateExistingVariant(row.id, 'sku', e.target.value)} placeholder="Optional" className="w-28 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
                         </td>
-                        <td className="px-3 py-2">
-                          <div className="flex gap-1 items-center">
-                            <input type="text" value={row.barcode} onChange={e => updateExistingVariant(row.id, 'barcode', e.target.value)} placeholder="Optional" className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                            <button type="button" onClick={() => updateExistingVariant(row.id, 'barcode', Math.floor(100000000000 + Math.random() * 900000000000).toString())} className="p-1 text-gray-400 hover:text-blue-500 transition-colors bg-gray-50 rounded shrink-0" title="Generate Barcode">
+                        <td className="px-3 py-2.5">
+                          <div className="flex gap-1.5 items-center">
+                            <input type="text" value={row.barcode} onChange={e => updateExistingVariant(row.id, 'barcode', e.target.value)} placeholder="Optional" className="w-40 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
+                            <button type="button" onClick={() => updateExistingVariant(row.id, 'barcode', Math.floor(100000000000 + Math.random() * 900000000000).toString())} className="p-1.5 text-gray-400 hover:text-brand-teal transition-colors bg-gray-50 hover:bg-brand-teal/10 rounded-md shrink-0" title="Generate Barcode">
                               <RefreshCw className="h-3 w-3" />
                             </button>
                             {row.barcode && (
-                              <button type="button" onClick={() => setVariantBarcodeTarget({ id: row.id, name: `${product?.name} - ${row.name}`, barcode: row.barcode })} className="p-1 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100 transition-colors bg-indigo-50 rounded shrink-0" title="Print Barcode">
+                              <button type="button" onClick={() => setVariantBarcodeTarget({ id: row.id, name: `${product?.name} - ${row.name}`, barcode: row.barcode })} className="p-1.5 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100 transition-colors bg-indigo-50 rounded-md shrink-0" title="Print Barcode">
                                 <Barcode className="h-3.5 w-3.5" />
                               </button>
                             )}
                           </div>
                         </td>
-                        <td className="px-3 py-2">
-                          <input type="number" min="0" step="0.01" value={row.costPrice} onChange={e => updateExistingVariant(row.id, 'costPrice', e.target.value)} placeholder="0.00" className="w-20 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                        <td className="px-3 py-2.5">
+                          <input type="number" min="0" step="0.01" value={row.costPrice} onChange={e => updateExistingVariant(row.id, 'costPrice', e.target.value)} placeholder="0.00" className="w-24 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
                         </td>
-                        <td className="px-3 py-2">
-                          <input type="number" min="0" step="0.01" value={row.sellingPrice} onChange={e => updateExistingVariant(row.id, 'sellingPrice', e.target.value)} placeholder="0.00" className="w-20 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                        <td className="px-3 py-2.5">
+                          <input type="number" min="0" step="0.01" value={row.sellingPrice} onChange={e => updateExistingVariant(row.id, 'sellingPrice', e.target.value)} placeholder="0.00" className="w-24 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
                         </td>
-                        <td className="px-3 py-2">
-                          <input type="number" min="0" value={row.stock} onChange={e => updateExistingVariant(row.id, 'stock', e.target.value)} className="w-16 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                        <td className="px-3 py-2.5">
+                          <input type="number" min="0" value={row.stock} onChange={e => updateExistingVariant(row.id, 'stock', e.target.value)} className="w-20 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-3 py-2.5">
                           <button
                             type="button"
                             onClick={() => deleteVariant(row.id)}
                             disabled={deletingVariantId === row.id}
-                            className="text-gray-400 hover:text-red-500 disabled:opacity-40"
+                            className="flex h-8 w-8 items-center justify-center rounded-md text-red-500 bg-red-50 hover:bg-red-100 hover:text-red-600 transition-colors disabled:opacity-40"
                           >
                             {deletingVariantId === row.id
-                              ? <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-red-500" />
+                              ? <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-red-200 border-t-red-500" />
                               : <Trash2 className="h-3.5 w-3.5" />
                             }
                           </button>
@@ -764,11 +801,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                       <table className="min-w-full divide-y divide-gray-100 text-sm">
                         <thead className="bg-gray-50">
                           <tr>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Image</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Variant</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">SKU</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Barcode</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Cost (£)</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Price (£) *</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Cost ({currSymbol})</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Price ({currSymbol}) *</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Stock</th>
                             <th className="px-3 py-2" />
                           </tr>
@@ -776,6 +814,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                         <tbody className="divide-y divide-gray-100 bg-white">
                           {newVariantRows.map(row => (
                             <tr key={row.key} className="hover:bg-gray-50">
+                              <td className="px-3 py-2">
+                                <ImageUpload
+                                  compact
+                                  size="lg"
+                                  value={row.imageUrl}
+                                  onChange={(url) => updateNewVariantRow(row.key, 'imageUrl', url)}
+                                />
+                              </td>
                               <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">{row.name}</td>
                               <td className="px-3 py-2">
                                 <input type="text" value={row.sku} onChange={e => updateNewVariantRow(row.key, 'sku', e.target.value)} placeholder="Optional" className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
@@ -830,8 +876,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Cost Price (£)" type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
-                <Input label="Selling Price (£)" type="number" step="0.01" min="0" placeholder="0.00" required value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
+                <Input label="Cost Price ({currSymbol})" type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
+                <Input label="Selling Price ({currSymbol})" type="number" step="0.01" min="0" placeholder="0.00" required value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
               </div>
               {hasMargin && (
                 <div className="rounded-lg bg-green-50 border border-green-100 px-4 py-2.5 flex items-center gap-4 text-sm">
@@ -934,9 +980,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
-                      <Select options={[{ value: 'percentage', label: 'Percentage (%)' }, { value: 'fixed', label: 'Fixed Amount (£)' }]} value={commissionType} onValueChange={setCommissionType} />
+                      <Select options={[{ value: 'percentage', label: 'Percentage (%)' }, { value: 'fixed', label: 'Fixed Amount ({currSymbol})' }]} value={commissionType} onValueChange={setCommissionType} />
                     </div>
-                    <Input label={commissionType === 'percentage' ? 'Rate (%)' : 'Amount (£)'} type="number" step="0.01" min="0" placeholder="0" value={commissionRate} onChange={e => setCommissionRate(e.target.value)} />
+                    <Input label={commissionType === 'percentage' ? 'Rate (%)' : 'Amount ({currSymbol})'} type="number" step="0.01" min="0" placeholder="0" value={commissionRate} onChange={e => setCommissionRate(e.target.value)} />
                   </div>
                 )}
               </div>

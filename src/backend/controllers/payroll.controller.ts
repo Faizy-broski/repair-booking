@@ -50,7 +50,8 @@ export const PayrollController = {
     try {
       const period = await PayrollService.create(ctx.businessId, data.branch_id, data.employee_id, data.start_date, data.end_date, data.notes)
       return created(period)
-    } catch (err) {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.includes('overlaps')) return badRequest(err.message)
       return serverError('Failed to create payroll period', err)
     }
   },
@@ -129,8 +130,15 @@ export const CommissionController = {
     const { searchParams } = request.nextUrl
     const { page, limit } = getPagination(searchParams)
     const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? undefined
+    const employeeId = searchParams.get('employee_id') ?? undefined
+    const monthParam = searchParams.get('month')
+    const yearParam = searchParams.get('year')
+    const month = monthParam ? parseInt(monthParam, 10) : undefined
+    const year = yearParam ? parseInt(yearParam, 10) : undefined
     try {
-      const { data, total } = await CommissionService.listAll(ctx.businessId, branchId, page, limit)
+      const { data, total } = await CommissionService.listAll(ctx.businessId, branchId, page, limit, {
+        employeeId, month, year,
+      })
       return ok(data, { page, limit, total })
     } catch (err) {
       return serverError('Failed to fetch commissions', err)

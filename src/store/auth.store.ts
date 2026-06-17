@@ -17,14 +17,21 @@ interface AuthState {
   branches: Branch[]
   isLoading: boolean
   currency: string
+  brandColor: string
   subscriptionStatus: SubscriptionStatus | null
+  // Slug of the business's vertical template (e.g. "retail-store", "repair-shop").
+  // Drives UI differences that depend on business type rather than module state —
+  // e.g. simplified Inventory form fields for retail vs repair-shop businesses.
+  verticalTemplateSlug: string | null
 
   setProfile: (profile: Profile | null) => void
   setActiveBranch: (branch: Branch) => void
   setBranches: (branches: Branch[]) => void
   setLoading: (loading: boolean) => void
   setCurrency: (currency: string) => void
+  setBrandColor: (brandColor: string) => void
   setSubscriptionStatus: (status: SubscriptionStatus | null) => void
+  setVerticalTemplateSlug: (slug: string | null) => void
   clear: () => void
 
   // Computed helpers
@@ -60,15 +67,19 @@ export const useAuthStore = create<AuthState>()(
       branches: [],
       isLoading: true,
       currency: 'GBP',
+      brandColor: '#008080',
       subscriptionStatus: null,
+      verticalTemplateSlug: null,
 
       setProfile: (profile) => set({ profile }),
       setActiveBranch: (branch) => set({ activeBranch: branch }),
       setBranches: (branches) => set({ branches }),
       setLoading: (isLoading) => set({ isLoading }),
       setCurrency: (currency) => set({ currency }),
+      setBrandColor: (brandColor) => set({ brandColor }),
       setSubscriptionStatus: (subscriptionStatus) => set({ subscriptionStatus }),
-      clear: () => set({ profile: null, activeBranch: null, branches: [], currency: 'GBP', subscriptionStatus: null }),
+      setVerticalTemplateSlug: (verticalTemplateSlug) => set({ verticalTemplateSlug }),
+      clear: () => set({ profile: null, activeBranch: null, branches: [], currency: 'GBP', brandColor: '#008080', subscriptionStatus: null, verticalTemplateSlug: null }),
 
       isOwner: () => {
         const role = get().profile?.role
@@ -91,6 +102,8 @@ export const useAuthStore = create<AuthState>()(
         activeBranch: state.activeBranch,
         branches: state.branches,
         currency: state.currency,
+        brandColor: state.brandColor,
+        verticalTemplateSlug: state.verticalTemplateSlug,
       }),
     }
   )

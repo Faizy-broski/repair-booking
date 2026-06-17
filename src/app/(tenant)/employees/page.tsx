@@ -1,14 +1,16 @@
 'use client'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Clock, LogIn, LogOut, DollarSign, CalendarDays, TrendingUp, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Clock, LogIn, LogOut, DollarSign, CalendarDays, TrendingUp, Pencil, Trash2, BarChart2, Users } from 'lucide-react'
 import * as Tabs from '@radix-ui/react-tabs'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/data-table'
 import { AsyncEmployeeSelect } from '@/components/shared/async-employee-select'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
+import { EmployeeReportTab } from './_components/employee-report'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { PhoneInput } from '@/components/ui/phone-input'
 import validations from '@/components/layout/number-validations.json'
@@ -18,26 +20,36 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
 import { toast } from 'sonner'
+import { Suspense } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 
 interface EmployeeRow {
   id: string; first_name: string; last_name: string | null; email: string | null; role: string | null; is_active: boolean
-  phone?: string | null; hourly_rate?: number | null
+  phone?: string | null; hourly_rate?: number | null; base_salary?: number | null
 }
 interface TimeClockRow {
   id: string; employee_id: string; clock_in: string; clock_out: string | null
+  break_minutes?: number | null
   employees?: { first_name: string; last_name: string | null } | null
 }
 interface ShiftRow {
   id: string; name: string; start_time: string; end_time: string; days_of_week: number[]
 }
 interface PayrollRow {
-  id: string; start_date: string; end_date: string; status: string; gross_pay: number | null; total_hours: number | null
+  id: string; start_date: string; end_date: string; status: string
+  gross_pay: number | null; total_hours: number | null; base_salary?: number | null
   employees?: { first_name: string; last_name: string | null } | null
 }
 interface CommissionRow {
   id: string; amount: number; status: string; source_type: string; created_at: string
+  employee_id: string
   employees?: { first_name: string; last_name: string | null } | null
+  sale?: {
+    id: string; total: number; subtotal: number; discount: number; tax: number
+    payment_method: string; created_at: string
+    customers?: { first_name: string; last_name: string | null } | null
+    sale_items?: { name: string; quantity: number; unit_price: number; total: number }[]
+  } | null
 }
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -49,6 +61,7 @@ const schema = z.object({
   phone: z.string().optional(),
   role: z.string().optional(),
   hourly_rate: z.coerce.number().optional(),
+  base_salary: z.coerce.number().min(0).optional(),
 }).refine((data) => {
   if (!data.phone || !data.phone.startsWith('+')) return true
   const sortedValidations = [...validations].sort((a, b) => b.phone.length - a.phone.length)
@@ -84,13 +97,34 @@ type PayrollForm = z.infer<typeof payrollSchema>
 
 
 
-export default function EmployeesPage() {
-  const { activeBranch } = useAuthStore()
+function EmployeesPageInner() {
+  const { activeBranch, verticalTemplateSlug } = useAuthStore()
+  // Base salary + per-sale commission entry is specific to the retail-store
+  // vertical template, independent of any module's enabled/disabled state.
+  const isRetailTemplate = verticalTemplateSlug === 'retail-store'
   const queryClient = useQueryClient()
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const activeTab = searchParams.get('tab') ?? 'employees'
+
+  function handleTabChange(tab: string) {
+    router.push(`/employees?tab=${tab}`, { scroll: false })
+  }
   const [sheetOpen, setSheetOpen] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [shiftSheetOpen, setShiftSheetOpen] = useState(false)
   const [payrollSheetOpen, setPayrollSheetOpen] = useState(false)
+  // ── Commissions filters ─────────────────────────────────────────────────
+  const nowMonth = String(new Date().getMonth() + 1)
+  const nowYear  = String(new Date().getFullYear())
+
+  const [commEmployeeFilter, setCommEmployeeFilter] = useState('')
+  const [commMonthFilter, setCommMonthFilter] = useState(nowMonth)
+  const [commYearFilter, setCommYearFilter]   = useState(nowYear)
+  // ── Clock In/Out filters ─────────────────────────────────────────────────
+  const [clockEmployeeFilter, setClockEmployeeFilter] = useState('')
+  const [clockMonthFilter, setClockMonthFilter] = useState(nowMonth)
+  const [clockYearFilter, setClockYearFilter]   = useState(nowYear)
   const [clockingEmployee, setClockinEmployee] = useState<string | null>(null)
   const [selectedDays, setSelectedDays] = useState<number[]>([])
   const [payrollAction, setPayrollAction] = useState<string | null>(null)
@@ -132,10 +166,28 @@ export default function EmployeesPage() {
   // the data will already be loaded in the React Query cache.
   const bgEnabled = !!activeBranch && employeesLoaded
 
+  // Always today-only — drives the quick clock-in/out buttons in the Employees tab.
+  // Kept separate from the filterable Clock In/Out report below so changing
+  // those filters never affects whether an employee shows as "clocked in" today.
   const { data: timeLogs = [], isLoading: loadingClock } = useQuery({
     queryKey: ['employees-clock', activeBranch?.id, today],
     queryFn: async () => {
       const res = await fetch(`/api/employees/clock?branch_id=${activeBranch!.id}&date=${today}`)
+      const json = await res.json(); return (json.data ?? []) as TimeClockRow[]
+    },
+    enabled: bgEnabled,
+    staleTime: 15_000,
+  })
+
+  // Filterable attendance report — Clock In/Out tab.
+  const { data: clockHistory = [], isLoading: loadingClockHistory } = useQuery({
+    queryKey: ['employees-clock-history', activeBranch?.id, clockEmployeeFilter, clockMonthFilter, clockYearFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams({ branch_id: activeBranch!.id })
+      if (clockEmployeeFilter) params.set('employee_id', clockEmployeeFilter)
+      if (clockMonthFilter) params.set('month', clockMonthFilter)
+      if (clockYearFilter) params.set('year', clockYearFilter)
+      const res = await fetch(`/api/employees/clock?${params}`)
       const json = await res.json(); return (json.data ?? []) as TimeClockRow[]
     },
     enabled: bgEnabled,
@@ -163,9 +215,13 @@ export default function EmployeesPage() {
   })
 
   const { data: commissions = [], isLoading: loadingCommissions } = useQuery({
-    queryKey: ['employees-commissions', activeBranch?.id],
+    queryKey: ['employees-commissions', activeBranch?.id, commEmployeeFilter, commMonthFilter, commYearFilter],
     queryFn: async () => {
-      const res = await fetch(`/api/employees/commissions?branch_id=${activeBranch!.id}`)
+      const params = new URLSearchParams({ branch_id: activeBranch!.id })
+      if (commEmployeeFilter) params.set('employee_id', commEmployeeFilter)
+      if (commMonthFilter) params.set('month', commMonthFilter)
+      if (commYearFilter) params.set('year', commYearFilter)
+      const res = await fetch(`/api/employees/commissions?${params}`)
       const json = await res.json(); return (json.data ?? []) as CommissionRow[]
     },
     enabled: bgEnabled,
@@ -174,7 +230,7 @@ export default function EmployeesPage() {
 
   function openCreateSheet() {
     setEditingEmployee(null)
-    reset({ first_name: '', last_name: '', email: '', phone: '', role: '', hourly_rate: undefined })
+    reset({ first_name: '', last_name: '', email: '', phone: '', role: '', hourly_rate: undefined, base_salary: undefined })
     setCreateError(null)
     setSheetOpen(true)
   }
@@ -188,6 +244,7 @@ export default function EmployeesPage() {
       phone: employee.phone ?? '',
       role: employee.role ?? '',
       hourly_rate: employee.hourly_rate ?? undefined,
+      base_salary: employee.base_salary ?? undefined,
     })
     setCreateError(null)
     setSheetOpen(true)
@@ -267,10 +324,20 @@ export default function EmployeesPage() {
     })
     if (!res.ok) {
       const json = await res.json().catch(() => ({}))
-      toast.error(json.error ?? 'Clock action failed')
+      toast.error(json?.error?.message ?? 'Clock action failed')
     }
     setClockinEmployee(null)
     queryClient.invalidateQueries({ queryKey: ['employees-clock', activeBranch.id, today] })
+    queryClient.invalidateQueries({ queryKey: ['employees-clock-history', activeBranch.id] })
+  }
+
+  function formatDuration(clockIn: string, clockOut: string | null, breakMinutes?: number | null) {
+    if (!clockOut) return null
+    const ms = new Date(clockOut).getTime() - new Date(clockIn).getTime() - (breakMinutes ?? 0) * 60_000
+    const totalMinutes = Math.max(0, Math.round(ms / 60_000))
+    const h = Math.floor(totalMinutes / 60)
+    const m = totalMinutes % 60
+    return `${h}h ${m}m`
   }
 
   async function onCreateShift(data: ShiftForm) {
@@ -282,7 +349,7 @@ export default function EmployeesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...data, days_of_week: selectedDays }),
       })
-      if (!res.ok) { const j = await res.json().catch(() => ({})); toast.error(j.error ?? 'Failed to update shift'); return }
+      if (!res.ok) { const j = await res.json().catch(() => ({})); toast.error(j?.error?.message ?? 'Failed to update shift'); return }
       toast.success('Shift updated')
     } else {
       // Create mode — POST
@@ -291,7 +358,7 @@ export default function EmployeesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...data, branch_id: activeBranch.id, days_of_week: selectedDays }),
       })
-      if (!res.ok) { const j = await res.json().catch(() => ({})); toast.error(j.error ?? 'Failed to create shift'); return }
+      if (!res.ok) { const j = await res.json().catch(() => ({})); toast.error(j?.error?.message ?? 'Failed to create shift'); return }
       toast.success('Shift created')
     }
     shiftForm.reset()
@@ -321,7 +388,13 @@ export default function EmployeesPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, branch_id: activeBranch.id }),
     })
-    if (res.ok) { payrollForm.reset(); setPayrollSheetOpen(false); queryClient.invalidateQueries({ queryKey: ['employees-payroll', activeBranch.id] }) }
+    if (res.ok) {
+      payrollForm.reset(); setPayrollSheetOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['employees-payroll', activeBranch.id] })
+    } else {
+      const json = await res.json().catch(() => ({}))
+      toast.error(json?.error?.message ?? 'Failed to create payroll period')
+    }
   }
 
   async function handlePayrollAction(id: string, action: 'approve' | 'paid') {
@@ -342,16 +415,35 @@ export default function EmployeesPage() {
     )},
     { id: 'clock', header: 'Clock', cell: ({ row }) => {
       const isClockedIn = timeLogs.some((t) => t.employee_id === row.original.id && !t.clock_out)
+      const isLoading   = clockingEmployee === row.original.id
       return (
-        <div className="flex gap-1">
-          <Button size="sm" variant="outline" loading={clockingEmployee === row.original.id}
-            onClick={() => handleClock(row.original.id, 'in')} disabled={isClockedIn}>
+        <div className="flex items-center gap-2">
+          {/* Status dot */}
+          <span className={`inline-block h-2 w-2 rounded-full shrink-0 ${isClockedIn ? 'bg-green-500' : 'bg-gray-300'}`} />
+          {/* Clock In */}
+          <button
+            onClick={() => !isClockedIn && !isLoading && handleClock(row.original.id, 'in')}
+            disabled={isClockedIn || isLoading}
+            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+              isClockedIn
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
+                : 'bg-green-500 text-white hover:bg-green-600 shadow-sm'
+            }`}
+          >
             <LogIn className="h-3 w-3" /> In
-          </Button>
-          <Button size="sm" variant="outline" loading={clockingEmployee === row.original.id}
-            onClick={() => handleClock(row.original.id, 'out')} disabled={!isClockedIn}>
+          </button>
+          {/* Clock Out */}
+          <button
+            onClick={() => isClockedIn && !isLoading && handleClock(row.original.id, 'out')}
+            disabled={!isClockedIn || isLoading}
+            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+              !isClockedIn
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
+                : 'bg-red-500 text-white hover:bg-red-600 shadow-sm'
+            }`}
+          >
             <LogOut className="h-3 w-3" /> Out
-          </Button>
+          </button>
         </div>
       )
     }},
@@ -378,7 +470,19 @@ export default function EmployeesPage() {
       const v = getValue() as string | null
       return v ? formatDateTime(v) : <Badge variant="warning">Active</Badge>
     }},
+    { id: 'hours', header: 'Hours Worked', cell: ({ row }) => {
+      const duration = formatDuration(row.original.clock_in, row.original.clock_out, row.original.break_minutes)
+      return duration ?? <span className="text-gray-400">—</span>
+    }},
   ]
+
+  // Sum of completed shifts in the currently filtered Clock In/Out view.
+  const clockHistoryTotalMinutes = clockHistory.reduce((sum, t) => {
+    if (!t.clock_out) return sum
+    const ms = new Date(t.clock_out).getTime() - new Date(t.clock_in).getTime() - (t.break_minutes ?? 0) * 60_000
+    return sum + Math.max(0, Math.round(ms / 60_000))
+  }, 0)
+  const clockHistoryTotalLabel = `${Math.floor(clockHistoryTotalMinutes / 60)}h ${clockHistoryTotalMinutes % 60}m`
 
   const shiftColumns: ColumnDef<ShiftRow>[] = [
     { accessorKey: 'name', header: 'Shift Name' },
@@ -414,6 +518,11 @@ export default function EmployeesPage() {
     { accessorKey: 'total_hours', header: 'Hours', cell: ({ getValue }) => {
       const v = getValue() as number | null; return v != null ? `${v}h` : '—'
     }},
+    ...(isRetailTemplate ? [{
+      accessorKey: 'base_salary', header: 'Base Salary', cell: ({ getValue }: { getValue: () => unknown }) => {
+        const v = getValue() as number | null; return v != null && v > 0 ? formatCurrency(v) : '—'
+      },
+    } as ColumnDef<PayrollRow>] : []),
     { accessorKey: 'gross_pay', header: 'Gross Pay', cell: ({ getValue }) => {
       const v = getValue() as number | null; return v != null ? formatCurrency(v) : '—'
     }},
@@ -442,56 +551,137 @@ export default function EmployeesPage() {
     { accessorKey: 'source_type', header: 'Source', cell: ({ getValue }) => (
       <Badge variant="secondary">{getValue() as string}</Badge>
     )},
-    { accessorKey: 'amount', header: 'Amount', cell: ({ getValue }) => formatCurrency(getValue() as number) },
+    { id: 'sale_customer', header: 'Customer', cell: ({ row }) => {
+      const c = row.original.sale?.customers
+      return c ? `${c.first_name} ${c.last_name ?? ''}` : <span className="text-gray-400">Walk-in</span>
+    }},
+    { id: 'sale_items', header: 'Items Sold', cell: ({ row }) => {
+      const items = row.original.sale?.sale_items
+      if (!items || items.length === 0) return '—'
+      const summary = items.map(i => `${i.name} ×${i.quantity}`).join(', ')
+      return <span className="text-xs text-gray-600" title={summary}>{summary.length > 40 ? summary.slice(0, 40) + '…' : summary}</span>
+    }},
+    { id: 'sale_total', header: 'Sale Total', cell: ({ row }) => {
+      const sale = row.original.sale
+      return sale ? formatCurrency(sale.total) : '—'
+    }},
+    { accessorKey: 'amount', header: 'Commission', cell: ({ getValue }) => (
+      <span className="font-semibold text-green-700">{formatCurrency(getValue() as number)}</span>
+    )},
     { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => (
       <Badge variant={(getValue() as string) === 'paid' ? 'success' : 'warning'}>{getValue() as string}</Badge>
     )},
     { accessorKey: 'created_at', header: 'Date', cell: ({ getValue }) => formatDate(getValue() as string) },
   ]
 
-  const tabCls = 'rounded-md px-4 py-1.5 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm'
+  const commissionsTotal = commissions.reduce((sum, c) => sum + (c.amount ?? 0), 0)
+  const currentYear = new Date().getFullYear()
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
+
+  const TAB_DEFS = [
+    { value: 'employees',        label: 'Employees',       icon: Users },
+    { value: 'clock',            label: 'Clock In/Out',    icon: Clock },
+    { value: 'shifts',           label: 'Shifts',          icon: CalendarDays },
+    { value: 'payroll',          label: 'Payroll',         icon: DollarSign },
+    { value: 'commissions',      label: 'Commissions',     icon: TrendingUp },
+    { value: 'employee-report',  label: 'Employee Report', icon: BarChart2 },
+  ] as const
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-0">
+      {/* ── Page header ── */}
+      <div className="flex items-center justify-between mb-5">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Employees</h1>
-          <p className="text-sm text-gray-500">{totalEmployees} employees</p>
+          <h1 className="text-2xl font-bold text-gray-900">Employees</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{totalEmployees} {totalEmployees === 1 ? 'employee' : 'employees'} across all roles</p>
         </div>
-        <Button onClick={openCreateSheet}>
+        <Button onClick={openCreateSheet} size="default">
           <Plus className="h-4 w-4" /> Add Employee
         </Button>
       </div>
 
-      <Tabs.Root defaultValue="employees">
-        <Tabs.List className="flex gap-1 rounded-lg bg-gray-100 p-1 w-fit flex-wrap">
-          <Tabs.Trigger value="employees" className={tabCls}>Employees</Tabs.Trigger>
-          <Tabs.Trigger value="clock" className={tabCls}>
-            <Clock className="mr-1.5 inline h-3.5 w-3.5" />Clock In/Out
-          </Tabs.Trigger>
-          <Tabs.Trigger value="shifts" className={tabCls}>
-            <CalendarDays className="mr-1.5 inline h-3.5 w-3.5" />Shifts
-          </Tabs.Trigger>
-          <Tabs.Trigger value="payroll" className={tabCls}>
-            <DollarSign className="mr-1.5 inline h-3.5 w-3.5" />Payroll
-          </Tabs.Trigger>
-          <Tabs.Trigger value="commissions" className={tabCls}>
-            <TrendingUp className="mr-1.5 inline h-3.5 w-3.5" />Commissions
-          </Tabs.Trigger>
-        </Tabs.List>
+      <Tabs.Root value={activeTab} onValueChange={handleTabChange}>
+        {/* ── Tab bar ── */}
+        <div className="border-b border-gray-200 mb-6">
+          <Tabs.List className="flex gap-0 overflow-x-auto no-scrollbar -mb-px">
+            {TAB_DEFS.map(({ value, label, icon: Icon }) => (
+              <Tabs.Trigger
+                key={value}
+                value={value}
+                className={[
+                  'group relative flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors outline-none',
+                  'border-b-2 -mb-px',
+                  'data-[state=active]:border-brand-teal data-[state=active]:text-brand-teal',
+                  'data-[state=inactive]:border-transparent data-[state=inactive]:text-gray-500 data-[state=inactive]:hover:text-gray-800 data-[state=inactive]:hover:border-gray-300',
+                ].join(' ')}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {label}
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+        </div>
 
         {/* ── Employees ── */}
-        <Tabs.Content value="employees" className="mt-4">
+        <Tabs.Content value="employees" className="">
           <DataTable data={employees} columns={empColumns} isLoading={loadingEmployees} totalCount={totalEmployees} pageIndex={empPage} pageSize={empPageSize} onPageChange={setEmpPage} onPageSizeChange={(s) => { setEmpPageSize(s); setEmpPage(0) }} emptyMessage="No employees yet." />
         </Tabs.Content>
 
         {/* ── Clock In/Out ── */}
-        <Tabs.Content value="clock" className="mt-4">
-          <DataTable data={timeLogs} columns={clockColumns} isLoading={loadingClock} emptyMessage="No clock records for today." />
+        <Tabs.Content value="clock" className="">
+          <div className="mb-3 flex flex-wrap items-end gap-3">
+            <div className="w-56">
+              {activeBranch && (
+                <AsyncEmployeeSelect
+                  branchId={activeBranch.id}
+                  value={clockEmployeeFilter}
+                  onChange={setClockEmployeeFilter}
+                  label="Employee"
+                  placeholder="All employees"
+                />
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+              <select
+                value={clockMonthFilter}
+                onChange={e => setClockMonthFilter(e.target.value)}
+                className="h-9 rounded-lg border border-gray-200 px-3 text-sm focus:border-brand-teal focus:outline-none"
+              >
+                <option value="">All months</option>
+                {MONTH_NAMES.map((m, i) => (
+                  <option key={i} value={i + 1}>{m}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+              <select
+                value={clockYearFilter}
+                onChange={e => setClockYearFilter(e.target.value)}
+                className="h-9 rounded-lg border border-gray-200 px-3 text-sm focus:border-brand-teal focus:outline-none"
+              >
+                <option value="">All years</option>
+                {[currentYear, currentYear - 1, currentYear - 2].map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+            {(clockEmployeeFilter || clockMonthFilter !== nowMonth || clockYearFilter !== nowYear) && (
+              <Button size="sm" variant="outline" onClick={() => { setClockEmployeeFilter(''); setClockMonthFilter(nowMonth); setClockYearFilter(nowYear) }}>
+                Clear Filters
+              </Button>
+            )}
+          </div>
+          <div className="mb-3 rounded-lg bg-blue-50 border border-blue-100 px-4 py-2 text-sm inline-block">
+            <span className="text-gray-600">Total hours worked (filtered): </span>
+            <span className="font-bold text-blue-700">{clockHistoryTotalLabel}</span>
+          </div>
+          <DataTable data={clockHistory} columns={clockColumns} isLoading={loadingClockHistory} emptyMessage="No attendance records found for this filter." />
         </Tabs.Content>
 
         {/* ── Shifts ── */}
-        <Tabs.Content value="shifts" className="mt-4">
+        <Tabs.Content value="shifts" className="">
           <div className="mb-3 flex justify-end">
             <Button size="sm" onClick={() => { setEditingShift(null); shiftForm.reset(); setSelectedDays([]); setShiftSheetOpen(true) }}>
               <Plus className="h-4 w-4" /> Add Shift
@@ -501,7 +691,7 @@ export default function EmployeesPage() {
         </Tabs.Content>
 
         {/* ── Payroll ── */}
-        <Tabs.Content value="payroll" className="mt-4">
+        <Tabs.Content value="payroll" className="">
           <div className="mb-3 flex justify-end">
             <Button size="sm" onClick={() => setPayrollSheetOpen(true)}>
               <Plus className="h-4 w-4" /> Create Period
@@ -511,8 +701,61 @@ export default function EmployeesPage() {
         </Tabs.Content>
 
         {/* ── Commissions ── */}
-        <Tabs.Content value="commissions" className="mt-4">
+        <Tabs.Content value="commissions" className="">
+          <div className="mb-3 flex flex-wrap items-end gap-3">
+            <div className="w-56">
+              {activeBranch && (
+                <AsyncEmployeeSelect
+                  branchId={activeBranch.id}
+                  value={commEmployeeFilter}
+                  onChange={setCommEmployeeFilter}
+                  label="Employee"
+                  placeholder="All employees"
+                />
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+              <select
+                value={commMonthFilter}
+                onChange={e => setCommMonthFilter(e.target.value)}
+                className="h-9 rounded-lg border border-gray-200 px-3 text-sm focus:border-brand-teal focus:outline-none"
+              >
+                <option value="">All months</option>
+                {MONTH_NAMES.map((m, i) => (
+                  <option key={i} value={i + 1}>{m}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+              <select
+                value={commYearFilter}
+                onChange={e => setCommYearFilter(e.target.value)}
+                className="h-9 rounded-lg border border-gray-200 px-3 text-sm focus:border-brand-teal focus:outline-none"
+              >
+                <option value="">All years</option>
+                {[currentYear, currentYear - 1, currentYear - 2].map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+            {(commEmployeeFilter || commMonthFilter !== nowMonth || commYearFilter !== nowYear) && (
+              <Button size="sm" variant="outline" onClick={() => { setCommEmployeeFilter(''); setCommMonthFilter(nowMonth); setCommYearFilter(nowYear) }}>
+                Clear Filters
+              </Button>
+            )}
+            <div className="ml-auto rounded-lg bg-green-50 border border-green-100 px-4 py-2 text-sm">
+              <span className="text-gray-600">Total commission: </span>
+              <span className="font-bold text-green-700">{formatCurrency(commissionsTotal)}</span>
+            </div>
+          </div>
           <DataTable data={commissions} columns={commColumns} isLoading={loadingCommissions} emptyMessage="No commissions recorded." />
+        </Tabs.Content>
+
+        {/* ── Employee Report ── */}
+        <Tabs.Content value="employee-report" className="">
+          {activeBranch && <EmployeeReportTab branchId={activeBranch.id} />}
         </Tabs.Content>
       </Tabs.Root>
 
@@ -539,6 +782,9 @@ export default function EmployeesPage() {
           />
           <Input label="Role/Position" placeholder="Technician, Cashier..." {...register('role')} />
           <Input label="Hourly Rate (£)" type="number" step="0.01" {...register('hourly_rate')} />
+          {isRetailTemplate && (
+            <Input label="Base Salary (£)" type="number" step="0.01" min="0" placeholder="Monthly fixed pay (optional)" {...register('base_salary')} />
+          )}
           <Button type="submit" className="w-full" loading={isSubmitting}>
             {editingEmployee ? 'Save Changes' : 'Add Employee'}
           </Button>
@@ -612,5 +858,13 @@ export default function EmployeesPage() {
         loading={!!deletingEmployee}
       />
     </div>
+  )
+}
+
+export default function EmployeesPage() {
+  return (
+    <Suspense fallback={null}>
+      <EmployeesPageInner />
+    </Suspense>
   )
 }

@@ -1,10 +1,11 @@
 ﻿'use client'
 import { useState, useEffect } from 'react'
 import { Tag, ChevronRight, ArrowLeft, Loader2, Search } from 'lucide-react'
+import { getBrandStyle } from '@/lib/brand-theme'
 
 interface Category { id: string; name: string; slug: string }
 interface Problem  { id: string; name: string; price: number; warranty_days: number; device: string | null; category: string | null }
-interface BusinessInfo { name: string; currency: string }
+interface BusinessInfo { name: string; currency: string; brand_color: string | null }
 
 function formatPrice(price: number, currency: string) {
   return new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(price)
@@ -81,7 +82,7 @@ export default function PriceWidget() {
   )
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-green-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-green-50" style={getBrandStyle(business?.brand_color)}>
       {/* Header */}
       <div className="bg-gradient-to-r from-brand-teal to-brand-teal-dark px-6 py-5 text-white">
         <div className="flex items-center gap-2 mb-0.5">

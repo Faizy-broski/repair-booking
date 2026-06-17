@@ -223,6 +223,15 @@ export async function middleware(request: NextRequest) {
       return forwardAuthCookies(supabaseResponse, NextResponse.redirect(loginUrl))
     }
 
+    // /register on a tenant subdomain makes no sense — new businesses must sign up
+    // at the root domain. Redirect unauthenticated visitors there immediately.
+    if (pathname.startsWith('/register') && !user) {
+      const rootRegisterUrl = process.env.NODE_ENV === 'development'
+        ? new URL('/register', `http://localhost:${request.nextUrl.port || '3000'}`)
+        : new URL('/register', `https://${ROOT_DOMAIN}`)
+      return NextResponse.redirect(rootRegisterUrl)
+    }
+
     // Auth + password-reset pages — pass through without requiring an existing session.
     // /forgot-password and /reset-password must be accessible unauthenticated so users
     // can initiate and complete a password reset from any device.

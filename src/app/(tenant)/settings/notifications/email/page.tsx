@@ -152,7 +152,7 @@ export default function EmailSmtpPage() {
       <div className="grid grid-cols-2 gap-3">
         <button
           onClick={() => setTab('simple')}
-          className={`relative flex flex-col items-start gap-2 rounded-xl border-2 p-4 text-left transition-all ${
+          className={`relative flex flex-col items-start gap-2 rounded-xl border-2 p-4 text-left cursor-pointer transition-all ${
             tab === 'simple'
               ? 'border-teal-500 bg-teal-50 shadow-sm'
               : 'border-gray-200 bg-white hover:border-gray-300'
@@ -182,7 +182,7 @@ export default function EmailSmtpPage() {
 
         <button
           onClick={() => setTab('business')}
-          className={`relative flex flex-col items-start gap-2 rounded-xl border-2 p-4 text-left transition-all ${
+          className={`relative flex flex-col items-start gap-2 rounded-xl border-2 p-4 text-left cursor-pointer transition-all ${
             tab === 'business'
               ? 'border-indigo-500 bg-indigo-50 shadow-sm'
               : 'border-gray-200 bg-white hover:border-gray-300'

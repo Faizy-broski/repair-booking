@@ -189,7 +189,7 @@ export default function InventoryReportPage() {
             <thead className="bg-surface-container-low text-xs text-on-surface-variant">
               <tr>
                 <th className="px-4 py-2 text-left">Product</th>
-                <th className="px-4 py-2 text-right">On Hand</th>
+                <th className="px-4 py-2 text-right">Stock</th>
                 <th className="px-4 py-2 text-right">Alert</th>
                 <th className="px-4 py-2 text-right">Shortfall</th>
               </tr>

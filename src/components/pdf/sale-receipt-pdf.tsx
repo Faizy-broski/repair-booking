@@ -46,7 +46,7 @@ function calcSaleReceiptPageHeight(opts: {
   hasNotes: boolean
   hasThankYou: boolean
   footerLines: string[]
-  hasSocialLinks: boolean
+  socialLinkCount: number
   policyText: string | null | undefined
   pageWidth: number
 }): number {
@@ -102,13 +102,13 @@ function calcSaleReceiptPageHeight(opts: {
     const wrappedLines = Math.max(1, Math.ceil(line.length / footerCharsPerLine))
     h += wrappedLines * 10 + 3
   }
-  if (opts.hasSocialLinks) h += 20
+  h += opts.socialLinkCount * 10
   if (opts.policyText) {
     const policyWrappedLines = Math.max(2, Math.ceil(opts.policyText.length / footerCharsPerLine))
     h += 15 + policyWrappedLines * 8
   }
 
-  h += 16 // bottom breathing room
+  h += 80 // bottom breathing room — generous buffer so printer never clips footer
   return Math.max(h, 200)
 }
 
@@ -214,7 +214,7 @@ export function SaleReceiptPdf({
         hasNotes: !!notes,
         hasThankYou: !!settings.thank_you_message,
         footerLines: uniqueFooterLines,
-        hasSocialLinks: !!(settings.social_links && Object.values(settings.social_links).some(Boolean)),
+        socialLinkCount: settings.social_links ? Object.values(settings.social_links).filter(Boolean).length : 0,
         policyText: settings.policy_text,
         pageWidth,
       }),

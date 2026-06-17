@@ -134,59 +134,6 @@ export type Database = {
           },
         ]
       }
-      system_broadcasts: {
-        Row: {
-          id: string
-          created_by: string
-          type: 'info' | 'warning' | 'downtime' | 'maintenance'
-          title: string
-          body: string
-          target_scope: 'all' | 'business'
-          target_business_id: string | null
-          status: 'draft' | 'active' | 'archived'
-          expires_at: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          created_by: string
-          type?: 'info' | 'warning' | 'downtime' | 'maintenance'
-          title: string
-          body: string
-          target_scope?: 'all' | 'business'
-          target_business_id?: string | null
-          status?: 'draft' | 'active' | 'archived'
-          expires_at?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          type?: 'info' | 'warning' | 'downtime' | 'maintenance'
-          title?: string
-          body?: string
-          target_scope?: 'all' | 'business'
-          target_business_id?: string | null
-          status?: 'draft' | 'active' | 'archived'
-          expires_at?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      broadcast_reads: {
-        Row: {
-          broadcast_id: string
-          profile_id: string
-          read_at: string
-        }
-        Insert: {
-          broadcast_id: string
-          profile_id: string
-          read_at?: string
-        }
-        Update: {}
-        Relationships: []
-      }
       blocked_dates: {
         Row: {
           blocked_date: string
@@ -319,10 +266,8 @@ export type Database = {
           id: string
           is_active: boolean | null
           is_main: boolean | null
-          logo_url: string | null
           name: string
           phone: string | null
-          pos_require_shift: boolean | null
           updated_at: string | null
         }
         Insert: {
@@ -333,10 +278,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_main?: boolean | null
-          logo_url?: string | null
           name: string
           phone?: string | null
-          pos_require_shift?: boolean | null
           updated_at?: string | null
         }
         Update: {
@@ -347,10 +290,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_main?: boolean | null
-          logo_url?: string | null
           name?: string
           phone?: string | null
-          pos_require_shift?: boolean | null
           updated_at?: string | null
         }
         Relationships: [
@@ -508,6 +449,7 @@ export type Database = {
           slug: string
           sort_order: number
           updated_at: string
+          version: number
         }
         Insert: {
           created_at?: string
@@ -522,6 +464,7 @@ export type Database = {
           slug: string
           sort_order?: number
           updated_at?: string
+          version?: number
         }
         Update: {
           created_at?: string
@@ -536,6 +479,7 @@ export type Database = {
           slug?: string
           sort_order?: number
           updated_at?: string
+          version?: number
         }
         Relationships: [
           {
@@ -550,6 +494,7 @@ export type Database = {
       businesses: {
         Row: {
           address: string | null
+          brand_color: string
           country: string | null
           created_at: string | null
           currency: string | null
@@ -570,9 +515,11 @@ export type Database = {
           timezone: string | null
           updated_at: string | null
           vertical_template_id: string | null
+          vertical_template_version: number | null
         }
         Insert: {
           address?: string | null
+          brand_color?: string
           country?: string | null
           created_at?: string | null
           currency?: string | null
@@ -593,9 +540,11 @@ export type Database = {
           timezone?: string | null
           updated_at?: string | null
           vertical_template_id?: string | null
+          vertical_template_version?: number | null
         }
         Update: {
           address?: string | null
+          brand_color?: string
           country?: string | null
           created_at?: string | null
           currency?: string | null
@@ -616,6 +565,7 @@ export type Database = {
           timezone?: string | null
           updated_at?: string | null
           vertical_template_id?: string | null
+          vertical_template_version?: number | null
         }
         Relationships: [
           {
@@ -1232,6 +1182,7 @@ export type Database = {
       employees: {
         Row: {
           access_pin: string | null
+          base_salary: number
           branch_id: string
           commission_rate: number | null
           created_at: string | null
@@ -1248,6 +1199,7 @@ export type Database = {
         }
         Insert: {
           access_pin?: string | null
+          base_salary?: number
           branch_id: string
           commission_rate?: number | null
           created_at?: string | null
@@ -1264,6 +1216,7 @@ export type Database = {
         }
         Update: {
           access_pin?: string | null
+          base_salary?: number
           branch_id?: string
           commission_rate?: number | null
           created_at?: string | null
@@ -2484,6 +2437,7 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          base_salary: number
           branch_id: string
           business_id: string
           commission_total: number
@@ -2502,6 +2456,7 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          base_salary?: number
           branch_id: string
           business_id: string
           commission_total?: number
@@ -2520,6 +2475,7 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          base_salary?: number
           branch_id?: string
           business_id?: string
           commission_total?: number
@@ -3416,8 +3372,6 @@ export type Database = {
           estimated_cost: number | null
           id: string
           issue: string
-          lock_type: string | null
-          passcode: string | null
           job_number: string
           label_ids: string[] | null
           notify_customer: boolean | null
@@ -3444,8 +3398,6 @@ export type Database = {
           estimated_cost?: number | null
           id?: string
           issue: string
-          lock_type: string | null
-          passcode: string | null
           job_number: string
           label_ids?: string[] | null
           notify_customer?: boolean | null
@@ -3698,6 +3650,7 @@ export type Database = {
           payment_splits: Json | null
           payment_status: string
           refund_reason: string | null
+          served_by_employee_id: string | null
           subtotal: number
           tax: number | null
           total: number
@@ -3717,6 +3670,7 @@ export type Database = {
           payment_splits?: Json | null
           payment_status?: string
           refund_reason?: string | null
+          served_by_employee_id?: string | null
           subtotal?: number
           tax?: number | null
           total?: number
@@ -3736,6 +3690,7 @@ export type Database = {
           payment_splits?: Json | null
           payment_status?: string
           refund_reason?: string | null
+          served_by_employee_id?: string | null
           subtotal?: number
           tax?: number | null
           total?: number
@@ -3774,6 +3729,13 @@ export type Database = {
             columns: ["original_sale_id"]
             isOneToOne: false
             referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_served_by_employee_id_fkey"
+            columns: ["served_by_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
             referencedColumns: ["id"]
           },
         ]

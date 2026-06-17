@@ -61,8 +61,22 @@ export const VerticalTemplateService = {
     id: string,
     payload: Partial<CreateVerticalTemplatePayload> & { is_active?: boolean }
   ): Promise<BusinessVerticalTemplate> {
+    // Auto-increment version whenever modules_enabled or module_settings change,
+    // so callers can detect which businesses are behind after this edit.
+    const bumpVersion =
+      'modules_enabled' in payload || 'module_settings' in payload
+
+    const { data: current } = await db('business_vertical_templates')
+      .select('version')
+      .eq('id', id)
+      .single()
+
     const { data, error } = await db('business_vertical_templates')
-      .update({ ...payload, updated_at: new Date().toISOString() })
+      .update({
+        ...payload,
+        ...(bumpVersion ? { version: ((current as any)?.version ?? 1) + 1 } : {}),
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', id)
       .select()
       .single()
@@ -126,9 +140,13 @@ export const VerticalTemplateService = {
       if (error) throw error
     }
 
-    // Link business to vertical template
+    // Link business to vertical template and stamp the version they received
     await db('businesses')
-      .update({ vertical_template_id: templateId, updated_at: new Date().toISOString() })
+      .update({
+        vertical_template_id:      templateId,
+        vertical_template_version: (template as any).version ?? 1,
+        updated_at:                new Date().toISOString(),
+      })
       .eq('id', businessId)
 
     // Log the application
@@ -142,6 +160,81 @@ export const VerticalTemplateService = {
     })
 
     return { modules_applied: modulesToApply }
+  },
+
+  /**
+   * Returns all active businesses on a given template with their drift status.
+   * "behind" = their applied version < current template version.
+   */
+  async listBusinessesByTemplate(templateId: string): Promise<{
+    business_id: string; business_name: string; subdomain: string
+    applied_version: number | null; current_version: number; versions_behind: number
+  }[]> {
+    const { data, error } = await db('businesses')
+      .select(`
+        id,
+        name,
+        subdomain,
+        vertical_template_version,
+        business_vertical_templates!inner(version)
+      `)
+      .eq('vertical_template_id', templateId)
+      .eq('is_active', true)
+      .order('name')
+    if (error) throw error
+
+    return (data ?? []).map((b: any) => {
+      const currentVersion: number = b.business_vertical_templates?.version ?? 1
+      const appliedVersion: number | null = b.vertical_template_version ?? null
+      return {
+        business_id:      b.id,
+        business_name:    b.name,
+        subdomain:        b.subdomain,
+        applied_version:  appliedVersion,
+        current_version:  currentVersion,
+        versions_behind:  currentVersion - (appliedVersion ?? 0),
+      }
+    })
+  },
+
+  /**
+   * Push the current template to all businesses on it (or only those behind).
+   * mode='merge'    — safe: only adds new modules, never overwrites existing settings
+   * mode='reapply'  — force: overwrites all module settings to match template
+   * onlyBehind=true — skip businesses already on the current version
+   */
+  async bulkPush(
+    templateId: string,
+    appliedBy: string | null,
+    mode: 'merge' | 'reapply' = 'merge',
+    onlyBehind = true
+  ): Promise<{ pushed: number; skipped: number; businesses: string[] }> {
+    const template = await VerticalTemplateService.getById(templateId)
+    if (!template) throw new Error('Vertical template not found')
+
+    const businesses = await VerticalTemplateService.listBusinessesByTemplate(templateId)
+
+    const targets = onlyBehind
+      ? businesses.filter(b => b.versions_behind > 0)
+      : businesses
+
+    const pushed: string[] = []
+    const errors: string[] = []
+
+    for (const biz of targets) {
+      try {
+        await VerticalTemplateService.applyToBusiness(templateId, biz.business_id, appliedBy, mode)
+        pushed.push(biz.business_id)
+      } catch {
+        errors.push(biz.business_id)
+      }
+    }
+
+    return {
+      pushed:     pushed.length,
+      skipped:    businesses.length - targets.length,
+      businesses: pushed,
+    }
   },
 
   async getApplyLog(businessId: string) {

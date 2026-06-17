@@ -22,17 +22,20 @@ body {
 :root {
   /* ── Material Design 3 Color Tokens ─────────────────── */
 
-  /* Primary – teal */
-  --primary:                    #008080;
-  --primary-dim:                #005959;
-  --primary-fixed:              #8dedec;
-  --primary-fixed-dim:          #7fdede;
-  --primary-container:          #8dedec;
-  --on-primary:                 #bbfffe;
-  --on-primary-container:       #005858;
-  --on-primary-fixed:           #004343;
-  --on-primary-fixed-variant:   #006262;
-  --inverse-primary:            #8dedec;
+  /* Primary – derived from a single overridable brand color.
+     Per-tenant theming overrides only --brand-primary; everything else
+     re-derives via color-mix() so the whole primary family stays in sync. */
+  --brand-primary:               #008080;
+  --primary:                     var(--brand-primary);
+  --primary-dim:                 color-mix(in srgb, var(--brand-primary) 80%, black);
+  --primary-fixed:                color-mix(in srgb, var(--brand-primary) 25%, white);
+  --primary-fixed-dim:            color-mix(in srgb, var(--brand-primary) 35%, white);
+  --primary-container:            color-mix(in srgb, var(--brand-primary) 25%, white);
+  --on-primary:                  #bbfffe;
+  --on-primary-container:        #005858;
+  --on-primary-fixed:            #004343;
+  --on-primary-fixed-variant:    #006262;
+  --inverse-primary:             color-mix(in srgb, var(--brand-primary) 25%, white);
 
   /* Secondary – slate-blue */
   --secondary:                  #535b71;
@@ -67,7 +70,7 @@ body {
   --surface:                    #f5f7f9;
   --surface-dim:                #d0d5d8;
   --surface-bright:             #f5f7f9;
-  --surface-tint:               #008080;
+  --surface-tint:               var(--brand-primary);
   --surface-variant:            #d9dde0;
   --surface-container-lowest:   #ffffff;
   --surface-container-low:      #eef1f3;

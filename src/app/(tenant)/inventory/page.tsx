@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Search, AlertTriangle, Upload, Download, CheckCircle2, Package, Boxes, TrendingDown, ShoppingCart, Edit2, Trash2, Layers, X, ExternalLink, Filter, ChevronDown, RefreshCw, Barcode } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { toast } from 'sonner'
+import { Plus, Search, AlertTriangle, Upload, Download, CheckCircle2, Package, Boxes, TrendingDown, ShoppingCart, Edit2, Trash2, Layers, X, ExternalLink, Filter, ChevronDown, RefreshCw, Barcode, MoreVertical, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/ui/modal'
@@ -26,6 +28,7 @@ interface ProductRow {
   cost_price: number | null
   is_service: boolean | null
   is_serialized: boolean | null
+  is_draft: boolean | null
   has_variants: boolean | null
   variant_count: number
   valuation_method: string | null
@@ -55,8 +58,93 @@ interface ProductStats {
   inPoCount: number
 }
 
+function RowActionsMenu({
+  productId,
+  onDelete,
+  onDuplicate,
+  duplicating,
+}: {
+  productId: string
+  onDelete: () => void
+  onDuplicate: () => void
+  duplicating?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (
+        btnRef.current && !btnRef.current.contains(e.target as Node) &&
+        menuRef.current && !menuRef.current.contains(e.target as Node)
+      ) setOpen(false)
+    }
+    if (open) document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  function toggle() {
+    if (!btnRef.current) return
+    const r = btnRef.current.getBoundingClientRect()
+    setPos({ top: r.bottom + window.scrollY + 4, left: r.right + window.scrollX - 144 })
+    setOpen((v) => !v)
+  }
+
+  return (
+    <div>
+      <button
+        ref={btnRef}
+        onClick={toggle}
+        disabled={duplicating}
+        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-gray-800 hover:bg-gray-100 hover:text-black transition-colors disabled:opacity-60"
+        title={duplicating ? 'Duplicating…' : 'More actions'}
+      >
+        {duplicating
+          ? <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-brand-teal" />
+          : <MoreVertical className="h-5 w-5" />
+        }
+      </button>
+
+      {open && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'absolute', top: pos.top, left: pos.left, zIndex: 9999 }}
+          className="w-36 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+        >
+          <Link
+            href={`/inventory/${productId}`}
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            <Edit2 className="h-3.5 w-3.5" />
+            Edit
+          </Link>
+          <button
+            onClick={() => { onDuplicate(); setOpen(false) }}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Duplicate
+          </button>
+          <button
+            onClick={() => { onDelete(); setOpen(false) }}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </button>
+        </div>,
+        document.body
+      )}
+    </div>
+  )
+}
+
 export default function InventoryPage() {
-  const { activeBranch, isLoading: authLoading } = useAuthStore()
+  const { activeBranch, isLoading: authLoading, verticalTemplateSlug } = useAuthStore()
+  const isRetail = verticalTemplateSlug === 'retail-store'
   // Use the branch ID as a stable primitive — avoids re-running effects when
   // the layout refreshes the activeBranch object reference but the ID is the same.
   const branchId = activeBranch?.id ?? null
@@ -82,6 +170,7 @@ export default function InventoryPage() {
   const [deleteTarget, setDeleteTarget] = useState<ProductRow | null>(null)
   const [barcodeTarget, setBarcodeTarget] = useState<ProductRow | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
 
   // Filters
@@ -118,7 +207,7 @@ export default function InventoryPage() {
   const { data: productResponse, isLoading: loading } = useQuery({
     queryKey: ['inventory', branchId, page, pageSize, search, categoryFilter, brandFilter, supplierFilter, valuationFilter, hideOutOfStock, typeFilter],
     queryFn: async () => {
-      const params = new URLSearchParams({ page: String(page + 1), limit: String(pageSize), branch_id: branchId! })
+      const params = new URLSearchParams({ page: String(page + 1), limit: String(pageSize), branch_id: branchId!, include_drafts: 'true' })
       if (search) params.set('search', search)
       if (categoryFilter) params.set('category_id', categoryFilter)
       if (brandFilter) params.set('brand_id', brandFilter)
@@ -182,6 +271,24 @@ export default function InventoryPage() {
     const json = await res.json()
     setDrawerVariants(json.data ?? [])
     setDrawerLoading(false)
+  }
+
+  async function handleDuplicate(product: ProductRow) {
+    setDuplicatingId(product.id)
+    try {
+      const qs = branchId ? `?branch_id=${branchId}` : ''
+      const res = await fetch(`/api/products/${product.id}/duplicate${qs}`, { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) {
+        toast.error(json?.error?.message ?? 'Failed to duplicate product.')
+        return
+      }
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      toast.success('Product duplicated as a draft.')
+      router.push(`/inventory/${json.data.id}`)
+    } finally {
+      setDuplicatingId(null)
+    }
   }
 
   async function handleDelete() {
@@ -263,9 +370,12 @@ export default function InventoryPage() {
       header: 'Product',
       cell: ({ row }) => (
         <div>
-          <Link href={`/inventory/${row.original.id}`} className="font-medium text-gray-900 text-sm hover:text-blue-600 transition-colors">
-            {row.original.name}
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href={`/inventory/${row.original.id}`} className="font-medium text-gray-900 text-sm hover:text-blue-600 transition-colors">
+              {row.original.name}
+            </Link>
+            {row.original.is_draft && <Badge variant="warning" className="text-xs">Draft</Badge>}
+          </div>
           <div className="flex items-center gap-2 mt-0.5">
             {row.original.sku && <span className="text-xs text-gray-400">SKU: {row.original.sku}</span>}
             {row.original.barcode && <span className="text-xs text-gray-400">· {row.original.barcode}</span>}
@@ -276,7 +386,7 @@ export default function InventoryPage() {
     },
     {
       id: 'category',
-      header: 'Device Type',
+      header: isRetail ? 'Category' : 'Device Type',
       cell: ({ row }) => row.original.categories?.name
         ? <Badge variant="secondary">{row.original.categories.name}</Badge>
         : <span className="text-gray-300">—</span>,
@@ -288,32 +398,34 @@ export default function InventoryPage() {
         ? <span className="text-sm text-gray-600">{row.original.brands.name}</span>
         : <span className="text-gray-300">—</span>,
     },
-    {
-      id: 'model',
-      header: 'Model',
-      cell: ({ row }) => (row.original as any).service_devices?.name
-        ? <span className="text-sm text-gray-600">{(row.original as any).service_devices.name}</span>
-        : <span className="text-gray-300">—</span>,
-    },
-    {
-      id: 'type',
-      header: 'Type',
-      cell: ({ row }) => {
-        const t = row.original.item_type ?? (row.original.is_service ? 'part' : 'product')
-        return (
-          <div className="flex flex-col gap-1 items-start">
-            <Badge variant={t === 'part' ? 'warning' : 'secondary'}>
-              {t === 'part' ? 'Part' : 'Product'}
-            </Badge>
-            {row.original.part_type && (
-              <span className="text-[10px] uppercase text-gray-500 font-semibold tracking-wider">
-                {row.original.part_type}
-              </span>
-            )}
-          </div>
-        )
+    ...(!isRetail ? [
+      {
+        id: 'model',
+        header: 'Model',
+        cell: ({ row }: any) => (row.original as any).service_devices?.name
+          ? <span className="text-sm text-gray-600">{(row.original as any).service_devices.name}</span>
+          : <span className="text-gray-300">—</span>,
       },
-    },
+      {
+        id: 'type',
+        header: 'Type',
+        cell: ({ row }: any) => {
+          const t = row.original.item_type ?? (row.original.is_service ? 'part' : 'product')
+          return (
+            <div className="flex flex-col gap-1 items-start">
+              <Badge variant={t === 'part' ? 'warning' : 'secondary'}>
+                {t === 'part' ? 'Part' : 'Product'}
+              </Badge>
+              {row.original.part_type && (
+                <span className="text-[10px] uppercase text-gray-500 font-semibold tracking-wider">
+                  {row.original.part_type}
+                </span>
+              )}
+            </div>
+          )
+        },
+      },
+    ] as any : []),
     {
       accessorKey: 'selling_price',
       header: 'Price',
@@ -336,7 +448,7 @@ export default function InventoryPage() {
     },
     {
       id: 'stock',
-      header: 'On Hand',
+      header: 'Stock',
       cell: ({ row }) => {
         const p = row.original
         if (p.is_service) return <span className="text-xs text-gray-400">Service</span>
@@ -368,23 +480,20 @@ export default function InventoryPage() {
       id: 'actions',
       header: '',
       cell: ({ row }) => (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={() => setBarcodeTarget(row.original)}
-            className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            className="rounded-md p-2 text-brand-teal bg-brand-teal/10 hover:bg-brand-teal/20 transition-colors"
             title="Generate or Print Barcode"
           >
-            <Barcode className="h-3.5 w-3.5" />
+            <Barcode className="h-5 w-5" />
           </button>
-          <Link
-            href={`/inventory/${row.original.id}`}
-            className="rounded p-1.5 text-blue-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-          >
-            <Edit2 className="h-3.5 w-3.5" />
-          </Link>
-          <button onClick={() => setDeleteTarget(row.original)} className="rounded p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors">
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          <RowActionsMenu
+            productId={row.original.id}
+            onDelete={() => setDeleteTarget(row.original)}
+            onDuplicate={() => handleDuplicate(row.original)}
+            duplicating={duplicatingId === row.original.id}
+          />
         </div>
       ),
     },
@@ -399,7 +508,10 @@ export default function InventoryPage() {
           { label: 'Purchase Orders', href: '/inventory/purchase-orders' },
           { label: 'Suppliers',       href: '/inventory/suppliers' },
           { label: 'Stock Count',     href: '/inventory/stock-count' },
-          // { label: 'Special Orders',  href: '/inventory/special-orders' },
+          ...(isRetail ? [
+            { label: 'Categories',    href: '/inventory/categories' },
+            { label: 'Attributes',    href: '/inventory/attributes' },
+          ] : []),
         ].map(({ label, href }) => (
           <Link
             key={href}
@@ -509,29 +621,52 @@ export default function InventoryPage() {
 
       {/* Filter Bar */}
       <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
+        {/* Retail: category quick-filter pills */}
+        {isRetail && categories.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap pb-1 border-b border-gray-100">
+            <button
+              onClick={() => { setCategoryFilter(''); setPage(0) }}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${!categoryFilter ? 'bg-brand-teal text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              All
+            </button>
+            {categories.map(c => (
+              <button
+                key={c.id}
+                onClick={() => { setCategoryFilter(categoryFilter === c.id ? '' : c.id); setPage(0) }}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${categoryFilter === c.id ? 'bg-brand-teal text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Row 1: search + type tabs + advanced toggle */}
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 min-w-[200px] max-w-xs">
             <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               type="search"
-              placeholder="Search by name, SKU, barcode, IMEI..."
+              placeholder={isRetail ? 'Search by name, SKU, barcode...' : 'Search by name, SKU, barcode, IMEI...'}
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(0) }}
               className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
             />
           </div>
-          <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 gap-0.5">
-            {(['all', 'product', 'part'] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => { setTypeFilter(f); setPage(0) }}
-                className={`rounded px-3 py-1 text-xs font-medium transition-colors ${typeFilter === f ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                {f === 'all' ? 'All' : f === 'product' ? 'Products' : 'Parts'}
-              </button>
-            ))}
-          </div>
+          {!isRetail && (
+            <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 gap-0.5">
+              {(['all', 'product', 'part'] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => { setTypeFilter(f); setPage(0) }}
+                  className={`rounded px-3 py-1 text-xs font-medium transition-colors ${typeFilter === f ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  {f === 'all' ? 'All' : f === 'product' ? 'Products' : 'Parts'}
+                </button>
+              ))}
+            </div>
+          )}
           <button
             onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
             className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${showAdvancedFilters ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
@@ -552,7 +687,7 @@ export default function InventoryPage() {
         {showAdvancedFilters && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-gray-100">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{isRetail ? 'Category' : 'Device Type / Category'}</label>
               <Select
                 options={[{ value: '', label: 'All Categories' }, ...categories.map(c => ({ value: c.id, label: c.name }))]}
                 value={categoryFilter}
@@ -575,19 +710,21 @@ export default function InventoryPage() {
                 onValueChange={(v) => { setSupplierFilter(v); setPage(0) }}
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Valuation Method</label>
-              <Select
-                options={[
-                  { value: '', label: 'All Methods' },
-                  { value: 'weighted_average', label: 'Weighted Average' },
-                  { value: 'fifo', label: 'FIFO' },
-                  { value: 'lifo', label: 'LIFO' },
-                ]}
-                value={valuationFilter}
-                onValueChange={(v) => { setValuationFilter(v); setPage(0) }}
-              />
-            </div>
+            {!isRetail && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Valuation Method</label>
+                <Select
+                  options={[
+                    { value: '', label: 'All Methods' },
+                    { value: 'weighted_average', label: 'Weighted Average' },
+                    { value: 'fifo', label: 'FIFO' },
+                    { value: 'lifo', label: 'LIFO' },
+                  ]}
+                  value={valuationFilter}
+                  onValueChange={(v) => { setValuationFilter(v); setPage(0) }}
+                />
+              </div>
+            )}
             <div className="flex items-end pb-1">
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input

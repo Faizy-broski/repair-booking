@@ -10,7 +10,7 @@ import { ImageUpload } from '@/components/ui/image-upload'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/store/auth.store'
 import { queryClient } from '@/lib/query-client'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, getCurrencySymbol } from '@/lib/utils'
 import Link from 'next/link'
 
 interface Category    { id: string; name: string }
@@ -25,6 +25,7 @@ interface VariantRow {
   attributes: Record<string, string>
   sku: string
   barcode: string
+  imageUrl: string
   costPrice: string
   sellingPrice: string
   stock: string
@@ -47,7 +48,11 @@ function cartesian(attrs: { name: string; values: string[] }[]): Record<string, 
 }
 
 export default function NewProductPage() {
-  const { activeBranch, branches } = useAuthStore()
+  const { activeBranch, branches, verticalTemplateSlug } = useAuthStore()
+  const currSymbol = getCurrencySymbol()
+  // Simplified, repair-free product form is specific to the retail-store
+  // vertical template — independent of any module's enabled/disabled state.
+  const hasRepairs = verticalTemplateSlug !== 'retail-store'
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [saveAndNew, setSaveAndNew] = useState(false)
@@ -80,7 +85,7 @@ export default function NewProductPage() {
   const [barcodeConflict, setBarcodeConflict] = useState(false)
 
   // ── Variants ──────────────────────────────────────────────────────────────
-  const [hasVariants, setHasVariants] = useState(false)
+  const [hasVariants, setHasVariants] = useState(true)
   const [attrDefs, setAttrDefs] = useState<AttrDef[]>([{ id: uid(), name: '', valuesRaw: '' }])
   const [variantRows, setVariantRows] = useState<VariantRow[]>([])
 
@@ -90,6 +95,24 @@ export default function NewProductPage() {
     fetch('/api/suppliers').then(r => r.json()).then(j => setSuppliers(j.data ?? [])).catch(() => {})
     fetch('/api/services/devices').then(r => r.json()).then(j => setAllDevices(j.data ?? [])).catch(() => {})
   }, [])
+
+  // Retail: when a category is selected, pre-populate variant attribute rows
+  // with the attributes assigned to that category (set in Inventory → Categories).
+  useEffect(() => {
+    if (!categoryId || hasRepairs) return // retail-store only (hasRepairs=false)
+    fetch(`/api/categories/${categoryId}/attributes`)
+      .then(r => r.json())
+      .then(json => {
+        const attrs: { name: string; product_attribute_values: { value: string }[] }[] = json.data ?? []
+        if (attrs.length === 0) return
+        setAttrDefs(attrs.map(a => ({
+          id: uid(),
+          name: a.name,
+          valuesRaw: a.product_attribute_values.map(v => v.value).join(', '),
+        })))
+      })
+      .catch(() => {})
+  }, [categoryId, hasRepairs])
 
   useEffect(() => {
     if (!sku && !barcode) { setSkuConflict(false); setBarcodeConflict(false); return }
@@ -174,6 +197,7 @@ export default function NewProductPage() {
       attributes: attrs,
       sku: '',
       barcode: '',
+      imageUrl: '',
       costPrice: base.costPrice,
       sellingPrice: base.sellingPrice,
       stock: '0',
@@ -199,9 +223,8 @@ export default function NewProductPage() {
 
   async function handleSave(andNew = false) {
     if (!name.trim()) { toast.error('Please enter a product name.'); return }
-    if (!categoryId) { toast.error('Please select a Device Type.'); return }
+    if (!categoryId) { toast.error(`Please select a ${hasRepairs ? 'Device Type' : 'Category'}.`); return }
     if (!brandId) { toast.error('Please select a Brand.'); return }
-    if (!modelId) { toast.error('Please select a Model.'); return }
     if (!hasVariants && !sellingPrice) { toast.error('Please enter a selling price.'); return }
     if (hasVariants && variantRows.length === 0) { toast.error('Generate variants before saving.'); return }
     if (hasVariants && variantRows.some(v => !v.sellingPrice)) { toast.error('All variants must have a selling price.'); return }
@@ -312,11 +335,11 @@ export default function NewProductPage() {
             </div>
             <div className="space-y-4">
               <ImageUpload label="Product image" value={imageUrl} onChange={setImageUrl} />
-              <Input label="Name" placeholder="e.g. iPhone 13 Pro Max" required value={name} onChange={e => setName(e.target.value)} />
+              <Input label="Name" placeholder="Product name" required value={name} onChange={e => setName(e.target.value)} />
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Device Type <span className="text-red-500">*</span> <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
-                  <CreatableCombobox options={categories.map(c => ({ value: c.id, label: c.name }))} value={categoryId} onChange={(id) => { setCategoryId(id); setBrandId(''); setModelId('') }} onCreate={createCategory} placeholder="Select or type to create..." createLabel="Add device type" />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{hasRepairs ? 'Device Type' : 'Category'} <span className="text-red-500">*</span> <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
+                  <CreatableCombobox options={categories.map(c => ({ value: c.id, label: c.name }))} value={categoryId} onChange={(id) => { setCategoryId(id); setBrandId(''); setModelId('') }} onCreate={createCategory} placeholder="Select or type to create..." createLabel={hasRepairs ? 'Add device type' : 'Add category'} />
                 </div>
                 <div>
                   <label className={`block text-sm font-medium mb-1 ${!categoryId ? 'text-gray-400' : 'text-gray-700'}`}>Brand <span className="text-red-500">*</span> <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
@@ -324,24 +347,35 @@ export default function NewProductPage() {
                     <CreatableCombobox options={brands.map(b => ({ value: b.id, label: b.name }))} value={brandId} onChange={(id) => { setBrandId(id); setModelId('') }} onCreate={createBrand} placeholder="Select or type to create..." createLabel="Add brand" />
                   ) : (
                     <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
-                      <Lock className="h-3.5 w-3.5 shrink-0" /> Select device type first
+                      <Lock className="h-3.5 w-3.5 shrink-0" /> {hasRepairs ? 'Select device type first' : 'Select category first'}
                     </div>
                   )}
                 </div>
               </div>
-              <div>
-                <label className={`block text-sm font-medium mb-1 ${!brandId ? 'text-gray-400' : 'text-gray-700'}`}>Model <span className="text-red-500">*</span> <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
-                {brandId ? (
-                  <CreatableCombobox options={devices.map(d => ({ value: d.id, label: d.name }))} value={modelId} onChange={setModelId} onCreate={createModel} placeholder="Select or type to create..." createLabel="Add model" />
-                ) : (
-                  <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
-                    <Lock className="h-3.5 w-3.5 shrink-0" /> Select brand first
-                  </div>
-                )}
-              </div>
+              {hasRepairs && (
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${!brandId ? 'text-gray-400' : 'text-gray-700'}`}>Model <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
+                  {brandId ? (
+                    <CreatableCombobox options={devices.map(d => ({ value: d.id, label: d.name }))} value={modelId} onChange={setModelId} onCreate={createModel} placeholder="Select or type to create..." createLabel="Add model" />
+                  ) : (
+                    <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                      <Lock className="h-3.5 w-3.5 shrink-0" /> Select brand first
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <Input label="SKU" placeholder="Optional" value={sku} onChange={e => setSku(e.target.value)} error={skuConflict ? 'This SKU is already in use' : undefined} />
-                <Input label="Barcode / UPC" placeholder="Optional" value={barcode} onChange={e => setBarcode(e.target.value)} error={barcodeConflict ? 'This Barcode is already in use' : undefined} />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Barcode / UPC</label>
+                  <div className="flex gap-2">
+                    <input type="text" placeholder="Optional" value={barcode} onChange={e => setBarcode(e.target.value)} className={`flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal ${barcodeConflict ? 'border-red-400 bg-red-50' : 'border-gray-300'}`} />
+                    <button type="button" title="Generate Barcode" onClick={() => setBarcode(Math.floor(100000000000 + Math.random() * 900000000000).toString())} className="shrink-0 rounded-lg border border-brand-teal bg-brand-teal/10 px-2.5 py-2 text-brand-teal hover:bg-brand-teal hover:text-white transition-colors">
+                      <RefreshCw className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {barcodeConflict && <p className="mt-1 text-xs text-red-500">This Barcode is already in use</p>}
+                </div>
               </div>
             </div>
           </section>
@@ -389,7 +423,7 @@ export default function NewProductPage() {
                         type="button"
                         onClick={() => removeAttr(attr.id)}
                         disabled={attrDefs.length === 1}
-                        className="p-1.5 text-gray-400 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="rounded-lg p-1.5 text-white bg-red-500 hover:bg-red-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -399,7 +433,7 @@ export default function NewProductPage() {
                     <button type="button" onClick={addAttr} className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium">
                       <Plus className="h-3.5 w-3.5" /> Add attribute
                     </button>
-                    <Button size="sm" variant="outline" onClick={generateVariants} className="ml-auto">
+                    <Button size="sm" onClick={generateVariants} className="ml-auto bg-brand-teal hover:bg-brand-teal-dark text-white">
                       <RefreshCw className="h-3.5 w-3.5" /> Generate Variants
                     </Button>
                   </div>
@@ -412,45 +446,84 @@ export default function NewProductPage() {
                       <p className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
                         <Layers className="h-4 w-4 text-gray-400" /> {variantRows.length} variant{variantRows.length !== 1 ? 's' : ''}
                       </p>
-                      <button type="button" onClick={generateVariants} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                      <button type="button" onClick={generateVariants} className="flex items-center gap-1 rounded-lg border border-brand-teal bg-brand-teal/10 px-2.5 py-1 text-xs font-medium text-brand-teal hover:bg-brand-teal hover:text-white transition-colors">
                         <RefreshCw className="h-3 w-3" /> Regenerate
                       </button>
                     </div>
-                    <div className="overflow-x-auto rounded-lg border border-gray-200">
-                      <table className="min-w-full divide-y divide-gray-100 text-sm">
+                    <div className="rounded-lg border border-gray-200">
+                      <table className="w-full divide-y divide-gray-100 text-sm">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Variant</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">SKU</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Barcode</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Cost (£)</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Price (£) *</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Stock</th>
-                            <th className="px-3 py-2" />
+                            {!hasRepairs && <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Image</th>}
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Variant</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">SKU</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Barcode</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Cost ({currSymbol})</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Price ({currSymbol}) *</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Stock</th>
+                            <th className="px-4 py-3" />
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 bg-white">
                           {variantRows.map(row => (
-                            <tr key={row.key} className="hover:bg-gray-50">
-                              <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">{row.name}</td>
-                              <td className="px-3 py-2">
-                                <input type="text" value={row.sku} onChange={e => updateVariantRow(row.key, 'sku', e.target.value)} placeholder="Optional" className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                            <tr key={row.key} className="hover:bg-gray-50/60 align-middle">
+                              {!hasRepairs && (
+                                <td className="px-4 py-3">
+                                  {row.imageUrl ? (
+                                    <div className="relative w-12 h-12 group">
+                                      <img src={row.imageUrl} alt={row.name} className="w-12 h-12 rounded-lg object-cover border border-gray-200" />
+                                      <button
+                                        type="button"
+                                        onClick={() => updateVariantRow(row.key, 'imageUrl', '')}
+                                        className="absolute -top-1 -right-1 hidden group-hover:flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white text-[10px]"
+                                      >×</button>
+                                    </div>
+                                  ) : (
+                                    <label className="flex w-12 h-12 cursor-pointer items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 hover:border-brand-teal hover:bg-brand-teal/5 transition-colors">
+                                      <Plus className="h-5 w-5 text-gray-400" />
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="sr-only"
+                                        onChange={async e => {
+                                          const file = e.target.files?.[0]
+                                          if (!file) return
+                                          const fd = new FormData(); fd.append('file', file)
+                                          const res = await fetch('/api/upload/image', { method: 'POST', body: fd })
+                                          if (res.ok) {
+                                            const json = await res.json()
+                                            updateVariantRow(row.key, 'imageUrl', json.data?.url ?? json.url ?? '')
+                                          }
+                                        }}
+                                      />
+                                    </label>
+                                  )}
+                                </td>
+                              )}
+                              <td className="px-4 py-3 font-semibold text-sm text-gray-800 whitespace-nowrap">{row.name}</td>
+                              <td className="px-4 py-3">
+                                <input type="text" value={row.sku} onChange={e => updateVariantRow(row.key, 'sku', e.target.value)} placeholder="Optional" className="w-24 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal" />
                               </td>
-                              <td className="px-3 py-2">
-                                <input type="text" value={row.barcode} onChange={e => updateVariantRow(row.key, 'barcode', e.target.value)} placeholder="Optional" className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-1.5">
+                                  <input type="text" value={row.barcode} onChange={e => updateVariantRow(row.key, 'barcode', e.target.value)} placeholder="Optional" className="w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal" />
+                                  <button type="button" title="Generate" onClick={() => updateVariantRow(row.key, 'barcode', Math.floor(100000000000 + Math.random() * 900000000000).toString())} className="p-2 text-brand-teal bg-brand-teal/10 hover:bg-brand-teal hover:text-white transition-colors rounded-lg shrink-0">
+                                    <RefreshCw className="h-4 w-4" />
+                                  </button>
+                                </div>
                               </td>
-                              <td className="px-3 py-2">
-                                <input type="number" min="0" step="0.01" value={row.costPrice} onChange={e => updateVariantRow(row.key, 'costPrice', e.target.value)} placeholder="0.00" className="w-20 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                              <td className="px-4 py-3">
+                                <input type="number" min="0" step="0.01" value={row.costPrice} onChange={e => updateVariantRow(row.key, 'costPrice', e.target.value)} placeholder="0.00" className="w-24 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal" />
                               </td>
-                              <td className="px-3 py-2">
-                                <input type="number" min="0" step="0.01" value={row.sellingPrice} onChange={e => updateVariantRow(row.key, 'sellingPrice', e.target.value)} placeholder="0.00" className={`w-20 rounded border px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 ${!row.sellingPrice ? 'border-red-300 bg-red-50' : 'border-gray-200'}`} />
+                              <td className="px-4 py-3">
+                                <input type="number" min="0" step="0.01" value={row.sellingPrice} onChange={e => updateVariantRow(row.key, 'sellingPrice', e.target.value)} placeholder="0.00" className={`w-24 rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal ${!row.sellingPrice ? 'border-red-300 bg-red-50' : 'border-gray-200'}`} />
                               </td>
-                              <td className="px-3 py-2">
-                                <input type="number" min="0" value={row.stock} onChange={e => updateVariantRow(row.key, 'stock', e.target.value)} className="w-16 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                              <td className="px-4 py-3">
+                                <input type="number" min="0" value={row.stock} onChange={e => updateVariantRow(row.key, 'stock', e.target.value)} className="w-20 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal" />
                               </td>
-                              <td className="px-3 py-2">
-                                <button type="button" onClick={() => removeVariantRow(row.key)} className="text-gray-400 hover:text-red-500">
-                                  <Trash2 className="h-3.5 w-3.5" />
+                              <td className="px-4 py-3">
+                                <button type="button" onClick={() => removeVariantRow(row.key)} className="rounded-lg p-2 bg-red-500 text-white hover:bg-red-600 transition-colors">
+                                  <Trash2 className="h-4 w-4" />
                                 </button>
                               </td>
                             </tr>
@@ -476,8 +549,8 @@ export default function NewProductPage() {
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Cost Price (£)" type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
-                <Input label="Selling Price (£)" type="number" step="0.01" min="0" placeholder="0.00" required={!hasVariants} value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
+                <Input label="Cost Price ({currSymbol})" type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
+                <Input label="Selling Price ({currSymbol})" type="number" step="0.01" min="0" placeholder="0.00" required={!hasVariants} value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
               </div>
               {hasMargin && (
                 <div className="rounded-lg bg-green-50 border border-green-100 px-4 py-2.5 flex items-center gap-4 text-sm">
@@ -538,9 +611,9 @@ export default function NewProductPage() {
                   <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
-                      <Select options={[{ value: 'percentage', label: 'Percentage (%)' }, { value: 'fixed', label: 'Fixed Amount (£)' }]} value={commissionType} onValueChange={setCommissionType} />
+                      <Select options={[{ value: 'percentage', label: 'Percentage (%)' }, { value: 'fixed', label: 'Fixed Amount ({currSymbol})' }]} value={commissionType} onValueChange={setCommissionType} />
                     </div>
-                    <Input label={commissionType === 'percentage' ? 'Rate (%)' : 'Amount (£)'} type="number" step="0.01" min="0" placeholder="0" value={commissionRate} onChange={e => setCommissionRate(e.target.value)} />
+                    <Input label={commissionType === 'percentage' ? 'Rate (%)' : 'Amount ({currSymbol})'} type="number" step="0.01" min="0" placeholder="0" value={commissionRate} onChange={e => setCommissionRate(e.target.value)} />
                   </div>
                 )}
               </div>

@@ -132,12 +132,14 @@ export function CreatableCombobox({
             <span
               role="button"
               onClick={clearValue}
-              className="text-gray-300 hover:text-gray-500 transition-colors"
+              className="flex items-center justify-center h-4 w-4 rounded-full bg-red-100 text-red-500 hover:bg-red-500 hover:text-white transition-colors"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-2.5 w-2.5" />
             </span>
           )}
-          <ChevronDown className={cn('h-4 w-4 text-gray-400 transition-transform', open && 'rotate-180')} />
+          <span className={cn('flex items-center justify-center h-5 w-5 rounded-md transition-colors', open ? 'bg-brand-teal text-white' : 'bg-brand-teal/10 text-brand-teal hover:bg-brand-teal hover:text-white')}>
+            <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', open && 'rotate-180')} />
+          </span>
         </span>
       </button>
 

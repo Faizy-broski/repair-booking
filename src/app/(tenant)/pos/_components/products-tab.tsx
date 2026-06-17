@@ -93,7 +93,8 @@ const ProductCard = memo(function ProductCard({
 
 export function ProductsTab() {
   const router = useRouter()
-  const { activeBranch } = useAuthStore()
+  const { activeBranch, verticalTemplateSlug } = useAuthStore()
+  const isRetail = verticalTemplateSlug === 'retail-store'
   const pos = usePosStore()
   const queryClient = useQueryClient()
   const prevBranchIdRef = useRef<string | null>(null)
@@ -178,13 +179,15 @@ export function ProductsTab() {
   const [scannerOpen, setScannerOpen] = useState(false)
 
   // ── Variant modal ──────────────────────────────────────────────────────────
-  const [variantProduct, setVariantProduct]       = useState<ProductWithStock | null>(null)
-  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
+  const [variantProduct, setVariantProduct]         = useState<ProductWithStock | null>(null)
+  const [selectedVariantIds, setSelectedVariantIds] = useState<Set<string>>(new Set())
 
   const { data: variantData, isFetching: variantLoading } = useQuery<ProductVariant[]>({
-    queryKey: ['pos-variants', variantProduct?.id],
+    queryKey: ['pos-variants', variantProduct?.id, activeBranch?.id],
     queryFn: async () => {
-      const res = await fetch(`/api/products/${variantProduct!.id}/variants`)
+      const params = new URLSearchParams()
+      if (activeBranch?.id) params.set('branch_id', activeBranch.id)
+      const res = await fetch(`/api/products/${variantProduct!.id}/variants?${params}`)
       const j = await res.json()
       return j.data ?? []
     },
@@ -214,7 +217,16 @@ export function ProductsTab() {
   // ── Helpers ────────────────────────────────────────────────────────────────
   function openVariantSelect(product: ProductWithStock) {
     setVariantProduct(product)
-    setSelectedVariantId(null)
+    setSelectedVariantIds(new Set())
+  }
+
+  function toggleVariantSelected(variantId: string) {
+    setSelectedVariantIds(prev => {
+      const next = new Set(prev)
+      if (next.has(variantId)) next.delete(variantId)
+      else next.add(variantId)
+      return next
+    })
   }
 
   function prefetchVariants(product: ProductWithStock) {
@@ -230,10 +242,12 @@ export function ProductsTab() {
   }
 
   function addVariantToCart() {
-    if (!variantProduct || !selectedVariantId) return
-    const variant = variantList.find(v => v.id === selectedVariantId)
-    if (variant) pos.addToCart(variantProduct as unknown as Product, variant as any)
-    setVariantProduct(null); setSelectedVariantId(null)
+    if (!variantProduct || selectedVariantIds.size === 0) return
+    for (const variantId of selectedVariantIds) {
+      const variant = variantList.find(v => v.id === variantId)
+      if (variant) pos.addToCart(variantProduct as unknown as Product, variant as any)
+    }
+    setVariantProduct(null); setSelectedVariantIds(new Set())
   }
 
   function addMiscItem() {
@@ -407,13 +421,22 @@ export function ProductsTab() {
       <div className="flex shrink-0 items-center gap-2 border-b border-gray-200 bg-white px-3 py-2">
         <div className="flex min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex overflow-hidden rounded-lg border border-gray-200">
-          {(['all_products', 'by_products', 'by_parts', 'custom_item'] as const).map((view, i) => {
-            const labels = ['All Products', 'By Products', 'By Part Items', 'Custom Item']
+          {(
+            isRetail
+              ? (['all_products', 'by_category', 'custom_item'] as const)
+              : (['all_products', 'by_products', 'by_parts', 'custom_item'] as const)
+          ).map((view, i) => {
+            const label =
+              view === 'all_products' ? 'All Products'
+              : view === 'by_products' ? 'By Products'
+              : view === 'by_parts'    ? 'By Part Items'
+              : view === 'by_category' ? 'By Category'
+              : 'Custom Item'
             return (
               <button
                 key={view}
                 onClick={() => {
-                  setProductsView(view)
+                  setProductsView(view as ProductsView)
                   if (view === 'by_products' && catBreadcrumb.length === 0) loadCatLevel('device_types')
                   if (view === 'by_parts' && partBreadcrumb.length === 0) loadPartLevel('device_types')
                 }}
@@ -421,7 +444,7 @@ export function ProductsTab() {
                   productsView === view ? 'bg-white text-brand-teal font-semibold border-b-2 border-brand-teal' : 'text-gray-500 hover:bg-gray-50'
                 }`}
               >
-                {labels[i]}
+                {label}
               </button>
             )
           })}
@@ -457,7 +480,7 @@ export function ProductsTab() {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {(['all', 'product', 'part'] as const).map(t => (
+              {(isRetail ? (['all', 'product'] as const) : (['all', 'product', 'part'] as const)).map(t => (
                 <button
                   key={t}
                   onClick={() => setAllProductsItemType(t)}
@@ -649,6 +672,57 @@ export function ProductsTab() {
           </>
         )}
 
+        {/* BY CATEGORY VIEW — retail only */}
+        {productsView === 'by_category' && (
+          <div className="space-y-3">
+            {!allProductsCategoryId ? (
+              allCats.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <Package className="h-12 w-12 text-gray-200 mb-3" />
+                  <p className="text-sm text-gray-500 font-medium">No categories found</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                  {allCats.map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setAllProductsCategoryId(cat.id)}
+                      className="flex flex-col w-full overflow-hidden rounded-xl border border-gray-200 bg-white hover:border-brand-teal hover:shadow-sm transition-all text-center min-h-[100px] items-center justify-center p-4"
+                    >
+                      <Layers className="h-8 w-8 text-gray-400 mb-2" />
+                      <span className="text-sm font-semibold text-gray-800 line-clamp-2 leading-tight">{cat.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-xs">
+                  <button onClick={() => setAllProductsCategoryId('')} className="text-blue-500 hover:underline">
+                    All Categories
+                  </button>
+                  <ChevronRight className="h-3 w-3 text-gray-400" />
+                  <span className="font-semibold text-gray-800">{allCats.find(c => c.id === allProductsCategoryId)?.name}</span>
+                </div>
+                {allProductsLoading ? (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                    {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}
+                  </div>
+                ) : allProductsList.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                    {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={openVariantSelect} onVariantHover={prefetchVariants} />)}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <Package className="h-12 w-12 text-gray-200 mb-3" />
+                    <p className="text-sm text-gray-500 font-medium">No products in this category</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* CUSTOM ITEM VIEW */}
         {productsView === 'custom_item' && (
           <div className="max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-3">
@@ -665,7 +739,7 @@ export function ProductsTab() {
       {/* ── Variant Selection Modal ── */}
       <Modal
         open={!!variantProduct}
-        onClose={() => { setVariantProduct(null); setSelectedVariantId(null) }}
+        onClose={() => { setVariantProduct(null); setSelectedVariantIds(new Set()) }}
         title={variantProduct ? `Select Variant — ${variantProduct.name}` : 'Select Variant'}
       >
         <div className="space-y-3">
@@ -674,32 +748,54 @@ export function ProductsTab() {
           ) : variantList.length === 0 ? (
             <p className="py-6 text-center text-sm text-gray-400">No variants found</p>
           ) : (
-            <div className="space-y-2 max-h-80 overflow-y-auto">
-              {variantList.map(v => {
-                const selected = selectedVariantId === v.id
-                return (
-                  <button key={v.id} onClick={() => setSelectedVariantId(v.id)} className={`flex w-full items-center justify-between rounded-lg border-2 px-4 py-3 text-left transition-colors ${selected ? 'border-brand-teal bg-brand-teal-light' : 'border-gray-200 hover:border-gray-300'}`}>
-                    <div className="min-w-0">
-                      <p className="font-medium text-gray-900 text-sm">{v.name}</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {Object.entries(v.attributes ?? {}).map(([k, val]) => (
-                          <span key={k} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">{k}: {val}</span>
-                        ))}
+            <>
+              <p className="text-xs text-gray-400">Select one or more variants to add to the cart.</p>
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {variantList.map(v => {
+                  const selected = selectedVariantIds.has(v.id)
+                  const oos = typeof v.stock === 'number' && v.stock <= 0
+                  return (
+                    <button key={v.id} disabled={oos} onClick={() => !oos && toggleVariantSelected(v.id)}
+                      className={`relative flex w-full items-center justify-between rounded-lg border-2 px-4 py-3 text-left transition-colors ${oos ? 'border-gray-100 opacity-50 cursor-not-allowed' : selected ? 'border-brand-teal bg-brand-teal-light cursor-pointer' : 'border-gray-200 hover:border-gray-300 cursor-pointer'}`}>
+                      {oos && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-600">Out of Stock</span>
+                      )}
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${selected && !oos ? 'border-brand-teal bg-brand-teal' : 'border-gray-300 bg-white'}`}>
+                          {selected && !oos && <Check className="h-3.5 w-3.5 text-white" />}
+                        </div>
+                        {v.image_url ? (
+                          <img src={v.image_url} alt={v.name} className="h-12 w-12 shrink-0 rounded-lg border border-gray-200 object-cover" />
+                        ) : (
+                          <div className="h-12 w-12 shrink-0 rounded-lg border border-dashed border-gray-200 bg-gray-50" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-900 text-sm">{v.name}</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {Object.entries(v.attributes ?? {}).map(([k, val]) => (
+                              <span key={k} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">{k}: {val}</span>
+                            ))}
+                          </div>
+                          {v.sku && <p className="text-xs text-gray-400 mt-0.5">SKU: {v.sku}</p>}
+                          {typeof v.stock === 'number' && !oos && <p className="text-xs text-gray-400 mt-0.5">{v.stock} on hand</p>}
+                        </div>
                       </div>
-                      {v.sku && <p className="text-xs text-gray-400 mt-0.5">SKU: {v.sku}</p>}
-                    </div>
-                    <div className="shrink-0 ml-3 text-right">
-                      <p className="font-bold text-brand-teal">{formatCurrency(v.selling_price)}</p>
-                      {selected && <Check className="ml-auto h-4 w-4 text-brand-teal mt-1" />}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+                      {!oos && (
+                        <div className="shrink-0 ml-3 text-right">
+                          <p className="font-bold text-brand-teal">{formatCurrency(v.selling_price)}</p>
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </>
           )}
           <div className="flex justify-end gap-2 pt-1">
-            <Button variant="outline" onClick={() => { setVariantProduct(null); setSelectedVariantId(null) }}>Cancel</Button>
-            <Button className="bg-brand-teal hover:bg-brand-teal-dark" disabled={!selectedVariantId} onClick={addVariantToCart}>Add to Cart</Button>
+            <Button variant="outline" onClick={() => { setVariantProduct(null); setSelectedVariantIds(new Set()) }}>Cancel</Button>
+            <Button className="bg-brand-teal hover:bg-brand-teal-dark" disabled={selectedVariantIds.size === 0} onClick={addVariantToCart}>
+              Add to Cart{selectedVariantIds.size > 1 ? ` (${selectedVariantIds.size})` : ''}
+            </Button>
           </div>
         </div>
       </Modal>

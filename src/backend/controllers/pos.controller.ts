@@ -89,6 +89,12 @@ const createSaleSchema = z.object({
   gift_card_id: z.string().uuid().optional().nullable(),
   gift_card_amount: z.number().min(0).optional(),
   notes: z.string().optional().nullable(),
+  served_by_employee_id: z.string().uuid().optional().nullable(),
+  // Cashier-entered commission for the served_by employee on this specific
+  // sale (retail-store flow). Takes priority over any business-wide
+  // commission rule or product-level commission rate.
+  commission_amount: z.number().min(0).optional().nullable(),
+  commission_type: z.enum(['flat', 'percentage']).optional().nullable(),
   items: z.array(saleItemSchema).min(1),
 })
 
@@ -98,7 +104,12 @@ export const PosController = {
     if (error) return error
     try {
       const saleId = await PosService.processSale(data)
-      CommissionService.recordForSale(ctx.businessId, data.cashier_id, saleId, data.total).catch(() => {})
+      CommissionService.recordForSale(ctx.businessId, data.cashier_id, saleId, data.total, {
+        servedByEmployeeId: data.served_by_employee_id ?? null,
+        manualCommission: data.commission_amount
+          ? { type: data.commission_type ?? 'flat', value: data.commission_amount }
+          : null,
+      }).catch(() => {})
       return created({ sale_id: saleId })
     } catch (err: any) {
       if (err?.code === 'P0001' && err?.message) return badRequest(err.message, 'STOCK_ERROR')

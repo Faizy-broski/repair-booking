@@ -7,12 +7,12 @@ const db = adminSupabase as any
 export const ProductService = {
   async list(businessId: string, params: {
     page?: number; limit?: number; search?: string; categoryId?: string
-    branchId?: string; includeInactive?: boolean
+    branchId?: string; includeInactive?: boolean; includeDrafts?: boolean
     brandId?: string; supplierId?: string; valuation?: string
     hideOutOfStock?: boolean; itemType?: string; modelId?: string; partType?: string
     barcode?: string  // exact match on barcode or sku — used by scanner (not ilike)
   }) {
-    const { page = 1, limit = 20, search, categoryId, branchId, includeInactive,
+    const { page = 1, limit = 20, search, categoryId, branchId, includeInactive, includeDrafts,
             brandId, supplierId, valuation, hideOutOfStock, itemType, modelId, partType,
             barcode } = params
 
@@ -28,6 +28,7 @@ export const ProductService = {
       .range((page - 1) * limit, page * limit - 1)
 
     if (!includeInactive) q = q.eq('is_active', true)
+    if (!includeDrafts) q = q.eq('is_draft', false)
 
     // When listing for a specific branch, only return products that are enabled
     // in that branch's catalog via the branch_products join.
@@ -119,6 +120,29 @@ export const ProductService = {
     const { data, error } = await adminSupabase.from('products').insert(payload).select().single()
     if (error) throw error
     return data
+  },
+
+  /** Atomically duplicates a product (+ variants) as a draft via the `duplicate_product` SQL function. */
+  async duplicateProduct(id: string, businessId: string, branchId: string | undefined, actorId?: string) {
+    const { data: newId, error } = await db.rpc('duplicate_product', {
+      p_product_id: id,
+      p_business_id: businessId,
+      p_branch_id: branchId ?? null,
+    })
+    if (error) throw error
+
+    const duplicate = await ProductService.getById(newId as string, businessId)
+
+    ProductService.recordHistory({
+      product_id: newId as string,
+      business_id: businessId,
+      actor_id: actorId,
+      action: 'create',
+      category: 'product',
+      description: `Duplicated from "${(duplicate as any)?.name?.replace(/ \(Copy - \w{4}\)$/, '') ?? 'product'}"`,
+    })
+
+    return duplicate
   },
 
   async update(id: string, businessId: string, payload: UpdateTables<'products'>) {
@@ -252,7 +276,11 @@ export const ProductService = {
     product_id: string; business_id: string; actor_id?: string; actor_name?: string
     action: 'create' | 'update' | 'delete'; category: string; description: string; metadata?: Record<string, unknown>
   }) {
-    await db.from('product_history').insert(entry).catch(() => {}) // non-blocking
+    try {
+      await db.from('product_history').insert(entry) // non-blocking — errors are swallowed below
+    } catch {
+      // non-fatal — history is best-effort
+    }
   },
 
   // ── Stats ────────────────────────────────────────────────────────────────
@@ -333,14 +361,15 @@ export const ProductService = {
     
     return (data ?? []).map((v: any) => {
       const inv = branchId ? v.inventory?.find((i: any) => i.branch_id === branchId) : null
-      return { ...v, stock: inv?.quantity ?? 0, inventory: undefined }
+      const stock = branchId ? (inv ? inv.quantity : null) : null
+      return { ...v, stock, inventory: undefined }
     })
   },
 
   async createVariants(productId: string, businessId: string, variants: Array<{
     name: string; sku?: string | null; barcode?: string | null
     selling_price: number; cost_price?: number | null; attributes?: Record<string, string>
-    stock?: number
+    stock?: number; image_url?: string | null
   }>, branchId?: string) {
     const { data: product, error: prodErr } = await adminSupabase
       .from('products').select('id').eq('id', productId).eq('business_id', businessId).single()
@@ -349,6 +378,7 @@ export const ProductService = {
     const rows = variants.map(v => ({
       product_id: productId, name: v.name, sku: v.sku ?? null, barcode: v.barcode || Math.floor(100000000000 + Math.random() * 900000000000).toString(),
       selling_price: v.selling_price, cost_price: v.cost_price ?? null, attributes: v.attributes ?? {},
+      image_url: v.image_url ?? null,
     }))
 
     const { data, error } = await adminSupabase.from('product_variants').insert(rows).select()
@@ -376,7 +406,7 @@ export const ProductService = {
   async updateVariant(variantId: string, productId: string, businessId: string, payload: {
     name?: string; sku?: string | null; barcode?: string | null
     selling_price?: number; cost_price?: number | null; attributes?: Record<string, string>
-    stock?: number
+    stock?: number; image_url?: string | null
   }, branchId?: string) {
     const { stock, ...variantPayload } = payload
     const { data: product, error: prodErr } = await adminSupabase

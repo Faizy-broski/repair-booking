@@ -34,6 +34,11 @@ const applySchema = z.object({
   mode: z.enum(['initial', 'reapply', 'merge']).default('initial'),
 })
 
+const bulkPushSchema = z.object({
+  mode: z.enum(['merge', 'reapply']).default('merge'),
+  only_behind: z.boolean().default(true),
+})
+
 export const VerticalTemplateController = {
   async list(request: NextRequest, _ctx: RequestContext): Promise<NextResponse> {
     try {
@@ -136,6 +141,60 @@ export const VerticalTemplateController = {
       return ok(data)
     } catch (error) {
       return serverError('Failed to get apply log', error)
+    }
+  },
+
+  /**
+   * GET /api/admin/vertical-templates/[id]/businesses
+   * Lists all active businesses on this template with their version drift.
+   * Response includes versions_behind so caller knows who needs a push.
+   */
+  async listBusinesses(
+    _request: NextRequest,
+    _ctx: RequestContext,
+    routeCtx: { params: Promise<{ id: string }> }
+  ): Promise<NextResponse> {
+    try {
+      const { id } = await routeCtx.params
+      const data = await VerticalTemplateService.listBusinessesByTemplate(id)
+      const behind = data.filter(b => b.versions_behind > 0).length
+      return ok(data, { total: data.length, behind })
+    } catch (error) {
+      return serverError('Failed to list businesses for template', error)
+    }
+  },
+
+  /**
+   * POST /api/admin/vertical-templates/[id]/bulk-push
+   * Pushes the current template to all (or only behind) businesses on it.
+   * Body: { mode: 'merge' | 'reapply', only_behind: boolean }
+   *
+   * merge (default + recommended):
+   *   Adds new modules only. Never overwrites existing settings.
+   *   Safe to run at any time — idempotent for businesses already up-to-date.
+   *
+   * reapply:
+   *   Overwrites all module settings to match the template exactly.
+   *   Use only when you want to reset customisations (e.g. wrong tax rate spread).
+   */
+  async bulkPush(
+    request: NextRequest,
+    ctx: RequestContext,
+    routeCtx: { params: Promise<{ id: string }> }
+  ): Promise<NextResponse> {
+    const { id } = await routeCtx.params
+    const { data: body, error: valErr } = await validateBody(request, bulkPushSchema)
+    if (valErr) return valErr
+    try {
+      const result = await VerticalTemplateService.bulkPush(
+        id,
+        ctx.auth.userId,
+        body.mode,
+        body.only_behind
+      )
+      return ok(result)
+    } catch (error) {
+      return serverError('Failed to bulk push template', error)
     }
   },
 }

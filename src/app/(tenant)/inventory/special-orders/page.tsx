@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/ui/modal'
 import { useAuthStore } from '@/store/auth.store'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, getCurrencySymbol } from '@/lib/utils'
 
 interface SpecialOrder {
   id: string
@@ -36,6 +36,7 @@ const emptyForm = {
 
 export default function SpecialOrdersPage() {
   const { activeBranch } = useAuthStore()
+  const currSymbol = getCurrencySymbol()
   const [orders, setOrders] = useState<SpecialOrder[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -227,7 +228,7 @@ export default function SpecialOrdersPage() {
               onChange={(e) => setForm((f) => ({ ...f, quantity: Number(e.target.value) }))}
             />
             <Input
-              label="Unit Cost (£)"
+              label="Unit Cost ({currSymbol})"
               type="number"
               min="0"
               step="0.01"

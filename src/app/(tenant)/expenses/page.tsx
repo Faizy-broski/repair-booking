@@ -96,7 +96,7 @@ export default function ExpensesPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, branch_id: activeBranch.id, category_id: data.category_id || null }),
     })
-    if (!res.ok) { const j = await res.json().catch(() => ({})); toast.error(j.error ?? 'Failed to add expense'); return }
+    if (!res.ok) { const j = await res.json().catch(() => ({})); toast.error(j?.error?.message ?? 'Failed to add expense'); return }
     toast.success('Expense added')
     reset()
     setSheetOpen(false)

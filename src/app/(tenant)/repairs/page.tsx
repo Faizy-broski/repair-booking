@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Plus, Search, LayoutGrid, List, Wrench, DollarSign, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail, RefreshCw } from 'lucide-react'
+import { Plus, Search, LayoutGrid, List, Wrench, DollarSign, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail, RefreshCw, MoreHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
 import { AsyncEmployeeSelect } from '@/components/shared/async-employee-select'
@@ -77,10 +77,8 @@ function ActionsMenu({ onEdit, onSlip, onInvoice, onDelete, onMessage }: {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <button
-          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors focus:outline-none"
-        >
-          Actions <ChevronDown className="h-3 w-3" />
+        <button className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-gray-800 hover:bg-gray-100 hover:text-black transition-colors focus:outline-none">
+          <MoreHorizontal className="h-5 w-5" />
         </button>
       </DropdownMenu.Trigger>
 
@@ -156,7 +154,7 @@ function ComboInput({ value, onChange, options, placeholder }: {
         onChange={(e) => { onChange(e.target.value); setOpen(true) }}
         onFocus={() => setOpen(true)}
         placeholder={placeholder}
-        className="h-8 w-full rounded-md border border-indigo-200 bg-white px-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400/20"
+        className="h-8 w-full rounded-md border border-gray-200 bg-white px-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
       />
       {open && filtered.length > 0 && (
         <ul className="absolute z-50 mt-1 max-h-44 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
@@ -201,9 +199,9 @@ function MultiComboInput({ values, onAdd, onRemove, options, placeholder }: {
     <div ref={ref} className="relative">
       <div className="mb-1.5 flex flex-wrap gap-1.5">
         {values.map((v) => (
-          <span key={v} className="inline-flex items-center gap-1 rounded bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-700">
+          <span key={v} className="inline-flex items-center gap-1 rounded bg-brand-teal/10 px-2 py-0.5 text-xs font-semibold text-brand-teal">
             {v}
-            <button type="button" onClick={() => onRemove(v)} className="hover:text-indigo-900 transition-colors">
+            <button type="button" onClick={() => onRemove(v)} className="hover:text-brand-teal-dark transition-colors">
               <X className="h-3 w-3" />
             </button>
           </span>
@@ -222,7 +220,7 @@ function MultiComboInput({ values, onAdd, onRemove, options, placeholder }: {
             }
           }}
           placeholder={placeholder}
-          className="h-8 w-full rounded-md border border-indigo-200 bg-white px-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400/20"
+          className="h-8 w-full rounded-md border border-gray-200 bg-white px-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
         />
         {open && (value || filtered.length > 0) && (
           <ul className="absolute z-50 mt-1 max-h-44 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
@@ -255,21 +253,30 @@ function MultiComboInput({ values, onAdd, onRemove, options, placeholder }: {
   )
 }
 
-const EXPORTABLE_COLUMNS = ['Job #', 'Customer', 'Type', 'Brand', 'Model', 'Status', 'Cost', 'Created']
+const EXPORTABLE_COLUMNS = ['Job #', 'Customer', 'Phone', 'Email', 'Type', 'Brand', 'Model', 'Fault', 'Status', 'Due Date', 'Cost', 'Created']
+
+function buildExportRow(r: RepairRow): (string | number)[] {
+  const cf = (r.custom_fields as any) ?? {}
+  return [
+    r.job_number,
+    r.customers ? `${r.customers.first_name} ${r.customers.last_name ?? ''}`.trim() : 'N/A',
+    r.customers?.phone ?? 'N/A',
+    r.customers?.email ?? 'N/A',
+    r.device_type ?? 'N/A',
+    r.device_brand ?? 'N/A',
+    r.device_model ?? 'N/A',
+    r.issue && r.issue.toLowerCase() !== 'not specified' ? r.issue : 'N/A',
+    r.status,
+    cf.due_date ? formatDate(cf.due_date) : 'N/A',
+    r.actual_cost ?? r.estimated_cost ?? 0,
+    r.created_at ? formatDate(r.created_at) : 'N/A'
+  ]
+}
 
 function exportCSV(repairs: RepairRow[]) {
   const rows = [
     EXPORTABLE_COLUMNS.join(','),
-    ...repairs.map((r) => [
-      r.job_number,
-      `"${r.customers ? `${r.customers.first_name} ${r.customers.last_name ?? ''}`.trim() : 'N/A'}"`,
-      `"${r.device_type ?? 'N/A'}"`,
-      `"${r.device_brand ?? 'N/A'}"`,
-      `"${r.device_model ?? 'N/A'}"`,
-      r.status,
-      r.actual_cost ?? r.estimated_cost ?? 0,
-      r.created_at ? formatDate(r.created_at) : 'N/A'
-    ].join(','))
+    ...repairs.map((r) => buildExportRow(r).map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
   ]
   const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
   const a = document.createElement('a')
@@ -281,16 +288,7 @@ function exportCSV(repairs: RepairRow[]) {
 function exportExcel(repairs: RepairRow[]) {
   const rows = [
     EXPORTABLE_COLUMNS,
-    ...repairs.map((r) => [
-      r.job_number,
-      r.customers ? `${r.customers.first_name} ${r.customers.last_name ?? ''}`.trim() : 'N/A',
-      r.device_type ?? 'N/A',
-      r.device_brand ?? 'N/A',
-      r.device_model ?? 'N/A',
-      r.status,
-      r.actual_cost ?? r.estimated_cost ?? 0,
-      r.created_at ? formatDate(r.created_at) : 'N/A'
-    ])
+    ...repairs.map((r) => buildExportRow(r))
   ]
   const xml = `<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Repairs"><Table>${rows.map((r) => `<Row>${r.map((v) => `<Cell><Data ss:Type="String">${String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;')}</Data></Cell>`).join('')}</Row>`).join('')}</Table></Worksheet></Workbook>`
   const blob = new Blob([xml], { type: 'application/vnd.ms-excel' })
@@ -301,7 +299,7 @@ function exportExcel(repairs: RepairRow[]) {
 }
 
 function exportPDF(repairs: RepairRow[]) {
-  const html = `<html><head><title>Repairs Export</title><style>body{font-family:sans-serif;font-size:12px;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background:#0d7070;color:#fff}</style></head><body><h2>Repair Jobs Report</h2><p>Generated on: ${new Date().toLocaleString()}</p><table><thead><tr>${EXPORTABLE_COLUMNS.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${repairs.map(r => `<tr><td>${r.job_number}</td><td>${r.customers ? `${r.customers.first_name} ${r.customers.last_name ?? ''}`.trim() : 'N/A'}</td><td>${r.device_type ?? 'N/A'}</td><td>${r.device_brand ?? 'N/A'}</td><td>${r.device_model ?? 'N/A'}</td><td>${r.status}</td><td>$${r.actual_cost ?? r.estimated_cost ?? 0}</td><td>${r.created_at ? formatDate(r.created_at) : 'N/A'}</td></tr>`).join('')}</tbody></table></body></html>`
+  const html = `<html><head><title>Repairs Export</title><style>body{font-family:sans-serif;font-size:12px;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background:#0d7070;color:#fff}</style></head><body><h2>Repair Jobs Report</h2><p>Generated on: ${new Date().toLocaleString()}</p><table><thead><tr>${EXPORTABLE_COLUMNS.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${repairs.map(r => `<tr>${buildExportRow(r).map((v, i) => `<td>${i === 10 ? '$' : ''}${v}</td>`).join('')}</tr>`).join('')}</tbody></table></body></html>`
   const w = window.open('', '_blank')
   if (!w) return
   w.document.write(html)
@@ -1012,7 +1010,9 @@ export default function RepairsPage() {
     {
       accessorKey: 'job_number', header: 'Job #', cell: ({ row }) => (
         <div className="flex items-center gap-2">
-          <span className="font-mono text-sm font-semibold text-blue-600">{row.original.job_number}</span>
+          <Link href={`/repairs/${row.original.id}`} className="font-mono text-sm font-semibold text-blue-600 hover:underline hover:text-blue-800 transition-colors whitespace-nowrap">
+            {row.original.job_number}
+          </Link>
           {row.original.is_rush && <span className="flex h-4 items-center rounded bg-orange-100 px-1.5 text-[9px] font-bold text-orange-700 uppercase tracking-widest border border-orange-200" title="Rush Job">Rush</span>}
         </div>
       )
@@ -1127,25 +1127,19 @@ export default function RepairsPage() {
       }
     },
     {
-      id: 'actions', header: 'Action', size: 160,
+      id: 'actions',
+      header: 'Action',
+      size: 60,
       cell: ({ row }) => {
         const r = row.original
         return (
-          <div className="flex flex-col gap-1.5">
-            <Link
-              href={`/repairs/${r.id}`}
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 py-1.5 text-xs font-bold text-cyan-700 hover:bg-cyan-100 transition-all shadow-sm active:scale-95"
-            >
-              <Eye className="h-3.5 w-3.5" /> DETAILS
-            </Link>
-            <ActionsMenu
-              onEdit={() => openEdit(r)}
-              onSlip={() => setSlipRepair(r)}
-              onInvoice={() => handleOpenInvoice(r)}
-              onDelete={() => deleteRepair(r.id, r.job_number)}
-              onMessage={() => setEmailPrompt({ repairId: r.id, jobNumber: r.job_number, currentStatus: r.status ?? 'received' })}
-            />
-          </div>
+          <ActionsMenu
+            onEdit={() => openEdit(r)}
+            onSlip={() => setSlipRepair(r)}
+            onInvoice={() => handleOpenInvoice(r)}
+            onDelete={() => deleteRepair(r.id, r.job_number)}
+            onMessage={() => setEmailPrompt({ repairId: r.id, jobNumber: r.job_number, currentStatus: r.status ?? 'received' })}
+          />
         )
       }
     },
@@ -1784,16 +1778,16 @@ export default function RepairsPage() {
             : deviceData.models
           const remaining = (parseFloat(jobData.estimated_cost) || 0) - (parseFloat(jobData.deposit_paid) || 0)
           const pricePending = jobData.price_pending
-          const inp = 'h-8 w-full rounded-md border-2 border-indigo-200 bg-white px-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/20'
+          const inp = 'h-8 w-full rounded-md border-2 border-gray-200 bg-white px-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20'
           const sel = `${inp} appearance-none`
-          const lbl = 'mb-0.5 block text-[11px] font-bold uppercase tracking-wide text-indigo-400'
+          const lbl = 'mb-0.5 block text-[11px] font-bold uppercase tracking-wide text-brand-teal'
 
           return (
             <div className="space-y-2.5">
 
               {/* Row A: Device Type | Brand | Model | IMEI */}
               <div>
-                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
+                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
                   <Smartphone className="h-2.5 w-2.5" /> Device
                 </p>
                 <div className="grid grid-cols-4 gap-2">
@@ -1871,7 +1865,7 @@ export default function RepairsPage() {
 
               {/* REPAIR PARTS */}
               <div>
-                <p className="mb-1.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
+                <p className="mb-1.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
                   <Wrench className="h-2.5 w-2.5" /> Repair Parts
                 </p>
 
@@ -2045,7 +2039,7 @@ export default function RepairsPage() {
 
               {/* Row B: Fault | Due Date | Status | Assigned To */}
               <div>
-                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
+                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
                   <Wrench className="h-2.5 w-2.5" /> Fault & Assignment
                 </p>
                 <div className="grid grid-cols-4 gap-2">
@@ -2099,7 +2093,7 @@ export default function RepairsPage() {
 
               {/* Row C: Total | Deposit | Remaining | Assigned To */}
               <div>
-                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
+                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
                   <DollarSign className="h-2.5 w-2.5" /> Financials & Assignment
                 </p>
                 {/* Price Pending toggle */}
@@ -2207,7 +2201,7 @@ export default function RepairsPage() {
 
               {/* Row D: Lock / Passcode / Pattern */}
               <div>
-                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
+                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
                   <Lock className="h-2.5 w-2.5" /> Device Lock
                 </p>
                 <div className="flex items-center gap-2 mb-2">
@@ -2259,7 +2253,7 @@ export default function RepairsPage() {
 
               {/* Row E: Customer Note | Staff Note */}
               <div>
-                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
+                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
                   <StickyNote className="h-2.5 w-2.5" /> Notes
                 </p>
                 <div className="grid grid-cols-2 gap-2">

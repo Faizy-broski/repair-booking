@@ -18,22 +18,42 @@ function getBusinessCurrency(): string {
   }
 }
 
+// Currencies where Intl outputs an undesirable symbol — map to preferred display symbol
+const CURRENCY_SYMBOL_OVERRIDE: Record<string, string> = {
+  PKR: 'Rs',
+}
+
+export function getCurrencySymbol(currency?: string): string {
+  const c = currency ?? getBusinessCurrency()
+  if (CURRENCY_SYMBOL_OVERRIDE[c]) return CURRENCY_SYMBOL_OVERRIDE[c]
+  return new Intl.NumberFormat('en', { style: 'currency', currency: c, minimumFractionDigits: 0 })
+    .formatToParts(0)
+    .find(p => p.type === 'currency')?.value ?? c
+}
+
+function applySymbolOverride(formatted: string, c: string): string {
+  const override = CURRENCY_SYMBOL_OVERRIDE[c]
+  if (!override) return formatted
+  // Intl may produce "PKR 1,234.00" or "PKR1,234.00" — replace the code
+  return formatted.replace(c, override)
+}
+
 export function formatCurrency(amount: number, currency?: string): string {
   const c = currency ?? getBusinessCurrency()
   const locale = c === 'USD' ? 'en-US' : 'en-GB'
-  return new Intl.NumberFormat(locale, { style: 'currency', currency: c }).format(amount)
+  return applySymbolOverride(new Intl.NumberFormat(locale, { style: 'currency', currency: c }).format(amount), c)
 }
 
 export function formatCurrencyCompact(amount: number, currency?: string): string {
   const c = currency ?? getBusinessCurrency()
   const locale = c === 'USD' ? 'en-US' : 'en-GB'
-  return new Intl.NumberFormat(locale, {
+  return applySymbolOverride(new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: c,
     notation: 'compact',
     compactDisplay: 'short',
     maximumFractionDigits: Math.abs(amount) < 1000 ? 2 : 1,
-  }).format(amount)
+  }).format(amount), c)
 }
 
 export function formatDate(date: string | Date): string {

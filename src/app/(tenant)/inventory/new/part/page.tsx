@@ -10,7 +10,7 @@ import { ImageUpload } from '@/components/ui/image-upload'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/store/auth.store'
 import { queryClient } from '@/lib/query-client'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, getCurrencySymbol } from '@/lib/utils'
 import Link from 'next/link'
 
 interface Category    { id: string; name: string }
@@ -49,6 +49,7 @@ function cartesian(attrs: { name: string; values: string[] }[]): Record<string, 
 
 export default function NewPartPage() {
   const { activeBranch, branches } = useAuthStore()
+  const currSymbol = getCurrencySymbol()
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [saveAndNew, setSaveAndNew] = useState(false)
@@ -451,8 +452,8 @@ export default function NewPartPage() {
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Variant</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">SKU</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Barcode</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Cost (£)</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Price (£) *</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Cost ({currSymbol})</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Price ({currSymbol}) *</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Stock</th>
                             <th className="px-3 py-2" />
                           </tr>
@@ -504,8 +505,8 @@ export default function NewPartPage() {
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Cost Price (£)" type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
-                <Input label="Selling Price (£)" type="number" step="0.01" min="0" placeholder="0.00" required={!hasVariants} value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
+                <Input label="Cost Price ({currSymbol})" type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
+                <Input label="Selling Price ({currSymbol})" type="number" step="0.01" min="0" placeholder="0.00" required={!hasVariants} value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
               </div>
               {hasMargin && (
                 <div className="rounded-lg bg-green-50 border border-green-100 px-4 py-2.5 flex items-center gap-4 text-sm">
@@ -566,9 +567,9 @@ export default function NewPartPage() {
                   <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
-                      <Select options={[{ value: 'percentage', label: 'Percentage (%)' }, { value: 'fixed', label: 'Fixed Amount (£)' }]} value={commissionType} onValueChange={setCommissionType} />
+                      <Select options={[{ value: 'percentage', label: 'Percentage (%)' }, { value: 'fixed', label: 'Fixed Amount ({currSymbol})' }]} value={commissionType} onValueChange={setCommissionType} />
                     </div>
-                    <Input label={commissionType === 'percentage' ? 'Rate (%)' : 'Amount (£)'} type="number" step="0.01" min="0" placeholder="0" value={commissionRate} onChange={e => setCommissionRate(e.target.value)} />
+                    <Input label={commissionType === 'percentage' ? 'Rate (%)' : 'Amount ({currSymbol})'} type="number" step="0.01" min="0" placeholder="0" value={commissionRate} onChange={e => setCommissionRate(e.target.value)} />
                   </div>
                 )}
               </div>

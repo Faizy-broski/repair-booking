@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye, Trash2, MoreVertical, Users, Wrench, Package, X, Download, ChevronDown, CreditCard } from 'lucide-react'
+import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye, Trash2, MoreVertical, Users, Wrench, Package, X, Download, ChevronDown, CreditCard, Plus } from 'lucide-react'
 import { EditSubscriptionModal } from '@/components/superadmin/edit-subscription-modal'
 import type { PlanOption } from '@/components/superadmin/edit-subscription-modal'
 import type { SubscriptionRow } from '@/app/api/admin/subscriptions/route'
@@ -721,7 +721,16 @@ export default function BusinessesPage() {
           <h1 className="text-2xl font-bold text-gray-900">Businesses</h1>
           <p className="text-sm text-gray-500">{total} registered businesses</p>
         </div>
-        <ExportMenu />
+        <div className="flex items-center gap-2">
+          <Link
+            href="/superadmin/businesses/onboard"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3.5 py-2 text-sm font-medium text-white hover:bg-teal-700 transition-colors shadow-sm"
+          >
+            <Plus className="h-4 w-4" />
+            Onboard Business
+          </Link>
+          <ExportMenu />
+        </div>
       </div>
 
       <div className="relative max-w-xs">

@@ -14,10 +14,12 @@ import { useRealtime } from '@/hooks/use-realtime'
 import { createClient } from '@/lib/supabase/client'
 import { getSubdomain } from '@/lib/utils'
 import { Toaster } from 'sonner'
+import { getBrandStyle } from '@/lib/brand-theme'
 import type { Profile, Branch } from '@/types/database'
 import type { SubscriptionStatus } from '@/store/auth.store'
 import type { SystemBroadcast } from '@/backend/services/broadcast.service'
 import Providers from '@/components/providers'
+import { Suspense } from 'react'
 
 function getImpersonationBusinessName(): string | null {
   if (typeof document === 'undefined') return null
@@ -42,8 +44,8 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
 
   const {
     setProfile, setBranches, setActiveBranch, setLoading,
-    setCurrency, setSubscriptionStatus, clear,
-    profile: cachedProfile,
+    setCurrency, setBrandColor, setSubscriptionStatus, setVerticalTemplateSlug, clear,
+    profile: cachedProfile, brandColor,
   } = useAuthStore()
   const { fetchConfigs, invalidate: invalidateConfigs } = useModuleConfigStore()
   const { setLoaded: setBroadcastsLoaded, addBroadcast, syncBroadcast, reset: resetBroadcasts } = useBroadcastsStore()
@@ -89,6 +91,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
           const profile = json.data as Profile | null
           if (profile) {
             setProfile(profile)
+            setVerticalTemplateSlug((profile as any).verticalTemplateSlug ?? null)
             if (profile.business_id) {
               const branchRes = await fetch('/api/settings/branches').catch(() => null)
               if (branchRes?.ok) {
@@ -173,10 +176,23 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
       if (profile.business_id) {
         supabase
           .from('businesses')
-          .select('currency')
+          .select('currency, brand_color')
           .eq('id', profile.business_id)
           .single()
-          .then(({ data }) => { if (data?.currency) setCurrency(data.currency) })
+          .then(({ data }) => {
+            if (data?.currency) setCurrency(data.currency)
+            if (data?.brand_color) setBrandColor(data.brand_color)
+          })
+
+        supabase
+          .from('businesses')
+          .select('business_vertical_templates(slug)')
+          .eq('id', profile.business_id)
+          .single()
+          .then(({ data }) => {
+            const slug = (data?.business_vertical_templates as { slug?: string } | null)?.slug ?? null
+            setVerticalTemplateSlug(slug)
+          })
 
         supabase
           .from('subscriptions')
@@ -257,9 +273,11 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
 
   return (
     <Providers>
-      <div className="flex h-screen overflow-hidden bg-surface-container-low">
+      <div className="flex h-screen overflow-hidden bg-surface-container-low" style={getBrandStyle(brandColor)}>
         <div className="hidden lg:flex">
-          <Sidebar collapsed={collapsed} />
+          <Suspense fallback={null}>
+            <Sidebar collapsed={collapsed} />
+          </Suspense>
         </div>
 
         {sidebarOpen && (
@@ -269,7 +287,9 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
               onClick={() => setSidebarOpen(false)}
             />
             <div className="relative flex-shrink-0 animate-slide-in-left">
-              <Sidebar onClose={() => setSidebarOpen(false)} />
+              <Suspense fallback={null}>
+                <Sidebar onClose={() => setSidebarOpen(false)} />
+              </Suspense>
             </div>
           </div>
         )}
@@ -278,7 +298,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
           {impersonatingBusiness && <ImpersonationBanner businessName={impersonatingBusiness} />}
           <Topbar onMenuClick={() => setSidebarOpen(true)} />
           <BroadcastBanner />
-          <main className="flex-1 overflow-y-auto p-6">
+          <main className="relative flex-1 overflow-y-auto p-6">
             {children}
           </main>
         </div>

@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Eye, Pencil, Trash2, FileDown, FileSpreadsheet, Printer, Columns, FileText } from 'lucide-react'
+import { Plus, Search, Eye, Pencil, Trash2, FileDown, FileSpreadsheet, Printer, Columns, FileText, MoreHorizontal } from 'lucide-react'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DataTable } from '@/components/shared/data-table'
@@ -249,15 +250,25 @@ export default function CustomersPage() {
       id: 'sr',
       header: 'Sr No#',
       size: 70,
-      cell: ({ row }) => <span className="text-gray-500">{page * 20 + row.index + 1}</span>,
+      cell: ({ row }) => (
+        <button
+          onClick={() => router.push(`/customers/${row.original.id}`)}
+          className="cursor-pointer font-medium text-blue-600 hover:underline hover:text-blue-800 transition-colors"
+        >
+          {page * 20 + row.index + 1}
+        </button>
+      ),
     },
     {
       id: 'name',
       header: 'Name',
       cell: ({ row }) => (
-        <p className="font-medium text-gray-900">
+        <button
+          onClick={() => router.push(`/customers/${row.original.id}`)}
+          className="cursor-pointer font-medium text-gray-900 hover:text-blue-600 hover:underline transition-colors text-left"
+        >
           {row.original.first_name} {row.original.last_name ?? ''}
-        </p>
+        </button>
       ),
     },
     {
@@ -293,28 +304,42 @@ export default function CustomersPage() {
     {
       id: 'actions',
       header: 'Action',
-      size: 120,
+      size: 60,
       cell: ({ row }) => (
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => router.push(`/customers/${row.original.id}`)}
-            className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors"
-          >
-            <Eye className="h-3 w-3" /> Details
-          </button>
-          <button
-            onClick={() => openEdit(row.original)}
-            className="flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-600 hover:bg-amber-100 transition-colors border border-amber-200"
-          >
-            <Pencil className="h-3 w-3" /> Edit
-          </button>
-          <button
-            onClick={() => onDelete(row.original)}
-            className="flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-500 hover:bg-red-100 transition-colors border border-red-200"
-          >
-            <Trash2 className="h-3 w-3" /> Delete
-          </button>
-        </div>
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger asChild>
+            <button className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-gray-800 hover:bg-gray-100 hover:text-black transition-colors">
+              <MoreHorizontal className="h-5 w-5" />
+            </button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content
+              align="end"
+              sideOffset={4}
+              className="z-50 min-w-[140px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+            >
+              <DropdownMenu.Item
+                onSelect={() => router.push(`/customers/${row.original.id}`)}
+                className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 outline-none"
+              >
+                <Eye className="h-3.5 w-3.5 text-blue-500" /> Details
+              </DropdownMenu.Item>
+              <DropdownMenu.Item
+                onSelect={() => openEdit(row.original)}
+                className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 outline-none"
+              >
+                <Pencil className="h-3.5 w-3.5 text-amber-500" /> Edit
+              </DropdownMenu.Item>
+              <DropdownMenu.Separator className="my-1 border-t border-gray-100" />
+              <DropdownMenu.Item
+                onSelect={() => onDelete(row.original)}
+                className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 outline-none"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Delete
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
       ),
     },
   ]

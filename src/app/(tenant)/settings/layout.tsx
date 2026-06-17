@@ -1,5 +1,5 @@
 'use client'
-import { Store, GitBranch, Users, Sliders, Layers } from 'lucide-react'
+import { Store, GitBranch, Users, Sliders, Layers, Palette } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
@@ -11,6 +11,7 @@ const SETTINGS_TABS = [
   { id: 'users',          label: 'Users',         href: '/settings/users',          icon: Users,     color: 'bg-violet-500 hover:bg-violet-600', soft: 'hover:bg-violet-50 hover:text-violet-700', ownerOnly: true },
   { id: 'custom-fields',  label: 'Custom Fields', href: '/settings/custom-fields',  icon: Sliders,   color: 'bg-orange-500 hover:bg-orange-600', soft: 'hover:bg-orange-50 hover:text-orange-700' },
   { id: 'invoice-design', label: 'Invoice Design',href: '/settings/invoice-design', icon: Layers,    color: 'bg-indigo-500 hover:bg-indigo-600', soft: 'hover:bg-indigo-50 hover:text-indigo-700' },
+  { id: 'branding',       label: 'Branding',      href: '/settings/branding',       icon: Palette,   color: 'bg-pink-500   hover:bg-pink-600',   soft: 'hover:bg-pink-50   hover:text-pink-700',   ownerOnly: true },
 ]
 
 // These prefixes render their own page headers — suppress the settings tab bar for them

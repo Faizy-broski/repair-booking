@@ -75,7 +75,7 @@ export function QuickCreateModal({ open, onClose, barcode, branchId, onCreated, 
 
       if (!res.ok) {
         const json = await res.json().catch(() => ({}))
-        toast.error(json?.error ?? 'Failed to create product')
+        toast.error(json?.error?.message ?? 'Failed to create product')
         return
       }
 

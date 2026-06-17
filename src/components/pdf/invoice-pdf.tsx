@@ -101,7 +101,7 @@ function calcReceiptPageHeight(opts: {
     h += 15 + policyWrappedLines * 8 // border-top + padding + fontSize 6 text
   }
 
-  h += 40 // bottom breathing room — generous buffer so printer never clips footer
+  h += 100 // bottom breathing room — generous buffer so printer never clips footer
   return Math.max(h, 150)
 }
 

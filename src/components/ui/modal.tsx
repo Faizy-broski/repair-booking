@@ -33,8 +33,8 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
               ? 'fixed left-0 top-0 z-50 w-screen h-screen -translate-x-0 -translate-y-0 rounded-none'
               : 'fixed left-1/2 top-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 rounded-xl',
             'bg-white shadow-xl',
-            // For fullscreen we allow full height and hide scrollbars visually
-            size === 'full' ? 'overflow-auto no-scrollbar' : 'max-h-[80vh] overflow-auto no-scrollbar',
+            // For fullscreen we allow full height
+            size === 'full' ? 'overflow-auto' : 'max-h-[85vh] overflow-y-auto',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
             'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',

@@ -21,13 +21,14 @@ import type { Product } from '@/types/database'
 
 type PosTab = 'repairs' | 'products'
 
-const TABS: { key: PosTab; label: string; icon: React.ReactNode }[] = [
-  { key: 'products', label: 'Products', icon: <ShoppingBag className="h-4 w-4" /> },
-  { key: 'repairs',  label: 'Repairs',  icon: <Wrench className="h-4 w-4" /> },
-]
-
 export default function PosPage() {
-  const { activeBranch, profile } = useAuthStore()
+  const { activeBranch, profile, verticalTemplateSlug } = useAuthStore()
+
+  const isRetail = verticalTemplateSlug === 'retail-store'
+  const TABS: { key: PosTab; label: string; icon: React.ReactNode }[] = [
+    { key: 'products', label: 'Products', icon: <ShoppingBag className="h-4 w-4" /> },
+    ...(!isRetail ? [{ key: 'repairs' as PosTab, label: 'Repairs', icon: <Wrench className="h-4 w-4" /> }] : []),
+  ]
   const pos = usePosStore()
   const { PinModal } = usePinPrompt()
 
@@ -256,7 +257,7 @@ export default function PosPage() {
   // ── Main layout ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="-m-6 flex h-[calc(100vh-3.5rem)] flex-col overflow-hidden bg-gray-100">
+    <div className="absolute inset-0 flex flex-col overflow-hidden bg-gray-100">
 
       {/* Register open banner */}
       {pos.session && (
@@ -303,15 +304,15 @@ export default function PosPage() {
         <div className={`flex-1 flex-col overflow-hidden ${mobileView === 'browse' ? 'flex' : 'hidden lg:flex'}`}>
 
           {/* Tab bar */}
-          <div className="flex shrink-0 items-center bg-[#1a3c40]">
+          <div className="flex shrink-0 items-center bg-brand-teal">
             {TABS.map(tab => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex flex-1 items-center justify-center gap-2 border-b-3 px-4 py-2.5 lg:py-4 text-sm lg:text-base font-semibold whitespace-nowrap transition-all ${
+                className={`flex flex-1 items-center justify-center gap-2 border-b-2 px-4 py-2.5 lg:py-4 text-sm lg:text-base font-semibold whitespace-nowrap transition-all ${
                   activeTab === tab.key
                     ? 'border-white text-white bg-white/10'
-                    : 'border-transparent text-gray-400 hover:text-white hover:bg-white/5'
+                    : 'border-transparent text-white/60 hover:text-white hover:bg-white/5'
                 }`}
               >
                 {tab.icon}{tab.label}

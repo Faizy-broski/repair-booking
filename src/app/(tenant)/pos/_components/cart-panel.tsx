@@ -11,8 +11,10 @@ import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { useAuthStore } from '@/store/auth.store'
 import { usePosStore } from '@/store/pos.store'
+import { useModuleConfigStore } from '@/store/module-config.store'
+import { AsyncEmployeeSelect } from '@/components/shared/async-employee-select'
 import type { PaymentSplit } from '@/store/pos.store'
-import { formatCurrency, formatDateTime } from '@/lib/utils'
+import { formatCurrency, formatDateTime, getCurrencySymbol } from '@/lib/utils'
 import { pdf } from '@react-pdf/renderer'
 import { SaleReceiptPdf } from '@/components/pdf/sale-receipt-pdf'
 import { useRouter } from 'next/navigation'
@@ -24,11 +26,58 @@ interface Props {
   mobileView: 'browse' | 'cart'
 }
 
+function DiscountInput({ value, max, onChange, className }: { value: number; max: number; onChange: (v: number) => void; className?: string }) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const externalValue = useRef(value)
+
+  // Only push external value changes into the DOM when the input is not focused
+  useEffect(() => {
+    if (externalValue.current !== value) {
+      externalValue.current = value
+      if (inputRef.current && document.activeElement !== inputRef.current) {
+        inputRef.current.value = value === 0 ? '' : String(value)
+      }
+    }
+  }, [value])
+
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      inputMode="decimal"
+      defaultValue={value === 0 ? '' : String(value)}
+      placeholder="0"
+      onChange={e => {
+        const raw = e.target.value
+        if (raw === '' || /^\d*\.?\d{0,2}$/.test(raw)) {
+          const num = parseFloat(raw)
+          if (!isNaN(num)) onChange(Math.min(num, max))
+          else if (raw === '') onChange(0)
+        } else {
+          // Reject invalid character — restore previous valid value in DOM
+          e.target.value = e.target.value.slice(0, -1)
+        }
+      }}
+      onBlur={e => {
+        const num = Math.min(parseFloat(e.target.value) || 0, max)
+        e.target.value = num === 0 ? '' : String(num)
+        onChange(num)
+        externalValue.current = num
+      }}
+      className={className}
+    />
+  )
+}
+
 export function CartPanel({ mobileView }: Props) {
   const router = useRouter()
-  const { activeBranch, profile } = useAuthStore()
+  const { activeBranch, profile, verticalTemplateSlug, currency } = useAuthStore()
   const pos = usePosStore()
   const queryClient = useQueryClient()
+  const { isModuleEnabled } = useModuleConfigStore()
+  // "Served By" + per-sale commission entry is specific to the retail-store
+  // vertical template, independent of any module's enabled/disabled state.
+  const isRetailTemplate = verticalTemplateSlug === 'retail-store'
 
   // ── Customer state ─────────────────────────────────────────────────────────
   const [customerSearch, setCustomerSearch]         = useState('')
@@ -58,6 +107,11 @@ export function CartPanel({ mobileView }: Props) {
 
   // ── Checkout panel collapsed/expanded (mobile) ────────────────────────────
   const [showFullTotals, setShowFullTotals] = useState(false)
+
+  // ── Served by employee + per-sale commission (retail-store only) ───────────
+  const [servedByEmployeeId, setServedByEmployeeId] = useState('')
+  const [commissionAmount, setCommissionAmount] = useState('')
+  const [commissionType, setCommissionType] = useState<'flat' | 'percentage'>('flat')
 
   const { data: invoiceSettings = null } = useQuery({
     queryKey: ['invoice-settings', activeBranch?.id],
@@ -209,6 +263,9 @@ export function CartPanel({ mobileView }: Props) {
         payment_method: pos.paymentMethod,
         payment_splits: paymentSplits.length > 0 ? paymentSplits : undefined,
         gift_card_id: pos.giftCardId, gift_card_amount: pos.giftCardAmount || undefined,
+        served_by_employee_id: servedByEmployeeId || null,
+        commission_amount: servedByEmployeeId && commissionAmount ? parseFloat(commissionAmount) : null,
+        commission_type: servedByEmployeeId && commissionAmount ? commissionType : null,
         items: pos.cart.map(item => ({
           product_id: item.product.id, variant_id: item.variant?.id ?? null,
           name: item.product.name, quantity: item.quantity, unit_price: item.unitPrice,
@@ -220,6 +277,7 @@ export function CartPanel({ mobileView }: Props) {
     if (res.ok) {
       const saleJson = await res.json()
       setSuccess(true)
+      setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
       queryClient.invalidateQueries({ queryKey: ['sales'] })
       queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
       await printReceipt(saleJson.data?.sale_id ?? 'unknown', pos.paymentMethod, paymentSplits)
@@ -229,6 +287,7 @@ export function CartPanel({ mobileView }: Props) {
       const errJson = await res.json().catch(() => ({}))
       const msg = errJson?.error?.message ?? errJson?.message ?? 'Payment failed. Please try again.'
       toast.error(msg)
+      setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
     }
     setProcessing(false)
   }
@@ -250,12 +309,16 @@ export function CartPanel({ mobileView }: Props) {
         customer_id: pos.customer?.id ?? null,
         subtotal, discount: discountAmt, tax: taxAmt, total,
         payment_method: 'cash',
+        served_by_employee_id: servedByEmployeeId || null,
+        commission_amount: servedByEmployeeId && commissionAmount ? parseFloat(commissionAmount) : null,
+        commission_type: servedByEmployeeId && commissionAmount ? commissionType : null,
         items: cartSnapshot,
       }),
     })
     if (res.ok) {
       const saleJson = await res.json()
       setSuccess(true)
+      setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
       queryClient.invalidateQueries({ queryKey: ['sales'] })
       queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
       await printReceipt(saleJson.data?.sale_id ?? 'unknown', 'cash')
@@ -265,6 +328,7 @@ export function CartPanel({ mobileView }: Props) {
       const errJson = await res.json().catch(() => ({}))
       const msg = errJson?.error?.message ?? errJson?.message ?? 'Payment failed. Please try again.'
       toast.error(msg)
+      setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
     }
     setProcessing(false)
   }
@@ -401,11 +465,11 @@ export function CartPanel({ mobileView }: Props) {
           <table className="w-full table-fixed text-base">
             <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="w-[90px] px-1 py-2.5 text-left text-xs font-bold text-gray-700">QTY</th>
-                <th className="px-2 py-2.5 text-left text-xs font-bold text-gray-700">Item</th>
-                <th className="w-[54px] px-1 py-2.5 text-right text-xs font-bold text-gray-700">Disc</th>
-                <th className="w-[72px] px-1 py-2.5 text-right text-xs font-bold text-gray-700">Total</th>
-                <th className="w-[28px]"></th>
+                <th className="w-[88px] px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">QTY</th>
+                <th className="px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Item</th>
+                <th className="w-[78px] px-2 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Disc</th>
+                <th className="w-[80px] px-2 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Total</th>
+                <th className="w-[32px]"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -413,34 +477,39 @@ export function CartPanel({ mobileView }: Props) {
                 const lineTotal = (item.unitPrice - item.discount) * item.quantity
                 return (
                   <tr key={`${item.product.id}-${item.variant?.id}`} className="bg-white hover:bg-gray-50">
-                    <td className="px-1 py-2">
-                      <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity - 1)} className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded bg-red-100 hover:bg-red-200 text-red-600 transition-colors">
-                          <Minus className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    <td className="px-2 py-2.5 align-middle">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity - 1)} className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-md bg-red-100 hover:bg-red-200 text-red-600 transition-colors">
+                          <Minus className="h-3.5 w-3.5" />
                         </button>
                         <span className="w-5 sm:w-7 text-center text-sm font-bold text-gray-900">{item.quantity}</span>
-                        <button onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity + 1)} className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded bg-green-100 hover:bg-green-200 text-green-600 transition-colors">
-                          <Plus className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                        <button onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity + 1)} className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-md bg-green-100 hover:bg-green-200 text-green-600 transition-colors">
+                          <Plus className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     </td>
-                    <td className="px-1.5 py-2 overflow-hidden">
-                      <p className="truncate text-xs font-semibold text-gray-900">{item.product.name}</p>
-                      {item.product.sku && <p className="text-gray-400 text-[10px] truncate">#{item.product.sku}</p>}
-                      <p className="text-[10px] text-gray-500">{formatCurrency(item.unitPrice)}</p>
+                    <td className="px-2 py-2.5 align-middle overflow-hidden">
+                      <p className="truncate text-sm font-semibold text-gray-900">
+                        {item.product.name}
+                        {item.variant && <span className="font-normal text-indigo-600"> · {item.variant.name}</span>}
+                      </p>
+                      {(item.variant?.sku ?? item.product.sku) && (
+                        <p className="text-gray-400 text-xs truncate">#{item.variant?.sku ?? item.product.sku}</p>
+                      )}
+                      <p className="text-xs text-gray-500">{formatCurrency(item.unitPrice)}</p>
                     </td>
-                    <td className="px-1 py-2">
-                      <input
-                        type="number" min="0" step="0.01" placeholder="0"
-                        value={item.discount || ''}
-                        onChange={e => pos.setItemDiscount(item.product.id, item.variant?.id ?? null, Math.min(parseFloat(e.target.value) || 0, item.unitPrice))}
-                        className="h-6 sm:h-7 w-full rounded border border-gray-200 px-1 text-right text-xs sm:text-sm text-green-600 focus:border-brand-teal focus:outline-none"
+                    <td className="px-2 py-2.5 align-middle">
+                      <DiscountInput
+                        value={item.discount}
+                        max={item.unitPrice}
+                        onChange={v => pos.setItemDiscount(item.product.id, item.variant?.id ?? null, v)}
+                        className="h-8 sm:h-9 w-full rounded-md border border-gray-300 px-1.5 text-right text-sm font-medium text-green-600 focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/30"
                       />
                     </td>
-                    <td className="px-1 py-2.5 text-right font-bold text-gray-900 text-xs sm:text-sm">{formatCurrency(lineTotal)}</td>
-                    <td className="pr-1 py-2.5">
+                    <td className="px-2 py-2.5 align-middle text-right font-bold text-gray-900 text-xs">{formatCurrency(lineTotal)}</td>
+                    <td className="px-2 py-2.5 align-middle">
                       <button onClick={() => pos.removeFromCart(item.product.id, item.variant?.id ?? null)} className="text-red-400 hover:text-red-600 transition-colors">
-                        <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </td>
                   </tr>
@@ -452,7 +521,7 @@ export function CartPanel({ mobileView }: Props) {
       </div>
 
       {/* Checkout panel — collapsible on mobile */}
-      <div className="shrink-0 border-t-2 border-gray-200 bg-gray-50">
+      <div className="shrink-0 border-t-2 border-gray-200 bg-gray-50 overflow-y-auto max-h-[55vh] lg:max-h-[50vh]">
 
         {/* Expanded details (Discount, Gift Card, Sub Total breakdown) */}
         {showFullTotals && (
@@ -520,6 +589,55 @@ export function CartPanel({ mobileView }: Props) {
             }
           </div>
         </button>
+
+        {/* Served By employee selector + per-sale commission (retail-store only) */}
+        {activeBranch && isRetailTemplate && isModuleEnabled('employees') && (
+          <div className="border-t border-gray-100 bg-white px-4 py-2 space-y-2">
+            <AsyncEmployeeSelect
+              branchId={activeBranch.id}
+              value={servedByEmployeeId}
+              onChange={setServedByEmployeeId}
+              label="Served By"
+              placeholder="Select employee (optional)..."
+              openUpward
+            />
+            {servedByEmployeeId && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Commission for this sale</label>
+                <div className="flex gap-2">
+                  <div className="flex rounded-lg border border-gray-200 p-0.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setCommissionType('flat')}
+                      className={`rounded px-2.5 py-1.5 text-sm font-medium transition-colors ${commissionType === 'flat' ? 'bg-brand-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                      {getCurrencySymbol(currency)}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCommissionType('percentage')}
+                      className={`rounded px-2.5 py-1.5 text-sm font-medium transition-colors ${commissionType === 'percentage' ? 'bg-brand-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                      %
+                    </button>
+                  </div>
+                  <input
+                    type="number" min="0" step="0.01"
+                    placeholder={commissionType === 'percentage' ? 'e.g. 5' : '0.00'}
+                    value={commissionAmount}
+                    onChange={e => setCommissionAmount(e.target.value)}
+                    className="h-9 flex-1 rounded-lg border border-gray-200 px-3 text-sm focus:border-brand-teal focus:outline-none"
+                  />
+                  {commissionType === 'percentage' && commissionAmount && (
+                    <span className="shrink-0 text-xs text-gray-500 whitespace-nowrap">
+                      = {formatCurrency((parseFloat(commissionAmount) || 0) / 100 * total)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Payment buttons */}
@@ -540,7 +658,7 @@ export function CartPanel({ mobileView }: Props) {
             <Banknote className="h-5 w-5" /> Cash
           </button>
           <button
-            onClick={pos.clearCart}
+            onClick={() => { pos.clearCart(); setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat') }}
             disabled={pos.cart.length === 0}
             className="flex items-center justify-center rounded-lg bg-red-600 px-4 py-3.5 text-base font-bold text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
@@ -641,8 +759,8 @@ export function CartPanel({ mobileView }: Props) {
                 <div className="mt-4 space-y-2">
                   <Button className="w-full bg-brand-teal hover:bg-brand-teal-dark" loading={processing} disabled={!splitValid} onClick={processPayment}>Confirm</Button>
                   <button
-                    onClick={() => setSplits({ cash: totalDue.toFixed(2), card: '' })}
-                    className="w-full rounded-lg border border-gray-200 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                    onClick={() => setSplits({ cash: '', card: totalDue.toFixed(2) })}
+                    className="w-full rounded-lg border-2 border-brand-teal bg-brand-teal/10 py-2 text-sm font-semibold text-brand-teal hover:bg-brand-teal/20 transition-colors"
                   >
                     Full Payment
                   </button>

@@ -1,6 +1,6 @@
 'use client'
-import { useRef, useState } from 'react'
-import { ImagePlus, X, Loader2, Link as LinkIcon, Upload } from 'lucide-react'
+import { useRef, useState, useEffect, useCallback } from 'react'
+import { ImagePlus, X, Loader2, Link as LinkIcon, Upload, Camera } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ImageUploadProps {
@@ -10,8 +10,16 @@ interface ImageUploadProps {
   label?: string
   /** Compact mode: small square used in catalogue list rows */
   compact?: boolean
+  /** Compact mode only — square size. Defaults to 'sm' (32px). */
+  size?: 'sm' | 'md' | 'lg'
   className?: string
 }
+
+const COMPACT_SIZES = {
+  sm: { box: 'h-8 w-8', icon: 'h-3.5 w-3.5', remove: 'h-4 w-4 -top-1 -right-1', removeIcon: 'h-2.5 w-2.5', spinner: 'h-4 w-4' },
+  md: { box: 'h-12 w-12', icon: 'h-5 w-5', remove: 'h-5 w-5 -top-1.5 -right-1.5', removeIcon: 'h-3 w-3', spinner: 'h-5 w-5' },
+  lg: { box: 'h-16 w-16', icon: 'h-6 w-6', remove: 'h-5 w-5 -top-1.5 -right-1.5', removeIcon: 'h-3 w-3', spinner: 'h-6 w-6' },
+} as const
 
 /**
  * ImageUpload — supports both file upload (Supabase storage) and manual URL entry.
@@ -22,12 +30,54 @@ interface ImageUploadProps {
  * Compact mode (for catalogue rows):
  *   <ImageUpload value={imageUrl} onChange={setImageUrl} compact />
  */
-export function ImageUpload({ value, onChange, label, compact = false, className }: ImageUploadProps) {
-  const fileRef = useRef<HTMLInputElement>(null)
-  const [uploading, setUploading] = useState(false)
-  const [error, setError]         = useState<string | null>(null)
+export function ImageUpload({ value, onChange, label, compact = false, size = 'sm', className }: ImageUploadProps) {
+  const fileRef    = useRef<HTMLInputElement>(null)
+  const videoRef   = useRef<HTMLVideoElement>(null)
+  const canvasRef  = useRef<HTMLCanvasElement>(null)
+  const streamRef  = useRef<MediaStream | null>(null)
+
+  const [uploading, setUploading]       = useState(false)
+  const [error, setError]               = useState<string | null>(null)
   const [showUrlInput, setShowUrlInput] = useState(false)
-  const [urlDraft, setUrlDraft]   = useState('')
+  const [urlDraft, setUrlDraft]         = useState('')
+  const [camOpen, setCamOpen]           = useState(false)
+
+  const stopStream = useCallback(() => {
+    streamRef.current?.getTracks().forEach(t => t.stop())
+    streamRef.current = null
+  }, [])
+
+  useEffect(() => {
+    if (!camOpen) { stopStream(); return }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      .then(stream => {
+        streamRef.current = stream
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          videoRef.current.play()
+        }
+      })
+      .catch(() => {
+        setError('Camera access denied or not available')
+        setCamOpen(false)
+      })
+    return stopStream
+  }, [camOpen, stopStream])
+
+  function capturePhoto() {
+    const video  = videoRef.current
+    const canvas = canvasRef.current
+    if (!video || !canvas) return
+    canvas.width  = video.videoWidth
+    canvas.height = video.videoHeight
+    canvas.getContext('2d')!.drawImage(video, 0, 0)
+    canvas.toBlob(async blob => {
+      if (!blob) return
+      stopStream()
+      setCamOpen(false)
+      await handleFile(new File([blob], 'webcam.jpg', { type: 'image/jpeg' }))
+    }, 'image/jpeg', 0.92)
+  }
 
   async function handleFile(file: File) {
     setError(null)
@@ -89,6 +139,7 @@ export function ImageUpload({ value, onChange, label, compact = false, className
   // ── Compact variant (catalogue rows) ──────────────────────────────────────
 
   if (compact) {
+    const s = COMPACT_SIZES[size]
     return (
       <div className={cn('relative shrink-0', className)}>
         <input
@@ -104,14 +155,15 @@ export function ImageUpload({ value, onChange, label, compact = false, className
           disabled={uploading}
           title={value ? 'Change image' : 'Upload image'}
           className={cn(
-            'relative h-8 w-8 rounded-lg overflow-hidden border-2 transition-all',
+            'relative rounded-lg overflow-hidden border-2 transition-all',
+            s.box,
             value
               ? 'border-transparent hover:border-brand-teal'
               : 'border-dashed border-gray-300 hover:border-brand-teal bg-gray-50'
           )}
         >
           {uploading ? (
-            <Loader2 className="absolute inset-0 m-auto h-4 w-4 animate-spin text-brand-teal" />
+            <Loader2 className={cn('absolute inset-0 m-auto animate-spin text-brand-teal', s.spinner)} />
           ) : value ? (
             <img
               key={value}
@@ -122,17 +174,17 @@ export function ImageUpload({ value, onChange, label, compact = false, className
               onLoad={() => setError(null)}
             />
           ) : (
-            <ImagePlus className="absolute inset-0 m-auto h-3.5 w-3.5 text-gray-400" />
+            <ImagePlus className={cn('absolute inset-0 m-auto text-gray-400', s.icon)} />
           )}
         </button>
         {value && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onChange('') }}
-            className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white shadow-sm hover:bg-red-600"
+            className={cn('absolute flex items-center justify-center rounded-full bg-red-500 text-white shadow-sm hover:bg-red-600', s.remove)}
             title="Remove image"
           >
-            <X className="h-2.5 w-2.5" />
+            <X className={s.removeIcon} />
           </button>
         )}
       </div>
@@ -154,124 +206,134 @@ export function ImageUpload({ value, onChange, label, compact = false, className
       />
 
       {/* Preview + drop zone */}
-      <div
-        onDrop={onDrop}
-        onDragOver={(e) => e.preventDefault()}
-        className={cn(
-          'relative flex items-center gap-4 rounded-xl border-2 border-dashed p-4 transition-colors',
-          'hover:border-brand-teal/50 hover:bg-teal-50/30',
-          uploading ? 'pointer-events-none opacity-60' : 'cursor-pointer',
-          value ? 'border-gray-200 bg-gray-50' : 'border-gray-300 bg-white'
-        )}
-        onClick={() => !showUrlInput && fileRef.current?.click()}
-      >
-        {/* Thumbnail */}
-        <div className="relative shrink-0">
-          {value ? (
-            <>
-              <img
-                key={value}
-                src={value}
-                alt="Preview"
-                className="h-20 w-20 rounded-lg border border-gray-200 object-contain bg-white"
-                onError={() => setError('Image URL could not be loaded')}
-                onLoad={() => setError(null)}
-              />
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onChange(''); setError(null) }}
-                className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white shadow hover:bg-red-600 z-10"
-                title="Remove image"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </>
-          ) : (
-            <div className="flex h-20 w-20 flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 text-gray-400">
-              {uploading ? (
-                <Loader2 className="h-6 w-6 animate-spin text-brand-teal" />
-              ) : (
-                <>
+      {value ? (
+        /* ── Has image: compact preview bar ── */
+        <div className="relative flex items-center gap-3 rounded-xl border border-brand-teal/30 bg-brand-teal/5 px-3 py-2.5">
+          <img
+            key={value}
+            src={value}
+            alt="Preview"
+            className="h-14 w-14 rounded-lg border border-brand-teal/20 object-contain bg-white shrink-0 shadow-sm"
+            onError={() => setError('Image URL could not be loaded')}
+            onLoad={() => setError(null)}
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-brand-teal">Image uploaded</p>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="mt-0.5 text-xs text-gray-500 hover:text-brand-teal transition-colors"
+            >
+              Click to replace
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onChange(''); setError(null) }}
+            className="shrink-0 flex h-7 w-7 items-center justify-center rounded-lg bg-red-100 text-red-500 hover:bg-red-500 hover:text-white transition-colors"
+            title="Remove image"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : (
+        /* ── No image: full drop zone ── */
+        <div
+          onDrop={onDrop}
+          onDragOver={(e) => e.preventDefault()}
+          onClick={() => !showUrlInput && fileRef.current?.click()}
+          className={cn(
+            'relative rounded-xl border-2 border-dashed transition-all',
+            uploading ? 'pointer-events-none opacity-60' : 'cursor-pointer',
+            'border-brand-teal/30 bg-gradient-to-br from-brand-teal/5 to-blue-50/40 hover:border-brand-teal/60 hover:from-brand-teal/10 hover:to-blue-50/60'
+          )}
+        >
+          <div className="flex flex-col items-center justify-center gap-2 py-7 px-4">
+            {uploading ? (
+              <>
+                <Loader2 className="h-8 w-8 animate-spin text-brand-teal" />
+                <p className="text-sm font-medium text-brand-teal">Uploading…</p>
+              </>
+            ) : (
+              <>
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-teal/10 text-brand-teal">
                   <Upload className="h-6 w-6" />
-                  <span className="mt-1 text-[10px]">Upload</span>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Text */}
-        <div className="min-w-0 flex-1">
-          {uploading ? (
-            <p className="text-sm text-brand-teal font-medium">Uploading…</p>
-          ) : value ? (
-            <div className="space-y-1">
-              <p className="text-xs font-medium text-gray-700">Image uploaded</p>
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className="text-xs text-brand-teal hover:underline"
-              >
-                Replace image
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-gray-700">
-                Drag & drop or{' '}
-                <span className="text-brand-teal">click to browse</span>
-              </p>
-              <p className="text-xs text-gray-400">JPG, PNG, WebP, GIF — max 10 MB</p>
-
-              {/* URL input toggle */}
-              {showUrlInput ? (
-                <div className="flex gap-1.5 mt-2" onClick={(e) => e.stopPropagation()}>
-                  <input
-                    autoFocus
-                    type="url"
-                    value={urlDraft}
-                    onChange={(e) => setUrlDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') commitUrl()
-                      if (e.key === 'Escape') { setShowUrlInput(false); setUrlDraft('') }
-                    }}
-                    placeholder="https://example.com/image.jpg"
-                    className="h-7 flex-1 min-w-0 rounded border border-gray-300 px-2 text-xs focus:border-brand-teal focus:outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={commitUrl}
-                    className="h-7 px-2.5 rounded bg-brand-teal text-white text-xs font-medium hover:bg-brand-teal/90"
-                  >
-                    Use URL
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowUrlInput(false); setUrlDraft('') }}
-                    className="h-7 px-1.5 rounded text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); setShowUrlInput(true) }}
-                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-brand-teal mt-1"
-                >
-                  <LinkIcon className="h-3 w-3" /> Use image URL instead
-                </button>
-              )}
-            </div>
-          )}
+                <div className="text-center">
+                  <p className="text-sm font-semibold text-gray-700">
+                    Drag & drop or{' '}
+                    <span className="text-brand-teal">click to browse</span>
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-400">JPG, PNG, WebP, GIF — max 10 MB</p>
+                </div>
+
+                {showUrlInput ? (
+                  <div className="flex w-full max-w-sm gap-1.5 mt-1" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      autoFocus
+                      type="url"
+                      value={urlDraft}
+                      onChange={(e) => setUrlDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitUrl()
+                        if (e.key === 'Escape') { setShowUrlInput(false); setUrlDraft('') }
+                      }}
+                      placeholder="https://example.com/image.jpg"
+                      className="h-7 flex-1 min-w-0 rounded-lg border border-gray-300 px-2 text-xs focus:border-brand-teal focus:outline-none"
+                    />
+                    <button type="button" onClick={commitUrl} className="h-7 px-2.5 rounded-lg bg-brand-teal text-white text-xs font-medium hover:bg-brand-teal/90">Use URL</button>
+                    <button type="button" onClick={() => { setShowUrlInput(false); setUrlDraft('') }} className="h-7 px-1.5 rounded-lg bg-red-50 text-red-400 hover:bg-red-500 hover:text-white transition-colors">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 mt-0.5" onClick={(e) => e.stopPropagation()}>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setShowUrlInput(true) }} className="flex items-center gap-1 rounded-lg bg-brand-teal/10 border border-brand-teal/20 px-2.5 py-1 text-xs text-brand-teal font-medium hover:bg-brand-teal hover:text-white transition-colors">
+                      <LinkIcon className="h-3 w-3" /> Use image URL
+                    </button>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setCamOpen(true) }} className="flex items-center gap-1 rounded-lg bg-blue-50 border border-blue-200 px-2.5 py-1 text-xs text-blue-600 font-medium hover:bg-blue-600 hover:text-white transition-colors">
+                      <Camera className="h-3 w-3" /> Take photo
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {error && (
         <p className="mt-1.5 flex items-center gap-1 text-xs text-red-600">
           <X className="h-3.5 w-3.5 shrink-0" /> {error}
         </p>
       )}
+
+      {/* Webcam modal */}
+      {camOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => { stopStream(); setCamOpen(false) }}>
+          <div className="relative w-full max-w-md rounded-xl bg-white shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <p className="text-sm font-semibold text-gray-800">Take a photo</p>
+              <button type="button" onClick={() => { stopStream(); setCamOpen(false) }} className="text-gray-400 hover:text-gray-600">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="bg-black">
+              <video ref={videoRef} className="w-full max-h-72 object-contain" playsInline muted />
+            </div>
+            <div className="flex justify-center px-4 py-3">
+              <button
+                type="button"
+                onClick={capturePhoto}
+                className="flex items-center gap-2 rounded-lg bg-brand-teal px-6 py-2.5 text-sm font-semibold text-white hover:bg-brand-teal/90 transition-colors"
+              >
+                <Camera className="h-4 w-4" /> Capture
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <canvas ref={canvasRef} className="hidden" />
     </div>
   )
 }
