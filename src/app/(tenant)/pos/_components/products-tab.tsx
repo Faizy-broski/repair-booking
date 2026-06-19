@@ -21,7 +21,8 @@ import type {
 } from '../_types'
 import { ScanButton } from '@/components/scanner/scan-button'
 import { ScannerModal } from '@/components/scanner/scanner-modal'
-import type { ProductWithStock as ScannedProduct } from '@/hooks/use-barcode-lookup'
+import { useBarcodeLookup, type ProductWithStock as ScannedProduct } from '@/hooks/use-barcode-lookup'
+import { useHidScanner } from '@/hooks/use-hid-scanner'
 
 // ── Extracted & memoized so it isn't recreated on every ProductsTab render ──
 const ProductCard = memo(function ProductCard({
@@ -177,6 +178,9 @@ export function ProductsTab() {
 
   // ── Scanner ────────────────────────────────────────────────────────────────
   const [scannerOpen, setScannerOpen] = useState(false)
+  const [scannerDefaultState, setScannerDefaultState] = useState<'scanning' | 'not_found' | 'found'>('scanning')
+  const [scannerDefaultBarcode, setScannerDefaultBarcode] = useState<string>()
+  const [scannerDefaultProduct, setScannerDefaultProduct] = useState<ProductWithStock | null>(null)
 
   // ── Variant modal ──────────────────────────────────────────────────────────
   const [variantProduct, setVariantProduct]         = useState<ProductWithStock | null>(null)
@@ -213,6 +217,42 @@ export function ProductsTab() {
   const [warrantyClaimModal, setWarrantyClaimModal]     = useState<{ repairId: string; item: any } | null>(null)
   const [warrantyClaimReason, setWarrantyClaimReason]   = useState('')
   const [warrantyClaimSubmitting, setWarrantyClaimSubmitting] = useState(false)
+
+  // ── Global POS Scanner ─────────────────────────────────────────────────────
+  const { lookup } = useBarcodeLookup(activeBranch?.id ?? null)
+  const scanLockRef = useRef(false)
+
+  useHidScanner({
+    onScan: async (code) => {
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return
+      if (scanLockRef.current) return
+      scanLockRef.current = true
+      try {
+        const res = await lookup(code)
+        if (res.status === 'found' && res.product) {
+          if (res.product.has_variants || (res.product.variant_count ?? 0) > 0) {
+            toast.info(`Scanned ${res.product.name}. Please select variant.`)
+            setVariantProduct(res.product as unknown as ProductWithStock)
+            return
+          }
+          setScannerDefaultState('found')
+          setScannerDefaultBarcode(code)
+          setScannerDefaultProduct(res.product as unknown as ProductWithStock)
+          setScannerOpen(true)
+        } else if (res.status === 'not_found') {
+          setScannerDefaultState('not_found')
+          setScannerDefaultBarcode(code)
+          setScannerDefaultProduct(null)
+          setScannerOpen(true)
+        } else if (res.status === 'error' && res.error?.includes('misread')) {
+          toast.warning(`Scanner misread — try again`)
+        }
+      } finally {
+        scanLockRef.current = false
+      }
+    },
+    enabled: !scannerOpen
+  })
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   function openVariantSelect(product: ProductWithStock) {
@@ -470,6 +510,33 @@ export function ProductsTab() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               <input
                 type="text" value={allProductsSearch} onChange={e => setAllProductsSearch(e.target.value)}
+                onKeyDown={async (e) => {
+                  if (e.key === 'Enter' && allProductsSearch.trim()) {
+                    const code = allProductsSearch.trim()
+                    const res = await lookup(code)
+                    if (res.status === 'found' && res.product) {
+                      if (res.product.has_variants || (res.product.variant_count ?? 0) > 0) {
+                        toast.info(`Scanned ${res.product.name}. Please select variant.`)
+                        setVariantProduct(res.product as unknown as ProductWithStock)
+                        setAllProductsSearch('')
+                        return
+                      }
+                      setScannerDefaultState('found')
+                      setScannerDefaultBarcode(code)
+                      setScannerDefaultProduct(res.product as unknown as ProductWithStock)
+                      setScannerOpen(true)
+                      setAllProductsSearch('')
+                    } else if (res.status === 'not_found') {
+                      setScannerDefaultState('not_found')
+                      setScannerDefaultBarcode(code)
+                      setScannerDefaultProduct(null)
+                      setScannerOpen(true)
+                      setAllProductsSearch('')
+                    } else if (res.status === 'error' && res.error?.includes('misread')) {
+                      toast.warning(`Scanner misread — try again`)
+                    }
+                  }
+                }}
                 placeholder="Search by name, SKU or barcode…" autoFocus
                 className="w-full rounded-lg border border-gray-200 bg-white pl-9 pr-9 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal"
               />
@@ -1034,9 +1101,12 @@ export function ProductsTab() {
 
       <ScannerModal
         open={scannerOpen}
-        onClose={() => setScannerOpen(false)}
+        onClose={() => { setScannerOpen(false); setScannerDefaultState('scanning'); setScannerDefaultBarcode(undefined); setScannerDefaultProduct(null); }}
         mode="pos"
         branchId={activeBranch?.id ?? null}
+        defaultState={scannerDefaultState}
+        defaultBarcode={scannerDefaultBarcode}
+        defaultProduct={scannerDefaultProduct}
         onProductCreated={() => {
           queryClient.invalidateQueries({ queryKey: ['pos-products'] })
         }}

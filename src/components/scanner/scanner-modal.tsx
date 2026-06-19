@@ -1,5 +1,5 @@
 'use client'
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import {
   ScanLine, Camera, Usb, Package, ShoppingBag,
@@ -34,6 +34,9 @@ export interface ScannerModalProps {
   branchId: string | null
   onAddToCart?: (product: ProductWithStock) => void
   onProductCreated?: () => void
+  defaultBarcode?: string
+  defaultState?: 'scanning' | 'not_found' | 'found'
+  defaultProduct?: ProductWithStock | null
 }
 
 export function ScannerModal({
@@ -43,10 +46,13 @@ export function ScannerModal({
   branchId,
   onAddToCart,
   onProductCreated,
+  defaultBarcode,
+  defaultState,
+  defaultProduct,
 }: ScannerModalProps) {
   const [tab, setTab] = useState<ScannerTab>('webcam')
-  const [scanState, setScanState] = useState<ScanState>('scanning')
-  const [lastBarcode, setLastBarcode] = useState('')
+  const [scanState, setScanState] = useState<ScanState>(defaultState || 'scanning')
+  const [lastBarcode, setLastBarcode] = useState(defaultBarcode || '')
   const [foundProduct, setFoundProduct] = useState<ProductWithStock | null>(null)
   const [prefill, setPrefill] = useState<QuickCreatePrefill | undefined>()
   const isProcessing = useRef(false)
@@ -88,6 +94,18 @@ export function ScannerModal({
     setPrefill(undefined)
     isProcessing.current = false
   }
+
+  // Pre-seed state when opening
+  useEffect(() => {
+    if (open) {
+      setScanState(defaultState || 'scanning')
+      setLastBarcode(defaultBarcode || '')
+      setFoundProduct(defaultProduct || null)
+      setPrefill(undefined)
+      isProcessing.current = false
+      if (defaultState === 'not_found' || defaultState === 'found') setTab('hid')
+    }
+  }, [open, defaultState, defaultBarcode, defaultProduct])
 
   function handleClose() {
     resetToScanning()
