@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { Plus, Eye, X, CheckCircle, Copy } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -32,12 +33,9 @@ export default function PurchaseOrdersPage() {
   const { activeBranch } = useAuthStore()
   const router = useRouter()
 
-  const [orders,    setOrders]    = useState<PORow[]>([])
-  const [total,     setTotal]     = useState(0)
+  const queryClient = useQueryClient()
   const [page,      setPage]      = useState(0)
   const [pageSize,  setPageSize]  = useState(20)
-  const [loading,   setLoading]   = useState(true)
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [sheetOpen, setSheetOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState('')
 
@@ -48,23 +46,31 @@ export default function PurchaseOrdersPage() {
   const [lineItems,       setLineItems]       = useState([{ name: '', sku: '', quantity_ordered: 1, unit_cost: 0 }])
   const [submitting,      setSubmitting]      = useState(false)
 
-  const fetchData = useCallback(async () => {
-    if (!activeBranch) return
-    setLoading(true)
-    const params = new URLSearchParams({ branch_id: activeBranch.id, page: String(page + 1), limit: String(pageSize) })
-    if (statusFilter) params.set('status', statusFilter)
-    const [poRes, supRes] = await Promise.all([
-      fetch(`/api/purchase-orders?${params}`),
-      fetch('/api/suppliers'),
-    ])
-    const [poJson, supJson] = await Promise.all([poRes.json(), supRes.json()])
-    setOrders(poJson.data ?? [])
-    setTotal(poJson.meta?.total ?? 0)
-    setSuppliers(supJson.data ?? [])
-    setLoading(false)
-  }, [activeBranch, page, pageSize, statusFilter])
+  const { data: poData, isLoading: loading } = useQuery({
+    queryKey: ['purchase-orders', activeBranch?.id, page, pageSize, statusFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams({ branch_id: activeBranch!.id, page: String(page + 1), limit: String(pageSize) })
+      if (statusFilter) params.set('status', statusFilter)
+      const res = await fetch(`/api/purchase-orders?${params}`)
+      const json = await res.json()
+      return { orders: (json.data ?? []) as PORow[], total: (json.meta?.total ?? 0) as number }
+    },
+    enabled: !!activeBranch,
+    staleTime: 5 * 60_000,
+    placeholderData: (prev) => prev,
+  })
+  const orders = poData?.orders ?? []
+  const total  = poData?.total  ?? 0
 
-  useEffect(() => { fetchData() }, [fetchData])
+  const { data: suppliers = [] } = useQuery<Supplier[]>({
+    queryKey: ['suppliers-list', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch('/api/suppliers')
+      return (await res.json()).data ?? []
+    },
+    enabled: !!activeBranch,
+    staleTime: 5 * 60_000,
+  })
 
   async function createPO() {
     if (!activeBranch || !supplierId) return
@@ -81,13 +87,12 @@ export default function PurchaseOrdersPage() {
       }),
     })
     if (res.ok) {
-      const json = await res.json()
       setSheetOpen(false)
       setSupplierId('')
       setDeliveryDate('')
       setPoNotes('')
       setLineItems([{ name: '', sku: '', quantity_ordered: 1, unit_cost: 0 }])
-      fetchData()
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders', activeBranch?.id] })
     }
     setSubmitting(false)
   }
@@ -142,7 +147,7 @@ export default function PurchaseOrdersPage() {
           <Button size="sm" variant="ghost" title="Clone" onClick={async () => {
             if (!activeBranch) return
             const res = await fetch(`/api/purchase-orders/${row.original.id}/clone?branch_id=${activeBranch.id}`, { method: 'POST' })
-            if (res.ok) fetchData()
+            if (res.ok) queryClient.invalidateQueries({ queryKey: ['purchase-orders', activeBranch?.id] })
           }}>
             <Copy className="h-3.5 w-3.5" />
           </Button>

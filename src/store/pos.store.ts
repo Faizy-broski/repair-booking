@@ -50,6 +50,7 @@ interface PosState {
   setStoreCredit: (amount: number) => void
   setLoyaltyPoints: (points: number, amount: number) => void
   clearCart: () => void
+  restoreCart: (items: CartItem[]) => void
 
   // Computed
   subtotal: () => number
@@ -140,6 +141,8 @@ export const usePosStore = create<PosState>((set, get) => ({
       loyaltyPointsAmount: 0,
       loyaltyPointsUsed: 0,
     }),
+
+  restoreCart: (items) => set({ cart: items }),
 
   subtotal: () =>
     get().cart.reduce((sum, item) => sum + (item.unitPrice - item.discount) * item.quantity, 0),

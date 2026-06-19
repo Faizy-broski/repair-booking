@@ -76,6 +76,7 @@ export default function ReportsOverviewPage() {
       return (json.data ?? null) as RegisterSession | null
     },
     enabled: !!activeBranch,
+    staleTime: 0,
   })
 
   const statsCards = [

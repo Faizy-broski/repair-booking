@@ -10,6 +10,7 @@ import { CURRENCIES } from '@/lib/currencies'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
 import Link from 'next/link'
+import { ImageUpload } from '@/components/ui/image-upload'
 
 const businessSchema = z.object({
   name: z.string().min(1),
@@ -18,6 +19,7 @@ const businessSchema = z.object({
   country: z.string().optional(),
   currency: z.string().default('GBP'),
   timezone: z.string().default('Europe/London'),
+  logo_url: z.string().optional().nullable(),
 })
 type BusinessFormData = z.infer<typeof businessSchema>
 
@@ -38,6 +40,7 @@ export default function GeneralSettingsPage() {
           country: json.data.country ?? '',
           currency: json.data.currency ?? 'GBP',
           timezone: json.data.timezone ?? 'Europe/London',
+          logo_url: json.data.logo_url ?? '',
         })
       }
     }
@@ -61,6 +64,17 @@ export default function GeneralSettingsPage() {
         <h3 className="mb-4 font-semibold text-gray-900">Business Information</h3>
         <form onSubmit={businessForm.handleSubmit(onSaveBusiness)} className="space-y-4 max-w-lg">
           <Input label="Business Name" required {...businessForm.register('name')} />
+          <Controller
+            name="logo_url"
+            control={businessForm.control}
+            render={({ field }) => (
+              <ImageUpload
+                label="Business Logo"
+                value={field.value ?? ''}
+                onChange={(url) => field.onChange(url || null)}
+              />
+            )}
+          />
           <div className="grid grid-cols-2 gap-3">
             <Input label="Email" type="email" {...businessForm.register('email')} />
             <Input label="Phone" {...businessForm.register('phone')} />

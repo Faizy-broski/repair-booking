@@ -77,6 +77,22 @@ function fetchAllConfigsCached(branchId: string): Promise<ResolvedModuleConfigMa
   )()
 }
 
+// Branch→business ownership lookup — result is immutable so safe to cache at same TTL.
+async function getBranchBusinessId(branchId: string): Promise<string | null> {
+  const { data } = await adminSupabase
+    .from('branches')
+    .select('business_id')
+    .eq('id', branchId)
+    .single()
+  return data?.business_id ?? null
+}
+
+const cachedBranchBusinessId = unstable_cache(
+  getBranchBusinessId,
+  ['branch-business-id'],
+  { revalidate: 300 }
+)
+
 // ── Core resolution ─────────────────────────────────────────────────────────
 
 export const ModuleConfigService = {
@@ -92,15 +108,14 @@ export const ModuleConfigService = {
     branchId: string,
     callerBusinessId?: string
   ): Promise<ResolvedModuleConfigMap> {
-    // Ownership check — skip only for superadmin routes
+    // Ownership check — skip only for superadmin routes.
+    // Uses a cached lookup (same 5-min TTL as configs) since branch→business is immutable.
     if (callerBusinessId && callerBusinessId !== 'superadmin') {
-      const { data: branch } = await adminSupabase
-        .from('branches')
-        .select('business_id')
-        .eq('id', branchId)
-        .single()
+      const ownerBizId = process.env.NODE_ENV === 'development'
+        ? await getBranchBusinessId(branchId)
+        : await cachedBranchBusinessId(branchId)
 
-      if (!branch || branch.business_id !== callerBusinessId) {
+      if (!ownerBizId || ownerBizId !== callerBusinessId) {
         const err = new Error('Branch not found or access denied') as Error & { code: string }
         err.code = 'FORBIDDEN'
         throw err

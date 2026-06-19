@@ -142,7 +142,7 @@ export default function InventoryAttributesPage() {
     { label: 'Products',        href: '/inventory' },
     { label: 'Purchase Orders', href: '/inventory/purchase-orders' },
     { label: 'Suppliers',       href: '/inventory/suppliers' },
-    { label: 'Stock Count',     href: '/inventory/stock-count' },
+    // { label: 'Stock Count', href: '/inventory/stock-count' },  // disabled
     ...(isRetail ? [
       { label: 'Categories', href: '/inventory/categories' },
       { label: 'Attributes', href: '/inventory/attributes' },

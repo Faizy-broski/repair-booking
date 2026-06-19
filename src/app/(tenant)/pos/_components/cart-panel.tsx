@@ -250,40 +250,53 @@ export function CartPanel({ mobileView }: Props) {
   async function processPayment() {
     if (!activeBranch || !profile) return
     setProcessing(true)
-    const paymentSplits: PaymentSplit[] = pos.paymentMethod === 'split'
+
+    const cartSnapshot = [...pos.cart]
+    const paymentMethod = pos.paymentMethod
+    const paymentSplits: PaymentSplit[] = paymentMethod === 'split'
       ? Object.entries(splits).filter(([, v]) => parseFloat(v) > 0)
           .map(([method, amount]) => ({ method: method as PaymentSplit['method'], amount: parseFloat(amount) }))
       : []
+
+    const payload = {
+      branch_id: activeBranch.id, cashier_id: profile.id,
+      customer_id: pos.customer?.id ?? null,
+      subtotal, discount: discountAmt, tax: taxAmt, total,
+      payment_method: paymentMethod,
+      payment_splits: paymentSplits.length > 0 ? paymentSplits : undefined,
+      gift_card_id: pos.giftCardId, gift_card_amount: pos.giftCardAmount || undefined,
+      served_by_employee_id: servedByEmployeeId || null,
+      commission_amount: servedByEmployeeId && commissionAmount ? parseFloat(commissionAmount) : null,
+      commission_type: servedByEmployeeId && commissionAmount ? commissionType : null,
+      items: pos.cart.map(item => ({
+        product_id: item.product.id, variant_id: item.variant?.id ?? null,
+        name: item.product.name, quantity: item.quantity, unit_price: item.unitPrice,
+        discount: item.discount, total: (item.unitPrice - item.discount) * item.quantity,
+        is_service: item.product.is_service,
+      })),
+    }
+
+    // Optimistic update: clear cart and show success before server responds
+    setSuccess(true)
+    pos.clearCart()
+    setCashTendered('')
+
     const res = await fetch('/api/pos/sales', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        branch_id: activeBranch.id, cashier_id: profile.id,
-        customer_id: pos.customer?.id ?? null,
-        subtotal, discount: discountAmt, tax: taxAmt, total,
-        payment_method: pos.paymentMethod,
-        payment_splits: paymentSplits.length > 0 ? paymentSplits : undefined,
-        gift_card_id: pos.giftCardId, gift_card_amount: pos.giftCardAmount || undefined,
-        served_by_employee_id: servedByEmployeeId || null,
-        commission_amount: servedByEmployeeId && commissionAmount ? parseFloat(commissionAmount) : null,
-        commission_type: servedByEmployeeId && commissionAmount ? commissionType : null,
-        items: pos.cart.map(item => ({
-          product_id: item.product.id, variant_id: item.variant?.id ?? null,
-          name: item.product.name, quantity: item.quantity, unit_price: item.unitPrice,
-          discount: item.discount, total: (item.unitPrice - item.discount) * item.quantity,
-          is_service: item.product.is_service,
-        })),
-      }),
+      body: JSON.stringify(payload),
     })
+
     if (res.ok) {
       const saleJson = await res.json()
-      setSuccess(true)
       setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
       queryClient.invalidateQueries({ queryKey: ['sales'] })
       queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
-      await printReceipt(saleJson.data?.sale_id ?? 'unknown', pos.paymentMethod, paymentSplits)
-      pos.clearCart(); setCashTendered('')
+      await printReceipt(saleJson.data?.sale_id ?? 'unknown', paymentMethod, paymentSplits)
       setTimeout(() => { setSuccess(false); setPaymentOpen(false) }, 2500)
     } else {
+      // Rollback: restore cart and hide success screen
+      pos.restoreCart(cartSnapshot)
+      setSuccess(false)
       const errJson = await res.json().catch(() => ({}))
       const msg = errJson?.error?.message ?? errJson?.message ?? 'Payment failed. Please try again.'
       toast.error(msg)
@@ -296,12 +309,20 @@ export function CartPanel({ mobileView }: Props) {
   async function processCashPayment() {
     if (!activeBranch || !profile || pos.cart.length === 0) return
     setProcessing(true)
-    const cartSnapshot = pos.cart.map(item => ({
+
+    const cartSnapshot = [...pos.cart]
+    const itemsPayload = pos.cart.map(item => ({
       product_id: item.product.id, variant_id: item.variant?.id ?? null,
       name: item.product.name, quantity: item.quantity, unit_price: item.unitPrice,
       discount: item.discount, total: (item.unitPrice - item.discount) * item.quantity,
       is_service: item.product.is_service,
     }))
+
+    // Optimistic update: clear cart and show success before server responds
+    setSuccess(true)
+    pos.clearCart()
+    setCashTendered('')
+
     const res = await fetch('/api/pos/sales', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -312,19 +333,21 @@ export function CartPanel({ mobileView }: Props) {
         served_by_employee_id: servedByEmployeeId || null,
         commission_amount: servedByEmployeeId && commissionAmount ? parseFloat(commissionAmount) : null,
         commission_type: servedByEmployeeId && commissionAmount ? commissionType : null,
-        items: cartSnapshot,
+        items: itemsPayload,
       }),
     })
+
     if (res.ok) {
       const saleJson = await res.json()
-      setSuccess(true)
       setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
       queryClient.invalidateQueries({ queryKey: ['sales'] })
       queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
       await printReceipt(saleJson.data?.sale_id ?? 'unknown', 'cash')
-      pos.clearCart(); setCashTendered('')
       setTimeout(() => setSuccess(false), 2500)
     } else {
+      // Rollback: restore cart and hide success screen
+      pos.restoreCart(cartSnapshot)
+      setSuccess(false)
       const errJson = await res.json().catch(() => ({}))
       const msg = errJson?.error?.message ?? errJson?.message ?? 'Payment failed. Please try again.'
       toast.error(msg)

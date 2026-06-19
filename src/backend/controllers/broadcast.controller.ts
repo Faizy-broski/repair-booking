@@ -93,14 +93,16 @@ export const BroadcastController = {
   // ── Tenant-facing handlers ─────────────────────────────────────────────────
 
   /** GET /api/broadcasts — returns active broadcasts for the calling tenant,
-   *  plus the IDs this profile has already read (so client can compute unread count) */
+   *  plus the IDs this profile has already read (so client can compute unread count).
+   *  Both queries run in parallel; intersection computed in JS. */
   async listForTenant(request: NextRequest, ctx: RequestContext) {
     try {
-      const broadcasts = await BroadcastService.listActiveForBusiness(ctx.businessId)
-      const readIds = await BroadcastService.getReadIds(
-        ctx.auth.userId,
-        broadcasts.map((b) => b.id)
-      )
+      const [broadcasts, allReadIds] = await Promise.all([
+        BroadcastService.listActiveForBusiness(ctx.businessId),
+        BroadcastService.getAllReadIdsForUser(ctx.auth.userId),
+      ])
+      const broadcastIdSet = new Set(broadcasts.map((b) => b.id))
+      const readIds = allReadIds.filter((id) => broadcastIdSet.has(id))
       return ok({ broadcasts, readIds })
     } catch (err) {
       return serverError('Failed to fetch broadcasts', err)

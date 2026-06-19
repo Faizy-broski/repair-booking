@@ -210,7 +210,7 @@ export default function SalesPage() {
     },
     enabled: !!activeBranch,
     placeholderData: (prev) => prev,
-    refetchOnMount: true,
+    staleTime: 30_000,
   })
 
   const { data: statsData } = useQuery({
@@ -226,7 +226,7 @@ export default function SalesPage() {
     },
     enabled: !!activeBranch,
     placeholderData: (prev) => prev,
-    refetchOnMount: true,
+    staleTime: 30_000,
   })
 
   function refreshSales() {

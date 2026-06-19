@@ -74,13 +74,11 @@ export function useHidScanner({ onScan, enabled = true }: UseHidScannerOptions) 
         )
 
         if (gap < HID_CHAR_INTERVAL_MS) {
-          if (inField) { e.preventDefault(); e.stopPropagation() }
           isScanning.current = true
           buffer.current += e.key
         } else if (isScanning.current) {
           // Slightly slow char while already in scan mode — scanners sometimes
           // introduce a brief delay before special characters (e.g. hyphen).
-          if (inField) { e.preventDefault(); e.stopPropagation() }
           buffer.current += e.key
         } else {
           // Slow keystroke, not scanning — reset to this char.

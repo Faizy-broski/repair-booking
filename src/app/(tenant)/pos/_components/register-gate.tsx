@@ -1,10 +1,11 @@
 'use client'
-import { Lock, Unlock, Plus, Minus } from 'lucide-react'
+import { Lock, Unlock, Plus, Minus, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
 import { formatCurrency } from '@/lib/utils'
 import { DENOMINATIONS, denomTotal } from '../_types'
 import type { RegisterSession } from '../_types'
+import Link from 'next/link'
 
 interface Props {
   activeBranchName: string | undefined
@@ -99,7 +100,12 @@ export function RegisterGate({
         {prevClosingBalance !== null && (
           <div className="mb-4 flex items-center justify-between rounded-lg bg-gray-50 px-4 py-2.5 text-sm">
             <span className="text-gray-500">Previous shift closing balance</span>
-            <span className="font-semibold text-gray-900">{formatCurrency(prevClosingBalance)}</span>
+            <div className="flex items-center gap-3">
+              <span className="font-semibold text-gray-900">{formatCurrency(prevClosingBalance)}</span>
+              <Link href="/reports/z-report" className="flex items-center gap-1 text-xs font-medium text-brand-teal hover:underline">
+                <ExternalLink className="h-3 w-3" /> Z-Report
+              </Link>
+            </div>
           </div>
         )}
 

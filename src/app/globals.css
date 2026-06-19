@@ -1,5 +1,41 @@
 @import "tailwindcss";
 
+/* ── Tiptap editor prose reset ──────────────────────────────────── */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+.ProseMirror:focus { outline: none; }
+.ProseMirror ul, .ProseMirror ol { padding-left: 1.25rem; margin: 0.5rem 0; }
+.ProseMirror ul { list-style-type: disc; }
+.ProseMirror ol { list-style-type: decimal; }
+.ProseMirror blockquote { border-left: 3px solid #e5e7eb; margin: 0.5rem 0; padding-left: 0.75rem; color: #6b7280; }
+.ProseMirror a { color: #008080; text-decoration: underline; }
+.ProseMirror strong { font-weight: 600; }
+.ProseMirror code { background: #f3f4f6; border-radius: 3px; padding: 1px 4px; font-size: 0.875em; }
+
+/* ── Helpdesk ticket description renderer ───────────────────────── */
+.helpdesk-body p { margin: 0.25rem 0; }
+.helpdesk-body ul, .helpdesk-body ol { padding-left: 1.25rem; margin: 0.5rem 0; }
+.helpdesk-body ul { list-style-type: disc; }
+.helpdesk-body ol { list-style-type: decimal; }
+.helpdesk-body blockquote { border-left: 3px solid #e5e7eb; margin: 0.5rem 0; padding-left: 0.75rem; color: #6b7280; }
+.helpdesk-body a { color: #008080; text-decoration: underline; }
+.helpdesk-body strong { font-weight: 600; }
+.helpdesk-body code { background: #f3f4f6; border-radius: 3px; padding: 1px 4px; font-size: 0.875em; }
+
+/* Dotted circular brand spinner — used by BrandSpinner component */
+@keyframes brand-dot-fade {
+  0%, 100% { opacity: 0.15; transform: scale(0.65); }
+  50%       { opacity: 1;   transform: scale(1); }
+}
+.brand-dot {
+  animation: brand-dot-fade 1s ease-in-out infinite;
+}
+
 @keyframes progress-bar {
   0%   { transform: translateX(-100%); }
   100% { transform: translateX(200%); }

@@ -3,6 +3,7 @@ import {
   useReactTable, getCoreRowModel, getSortedRowModel, getPaginationRowModel,
   flexRender, type ColumnDef, type SortingState,
 } from '@tanstack/react-table'
+import { BrandSpinner } from '@/components/ui/brand-spinner'
 import { useState } from 'react'
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -52,7 +53,7 @@ export function DataTable<T>({
         {/* Spinner overlay during re-fetch — keeps existing rows visible, no layout shift */}
         {refetching && (
           <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/60 backdrop-blur-[1px]">
-            <div className="h-7 w-7 animate-spin rounded-full border-[3px] border-primary border-t-transparent" />
+            <BrandSpinner size="md" />
           </div>
         )}
 
@@ -94,7 +95,7 @@ export function DataTable<T>({
               <tr>
                 <td colSpan={columns.length} className="px-4 py-16 text-center">
                   <div className="flex items-center justify-center">
-                    <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-primary border-t-transparent" />
+                    <BrandSpinner size="lg" />
                   </div>
                 </td>
               </tr>

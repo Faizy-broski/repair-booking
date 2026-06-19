@@ -105,10 +105,11 @@ export default function DashboardPage() {
   const branchId = activeBranch?.id ?? null
   const [period, setPeriod] = useState<Period>('month')
 
-  const { data, isLoading: queryLoading } = useQuery({
-    queryKey: ['dashboard', branchId, period],
+  // Fast: stats + widgets — renders as soon as the 11 parallel queries return
+  const { data: mainData, isLoading: mainQueryLoading } = useQuery({
+    queryKey: ['dashboard-main', branchId, period],
     queryFn: async () => {
-      const res = await fetch(`/api/dashboard?branch_id=${branchId}&period=${period}`)
+      const res = await fetch(`/api/dashboard?branch_id=${branchId}&period=${period}&section=main`)
       const json = await res.json()
       return json.data ?? {}
     },
@@ -116,12 +117,25 @@ export default function DashboardPage() {
     staleTime: 5 * 60 * 1000,
   })
 
-  const loading = authLoading || queryLoading || !branchId
+  // Slow: revenue chart — renders independently so it never blocks the widgets above
+  const { data: revenueData, isLoading: revenueQueryLoading } = useQuery({
+    queryKey: ['dashboard-revenue', branchId, period],
+    queryFn: async () => {
+      const res = await fetch(`/api/dashboard?branch_id=${branchId}&period=${period}&section=revenue`)
+      const json = await res.json()
+      return json.data ?? {}
+    },
+    enabled: !!branchId,
+    staleTime: 5 * 60 * 1000,
+  })
 
-  const stats          = (data?.stats          ?? null)  as DashboardStats | null
-  const branchRevenue  = (data?.branchRevenue  ?? [])   as BranchRevenue[]
-  const recentRepairs  = (data?.recentRepairs  ?? [])   as RecentRepair[]
-  const recentActivity = (data?.recentActivity ?? [])   as RecentActivity[]
+  const loading        = authLoading || mainQueryLoading || !branchId
+  const revenueLoading = authLoading || revenueQueryLoading || !branchId
+
+  const stats          = (mainData?.stats          ?? null) as DashboardStats | null
+  const branchRevenue  = (revenueData?.branchRevenue ?? []) as BranchRevenue[]
+  const recentRepairs  = (mainData?.recentRepairs   ?? [])  as RecentRepair[]
+  const recentActivity = (mainData?.recentActivity  ?? [])  as RecentActivity[]
 
   return (
     <div className="space-y-6">
@@ -185,7 +199,7 @@ export default function DashboardPage() {
             <CardTitle>Revenue by Branch</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {revenueLoading ? (
               <div className="h-64 animate-pulse rounded-lg bg-surface-container" />
             ) : branchRevenue.length > 0 ? (
               <div className="h-64">

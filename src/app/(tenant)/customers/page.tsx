@@ -187,13 +187,36 @@ export default function CustomersPage() {
   async function onCreate(data: FormData) {
     if (!activeBranch) return
     setCreateError(null)
+    const customersKey = ['customers', activeBranch.id, page, pageSize, search]
+    const prev = queryClient.getQueryData(customersKey)
+    const optimistic: CustomerRow = {
+      id: `temp-${Date.now()}`,
+      first_name: data.first_name,
+      last_name: data.last_name ?? null,
+      email: data.email || null,
+      phone: data.phone ?? null,
+      address: data.address ?? null,
+      business_name: data.business_name ?? null,
+      created_at: new Date().toISOString(),
+    }
+    createForm.reset()
+    setSheetOpen(false)
+    queryClient.setQueryData(customersKey, (old: any) => {
+      if (!old?.rows) return old
+      return { ...old, rows: [optimistic, ...old.rows], total: old.total + 1 }
+    })
     const res = await fetch('/api/customers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, branch_id: activeBranch.id, custom_fields: customFields }),
     })
-    if (res.ok) { createForm.reset(); setSheetOpen(false); queryClient.invalidateQueries({ queryKey: ['customers', activeBranch?.id] }) }
-    else { const j = await res.json(); setCreateError(j?.error?.message ?? 'Failed to create customer.') }
+    if (res.ok) {
+      queryClient.invalidateQueries({ queryKey: ['customers', activeBranch?.id] })
+    } else {
+      if (prev) queryClient.setQueryData(customersKey, prev)
+      const j = await res.json()
+      toast.error(j?.error?.message ?? 'Failed to create customer.')
+    }
   }
 
   function openEdit(customer: CustomerRow) {
@@ -213,13 +236,35 @@ export default function CustomersPage() {
   async function onEdit(data: FormData) {
     if (!editingCustomer) return
     setEditError(null)
+    const customersKey = ['customers', activeBranch?.id, page, pageSize, search]
+    const prev = queryClient.getQueryData(customersKey)
+    const updated: CustomerRow = {
+      ...editingCustomer,
+      first_name: data.first_name,
+      last_name: data.last_name ?? null,
+      email: data.email || null,
+      phone: data.phone ?? null,
+      address: data.address ?? null,
+      business_name: data.business_name ?? null,
+    }
+    setEditSheetOpen(false)
+    queryClient.setQueryData(customersKey, (old: any) => {
+      if (!old?.rows) return old
+      return { ...old, rows: old.rows.map((r: CustomerRow) => r.id === editingCustomer.id ? updated : r) }
+    })
     const res = await fetch(`/api/customers/${editingCustomer.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, email: data.email || null }),
     })
-    if (res.ok) { setEditSheetOpen(false); queryClient.invalidateQueries({ queryKey: ['customers', activeBranch?.id] }) }
-    else { const j = await res.json(); setEditError(j?.error?.message ?? 'Failed to update customer.') }
+    if (res.ok) {
+      queryClient.invalidateQueries({ queryKey: ['customers', activeBranch?.id] })
+    } else {
+      if (prev) queryClient.setQueryData(customersKey, prev)
+      setEditSheetOpen(true)
+      const j = await res.json()
+      setEditError(j?.error?.message ?? 'Failed to update customer.')
+    }
   }
 
   function onDelete(customer: CustomerRow) {
@@ -228,15 +273,26 @@ export default function CustomersPage() {
 
   async function handleConfirmDelete() {
     if (!confirmDelete) return
+    const target = { ...confirmDelete }
+    const name = [target.first_name, target.last_name].filter(Boolean).join(' ')
+    const customersKey = ['customers', activeBranch?.id, page, pageSize, search]
+    const prev = queryClient.getQueryData(customersKey)
+    setConfirmDelete(null)
+    queryClient.setQueryData(customersKey, (old: any) => {
+      if (!old?.rows) return old
+      return {
+        ...old,
+        rows: old.rows.filter((r: CustomerRow) => r.id !== target.id),
+        total: Math.max(0, old.total - 1),
+      }
+    })
     setIsDeleting(true)
-    const name = [confirmDelete.first_name, confirmDelete.last_name].filter(Boolean).join(' ')
-    
-    const res = await fetch(`/api/customers/${confirmDelete.id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/customers/${target.id}`, { method: 'DELETE' })
     if (res.ok) {
       toast.success(`Customer "${name}" deleted.`)
       queryClient.invalidateQueries({ queryKey: ['customers', activeBranch?.id] })
-      setConfirmDelete(null)
     } else {
+      if (prev) queryClient.setQueryData(customersKey, prev)
       toast.error('Failed to delete customer.')
     }
     setIsDeleting(false)

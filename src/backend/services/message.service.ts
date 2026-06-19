@@ -123,19 +123,27 @@ export const MessageService = {
 
     const allUnread = (unreadData ?? []) as any[]
 
-    // Build a map: rootId → preview (latest unread message in that thread)
+    // Build a map: rootId → preview (latest unread message in that thread).
+    // DB rows arrive ORDER BY created_at DESC, so the first time we see a rootId
+    // it IS the most-recent message — Map insertion order is already correct.
     const threadMap = new Map<string, {
       id: string; subject: string | null; body: string
       from_branch_id: string | null; from_branch_name: string | null
       created_at: string
     }>()
 
-    // Collect root IDs that are only referenced via replies (need subject lookup)
+    // Collect root IDs that are only referenced via replies (need subject lookup).
     const rootsFromReplies = new Set<string>()
+    // Pre-build a Set of root message IDs present directly in this result set (O(n)).
+    const directRootIds = new Set<string>()
 
     for (const m of allUnread) {
       const rootId = (m.parent_id ?? m.id) as string
-      if (m.parent_id) rootsFromReplies.add(rootId)
+      if (m.parent_id) {
+        rootsFromReplies.add(rootId)
+      } else {
+        directRootIds.add(m.id as string)
+      }
 
       const existing = threadMap.get(rootId)
       if (!existing || new Date(m.created_at) > new Date(existing.created_at)) {
@@ -150,10 +158,9 @@ export const MessageService = {
       }
     }
 
-    // For threads we only have replies for, fetch the root subject
-    const replyOnlyRoots = [...rootsFromReplies].filter(
-      (id) => !allUnread.some((m: any) => !m.parent_id && m.id === id)
-    )
+    // For threads we only have replies for, fetch the root subject.
+    // Set lookup replaces the previous O(n²) .some() scan.
+    const replyOnlyRoots = [...rootsFromReplies].filter((id) => !directRootIds.has(id))
     if (replyOnlyRoots.length > 0) {
       const { data: roots } = await adminSupabase
         .from('messages')
@@ -168,9 +175,8 @@ export const MessageService = {
       }
     }
 
-    const messages = [...threadMap.values()]
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, 10)
+    // DB already ordered DESC; Map preserves insertion order → no re-sort needed.
+    const messages = [...threadMap.values()].slice(0, 10)
 
     return {
       count: threadMap.size,

@@ -293,24 +293,57 @@ export default function InventoryPage() {
 
   async function handleDelete() {
     if (!deleteTarget) return
+    const target = { ...deleteTarget }
+    const invKey = ['inventory', branchId, page, pageSize, search, categoryFilter, brandFilter, supplierFilter, valuationFilter, hideOutOfStock, typeFilter] as const
+    const prev = queryClient.getQueryData(invKey)
+    setDeleteTarget(null)
+    queryClient.setQueryData(invKey, (old: any) => {
+      if (!old?.data) return old
+      return {
+        ...old,
+        data: old.data.filter((p: ProductRow) => p.id !== target.id),
+        meta: { ...old.meta, total: Math.max(0, old.meta.total - 1) },
+      }
+    })
     setDeleting(true)
     const qs = branchId ? `?branch_id=${branchId}` : ''
-    await fetch(`/api/products/${deleteTarget.id}${qs}`, { method: 'DELETE' })
+    const res = await fetch(`/api/products/${target.id}${qs}`, { method: 'DELETE' })
+    if (res.ok) {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory-stats'] })
+    } else {
+      if (prev) queryClient.setQueryData(invKey, prev)
+      toast.error('Failed to delete product. Please try again.')
+    }
     setDeleting(false)
-    setDeleteTarget(null)
-    queryClient.invalidateQueries({ queryKey: ['inventory'] })
-    queryClient.invalidateQueries({ queryKey: ['inventory-stats'] })
   }
 
   async function handleBulkDelete() {
-    setBulkDeleting(true)
-    const qs = branchId ? `?branch_id=${branchId}` : ''
-    await Promise.all([...selectedIds].map((id) => fetch(`/api/products/${id}${qs}`, { method: 'DELETE' })))
-    setBulkDeleting(false)
+    const toDelete = new Set(selectedIds)
+    const invKey = ['inventory', branchId, page, pageSize, search, categoryFilter, brandFilter, supplierFilter, valuationFilter, hideOutOfStock, typeFilter] as const
+    const prev = queryClient.getQueryData(invKey)
     setShowBulkDeleteConfirm(false)
     setSelectedIds(new Set())
-    queryClient.invalidateQueries({ queryKey: ['inventory'] })
-    queryClient.invalidateQueries({ queryKey: ['inventory-stats'] })
+    queryClient.setQueryData(invKey, (old: any) => {
+      if (!old?.data) return old
+      return {
+        ...old,
+        data: old.data.filter((p: ProductRow) => !toDelete.has(p.id)),
+        meta: { ...old.meta, total: Math.max(0, old.meta.total - toDelete.size) },
+      }
+    })
+    setBulkDeleting(true)
+    const qs = branchId ? `?branch_id=${branchId}` : ''
+    const results = await Promise.all([...toDelete].map((id) => fetch(`/api/products/${id}${qs}`, { method: 'DELETE' })))
+    if (results.every(r => r.ok)) {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory-stats'] })
+    } else {
+      if (prev) queryClient.setQueryData(invKey, prev)
+      toast.error('Some products could not be deleted.')
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+    }
+    setBulkDeleting(false)
   }
 
   function clearFilters() {
@@ -507,7 +540,7 @@ export default function InventoryPage() {
           { label: 'Products',        href: '/inventory' },
           { label: 'Purchase Orders', href: '/inventory/purchase-orders' },
           { label: 'Suppliers',       href: '/inventory/suppliers' },
-          { label: 'Stock Count',     href: '/inventory/stock-count' },
+          // { label: 'Stock Count', href: '/inventory/stock-count' },  // disabled
           ...(isRetail ? [
             { label: 'Categories',    href: '/inventory/categories' },
             { label: 'Attributes',    href: '/inventory/attributes' },

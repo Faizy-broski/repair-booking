@@ -1,7 +1,9 @@
 'use client'
-import { useState, useEffect, use, useCallback } from 'react'
+import { useState, use } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, User, Wrench, ShoppingBag, FileText, Phone, Mail, MapPin, Cpu, CreditCard, Star, Plus, Pencil, Trash2, Coins } from 'lucide-react'
+import { BrandSpinner } from '@/components/ui/brand-spinner'
 import { Button } from '@/components/ui/button'
 import { Badge, REPAIR_STATUS_VARIANTS } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -72,82 +74,106 @@ const emptyAssetForm = { name: '', brand: '', model: '', serial_number: '', imei
 export default function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
-  const [customer, setCustomer] = useState<CustomerDetail | null>(null)
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [tab, setTab] = useState<Tab>('overview')
 
   // Assets
-  const [assets,      setAssets]      = useState<Asset[]>([])
   const [assetModal,  setAssetModal]  = useState<{ open: boolean; editing: Asset | null }>({ open: false, editing: null })
   const [assetForm,   setAssetForm]   = useState(emptyAssetForm)
   const [savingAsset, setSavingAsset] = useState(false)
 
   // Store Credits
-  const [creditBalance, setCreditBalance] = useState(0)
-  const [creditTxns,    setCreditTxns]    = useState<CreditTxn[]>([])
   const [addCreditModal, setAddCreditModal] = useState(false)
   const [creditAmount,   setCreditAmount]  = useState('')
   const [creditNote,     setCreditNote]    = useState('')
 
-  // Loyalty
-  const [loyaltyBalance, setLoyaltyBalance] = useState(0)
-  const [loyaltyTxns,    setLoyaltyTxns]    = useState<LoyaltyTxn[]>([])
-
   const [confirmDeleteAsset, setConfirmDeleteAsset] = useState<string | null>(null)
   const [isDeletingAsset, setIsDeletingAsset] = useState(false)
 
-  const fetchCustomer = useCallback(() => {
-    setLoading(true)
-    return fetch(`/api/customers/${id}?detail=true`)
-      .then((r) => r.json())
-      .then((json) => { setCustomer(json.data); setLoading(false) })
-  }, [id])
+  // ── Parallel data fetches (all fire simultaneously) ──────────────────────
+  const { data: customer = null, isLoading } = useQuery<CustomerDetail | null>({
+    queryKey: ['customer-detail', id],
+    queryFn: async () => {
+      const res = await fetch(`/api/customers/${id}?detail=true`)
+      return (await res.json()).data ?? null
+    },
+    staleTime: 5 * 60_000,
+  })
 
-  const fetchAssets = useCallback(() =>
-    fetch(`/api/customers/${id}/assets`)
-      .then((r) => r.json())
-      .then((j) => setAssets(j.data ?? []))
-  , [id])
+  const { data: assets = [] } = useQuery<Asset[]>({
+    queryKey: ['customer-assets', id],
+    queryFn: async () => {
+      const res = await fetch(`/api/customers/${id}/assets`)
+      return (await res.json()).data ?? []
+    },
+    staleTime: 2 * 60_000,
+  })
 
-  const fetchCredits = useCallback(() =>
-    fetch(`/api/customers/${id}/store-credits`)
-      .then((r) => r.json())
-      .then((j) => { if (j.data) { setCreditBalance(j.data.balance); setCreditTxns(j.data.transactions ?? []) } })
-  , [id])
+  const { data: creditsData } = useQuery({
+    queryKey: ['customer-credits', id],
+    queryFn: async () => {
+      const res = await fetch(`/api/customers/${id}/store-credits`)
+      const j = await res.json()
+      return j.data ? { balance: j.data.balance as number, transactions: (j.data.transactions ?? []) as CreditTxn[] } : null
+    },
+    staleTime: 2 * 60_000,
+  })
+  const creditBalance = creditsData?.balance ?? 0
+  const creditTxns    = creditsData?.transactions ?? []
 
-  const fetchLoyalty = useCallback(() =>
-    fetch(`/api/customers/${id}/loyalty`)
-      .then((r) => r.json())
-      .then((j) => { if (j.data) { setLoyaltyBalance(j.data.balance); setLoyaltyTxns(j.data.transactions ?? []) } })
-  , [id])
-
-  useEffect(() => {
-    fetchCustomer()
-    fetchAssets()
-    fetchCredits()
-    fetchLoyalty()
-  }, [fetchCustomer, fetchAssets, fetchCredits, fetchLoyalty])
+  const { data: loyaltyData } = useQuery({
+    queryKey: ['customer-loyalty', id],
+    queryFn: async () => {
+      const res = await fetch(`/api/customers/${id}/loyalty`)
+      const j = await res.json()
+      return j.data ? { balance: j.data.balance as number, transactions: (j.data.transactions ?? []) as LoyaltyTxn[] } : null
+    },
+    staleTime: 2 * 60_000,
+  })
+  const loyaltyBalance = loyaltyData?.balance ?? 0
+  const loyaltyTxns    = loyaltyData?.transactions ?? []
 
   async function saveAsset() {
     setSavingAsset(true)
     const { editing } = assetModal
     const url    = editing ? `/api/customers/assets/${editing.id}` : `/api/customers/${id}/assets`
     const method = editing ? 'PUT' : 'POST'
-    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(assetForm) })
+    const prev = queryClient.getQueryData<Asset[]>(['customer-assets', id])
+    if (editing) {
+      queryClient.setQueryData<Asset[]>(['customer-assets', id], (old = []) =>
+        old.map(a => a.id === editing.id ? { ...a, ...assetForm } : a)
+      )
+    } else {
+      const optimistic = { id: `temp-${Date.now()}`, ...assetForm, is_active: true } as Asset
+      queryClient.setQueryData<Asset[]>(['customer-assets', id], (old = []) => [...old, optimistic])
+    }
     setAssetModal({ open: false, editing: null })
-    fetchAssets()
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(assetForm) })
+    if (res.ok) {
+      queryClient.invalidateQueries({ queryKey: ['customer-assets', id] })
+    } else {
+      if (prev !== undefined) queryClient.setQueryData(['customer-assets', id], prev)
+      setAssetModal({ open: true, editing })
+      toast.error('Failed to save device.')
+    }
     setSavingAsset(false)
   }
 
   async function handleConfirmDeleteAsset() {
     if (!confirmDeleteAsset) return
+    const targetId = confirmDeleteAsset
+    const prev = queryClient.getQueryData<Asset[]>(['customer-assets', id])
+    setConfirmDeleteAsset(null)
+    queryClient.setQueryData<Asset[]>(['customer-assets', id], (old = []) =>
+      old.filter(a => a.id !== targetId)
+    )
     setIsDeletingAsset(true)
-    const res = await fetch(`/api/customers/assets/${confirmDeleteAsset}`, { method: 'DELETE' })
+    const res = await fetch(`/api/customers/assets/${targetId}`, { method: 'DELETE' })
     if (res.ok) {
       toast.success('Device deleted successfully.')
-      fetchAssets()
-      setConfirmDeleteAsset(null)
+      queryClient.invalidateQueries({ queryKey: ['customer-assets', id] })
     } else {
+      if (prev !== undefined) queryClient.setQueryData(['customer-assets', id], prev)
       toast.error('Failed to delete device.')
     }
     setIsDeletingAsset(false)
@@ -156,21 +182,39 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   async function addCredit() {
     const amount = parseFloat(creditAmount)
     if (!amount || amount <= 0) return
-    await fetch(`/api/customers/${id}/store-credits`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount, note: creditNote || undefined }),
+    const capturedNote = creditNote
+    const prevCredits = queryClient.getQueryData<{ balance: number; transactions: CreditTxn[] } | null>(['customer-credits', id])
+    const optimisticTxn: CreditTxn = {
+      id: `temp-${Date.now()}`,
+      amount,
+      type: 'manual',
+      note: capturedNote || null,
+      created_at: new Date().toISOString(),
+    }
+    queryClient.setQueryData<{ balance: number; transactions: CreditTxn[] } | null>(['customer-credits', id], (old) => {
+      if (!old) return old
+      return { balance: old.balance + amount, transactions: [optimisticTxn, ...old.transactions] }
     })
     setAddCreditModal(false)
     setCreditAmount('')
     setCreditNote('')
-    fetchCredits()
+    const res = await fetch(`/api/customers/${id}/store-credits`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, note: capturedNote || undefined }),
+    })
+    if (res.ok) {
+      queryClient.invalidateQueries({ queryKey: ['customer-credits', id] })
+    } else {
+      if (prevCredits !== undefined) queryClient.setQueryData(['customer-credits', id], prevCredits)
+      toast.error('Failed to add store credit.')
+    }
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="space-y-4">
-        {[1, 2, 3].map((i) => <div key={i} className="h-32 animate-pulse rounded-xl bg-gray-100" />)}
+      <div className="flex items-center justify-center py-32">
+        <BrandSpinner size="lg" />
       </div>
     )
   }

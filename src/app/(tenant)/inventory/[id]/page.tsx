@@ -2,6 +2,7 @@
 import { useState, useEffect, use } from 'react'
 import { toast } from 'sonner'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { BrandSpinner } from '@/components/ui/brand-spinner'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, Save, Trash2, Store, Plus, RefreshCw, Layers, Barcode } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -171,7 +172,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   // ── Variant state ─────────────────────────────────────────────────────────
   const [existingVariants, setExistingVariants] = useState<EditVariantRow[]>([])
-  const [deletingVariantId, setDeletingVariantId] = useState<string | null>(null)
+
   const [showAddVariants, setShowAddVariants] = useState(false)
   const [attrDefs, setAttrDefs] = useState<AttrDef[]>([{ id: uid(), name: '', valuesRaw: '' }])
   const [newVariantRows, setNewVariantRows] = useState<NewVariantRow[]>([])
@@ -357,17 +358,18 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   }
 
   async function deleteVariant(variantId: string) {
-    setDeletingVariantId(variantId)
+    const prevVariants = existingVariants
+    const wasLast = existingVariants.length === 1
+    setExistingVariants(p => p.filter(v => v.id !== variantId))
+    if (wasLast) setHasVariants(false)
     const res = await fetch(`/api/products/${id}/variants/${variantId}`, { method: 'DELETE' })
     if (res.ok) {
-      setExistingVariants(prev => prev.filter(v => v.id !== variantId))
       qc.invalidateQueries({ queryKey: ['inv-product-variants', id] })
-      // If last variant removed, turn off has_variants flag locally
-      if (existingVariants.length === 1) setHasVariants(false)
     } else {
+      setExistingVariants(prevVariants)
+      if (wasLast) setHasVariants(true)
       toast.error('Failed to delete variant.')
     }
-    setDeletingVariantId(null)
   }
 
   function updateAttr(attrId: string, field: 'name' | 'valuesRaw', val: string) {
@@ -426,12 +428,19 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       is_draft: false,
     }
 
+    const productCacheKey = ['inv-product', id, activeBranch?.id]
+    const prevProductData = qc.getQueryData(productCacheKey)
+    qc.setQueryData(productCacheKey, (old: any) =>
+      old ? { ...old, name: name.trim(), selling_price: parseFloat(sellingPrice) || old.selling_price, cost_price: parseFloat(costPrice) || old.cost_price } : old
+    )
+
     const res = await fetch(`/api/products/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
     if (!res.ok) {
+      qc.setQueryData(productCacheKey, prevProductData)
       const j = await res.json()
       toast.error(j?.message || j?.error?.message || 'Failed to update product.')
       setSaving(false)
@@ -528,7 +537,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   if (productLoading && !productData) {
     return (
       <div className="flex items-center justify-center py-32">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-brand-teal" />
+        <BrandSpinner size="lg" />
       </div>
     )
   }
@@ -723,13 +732,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                           <button
                             type="button"
                             onClick={() => deleteVariant(row.id)}
-                            disabled={deletingVariantId === row.id}
-                            className="flex h-8 w-8 items-center justify-center rounded-md text-red-500 bg-red-50 hover:bg-red-100 hover:text-red-600 transition-colors disabled:opacity-40"
+                            className="flex h-8 w-8 items-center justify-center rounded-md text-red-500 bg-red-50 hover:bg-red-100 hover:text-red-600 transition-colors"
                           >
-                            {deletingVariantId === row.id
-                              ? <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-red-200 border-t-red-500" />
-                              : <Trash2 className="h-3.5 w-3.5" />
-                            }
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </td>
                       </tr>

@@ -64,19 +64,27 @@ export const ReportService = {
       .eq('business_id', businessId)
       .eq('is_active', true)
 
-    const results = await Promise.all(
-      ((branches ?? []) as any[]).map(async (branch: any) => {
-        const { data } = await db('sales')
-          .select('total')
-          .eq('branch_id', branch.id)
-          .gte('created_at', from)
-          .lte('created_at', to)
-        const total = ((data ?? []) as any[]).reduce((s: number, r: any) => s + r.total, 0)
-        return { branchId: branch.id, branchName: branch.name, total }
-      })
+    const branchList = (branches ?? []) as any[]
+    if (branchList.length === 0) return []
+
+    const { data: salesRows } = await db('sales')
+      .select('branch_id, total')
+      .in('branch_id', branchList.map((b: any) => b.id))
+      .gte('created_at', from)
+      .lte('created_at', to)
+
+    const totalsByBranch = ((salesRows ?? []) as any[]).reduce(
+      (acc: Record<string, number>, r: any) => {
+        acc[r.branch_id] = (acc[r.branch_id] ?? 0) + r.total
+        return acc
+      }, {}
     )
 
-    return results
+    return branchList.map((b: any) => ({
+      branchId:   b.id,
+      branchName: b.name,
+      total:      totalsByBranch[b.id] ?? 0,
+    }))
   },
 
   async getInventoryReport(branchId: string) {

@@ -26,6 +26,7 @@ const closeSessionSchema = z.object({
 
 const cashMovementSchema = z.object({
   session_id: z.string().uuid(),
+  branch_id: z.string().uuid().optional(),
   type: z.enum(['cash_in', 'cash_out']),
   amount: z.number().positive(),
   payment_type: z.string().optional(),
@@ -198,7 +199,7 @@ export const ReportController = {
     const parsed = cashMovementSchema.safeParse(body)
     if (!parsed.success) return badRequest(parsed.error.message)
     try {
-      const branchId = ctx.auth.branchId
+      const branchId = ctx.auth.branchId ?? parsed.data.branch_id ?? null
       if (!branchId) return badRequest('branch_id required')
       const data = await ReportService.addCashMovement({
         sessionId: parsed.data.session_id,

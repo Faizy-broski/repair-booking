@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Wrench, ShoppingBag } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 import { usePosStore } from '@/store/pos.store'
@@ -64,28 +64,31 @@ export default function PosPage() {
 
   // ── Global POS Scanner (Instant HID support) ──────────────────────────────────
   const { lookup } = useBarcodeLookup(activeBranch?.id ?? null)
-  
+  const scanLockRef = useRef(false)
+
   useHidScanner({
-    // Only accept root level HID scans if the modal isn't open or we aren't inputting something specific
-    // Since we don't have a direct modal-open state here easily, HID will fire and add to cart when focused on body
     onScan: async (code) => {
-      // Don't scan if user isn't focused on body (eg. inputting notes)
+      // Don't scan if user is typing into an input field
       if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return
-      
-      const res = await lookup(code)
-      if (res.status === 'found' && res.product) {
-        // If it's a variant, let the user know they need to select one via product tab
-        if (res.product.has_variants || (res.product.variant_count ?? 0) > 0) {
-          toast.info(`Scanned ${res.product.name}. Please select variant from products menu.`)
-          return
+      // Prevent duplicate adds from rapid successive scans of the same barcode
+      if (scanLockRef.current) return
+      scanLockRef.current = true
+      try {
+        const res = await lookup(code)
+        if (res.status === 'found' && res.product) {
+          if (res.product.has_variants || (res.product.variant_count ?? 0) > 0) {
+            toast.info(`Scanned ${res.product.name}. Please select variant from products menu.`)
+            return
+          }
+          pos.addToCart(res.product as unknown as Product)
+          toast.success(`Scanned: ${res.product.name}`)
+        } else if (res.status === 'not_found') {
+          toast.error(`Barcode not found: ${code}`)
+        } else if (res.status === 'error' && res.error?.includes('misread')) {
+          toast.warning(`Scanner misread — try again`)
         }
-        
-        pos.addToCart(res.product as unknown as Product)
-        toast.success(`Scanned: ${res.product.name}`)
-      } else if (res.status === 'not_found') {
-        toast.error(`Barcode not found: ${code}`)
-      } else if (res.status === 'error' && res.error?.includes('misread')) {
-        toast.warning(`Scanner misread — try again`)
+      } finally {
+        scanLockRef.current = false
       }
     },
     enabled: true
@@ -192,13 +195,20 @@ export default function PosPage() {
         closing_note: closingNote || undefined,
       }),
     })
+    const j = await res.json()
     if (res.ok) {
-      const j = await res.json()
       setZReport(j.data ?? null)
       pos.setSession(null)
       pos.setSessionLoaded(false)
       setClosingDenoms({})
       setClosingNote('')
+    } else if (j?.error?.message?.includes('Session already closed')) {
+      // Session was already closed externally — sync local state
+      pos.setSession(null)
+      pos.setSessionLoaded(false)
+      setClosingDenoms({})
+      setClosingNote('')
+      await fetchSession()
     }
     setSessionProcessing(false)
   }
@@ -210,6 +220,7 @@ export default function PosPage() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         session_id: pos.session.id,
+        branch_id: activeBranch?.id,
         type: cashMovementType,
         amount: parseFloat(cashMovementAmount),
         notes: cashMovementNotes || undefined,

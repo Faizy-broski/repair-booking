@@ -386,17 +386,43 @@ export const ProductService = {
 
     await adminSupabase.from('products').update({ has_variants: true }).eq('id', productId)
 
-    // Handle stock
+    // Handle stock — batch all inventory writes into 3 queries total (was 3×N)
     if (branchId && data) {
-      for (const [idx, inserted] of data.entries()) {
-        const stock = variants[idx].stock ?? 0
-        const { data: existingInv } = await adminSupabase.from('inventory')
-          .select('id').eq('branch_id', branchId).eq('product_id', productId).eq('variant_id', inserted.id).maybeSingle()
-        if (existingInv) {
-          await adminSupabase.from('inventory').update({ quantity: stock }).eq('id', existingInv.id)
-        } else {
-          await adminSupabase.from('inventory').insert({ branch_id: branchId, product_id: productId, variant_id: inserted.id, quantity: stock, low_stock_alert: 5 })
-        }
+      const insertedIds = data.map(d => d.id)
+
+      // 1 query: find which inventory rows already exist for these variants
+      const { data: existingRows } = await adminSupabase
+        .from('inventory')
+        .select('id, variant_id')
+        .eq('branch_id', branchId)
+        .eq('product_id', productId)
+        .in('variant_id', insertedIds)
+
+      const existingMap = new Map((existingRows ?? []).map(r => [r.variant_id as string, r.id as string]))
+
+      const toUpdate = data.filter(d => existingMap.has(d.id))
+      const toInsert = data.filter(d => !existingMap.has(d.id))
+
+      // 1 query: bulk update existing rows in parallel
+      if (toUpdate.length > 0) {
+        await Promise.all(toUpdate.map(d =>
+          adminSupabase.from('inventory')
+            .update({ quantity: variants[data.indexOf(d)].stock ?? 0 })
+            .eq('id', existingMap.get(d.id)!)
+        ))
+      }
+
+      // 1 query: bulk insert new rows
+      if (toInsert.length > 0) {
+        await adminSupabase.from('inventory').insert(
+          toInsert.map(d => ({
+            branch_id:      branchId,
+            product_id:     productId,
+            variant_id:     d.id,
+            quantity:       variants[data.indexOf(d)].stock ?? 0,
+            low_stock_alert: 5,
+          }))
+        )
       }
     }
 

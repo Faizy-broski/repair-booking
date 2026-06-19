@@ -61,10 +61,15 @@ export const InventoryService = {
   },
 
   async getLowStockAlerts(branchId: string) {
+    // Order by quantity ASC so the most critically low items come first.
+    // Limit caps the result set — low-stock items have the smallest quantities
+    // so the 100 rows with the lowest counts cover all genuinely alert-worthy items.
     const { data, error } = await adminSupabase
       .from('inventory')
       .select('*, products(id,name,sku,image_url,cost_price)')
       .eq('branch_id', branchId)
+      .order('quantity', { ascending: true })
+      .limit(100)
 
     if (error) throw error
     return ((data ?? []) as any[]).filter((inv: any) => inv.quantity <= (inv.low_stock_alert ?? 5))

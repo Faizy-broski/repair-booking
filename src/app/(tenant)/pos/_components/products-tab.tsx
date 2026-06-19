@@ -192,7 +192,7 @@ export function ProductsTab() {
       return j.data ?? []
     },
     enabled: !!variantProduct?.id,
-    staleTime: 5 * 60_000,
+    staleTime: 0,
   })
   const variantList = variantData ?? []
 
@@ -237,7 +237,7 @@ export function ProductsTab() {
         const j = await res.json()
         return j.data ?? []
       },
-      staleTime: 5 * 60_000,
+      staleTime: 0,
     })
   }
 

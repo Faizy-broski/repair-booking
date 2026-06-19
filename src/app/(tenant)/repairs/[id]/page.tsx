@@ -3,6 +3,7 @@ import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Edit, Clock, ClipboardList, Receipt, BookOpen } from 'lucide-react'
+import { BrandSpinner } from '@/components/ui/brand-spinner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Modal } from '@/components/ui/modal'
@@ -15,6 +16,7 @@ import { LabelPicker } from '@/components/repairs/label-picker'
 import { EstimatesPanel } from '@/components/repairs/estimates-panel'
 import { CustomFieldRenderer, useCustomFieldDefs } from '@/components/shared/custom-field-renderer'
 import { PatternLock } from '@/components/ui/pattern-lock'
+import { toast } from 'sonner'
 
 
 interface Technician {
@@ -151,46 +153,76 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
   async function saveCustomFields(values: Record<string, unknown>) {
-    await fetch(`/api/repairs/${id}`, {
+    const prev = customFieldValues
+    setCustomFieldValues(values)  // optimistic — UI updates instantly
+    const res = await fetch(`/api/repairs/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ custom_fields: values }),
     })
-    setCustomFieldValues(values)
+    if (!res.ok) setCustomFieldValues(prev)  // rollback on failure
   }
 
   async function assignTechnician(employeeId: string | null) {
+    const prev = queryClient.getQueryData<RepairDetail | null>(['repair-detail', id])
+    const newEmployee = employeeId ? (technicians.find((t) => t.id === employeeId) ?? null) : null
+
+    // Optimistic: dropdown reflects new assignment instantly
+    queryClient.setQueryData<RepairDetail | null>(['repair-detail', id], (old) => {
+      if (!old) return old
+      return {
+        ...old,
+        assigned_to: employeeId,
+        employees: newEmployee
+          ? { id: newEmployee.id, first_name: newEmployee.first_name, last_name: newEmployee.last_name }
+          : null,
+      }
+    })
+
     setAssigningTech(true)
     const res = await fetch(`/api/repairs/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ assigned_to: employeeId }),
     })
-    if (res.ok) {
-      queryClient.invalidateQueries({ queryKey: ['repair-detail', id] })
+    if (!res.ok) {
+      // Rollback
+      if (prev !== undefined) queryClient.setQueryData(['repair-detail', id], prev)
+      toast.error('Failed to update technician.')
     }
     setAssigningTech(false)
   }
 
   async function updateStatus() {
     if (!repair) return
+    const prev = queryClient.getQueryData<RepairDetail | null>(['repair-detail', id])
+    const statusBeingSet = newStatus
+    const noteBeingSent  = statusNote  // capture before clearing
+
+    // Optimistic: flip status badge and close modal instantly
+    queryClient.setQueryData<RepairDetail | null>(['repair-detail', id], (old) =>
+      old ? { ...old, status: statusBeingSet } : old
+    )
+    setStatusModalOpen(false)
+    setStatusNote('')
+
     setUpdating(true)
     const res = await fetch(`/api/repairs/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus, note: statusNote }),
+      body: JSON.stringify({ status: statusBeingSet, note: noteBeingSent }),
     })
     if (res.ok) {
-      setStatusModalOpen(false)
-      setStatusNote('')
-      // Invalidate this repair's detail + the list for this branch only.
-      // Using the branch prefix avoids invalidating cached lists from other branches.
       queryClient.invalidateQueries({ queryKey: ['repair-detail', id] })
       queryClient.invalidateQueries({ queryKey: ['repairs', activeBranch?.id] })
       queryClient.invalidateQueries({ queryKey: ['repairs-stats', activeBranch?.id], exact: true })
       if (repair.customers?.email) {
-        setEmailPrompt({ repairId: id, jobNumber: repair.job_number, currentStatus: newStatus })
+        setEmailPrompt({ repairId: id, jobNumber: repair.job_number, currentStatus: statusBeingSet })
       }
+    } else {
+      // Rollback
+      if (prev !== undefined) queryClient.setQueryData(['repair-detail', id], prev)
+      toast.error('Failed to update status.')
     }
     setUpdating(false)
   }
@@ -209,10 +241,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
         </div>
         <div className="flex items-center justify-center py-8">
           <div className="flex items-center gap-3 text-gray-400">
-            <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
+            <BrandSpinner size="sm" />
             <span className="text-sm">Loading repair details…</span>
           </div>
         </div>

@@ -313,16 +313,18 @@ async function bulkImport(req: NextRequest, ctx: RequestContext) {
       }
     }
 
-    // ── Update existing products one-by-one ────────────────────────────
+    // ── Update existing products in a single batch upsert ─────────────
     const updatedIds: string[] = []
-    for (const item of toUpdate) {
-      const existingId = existingSkuMap.get(item.record.sku as string)!
+    if (toUpdate.length > 0) {
+      const upsertRecords = toUpdate.map((item) => {
+        const existingId = existingSkuMap.get(item.record.sku as string)!
+        updatedIds.push(existingId)
+        return { id: existingId, ...item.record }
+      })
       const { error: updateError } = await adminSupabase
         .from('products')
-        .update(item.record)
-        .eq('id', existingId)
+        .upsert(upsertRecords, { onConflict: 'id' })
       if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 })
-      updatedIds.push(existingId)
     }
     updated = updatedIds.length
 

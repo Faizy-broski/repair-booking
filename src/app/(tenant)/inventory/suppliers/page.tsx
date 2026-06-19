@@ -1,5 +1,6 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { confirmToast } from '@/lib/confirm-toast'
 import { Plus, Pencil, Trash2, Truck, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -22,19 +23,21 @@ const emptyForm = {
 
 export default function SuppliersPage() {
   const { activeBranch } = useAuthStore()
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const queryClient = useQueryClient()
   const [search,    setSearch]    = useState('')
   const [modal,     setModal]     = useState<{ open: boolean; editing: Supplier | null }>({ open: false, editing: null })
   const [form,      setForm]      = useState(emptyForm)
   const [saving,    setSaving]    = useState(false)
 
-  const fetchSuppliers = useCallback(async () => {
-    const res  = await fetch('/api/suppliers')
-    const json = await res.json()
-    setSuppliers(json.data ?? [])
-  }, [])
-
-  useEffect(() => { if (activeBranch) fetchSuppliers() }, [activeBranch, fetchSuppliers])
+  const { data: suppliers = [] } = useQuery<Supplier[]>({
+    queryKey: ['suppliers-list', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch('/api/suppliers')
+      return (await res.json()).data ?? []
+    },
+    enabled: !!activeBranch,
+    staleTime: 5 * 60_000,
+  })
 
   const filtered = suppliers.filter((s) =>
     !search || s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -58,14 +61,14 @@ export default function SuppliersPage() {
       body: JSON.stringify({ ...form, email: form.email || null }),
     })
     setModal({ open: false, editing: null })
-    fetchSuppliers()
+    queryClient.invalidateQueries({ queryKey: ['suppliers-list', activeBranch?.id] })
     setSaving(false)
   }
 
   async function deleteSupplier(id: string) {
     if (!await confirmToast('Delete this supplier?', 'Delete')) return
     await fetch(`/api/suppliers/${id}`, { method: 'DELETE' })
-    fetchSuppliers()
+    queryClient.invalidateQueries({ queryKey: ['suppliers-list', activeBranch?.id] })
   }
 
   return (

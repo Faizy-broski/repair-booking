@@ -109,9 +109,7 @@ export default function RepairsReportPage() {
       }))
     },
     enabled: !!activeBranch,
-    staleTime: 0,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
+    staleTime: 30_000,
   })
 
   const totalRepairs = data.reduce((s, r) => s + r.count, 0)

@@ -1,8 +1,9 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Topbar } from '@/components/layout/topbar'
 import { NotificationToasts } from '@/components/layout/notification-toasts'
+import { BrandSpinner } from '@/components/ui/brand-spinner'
 import { MessageBadge } from '@/components/layout/message-badge'
 import { BroadcastBanner } from '@/components/layout/broadcast-banner'
 import { TourGuide } from '@/components/shared/tour-guide'
@@ -50,10 +51,13 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
   const { fetchConfigs, invalidate: invalidateConfigs } = useModuleConfigStore()
   const { setLoaded: setBroadcastsLoaded, addBroadcast, syncBroadcast, reset: resetBroadcasts } = useBroadcastsStore()
   const broadcastsBusinessId = useAuthStore((s) => s.profile?.business_id ?? '')
+  const broadcastsFetched = useRef(false)
 
-  // Load broadcasts once profile+business is available
+  // Load broadcasts once profile+business is available.
+  // useRef guard prevents React 18 StrictMode double-invoke from firing two fetches.
   useEffect(() => {
-    if (!broadcastsBusinessId) return
+    if (!broadcastsBusinessId || broadcastsFetched.current) return
+    broadcastsFetched.current = true
     fetch('/api/broadcasts')
       .then((r) => r.ok ? r.json() : null)
       .then((j) => {
@@ -266,7 +270,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
   if (!isHydrated || !sessionVerified) {
     return (
       <div className="flex h-screen items-center justify-center bg-surface-container-low">
-        <div className="h-7 w-7 animate-spin rounded-full border-2 border-brand-teal border-t-transparent" />
+        <BrandSpinner size="lg" />
       </div>
     )
   }

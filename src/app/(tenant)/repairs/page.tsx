@@ -472,7 +472,7 @@ export default function RepairsPage() {
       return json.data ?? null
     },
     enabled: !!activeBranch,
-    staleTime: 0,
+    staleTime: 5 * 60_000,
     select: (d: any) => {
       if (!d) return null
       return {
@@ -495,7 +495,7 @@ export default function RepairsPage() {
       return (json.data as InvoiceSettings) ?? null
     },
     enabled: !!activeBranch && invoiceModalOpen,
-    staleTime: 0,
+    staleTime: 30 * 60_000,
   })
 
   function invalidateStats() {
@@ -523,14 +523,31 @@ export default function RepairsPage() {
 
   async function handleConfirmDelete() {
     if (!confirmDelete) return
+    const target = { ...confirmDelete }
+
+    // Snapshot for rollback
+    const prev = queryClient.getQueryData<RepairListResponse>(repairsQueryKey)
+
+    // Optimistic: close modal + remove row instantly
+    setConfirmDelete(null)
+    queryClient.setQueryData<RepairListResponse>(repairsQueryKey, (old) => {
+      if (!old?.data) return old
+      return {
+        ...old,
+        data: old.data.filter((r) => r.id !== target.id),
+        meta: { ...old.meta, total: Math.max(0, old.meta.total - 1) },
+      }
+    })
+
     setIsDeleting(true)
-    const res = await fetch(`/api/repairs/${confirmDelete.id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/repairs/${target.id}`, { method: 'DELETE' })
     if (res.ok) {
-      toast.success(`Repair ${confirmDelete.jobNumber} deleted.`)
+      toast.success(`Repair ${target.jobNumber} deleted.`)
       queryClient.invalidateQueries({ queryKey: repairsBaseKey })
       invalidateStats()
-      setConfirmDelete(null)
     } else {
+      // Rollback
+      if (prev) queryClient.setQueryData(repairsQueryKey, prev)
       if (res.status === 403) {
         toast.error("Permission Denied: You don't have permission to delete repair jobs.")
       } else {

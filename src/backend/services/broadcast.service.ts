@@ -110,4 +110,14 @@ export const BroadcastService = {
     if (error) throw error
     return (data ?? []).map((r) => r.broadcast_id)
   },
+
+  /** All broadcast IDs read by this profile (no broadcast-list filter needed) */
+  async getAllReadIdsForUser(profileId: string): Promise<string[]> {
+    const { data, error } = await adminSupabase
+      .from('broadcast_reads')
+      .select('broadcast_id')
+      .eq('profile_id', profileId)
+    if (error) throw error
+    return (data ?? []).map((r) => r.broadcast_id)
+  },
 }

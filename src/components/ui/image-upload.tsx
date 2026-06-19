@@ -91,7 +91,7 @@ export function ImageUpload({ value, onChange, label, compact = false, size = 's
       form.append('file', file)
       const res = await fetch('/api/upload/image', { method: 'POST', body: form })
       if (res.status === 413) {
-        setError('Image is too large — please use an image under 5 MB')
+        setError('Image is too large — please use an image under 10 MB')
         return
       }
       const json = await res.json()
@@ -207,30 +207,32 @@ export function ImageUpload({ value, onChange, label, compact = false, size = 's
 
       {/* Preview + drop zone */}
       {value ? (
-        /* ── Has image: compact preview bar ── */
-        <div className="relative flex items-center gap-3 rounded-xl border border-brand-teal/30 bg-brand-teal/5 px-3 py-2.5">
+        /* ── Has image: full-cover preview ── */
+        <div className="group relative w-full overflow-hidden rounded-xl border border-brand-teal/30 bg-gray-100" style={{ height: 200 }}>
           <img
             key={value}
             src={value}
             alt="Preview"
-            className="h-14 w-14 rounded-lg border border-brand-teal/20 object-contain bg-white shrink-0 shadow-sm"
+            className="h-full w-full object-contain"
             onError={() => setError('Image URL could not be loaded')}
             onLoad={() => setError(null)}
           />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-brand-teal">Image uploaded</p>
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="mt-0.5 text-xs text-gray-500 hover:text-brand-teal transition-colors"
-            >
-              Click to replace
-            </button>
-          </div>
+          {/* Dark overlay on hover */}
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors" />
+          {/* Replace button — centre, appears on hover */}
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="absolute inset-0 flex flex-col items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <Upload className="h-6 w-6 text-white drop-shadow" />
+            <span className="text-xs font-semibold text-white drop-shadow">Click to replace</span>
+          </button>
+          {/* Remove button — top-right corner */}
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onChange(''); setError(null) }}
-            className="shrink-0 flex h-7 w-7 items-center justify-center rounded-lg bg-red-100 text-red-500 hover:bg-red-500 hover:text-white transition-colors"
+            className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-red-500 text-white shadow hover:bg-red-600 transition-colors"
             title="Remove image"
           >
             <X className="h-3.5 w-3.5" />

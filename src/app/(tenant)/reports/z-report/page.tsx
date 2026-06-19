@@ -38,6 +38,30 @@ export default function ZReportPage() {
   const [closingCash, setClosingCash] = useState('')
   const [sessionLoading, setSessionLoading] = useState(false)
   const [zReportData, setZReportData] = useState<Record<string, unknown> | null>(null)
+  const [detailSession, setDetailSession] = useState<RegisterSession | null>(null)
+
+  const { data: cashMovements = [], isLoading: movementsLoading } = useQuery<any[]>({
+    queryKey: ['session-movements', detailSession?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/pos/session/movements?session_id=${detailSession!.id}`)
+      const json = await res.json()
+      return json.data ?? []
+    },
+    enabled: !!detailSession?.id,
+    staleTime: 0,
+  })
+
+  const zReportSessionId = (zReportData?.id ?? zReportData?.session_id) as string | undefined
+  const { data: zReportMovements = [] } = useQuery<any[]>({
+    queryKey: ['session-movements', zReportSessionId],
+    queryFn: async () => {
+      const res = await fetch(`/api/pos/session/movements?session_id=${zReportSessionId}`)
+      const json = await res.json()
+      return json.data ?? []
+    },
+    enabled: !!zReportSessionId,
+    staleTime: 0,
+  })
 
   const { data: sessions = [], isLoading: loading, refetch: refetchSessions } = useQuery<RegisterSession[]>({
     queryKey: ['report-sessions', activeBranch?.id, dateFrom, dateTo],
@@ -59,7 +83,7 @@ export default function ZReportPage() {
       return json.data ?? null
     },
     enabled: !!activeBranch,
-    staleTime: 30_000,
+    staleTime: 0,
   })
 
   async function handleOpenSession() {
@@ -160,6 +184,31 @@ export default function ZReportPage() {
               </div>
             ))}
           </div>
+
+          {zReportMovements.length > 0 && (
+            <div className="mt-4 rounded-lg border border-blue-200 bg-white p-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Cash Movements</p>
+              <div className="space-y-1.5">
+                {zReportMovements.map((m: any) => (
+                  <div key={m.id} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`text-xs font-semibold ${m.type === 'cash_in' ? 'text-green-600' : 'text-orange-600'}`}>
+                        {m.type === 'cash_in' ? '+ Cash In' : '− Cash Out'}
+                      </span>
+                      {m.notes && <span className="text-xs text-gray-400 truncate">{m.notes}</span>}
+                    </div>
+                    <span className={`font-semibold shrink-0 ${m.type === 'cash_in' ? 'text-green-600' : 'text-orange-600'}`}>
+                      {m.type === 'cash_in' ? '+' : '−'}{formatCurrency(m.amount)}
+                    </span>
+                  </div>
+                ))}
+                <div className="border-t border-gray-200 pt-1.5 flex justify-between text-xs font-semibold text-gray-700">
+                  <span>Net Cash Movement</span>
+                  <span>{formatCurrency(zReportMovements.reduce((s: number, m: any) => s + (m.type === 'cash_in' ? m.amount : -m.amount), 0))}</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -190,7 +239,7 @@ export default function ZReportPage() {
                 <tr><td colSpan={8} className="px-4 py-8 text-center text-on-surface-variant">No register sessions in this period.</td></tr>
               )}
               {sessions.map((s) => (
-                <tr key={s.id} className="hover:bg-surface-container-low">
+                <tr key={s.id} onClick={() => setDetailSession(s)} className="hover:bg-surface-container-low cursor-pointer">
                   <td className="px-4 py-3 text-on-surface">{formatDate(s.opened_at)}</td>
                   <td className="px-4 py-3 text-on-surface">{s.closed_at ? formatDate(s.closed_at) : '—'}</td>
                   <td className="px-4 py-3 text-right text-on-surface">{formatCurrency(s.opening_float)}</td>
@@ -209,6 +258,91 @@ export default function ZReportPage() {
           </table>
         </div>
       </div>
+
+      {/* Session Detail Modal */}
+      <Modal open={!!detailSession} onClose={() => setDetailSession(null)} title="Session Z-Report" size="sm">
+        {detailSession && (
+          <div className="space-y-4 text-sm">
+            <div className="flex justify-between text-xs text-on-surface-variant">
+              <span>Opened: {new Date(detailSession.opened_at).toLocaleString()}</span>
+              <span>{detailSession.closed_at ? `Closed: ${new Date(detailSession.closed_at).toLocaleString()}` : 'Still open'}</span>
+            </div>
+
+            <div className="rounded-xl bg-surface-container-low p-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant mb-3">Sales</p>
+              {([
+                ['Total Sales',  detailSession.total_sales,  false],
+                ['Cash Sales',   detailSession.cash_sales,   false],
+                ['Card Sales',   detailSession.card_sales,   false],
+                ['Other Sales',  detailSession.other_sales,  false],
+                ['Refunds',      detailSession.total_refunds, true],
+              ] as [string, number | null, boolean][]).map(([label, val, isNeg]) => (
+                <div key={label} className="flex justify-between">
+                  <span className="text-on-surface-variant">{label}</span>
+                  <span className={isNeg && (val ?? 0) > 0 ? 'text-red-600' : 'text-on-surface'}>
+                    {isNeg && (val ?? 0) > 0 ? '-' : ''}{formatCurrency(val ?? 0)}
+                  </span>
+                </div>
+              ))}
+              <div className="flex justify-between text-xs text-on-surface-variant border-t border-outline-variant pt-2 mt-1">
+                <span>Transactions</span><span>{detailSession.transaction_count ?? 0}</span>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-surface-container-low p-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant mb-3">Cash Reconciliation</p>
+              {([
+                ['Opening Float',  detailSession.opening_float, false],
+                ['Expected Cash',  detailSession.expected_cash, false],
+                ['Closing Cash',   detailSession.closing_cash,  false],
+              ] as [string, number | null, boolean][]).map(([label, val]) => (
+                <div key={label} className="flex justify-between">
+                  <span className="text-on-surface-variant">{label}</span>
+                  <span className="text-on-surface">{val != null ? formatCurrency(val) : '—'}</span>
+                </div>
+              ))}
+              <div className={`flex justify-between font-semibold border-t border-outline-variant pt-2 mt-1 ${(detailSession.variance ?? 0) !== 0 ? 'text-red-600' : 'text-green-600'}`}>
+                <span>Variance (Over/Short)</span>
+                <span>{detailSession.variance != null ? formatCurrency(detailSession.variance) : '—'}</span>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-surface-container-low p-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant mb-3">Cash Movements</p>
+              {movementsLoading ? (
+                <p className="text-xs text-on-surface-variant text-center py-2">Loading…</p>
+              ) : cashMovements.length === 0 ? (
+                <p className="text-xs text-on-surface-variant text-center py-2">No cash movements recorded</p>
+              ) : (
+                <div className="space-y-2">
+                  {cashMovements.map((m: any) => (
+                    <div key={m.id} className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className={`text-xs font-semibold ${m.type === 'cash_in' ? 'text-green-600' : 'text-orange-600'}`}>
+                          {m.type === 'cash_in' ? '+ Cash In' : '− Cash Out'}
+                        </span>
+                        {m.notes && <p className="text-xs text-on-surface-variant truncate">{m.notes}</p>}
+                        <p className="text-[10px] text-on-surface-variant">{new Date(m.created_at).toLocaleTimeString()}</p>
+                      </div>
+                      <span className={`text-sm font-semibold shrink-0 ${m.type === 'cash_in' ? 'text-green-600' : 'text-orange-600'}`}>
+                        {m.type === 'cash_in' ? '+' : '−'}{formatCurrency(m.amount)}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="border-t border-outline-variant pt-2 flex justify-between font-semibold text-xs">
+                    <span>Net Cash Movement</span>
+                    <span className={cashMovements.reduce((sum: number, m: any) => sum + (m.type === 'cash_in' ? m.amount : -m.amount), 0) >= 0 ? 'text-green-600' : 'text-orange-600'}>
+                      {formatCurrency(cashMovements.reduce((sum: number, m: any) => sum + (m.type === 'cash_in' ? m.amount : -m.amount), 0))}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <Button variant="outline" className="w-full" onClick={() => setDetailSession(null)}>Close</Button>
+          </div>
+        )}
+      </Modal>
 
       {/* Open Register Modal */}
       <Modal open={openModal} onClose={() => setOpenModal(false)} title="Open Register" size="sm">

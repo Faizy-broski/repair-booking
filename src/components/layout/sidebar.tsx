@@ -10,7 +10,7 @@ import {
   CreditCard, AlertCircle, Smartphone, BookOpen, TrendingUp, PieChart,
   ChevronDown, Bell, Server, Clock, Activity, Mail, Users2,
   Store, GitBranch, Sliders, Layers, Settings2, PackagePlus, Cpu, Tag,
-  CalendarDays, LogIn, Palette,
+  CalendarDays, LogIn, Palette, LifeBuoy,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
@@ -87,6 +87,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'SMS Gateway',      href: '/settings/notifications/sms',              icon: MessageSquare, requiredRole: 'branch_manager', module: 'notifications', subItem: true },
   { label: 'Invoice Reminders',href: '/settings/notifications/reminders',        icon: Clock,         requiredRole: 'branch_manager', module: 'notifications', subItem: true },
   { label: 'Delivery Logs',    href: '/settings/notifications/delivery-logs',    icon: Activity,      requiredRole: 'branch_manager', module: 'notifications', subItem: true },
+  { label: 'Helpdesk',         href: '/helpdesk',                                icon: LifeBuoy,      requiredRole: 'branch_manager' },
   { label: 'Settings',         href: '/settings',                                icon: Settings,      requiredRole: 'branch_manager' },
   { label: 'Business Information', href: '/settings/general',                    icon: Store,         requiredRole: 'branch_manager', subItem: true },
   { label: 'Branches',         href: '/settings/branches',                       icon: GitBranch,     requiredRole: 'business_owner', subItem: true },
