@@ -21,6 +21,8 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import type { Customer, Product } from '@/types/database'
 import type { ProductWithStock } from '../_types'
+import { ScannerModal } from '@/components/scanner/scanner-modal'
+import type { ProductWithStock as ScannedProduct } from '@/hooks/use-barcode-lookup'
 
 interface Props {
   mobileView: 'browse' | 'cart'
@@ -356,13 +358,15 @@ export function CartPanel({ mobileView }: Props) {
     setProcessing(false)
   }
 
-  // ── Barcode scan ───────────────────────────────────────────────────────────
-  async function handleBarcodeScan(val: string) {
+  // ── Scanner modal state ────────────────────────────────────────────────────
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const [scannerTriggerBarcode, setScannerTriggerBarcode] = useState<string | undefined>()
+
+  // ── Barcode scan — opens modal instantly, modal performs the lookup internally ──
+  function handleBarcodeScan(val: string) {
     if (!val) return
-    const res = await fetch(`/api/products?search=${encodeURIComponent(val)}&limit=1`)
-    const j = await res.json()
-    const found: ProductWithStock | undefined = j.data?.[0]
-    if (found) pos.addToCart(found as unknown as Product)
+    setScannerTriggerBarcode(val)
+    setScannerOpen(true)
   }
 
   return (
@@ -806,6 +810,22 @@ export function CartPanel({ mobileView }: Props) {
           </div>
         </div>
       )}
+
+      {/* Scanner Modal — triggered when barcode input is focused during HID scan */}
+      <ScannerModal
+        open={scannerOpen}
+        onClose={() => { setScannerOpen(false); setScannerTriggerBarcode(undefined) }}
+        mode="pos"
+        branchId={activeBranch?.id ?? null}
+        triggerBarcode={scannerTriggerBarcode}
+        onProductCreated={() => { queryClient.invalidateQueries({ queryKey: ['pos-products'] }) }}
+        onAddToCart={(scanned: ScannedProduct) => {
+          const product = scanned as unknown as ProductWithStock
+          pos.addToCart(product as unknown as Product)
+          toast.success(`${product.name} added to cart`)
+          setScannerOpen(false)
+        }}
+      />
 
       {/* Gift Card Modal */}
       {gcModalOpen && (

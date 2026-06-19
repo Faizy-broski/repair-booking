@@ -39,7 +39,8 @@ export const ProductService = {
     }
     if (barcode) {
       // Exact identifier match for scanner — barcode takes priority over search
-      q = q.or(`barcode.eq.${barcode},sku.eq.${barcode}`)
+      // We must wrap the barcode in double quotes so PostgREST treats numeric barcodes as text, avoiding casting errors.
+      q = q.or(`barcode.eq."${barcode}",sku.eq."${barcode}"`)
     } else if (search) {
       q = q.or(`name.ilike.%${search}%,sku.ilike.%${search}%,barcode.ilike.%${search}%,imei.ilike.%${search}%`)
     }

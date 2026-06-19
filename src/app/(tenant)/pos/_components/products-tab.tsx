@@ -21,7 +21,7 @@ import type {
 } from '../_types'
 import { ScanButton } from '@/components/scanner/scan-button'
 import { ScannerModal } from '@/components/scanner/scanner-modal'
-import { useBarcodeLookup, type ProductWithStock as ScannedProduct } from '@/hooks/use-barcode-lookup'
+import type { ProductWithStock as ScannedProduct } from '@/hooks/use-barcode-lookup'
 import { useHidScanner } from '@/hooks/use-hid-scanner'
 
 // ── Extracted & memoized so it isn't recreated on every ProductsTab render ──
@@ -45,11 +45,10 @@ const ProductCard = memo(function ProductCard({
       disabled={outOfStock}
       onMouseEnter={() => hasVariants && onVariantHover?.(product)}
       onClick={() => hasVariants ? onVariantSelect(product) : onAdd(product)}
-      className={`relative flex w-full flex-col overflow-hidden rounded-xl border bg-white p-3 text-left transition-all ${
-        outOfStock
+      className={`relative flex w-full flex-col overflow-hidden rounded-xl border bg-white p-3 text-left transition-all ${outOfStock
           ? 'border-gray-100 opacity-50 cursor-not-allowed'
           : 'border-gray-200 hover:border-brand-teal hover:shadow-sm cursor-pointer'
-      }`}
+        }`}
     >
       {outOfStock && (
         <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/60">
@@ -115,8 +114,8 @@ export function ProductsTab() {
   const [productsView, setProductsView] = useState<ProductsView>('all_products')
 
   // ── All Products view ──────────────────────────────────────────────────────
-  const [allProductsSearch, setAllProductsSearch]     = useState('')
-  const [debouncedSearch, setDebouncedSearch]         = useState('')
+  const [allProductsSearch, setAllProductsSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [allProductsItemType, setAllProductsItemType] = useState<'all' | 'product' | 'part'>('all')
   const [allProductsCategoryId, setAllProductsCategoryId] = useState('')
 
@@ -157,23 +156,23 @@ export function ProductsTab() {
   })
 
   // ── By Products hierarchy ──────────────────────────────────────────────────
-  const [catLevel, setCatLevel]                         = useState<CatLevel>('device_types')
-  const [catBreadcrumb, setCatBreadcrumb]               = useState<{ level: CatLevel; id: string; name: string }[]>([])
-  const [catItems, setCatItems]                         = useState<{ id: string; name: string; image_url?: string | null }[]>([])
-  const [catItemsLoading, setCatItemsLoading]           = useState(false)
-  const [categoryProducts, setCategoryProducts]         = useState<ProductWithStock[]>([])
+  const [catLevel, setCatLevel] = useState<CatLevel>('device_types')
+  const [catBreadcrumb, setCatBreadcrumb] = useState<{ level: CatLevel; id: string; name: string }[]>([])
+  const [catItems, setCatItems] = useState<{ id: string; name: string; image_url?: string | null }[]>([])
+  const [catItemsLoading, setCatItemsLoading] = useState(false)
+  const [categoryProducts, setCategoryProducts] = useState<ProductWithStock[]>([])
   const [categoryProductsLoading, setCategoryProductsLoading] = useState(false)
 
   // ── By Parts hierarchy ─────────────────────────────────────────────────────
-  const [partLevel, setPartLevel]                   = useState<PartLevel>('device_types')
-  const [partBreadcrumb, setPartBreadcrumb]         = useState<{ level: PartLevel; id: string; name: string }[]>([])
-  const [partItems, setPartItems]                   = useState<{ id: string; name: string; image_url?: string | null }[]>([])
-  const [partItemsLoading, setPartItemsLoading]     = useState(false)
-  const [partProducts, setPartProducts]             = useState<ProductWithStock[]>([])
+  const [partLevel, setPartLevel] = useState<PartLevel>('device_types')
+  const [partBreadcrumb, setPartBreadcrumb] = useState<{ level: PartLevel; id: string; name: string }[]>([])
+  const [partItems, setPartItems] = useState<{ id: string; name: string; image_url?: string | null }[]>([])
+  const [partItemsLoading, setPartItemsLoading] = useState(false)
+  const [partProducts, setPartProducts] = useState<ProductWithStock[]>([])
   const [partProductsLoading, setPartProductsLoading] = useState(false)
 
   // ── Custom item ────────────────────────────────────────────────────────────
-  const [miscName, setMiscName]   = useState('')
+  const [miscName, setMiscName] = useState('')
   const [miscPrice, setMiscPrice] = useState('')
 
   // ── Scanner ────────────────────────────────────────────────────────────────
@@ -181,9 +180,10 @@ export function ProductsTab() {
   const [scannerDefaultState, setScannerDefaultState] = useState<'scanning' | 'not_found' | 'found'>('scanning')
   const [scannerDefaultBarcode, setScannerDefaultBarcode] = useState<string>()
   const [scannerDefaultProduct, setScannerDefaultProduct] = useState<ProductWithStock | null>(null)
+  const [scannerTriggerBarcode, setScannerTriggerBarcode] = useState<string | undefined>()
 
   // ── Variant modal ──────────────────────────────────────────────────────────
-  const [variantProduct, setVariantProduct]         = useState<ProductWithStock | null>(null)
+  const [variantProduct, setVariantProduct] = useState<ProductWithStock | null>(null)
   const [selectedVariantIds, setSelectedVariantIds] = useState<Set<string>>(new Set())
 
   const { data: variantData, isFetching: variantLoading } = useQuery<ProductVariant[]>({
@@ -201,55 +201,38 @@ export function ProductsTab() {
   const variantList = variantData ?? []
 
   // ── Advanced search ────────────────────────────────────────────────────────
-  const [advSearchOpen, setAdvSearchOpen]       = useState(false)
-  const [advSearchName, setAdvSearchName]       = useState('')
-  const [advSearchSku, setAdvSearchSku]         = useState('')
-  const [advSearchCatIds, setAdvSearchCatIds]   = useState<Set<string>>(new Set())
+  const [advSearchOpen, setAdvSearchOpen] = useState(false)
+  const [advSearchName, setAdvSearchName] = useState('')
+  const [advSearchSku, setAdvSearchSku] = useState('')
+  const [advSearchCatIds, setAdvSearchCatIds] = useState<Set<string>>(new Set())
   const [advSearchResults, setAdvSearchResults] = useState<ProductWithStock[]>([])
-  const [advSearching, setAdvSearching]         = useState(false)
+  const [advSearching, setAdvSearching] = useState(false)
 
   // ── Warranty modal ─────────────────────────────────────────────────────────
-  const [warrantyOpen, setWarrantyOpen]                 = useState(false)
-  const [warrantyForm, setWarrantyForm]                 = useState({ imei: '', partSerial: '', invoiceId: '', ticketId: '', customerName: '', customerMobile: '' })
-  const [warrantyResults, setWarrantyResults]           = useState<any[]>([])
-  const [warrantySearching, setWarrantySearching]       = useState(false)
-  const [warrantyActionsOpen, setWarrantyActionsOpen]   = useState<string | null>(null)
-  const [warrantyClaimModal, setWarrantyClaimModal]     = useState<{ repairId: string; item: any } | null>(null)
-  const [warrantyClaimReason, setWarrantyClaimReason]   = useState('')
+  const [warrantyOpen, setWarrantyOpen] = useState(false)
+  const [warrantyForm, setWarrantyForm] = useState({ imei: '', partSerial: '', invoiceId: '', ticketId: '', customerName: '', customerMobile: '' })
+  const [warrantyResults, setWarrantyResults] = useState<any[]>([])
+  const [warrantySearching, setWarrantySearching] = useState(false)
+  const [warrantyActionsOpen, setWarrantyActionsOpen] = useState<string | null>(null)
+  const [warrantyClaimModal, setWarrantyClaimModal] = useState<{ repairId: string; item: any } | null>(null)
+  const [warrantyClaimReason, setWarrantyClaimReason] = useState('')
   const [warrantyClaimSubmitting, setWarrantyClaimSubmitting] = useState(false)
 
   // ── Global POS Scanner ─────────────────────────────────────────────────────
-  const { lookup } = useBarcodeLookup(activeBranch?.id ?? null)
   const scanLockRef = useRef(false)
 
   useHidScanner({
-    onScan: async (code) => {
+    onScan: (code) => {
       if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return
       if (scanLockRef.current) return
       scanLockRef.current = true
-      try {
-        const res = await lookup(code)
-        if (res.status === 'found' && res.product) {
-          if (res.product.has_variants || (res.product.variant_count ?? 0) > 0) {
-            toast.info(`Scanned ${res.product.name}. Please select variant.`)
-            setVariantProduct(res.product as unknown as ProductWithStock)
-            return
-          }
-          setScannerDefaultState('found')
-          setScannerDefaultBarcode(code)
-          setScannerDefaultProduct(res.product as unknown as ProductWithStock)
-          setScannerOpen(true)
-        } else if (res.status === 'not_found') {
-          setScannerDefaultState('not_found')
-          setScannerDefaultBarcode(code)
-          setScannerDefaultProduct(null)
-          setScannerOpen(true)
-        } else if (res.status === 'error' && res.error?.includes('misread')) {
-          toast.warning(`Scanner misread — try again`)
-        }
-      } finally {
-        scanLockRef.current = false
-      }
+      // Open modal instantly — the modal will perform the lookup internally and show the spinner
+      setScannerTriggerBarcode(code)
+      setScannerDefaultState('scanning')
+      setScannerDefaultBarcode(undefined)
+      setScannerDefaultProduct(null)
+      setScannerOpen(true)
+      setTimeout(() => { scanLockRef.current = false }, 500)
     },
     enabled: !scannerOpen
   })
@@ -298,7 +281,7 @@ export function ProductsTab() {
 
   useEffect(() => {
     if (productsView === 'by_products' && catBreadcrumb.length === 0) loadCatLevel('device_types')
-    if (productsView === 'by_parts'    && partBreadcrumb.length === 0) loadPartLevel('device_types')
+    if (productsView === 'by_parts' && partBreadcrumb.length === 0) loadPartLevel('device_types')
   }, [productsView]) // eslint-disable-line
 
   // ── Ctrl+S → Advanced Search ───────────────────────────────────────────────
@@ -397,7 +380,7 @@ export function ProductsTab() {
     const params = new URLSearchParams({ limit: '200', show_on_pos: 'true' })
     if (activeBranch) params.set('branch_id', activeBranch.id)
     const nameTerm = advSearchName.trim()
-    const skuTerm  = advSearchSku.trim()
+    const skuTerm = advSearchSku.trim()
     // Pass whichever term is provided to the API for server-side pre-filtering
     if (nameTerm) params.set('search', nameTerm)
     else if (skuTerm) params.set('search', skuTerm)
@@ -434,10 +417,10 @@ export function ProductsTab() {
     if (!imei && !ticketId && !invoiceId && !customerName && !customerMobile) return
     setWarrantySearching(true)
     const params = new URLSearchParams({ branch_id: activeBranch.id })
-    if (imei)           params.set('imei', imei)
-    if (ticketId)       params.set('ticket_id', ticketId)
-    if (invoiceId)      params.set('invoice_id', invoiceId)
-    if (customerName)   params.set('customer_name', customerName)
+    if (imei) params.set('imei', imei)
+    if (ticketId) params.set('ticket_id', ticketId)
+    if (invoiceId) params.set('invoice_id', invoiceId)
+    if (customerName) params.set('customer_name', customerName)
     if (customerMobile) params.set('customer_mobile', customerMobile)
     const res = await fetch(`/api/repairs/warranty-search?${params}`)
     const j = await res.json()
@@ -461,33 +444,32 @@ export function ProductsTab() {
       <div className="flex shrink-0 items-center gap-2 border-b border-gray-200 bg-white px-3 py-2">
         <div className="flex min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex overflow-hidden rounded-lg border border-gray-200">
-          {(
-            isRetail
-              ? (['all_products', 'by_category', 'custom_item'] as const)
-              : (['all_products', 'by_products', 'by_parts', 'custom_item'] as const)
-          ).map((view, i) => {
-            const label =
-              view === 'all_products' ? 'All Products'
-              : view === 'by_products' ? 'By Products'
-              : view === 'by_parts'    ? 'By Part Items'
-              : view === 'by_category' ? 'By Category'
-              : 'Custom Item'
-            return (
-              <button
-                key={view}
-                onClick={() => {
-                  setProductsView(view as ProductsView)
-                  if (view === 'by_products' && catBreadcrumb.length === 0) loadCatLevel('device_types')
-                  if (view === 'by_parts' && partBreadcrumb.length === 0) loadPartLevel('device_types')
-                }}
-                className={`shrink-0 px-3 py-2 text-xs font-medium transition-colors sm:px-5 sm:text-sm ${i > 0 ? 'border-l border-gray-200' : ''} ${
-                  productsView === view ? 'bg-white text-brand-teal font-semibold border-b-2 border-brand-teal' : 'text-gray-500 hover:bg-gray-50'
-                }`}
-              >
-                {label}
-              </button>
-            )
-          })}
+            {(
+              isRetail
+                ? (['all_products', 'by_category', 'custom_item'] as const)
+                : (['all_products', 'by_products', 'by_parts', 'custom_item'] as const)
+            ).map((view, i) => {
+              const label =
+                view === 'all_products' ? 'All Products'
+                  : view === 'by_products' ? 'By Products'
+                    : view === 'by_parts' ? 'By Part Items'
+                      : view === 'by_category' ? 'By Category'
+                        : 'Custom Item'
+              return (
+                <button
+                  key={view}
+                  onClick={() => {
+                    setProductsView(view as ProductsView)
+                    if (view === 'by_products' && catBreadcrumb.length === 0) loadCatLevel('device_types')
+                    if (view === 'by_parts' && partBreadcrumb.length === 0) loadPartLevel('device_types')
+                  }}
+                  className={`shrink-0 px-3 py-2 text-xs font-medium transition-colors sm:px-5 sm:text-sm ${i > 0 ? 'border-l border-gray-200' : ''} ${productsView === view ? 'bg-white text-brand-teal font-semibold border-b-2 border-brand-teal' : 'text-gray-500 hover:bg-gray-50'
+                    }`}
+                >
+                  {label}
+                </button>
+              )
+            })}
           </div>
         </div>
         <button
@@ -510,31 +492,18 @@ export function ProductsTab() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               <input
                 type="text" value={allProductsSearch} onChange={e => setAllProductsSearch(e.target.value)}
-                onKeyDown={async (e) => {
-                  if (e.key === 'Enter' && allProductsSearch.trim()) {
-                    const code = allProductsSearch.trim()
-                    const res = await lookup(code)
-                    if (res.status === 'found' && res.product) {
-                      if (res.product.has_variants || (res.product.variant_count ?? 0) > 0) {
-                        toast.info(`Scanned ${res.product.name}. Please select variant.`)
-                        setVariantProduct(res.product as unknown as ProductWithStock)
-                        setAllProductsSearch('')
-                        return
-                      }
-                      setScannerDefaultState('found')
-                      setScannerDefaultBarcode(code)
-                      setScannerDefaultProduct(res.product as unknown as ProductWithStock)
-                      setScannerOpen(true)
-                      setAllProductsSearch('')
-                    } else if (res.status === 'not_found') {
-                      setScannerDefaultState('not_found')
-                      setScannerDefaultBarcode(code)
-                      setScannerDefaultProduct(null)
-                      setScannerOpen(true)
-                      setAllProductsSearch('')
-                    } else if (res.status === 'error' && res.error?.includes('misread')) {
-                      toast.warning(`Scanner misread — try again`)
-                    }
+                onKeyDown={(e) => {
+                  const val = e.currentTarget.value.trim()
+                  if (e.key === 'Enter' && val) {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    // Open modal instantly — modal performs the lookup and shows the spinner
+                    setScannerTriggerBarcode(val)
+                    setScannerDefaultState('scanning')
+                    setScannerDefaultBarcode(undefined)
+                    setScannerDefaultProduct(null)
+                    setScannerOpen(true)
+                    setAllProductsSearch('')
                   }
                 }}
                 placeholder="Search by name, SKU or barcode…" autoFocus
@@ -618,8 +587,8 @@ export function ProductsTab() {
                       ) : (
                         <div className="flex w-full h-24 items-center justify-center bg-gray-50 border-b border-gray-100">
                           {catLevel === 'device_types' && <Layers className="h-8 w-8 text-gray-400" />}
-                          {catLevel === 'brands'       && <Tag   className="h-8 w-8 text-blue-400" />}
-                          {catLevel === 'models'       && <Phone className="h-8 w-8 text-purple-400" />}
+                          {catLevel === 'brands' && <Tag className="h-8 w-8 text-blue-400" />}
+                          {catLevel === 'models' && <Phone className="h-8 w-8 text-purple-400" />}
                         </div>
                       )}
                       <div className="w-full p-3 flex-1 flex items-center justify-center">
@@ -719,9 +688,9 @@ export function ProductsTab() {
                     ) : (
                       <div className="flex w-full h-24 items-center justify-center bg-gray-50 border-b border-gray-100">
                         {partLevel === 'device_types' && <Layers className="h-8 w-8 text-gray-400" />}
-                        {partLevel === 'brands'       && <Tag   className="h-8 w-8 text-blue-400" />}
-                        {partLevel === 'models'       && <Phone className="h-8 w-8 text-purple-400" />}
-                        {partLevel === 'part_types'   && <Package className="h-8 w-8 text-purple-500" />}
+                        {partLevel === 'brands' && <Tag className="h-8 w-8 text-blue-400" />}
+                        {partLevel === 'models' && <Phone className="h-8 w-8 text-purple-400" />}
+                        {partLevel === 'part_types' && <Package className="h-8 w-8 text-purple-500" />}
                       </div>
                     )}
                     <div className="w-full p-3 flex-1 flex items-center justify-center">
@@ -811,7 +780,7 @@ export function ProductsTab() {
       >
         <div className="space-y-3">
           {variantLoading ? (
-            <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-12 animate-pulse rounded-lg bg-gray-100" />)}</div>
+            <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-12 animate-pulse rounded-lg bg-gray-100" />)}</div>
           ) : variantList.length === 0 ? (
             <p className="py-6 text-center text-sm text-gray-400">No variants found</p>
           ) : (
@@ -905,7 +874,7 @@ export function ProductsTab() {
               <div className="flex-1 overflow-y-auto px-5 py-3">
                 <p className="mb-2 text-xs text-gray-500">Results ({advSearchResults.length})</p>
                 {advSearching ? (
-                  <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-12 animate-pulse rounded bg-gray-100" />)}</div>
+                  <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-12 animate-pulse rounded bg-gray-100" />)}</div>
                 ) : advSearchResults.length === 0 ? (
                   <p className="py-8 text-center text-sm text-gray-400">No results. Try searching above.</p>
                 ) : (
@@ -1013,7 +982,7 @@ export function ProductsTab() {
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {warrantySearching ? (
-                <div className="space-y-3">{[1,2].map(i => <div key={i} className="h-24 animate-pulse rounded-lg bg-gray-100" />)}</div>
+                <div className="space-y-3">{[1, 2].map(i => <div key={i} className="h-24 animate-pulse rounded-lg bg-gray-100" />)}</div>
               ) : warrantyResults.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                   <ShieldCheck className="h-12 w-12 mb-3 opacity-30" />
@@ -1101,9 +1070,10 @@ export function ProductsTab() {
 
       <ScannerModal
         open={scannerOpen}
-        onClose={() => { setScannerOpen(false); setScannerDefaultState('scanning'); setScannerDefaultBarcode(undefined); setScannerDefaultProduct(null); }}
+        onClose={() => { setScannerOpen(false); setScannerTriggerBarcode(undefined); setScannerDefaultState('scanning'); setScannerDefaultBarcode(undefined); setScannerDefaultProduct(null) }}
         mode="pos"
         branchId={activeBranch?.id ?? null}
+        triggerBarcode={scannerTriggerBarcode}
         defaultState={scannerDefaultState}
         defaultBarcode={scannerDefaultBarcode}
         defaultProduct={scannerDefaultProduct}

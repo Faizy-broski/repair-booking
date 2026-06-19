@@ -37,6 +37,8 @@ export interface ScannerModalProps {
   defaultBarcode?: string
   defaultState?: 'scanning' | 'not_found' | 'found'
   defaultProduct?: ProductWithStock | null
+  /** When set, the modal opens and immediately triggers a lookup for this barcode (physical scanner fast-path). */
+  triggerBarcode?: string
 }
 
 export function ScannerModal({
@@ -49,6 +51,7 @@ export function ScannerModal({
   defaultBarcode,
   defaultState,
   defaultProduct,
+  triggerBarcode,
 }: ScannerModalProps) {
   const [tab, setTab] = useState<ScannerTab>('webcam')
   const [scanState, setScanState] = useState<ScanState>(defaultState || 'scanning')
@@ -58,6 +61,8 @@ export function ScannerModal({
   const isProcessing = useRef(false)
 
   const { lookup, isLooking } = useBarcodeLookup(branchId)
+
+  const handleScanRef = useRef<(code: string, format?: string) => void>(() => {})
 
   const handleScan = useCallback(async (code: string, format = 'hid') => {
     // Guard against concurrent lookups (dedup at the orchestration level)
@@ -87,6 +92,9 @@ export function ScannerModal({
     isProcessing.current = false
   }, [open, lookup])
 
+  // Keep ref in sync so triggerBarcode useEffect always calls the latest version
+  useEffect(() => { handleScanRef.current = handleScan }, [handleScan])
+
   function resetToScanning() {
     setScanState('scanning')
     setLastBarcode('')
@@ -95,17 +103,22 @@ export function ScannerModal({
     isProcessing.current = false
   }
 
-  // Pre-seed state when opening
+  // Pre-seed state when opening; if triggerBarcode is provided, auto-trigger lookup
   useEffect(() => {
     if (open) {
       setScanState(defaultState || 'scanning')
-      setLastBarcode(defaultBarcode || '')
+      setLastBarcode(defaultBarcode || triggerBarcode || '')
       setFoundProduct(defaultProduct || null)
       setPrefill(undefined)
       isProcessing.current = false
       if (defaultState === 'not_found' || defaultState === 'found') setTab('hid')
+      if (triggerBarcode) {
+        setTab('hid')
+        handleScanRef.current(triggerBarcode, 'hid')
+      }
     }
-  }, [open, defaultState, defaultBarcode, defaultProduct])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, defaultState, defaultBarcode, defaultProduct, triggerBarcode])
 
   function handleClose() {
     resetToScanning()
