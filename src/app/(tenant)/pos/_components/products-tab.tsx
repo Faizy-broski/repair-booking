@@ -21,7 +21,7 @@ import type {
 } from '../_types'
 import { ScanButton } from '@/components/scanner/scan-button'
 import { ScannerModal } from '@/components/scanner/scanner-modal'
-import type { ProductWithStock as ScannedProduct } from '@/hooks/use-barcode-lookup'
+import { useBarcodeLookup, type ProductWithStock as ScannedProduct } from '@/hooks/use-barcode-lookup'
 import { useHidScanner } from '@/hooks/use-hid-scanner'
 
 // ── Extracted & memoized so it isn't recreated on every ProductsTab render ──
@@ -180,7 +180,6 @@ export function ProductsTab() {
   const [scannerDefaultState, setScannerDefaultState] = useState<'scanning' | 'not_found' | 'found'>('scanning')
   const [scannerDefaultBarcode, setScannerDefaultBarcode] = useState<string>()
   const [scannerDefaultProduct, setScannerDefaultProduct] = useState<ProductWithStock | null>(null)
-  const [scannerTriggerBarcode, setScannerTriggerBarcode] = useState<string | undefined>()
 
   // ── Variant modal ──────────────────────────────────────────────────────────
   const [variantProduct, setVariantProduct] = useState<ProductWithStock | null>(null)
@@ -219,20 +218,37 @@ export function ProductsTab() {
   const [warrantyClaimSubmitting, setWarrantyClaimSubmitting] = useState(false)
 
   // ── Global POS Scanner ─────────────────────────────────────────────────────
+  const { lookup } = useBarcodeLookup(activeBranch?.id ?? null)
   const scanLockRef = useRef(false)
 
   useHidScanner({
-    onScan: (code) => {
+    onScan: async (code) => {
       if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return
       if (scanLockRef.current) return
       scanLockRef.current = true
-      // Open modal instantly — the modal will perform the lookup internally and show the spinner
-      setScannerTriggerBarcode(code)
-      setScannerDefaultState('scanning')
-      setScannerDefaultBarcode(undefined)
-      setScannerDefaultProduct(null)
-      setScannerOpen(true)
-      setTimeout(() => { scanLockRef.current = false }, 500)
+      try {
+        const res = await lookup(code)
+        if (res.status === 'found' && res.product) {
+          if (res.product.has_variants || (res.product.variant_count ?? 0) > 0) {
+            toast.info(`Scanned ${res.product.name}. Please select variant.`)
+            setVariantProduct(res.product as unknown as ProductWithStock)
+            return
+          }
+          setScannerDefaultState('found')
+          setScannerDefaultBarcode(code)
+          setScannerDefaultProduct(res.product as unknown as ProductWithStock)
+          setScannerOpen(true)
+        } else if (res.status === 'not_found') {
+          setScannerDefaultState('not_found')
+          setScannerDefaultBarcode(code)
+          setScannerDefaultProduct(null)
+          setScannerOpen(true)
+        } else if (res.status === 'error' && res.error?.includes('misread')) {
+          toast.warning(`Scanner misread — try again`)
+        }
+      } finally {
+        scanLockRef.current = false
+      }
     },
     enabled: !scannerOpen
   })
@@ -492,18 +508,31 @@ export function ProductsTab() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               <input
                 type="text" value={allProductsSearch} onChange={e => setAllProductsSearch(e.target.value)}
-                onKeyDown={(e) => {
+                onKeyDown={async (e) => {
                   const val = e.currentTarget.value.trim()
                   if (e.key === 'Enter' && val) {
                     e.preventDefault()
                     e.stopPropagation()
-                    // Open modal instantly — modal performs the lookup and shows the spinner
-                    setScannerTriggerBarcode(val)
-                    setScannerDefaultState('scanning')
-                    setScannerDefaultBarcode(undefined)
-                    setScannerDefaultProduct(null)
-                    setScannerOpen(true)
-                    setAllProductsSearch('')
+                    const res = await lookup(val)
+                    if (res.status === 'found' && res.product) {
+                      if (res.product.has_variants || (res.product.variant_count ?? 0) > 0) {
+                        toast.info(`Scanned ${res.product.name}. Please select variant.`)
+                        setVariantProduct(res.product as unknown as ProductWithStock)
+                        setAllProductsSearch('')
+                        return
+                      }
+                      setScannerDefaultState('found')
+                      setScannerDefaultBarcode(val)
+                      setScannerDefaultProduct(res.product as unknown as ProductWithStock)
+                      setScannerOpen(true)
+                      setAllProductsSearch('')
+                    } else if (res.status === 'not_found') {
+                      setScannerDefaultState('not_found')
+                      setScannerDefaultBarcode(val)
+                      setScannerDefaultProduct(null)
+                      setScannerOpen(true)
+                      setAllProductsSearch('')
+                    }
                   }
                 }}
                 placeholder="Search by name, SKU or barcode…" autoFocus
@@ -1070,10 +1099,9 @@ export function ProductsTab() {
 
       <ScannerModal
         open={scannerOpen}
-        onClose={() => { setScannerOpen(false); setScannerTriggerBarcode(undefined); setScannerDefaultState('scanning'); setScannerDefaultBarcode(undefined); setScannerDefaultProduct(null) }}
+        onClose={() => { setScannerOpen(false); setScannerDefaultState('scanning'); setScannerDefaultBarcode(undefined); setScannerDefaultProduct(null) }}
         mode="pos"
         branchId={activeBranch?.id ?? null}
-        triggerBarcode={scannerTriggerBarcode}
         defaultState={scannerDefaultState}
         defaultBarcode={scannerDefaultBarcode}
         defaultProduct={scannerDefaultProduct}

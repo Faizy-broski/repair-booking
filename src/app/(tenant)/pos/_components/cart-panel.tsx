@@ -22,7 +22,7 @@ import { toast } from 'sonner'
 import type { Customer, Product } from '@/types/database'
 import type { ProductWithStock } from '../_types'
 import { ScannerModal } from '@/components/scanner/scanner-modal'
-import type { ProductWithStock as ScannedProduct } from '@/hooks/use-barcode-lookup'
+import { useBarcodeLookup, type ProductWithStock as ScannedProduct } from '@/hooks/use-barcode-lookup'
 
 interface Props {
   mobileView: 'browse' | 'cart'
@@ -360,13 +360,27 @@ export function CartPanel({ mobileView }: Props) {
 
   // ── Scanner modal state ────────────────────────────────────────────────────
   const [scannerOpen, setScannerOpen] = useState(false)
-  const [scannerTriggerBarcode, setScannerTriggerBarcode] = useState<string | undefined>()
+  const [scannerDefaultState, setScannerDefaultState] = useState<'scanning' | 'not_found' | 'found'>('scanning')
+  const [scannerDefaultBarcode, setScannerDefaultBarcode] = useState<string | undefined>()
+  const [scannerDefaultProduct, setScannerDefaultProduct] = useState<ScannedProduct | null>(null)
 
-  // ── Barcode scan — opens modal instantly, modal performs the lookup internally ──
-  function handleBarcodeScan(val: string) {
+  const { lookup } = useBarcodeLookup(activeBranch?.id ?? null)
+
+  // ── Barcode scan ───────────────────────────────────────────────────────────
+  async function handleBarcodeScan(val: string) {
     if (!val) return
-    setScannerTriggerBarcode(val)
-    setScannerOpen(true)
+    const res = await lookup(val)
+    if (res.status === 'found' && res.product) {
+      setScannerDefaultState('found')
+      setScannerDefaultBarcode(val)
+      setScannerDefaultProduct(res.product)
+      setScannerOpen(true)
+    } else if (res.status === 'not_found') {
+      setScannerDefaultState('not_found')
+      setScannerDefaultBarcode(val)
+      setScannerDefaultProduct(null)
+      setScannerOpen(true)
+    }
   }
 
   return (
@@ -814,10 +828,12 @@ export function CartPanel({ mobileView }: Props) {
       {/* Scanner Modal — triggered when barcode input is focused during HID scan */}
       <ScannerModal
         open={scannerOpen}
-        onClose={() => { setScannerOpen(false); setScannerTriggerBarcode(undefined) }}
+        onClose={() => { setScannerOpen(false); setScannerDefaultState('scanning'); setScannerDefaultBarcode(undefined); setScannerDefaultProduct(null) }}
         mode="pos"
         branchId={activeBranch?.id ?? null}
-        triggerBarcode={scannerTriggerBarcode}
+        defaultState={scannerDefaultState}
+        defaultBarcode={scannerDefaultBarcode}
+        defaultProduct={scannerDefaultProduct}
         onProductCreated={() => { queryClient.invalidateQueries({ queryKey: ['pos-products'] }) }}
         onAddToCart={(scanned: ScannedProduct) => {
           const product = scanned as unknown as ProductWithStock
