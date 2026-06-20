@@ -164,6 +164,12 @@ export const RepairController = {
           unit_price: p.unit_price,
         }))
         await adminSupabase.from('repair_items').insert(items)
+
+        // Deduct inventory for physical parts immediately on creation
+        await adminSupabase.rpc('deduct_repair_parts', {
+          p_repair_id: repair.id,
+          p_branch_id: data.branch_id,
+        })
       }
 
       // Fire ticket_created notification in background

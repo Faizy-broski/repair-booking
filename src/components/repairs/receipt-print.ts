@@ -300,14 +300,34 @@ export function printReceipt(data: ReceiptPrintData): void {
 
     win.focus()
     win.print()
+
+    // ── EPSON TM-T88V fix: delayed window close ───────────────────────────────
+    // `afterprint` fires the instant the user clicks "Print" in Chrome's dialog.
+    // At that moment, the job enters Windows' print spooler but the EPSON USB
+    // driver may not have finished receiving it yet.
+    // Calling win.close() immediately kills the connection mid-transfer → printer
+    // receives nothing and outputs no paper.
+    //
+    // Fix: wait 4 seconds after afterprint before destroying the window.
+    // 4s is enough for the EPSON TM-T88V to fully spool a receipt.
     win.addEventListener('afterprint', () => {
-      win.close()
-      URL.revokeObjectURL(blobUrl)
+      console.log('[RECEIPT PRINT] afterprint fired — waiting 4s before closing popup')
+      setTimeout(() => {
+        win.close()
+        URL.revokeObjectURL(blobUrl)
+        console.log('[RECEIPT PRINT] popup closed + blob URL revoked')
+      }, 4000)
     }, { once: true })
+
+    // Safety fallback: if afterprint never fires (e.g. user closes dialog without
+    // printing), clean up after 60s so we do not leak the blob URL forever.
+    setTimeout(() => {
+      if (!win.closed) win.close()
+      URL.revokeObjectURL(blobUrl)
+    }, 60_000)
   }
 
-  // Wait for the blob page to fully load, then add an extra 500ms for layout.
-  // 500ms is conservative — needed because the popup window is smaller than
-  // the main window and Chrome may re-flow the document on open.
+  // Wait for the blob page to fully load, then 500ms extra for layout reflow.
   win.addEventListener('load', () => setTimeout(triggerPrint, 500), { once: true })
 }
+

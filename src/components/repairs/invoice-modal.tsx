@@ -129,22 +129,45 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
 
   function handlePrint() {
     if (!receiptData) return
-    printReceipt({
-      settings:      receiptData.mergedSettings,
-      invoiceNumber: repair.job_number,
-      status:        repair.status,
-      issuedAt:      repair.created_at,
-      businessName:  branch?.name ?? 'Business',
-      branchName:    branch?.name,
-      branchAddress: branch?.address,
-      branchPhone:   branch?.phone,
-      customerName:  receiptData.customerName,
-      items:         receiptData.items,
-      subtotal:      receiptData.invoiceTotal,
-      total:         receiptData.invoiceTotal,
-      amountPaid:    receiptData.amountPaid,
-    })
+
+    const paperSize = receiptData.mergedSettings.paper_size ?? 'A4'
+    const isReceipt  = paperSize === 'Receipt80' || paperSize === 'Receipt58'
+    const pw         = paperSize === 'Receipt58' ? '58mm' : '80mm'
+
+    // ── Page size strategy ────────────────────────────────────────────────────
+    // THERMAL (Receipt80 / Receipt58):
+    //   Use 3276mm height — this matches the EPSON TM-T88V "Roll Paper 80 x 3276mm"
+    //   Windows driver setting. The driver with "Paper Save" enabled cuts after the
+    //   last printed line, not at the end of the roll. DO NOT use a measured px
+    //   height here — the EPSON driver rejects non-standard custom page sizes.
+    //
+    // A4 / A5 / LETTER:
+    //   Use standard CSS page size keywords. Content is measured to avoid excess.
+    let pageRule: string
+    if (isReceipt) {
+      pageRule = `@page { size: ${pw} 3276mm; margin: 0; }`
+    } else {
+      const sizeKeyword = paperSize === 'A5' ? 'A5' : paperSize === 'Letter' ? 'letter' : 'A4'
+      pageRule = `@page { size: ${sizeKeyword}; margin: 10mm; }`
+    }
+
+    console.log('[RECEIPT] paper_size:', paperSize, '| injecting:', pageRule)
+
+    const styleId = 'receipt-page-size-style'
+    document.getElementById(styleId)?.remove()
+    const style = document.createElement('style')
+    style.id = styleId
+    style.textContent = `@media print { ${pageRule} }`
+    document.head.appendChild(style)
+
+    window.print()
+
+    window.addEventListener('afterprint', () => {
+      document.getElementById(styleId)?.remove()
+    }, { once: true })
   }
+
+
 
   if (!repair) return null
 
@@ -171,7 +194,7 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
 
       {/* Print: HTML receipt — visible only during print, positioned at page root */}
       {receiptData && (
-        <div className="hidden print:block print:w-full print:h-auto print:overflow-visible print:bg-white print:m-0 print:p-0">
+        <div id="receipt-print-el" className="hidden print:block print:w-full print:h-auto print:overflow-visible print:bg-white print:m-0 print:p-0">
           <RepairReceiptHtml
             settings={receiptData.mergedSettings}
             invoiceNumber={repair.job_number}
