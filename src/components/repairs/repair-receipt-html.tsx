@@ -74,10 +74,10 @@ export function RepairReceiptHtml({
     balBar:   { display: 'flex', justifyContent: 'space-between', backgroundColor: pc, padding: '6px', borderRadius: '3px', marginTop: '4px', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' } as React.CSSProperties,
     balLbl:   { fontSize: '9px', fontWeight: 'bold', color: '#fff' },
     balVal:   { fontSize: '9px', fontWeight: 'bold', color: '#fff' },
-    footer:   { pageBreakInside: 'avoid', breakInside: 'avoid' } as React.CSSProperties,
-    thankYou: { fontSize: '8px', fontWeight: 'bold', color: pc, textAlign: 'center' as const, marginTop: '6px' },
-    footLine: { fontSize: '7px', color: '#6b7280', textAlign: 'center' as const, marginTop: '1.5px', wordBreak: 'break-word' as const },
-    policy:   { fontSize: '6px', color: '#9ca3af', textAlign: 'center' as const, marginTop: '5px', borderTop: '0.5px solid #e5e7eb', paddingTop: '4px' },
+    footer:   { pageBreakInside: 'avoid', breakInside: 'avoid', pageBreakBefore: 'avoid' } as React.CSSProperties,
+    thankYou: { fontSize: '9px', fontWeight: 'bold', color: '#000', textAlign: 'center' as const, marginTop: '6px' },
+    footLine: { fontSize: '7.5px', color: '#374151', textAlign: 'center' as const, marginTop: '2px', wordBreak: 'break-word' as const },
+    policy:   { fontSize: '6.5px', color: '#374151', textAlign: 'center' as const, marginTop: '5px', borderTop: '0.5px solid #e5e7eb', paddingTop: '4px' },
     green:    { color: '#10b981' },
   }
 

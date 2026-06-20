@@ -6,7 +6,7 @@ import { Printer, FileText, Loader2 } from 'lucide-react'
 import { pdf } from '@react-pdf/renderer'
 import { InvoicePdf } from '@/components/pdf/invoice-pdf'
 import { RepairReceiptHtml } from '@/components/repairs/repair-receipt-html'
-import { printReceipt } from '@/components/repairs/receipt-print'
+import { printReceipt, previewReceiptHtml } from '@/components/repairs/receipt-print'
 import { DEFAULT_INVOICE_SETTINGS, type InvoiceSettings } from '@/types/invoice-settings'
 
 interface Props {
@@ -199,6 +199,25 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
             <Button variant="outline" onClick={() => window.open(pdfUrl)}>
               <FileText className="h-4 w-4 mr-2" />
               Open PDF
+            </Button>
+          )}
+          {receiptData && (
+            <Button variant="outline" onClick={() => previewReceiptHtml({
+              settings: receiptData.mergedSettings,
+              invoiceNumber: repair.job_number,
+              status: repair.status,
+              issuedAt: repair.created_at,
+              businessName: branch?.name ?? 'Business',
+              branchName: branch?.name,
+              branchAddress: branch?.address,
+              branchPhone: branch?.phone,
+              customerName: receiptData.customerName,
+              items: receiptData.items,
+              subtotal: receiptData.invoiceTotal,
+              total: receiptData.invoiceTotal,
+              amountPaid: receiptData.amountPaid,
+            })}>
+              Debug HTML
             </Button>
           )}
           {receiptData && (

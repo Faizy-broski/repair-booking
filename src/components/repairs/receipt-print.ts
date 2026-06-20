@@ -58,10 +58,16 @@ function buildHtml(d: ReceiptPrintData): string {
     .filter((l): l is string => !!l && l !== settings.thank_you_message)
 
   const css = `
-    @page { size: ${w} auto; margin: 0 }
+    /* 
+     * size: ${w} — no height keyword so the browser uses natural content height.
+     * DO NOT add 'auto' here — that defers to the printer's paper height (e.g. 297mm)
+     * which clips the footer on long receipts.
+     */
+    @page { size: ${w}; margin: 0 }
     *     { box-sizing: border-box; margin: 0; padding: 0 }
     body  { font-family: Arial, Helvetica, sans-serif; font-size: 8px; color: #000;
-            background: #fff; padding: 10px; width: ${w} }
+            background: #fff; padding: 10px 10px 30px 10px; width: ${w};
+            -webkit-print-color-adjust: exact; print-color-adjust: exact }
     .c    { text-align: center }
     .logo { display: block; margin: 0 auto 6px; width: 48px; height: 48px; object-fit: contain }
     .bn   { font-size: 12px; font-weight: bold; text-align: center; margin-bottom: 1px }
@@ -86,7 +92,8 @@ function buildHtml(d: ReceiptPrintData): string {
             -webkit-print-color-adjust: exact; print-color-adjust: exact }
     .bl   { font-size: 9px; font-weight: bold; color: #fff }
     .bv   { font-size: 9px; font-weight: bold; color: #fff }
-    .ft   { page-break-inside: avoid; break-inside: avoid }
+    /* Keep footer block together — prevents browser from orphaning it across a phantom page boundary */
+    .ft   { page-break-inside: avoid; break-inside: avoid; page-break-before: avoid }
     .ty   { font-size: 8px; font-weight: bold; color: ${pc}; text-align: center; margin-top: 6px }
     .fl   { font-size: 7px; color: #6b7280; text-align: center; margin-top: 1.5px; word-break: break-word }
     .pl   { font-size: 6px; color: #9ca3af; text-align: center; margin-top: 5px;
@@ -127,12 +134,30 @@ ${L(bal > 0, `<div class="bar"><span class="bl">Balance Due</span><span class="b
 </body></html>`
 }
 
+/** DEBUG: open receipt HTML in a new tab without printing so you can inspect the full output */
+export function previewReceiptHtml(data: ReceiptPrintData): void {
+  const html = buildHtml(data)
+  console.log('[Receipt Debug] mergedSettings:', JSON.stringify(data.settings, null, 2))
+  console.log('[Receipt Debug] thank_you_message:', JSON.stringify(data.settings.thank_you_message))
+  console.log('[Receipt Debug] footer_line_1:', data.settings.footer_line_1)
+  console.log('[Receipt Debug] items:', data.items)
+  console.log('[Receipt Debug] amountPaid:', data.amountPaid, '| total:', data.total)
+  console.log('[Receipt Debug] full HTML length:', html.length)
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  window.open(URL.createObjectURL(blob), '_blank')
+}
+
 /**
  * Opens a self-contained print window with the receipt HTML, triggers print,
  * then closes the window. Works independently of any app CSS or layout.
+ *
+ * KEY: After the popup renders, we measure its actual body.scrollHeight and
+ * inject a precise @page { size: Wmm Hpx } so the browser creates exactly ONE
+ * page that matches the content height — no more 2-page splits at 297mm.
  */
 export function printReceipt(data: ReceiptPrintData): void {
   const html = buildHtml(data)
+  const paperWidth = data.settings.paper_size === 'Receipt58' ? '58mm' : '80mm'
 
   // Open a small blank window (not a tab) so it auto-closes cleanly after print
   const win = window.open('', '_blank', 'width=420,height=600,toolbar=0,location=0,menubar=0,status=0,scrollbars=1')
@@ -151,20 +176,30 @@ export function printReceipt(data: ReceiptPrintData): void {
   win.document.write(html)
   win.document.close()
 
-  // Print once the window (including logo image) has fully loaded
-  win.onload = () => {
+  const triggerPrint = () => {
+    // ── Dynamic page-height injection ─────────────────────────────────────────
+    // Measure how tall the rendered receipt actually is, then set @page size to
+    // exactly that height. This eliminates the 2-page split that happens when
+    // the browser uses the printer's paper height (e.g. 297mm) as the page boundary.
+    const bodyHeight = win.document.body.scrollHeight
+    const sizeStyle  = win.document.createElement('style')
+    sizeStyle.textContent = `@page { size: ${paperWidth} ${bodyHeight}px; margin: 0; }`
+    win.document.head.appendChild(sizeStyle)
+    // ──────────────────────────────────────────────────────────────────────────
+
     win.focus()
     win.print()
-    win.close()
+    // Close only AFTER the browser has finished sending data to the printer.
+    // Closing before afterprint fires truncates the print job mid-page.
+    win.addEventListener('afterprint', () => win.close(), { once: true })
   }
 
-  // Fallback: if onload never fires (some browsers skip it for document.write),
-  // trigger print after a short delay
-  setTimeout(() => {
-    if (!win.closed) {
-      win.focus()
-      win.print()
-      win.close()
-    }
-  }, 1200)
+  // Wait for full load (images included) then give the layout engine extra time
+  // to finish rendering all content (especially the footer) before the print dialog.
+  // 400ms is intentionally larger than 250ms to guarantee the footer is painted.
+  if (win.document.readyState === 'complete') {
+    setTimeout(triggerPrint, 400)
+  } else {
+    win.addEventListener('load', () => setTimeout(triggerPrint, 400), { once: true })
+  }
 }
