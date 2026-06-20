@@ -49,7 +49,6 @@ export function RepairReceiptHtml({
 }: RepairReceiptHtmlProps) {
   const pc = settings.primary_color ?? '#0f766e'
   const balanceDue = Math.max(0, total - amountPaid)
-  const width = settings.paper_size === 'Receipt58' ? '58mm' : '80mm'
 
   const socialEntries = Object.entries(settings.social_links ?? {})
     .filter(([, v]) => v)
@@ -62,35 +61,38 @@ export function RepairReceiptHtml({
     .filter((line): line is string => !!line && line !== settings.thank_you_message)
 
   const dateStr = new Date(issuedAt).toLocaleDateString('en-GB')
+  const paperWidth = settings.paper_size === 'Receipt58' ? '58mm' : '80mm'
 
-  // All styles are inline so Tailwind purging never removes them in print context
+  // All styles are inline so Tailwind purging never removes them in print context.
+  // width: 100% + maxWidth lets the iframe's @page size define the physical width —
+  // avoids right-side clipping from hardcoded mm values vs printer physical margins.
   const s = {
-    page: { width, margin: '0 auto', padding: '10px', fontFamily: 'Helvetica, Arial, sans-serif', fontSize: '8px', color: '#000', backgroundColor: '#fff' } as React.CSSProperties,
+    page: { width: '100%', maxWidth: paperWidth, margin: '0 auto', padding: '10px', fontFamily: 'Helvetica, Arial, sans-serif', fontSize: '9px', color: '#000', backgroundColor: '#fff', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact', colorAdjust: 'exact' } as React.CSSProperties,
     center: { textAlign: 'center' as const },
     logo: { display: 'block', margin: '0 auto 6px', width: '48px', height: '48px', objectFit: 'contain' as const },
     businessName: { fontSize: '12px', fontWeight: 'bold', textAlign: 'center' as const, marginBottom: '1px' },
-    branchName: { fontSize: '8px', color: '#6b7280', textAlign: 'center' as const, marginBottom: '1px' },
-    detail: { fontSize: '7.5px', color: '#6b7280', textAlign: 'center' as const, marginBottom: '1px' },
+    branchName: { fontSize: '8.5px', color: '#6b7280', textAlign: 'center' as const, marginBottom: '1px' },
+    detail: { fontSize: '8px', color: '#6b7280', textAlign: 'center' as const, marginBottom: '1px' },
     divider: { borderTop: '1px dashed #9ca3af', margin: '6px 0' },
-    invoiceNo: { fontSize: '9px', fontWeight: 'bold', textAlign: 'center' as const, marginBottom: '2px' },
+    invoiceNo: { fontSize: '10px', fontWeight: 'bold', textAlign: 'center' as const, marginBottom: '2px' },
     row: { display: 'flex', justifyContent: 'space-between', marginBottom: '2px' } as React.CSSProperties,
-    label: { fontSize: '7.5px', color: '#6b7280' },
-    value: { fontSize: '7.5px', fontWeight: 'bold' },
+    label: { fontSize: '8px', color: '#6b7280' },
+    value: { fontSize: '8px', fontWeight: 'bold' },
     itemRow: { display: 'flex', alignItems: 'flex-start', marginBottom: '4px' } as React.CSSProperties,
-    itemDesc: { flex: 1, paddingRight: '4px', fontSize: '8px' },
-    itemAmt: { fontSize: '8px', textAlign: 'right' as const, width: '52px', flexShrink: 0 },
+    itemDesc: { flex: 1, paddingRight: '4px', fontSize: '9px' },
+    itemAmt: { fontSize: '9px', textAlign: 'right' as const, width: '52px', flexShrink: 0 },
     totalRow: { display: 'flex', justifyContent: 'space-between', marginBottom: '1.5px' } as React.CSSProperties,
-    totalLabel: { fontSize: '8px', color: '#6b7280' },
-    totalValue: { fontSize: '8px' },
+    totalLabel: { fontSize: '8.5px', color: '#6b7280' },
+    totalValue: { fontSize: '8.5px' },
     grandRow: { display: 'flex', justifyContent: 'space-between', marginTop: '3px' } as React.CSSProperties,
-    grandLabel: { fontSize: '11px', fontWeight: 'bold' },
-    grandValue: { fontSize: '11px', fontWeight: 'bold', color: pc },
-    balanceRow: { display: 'flex', justifyContent: 'space-between', backgroundColor: pc, padding: '6px', borderRadius: '3px', marginTop: '4px' } as React.CSSProperties,
-    balanceLabel: { fontSize: '9px', fontWeight: 'bold', color: '#fff' },
-    balanceValue: { fontSize: '9px', fontWeight: 'bold', color: '#fff' },
-    thankYou: { fontSize: '9px', fontWeight: 'bold', color: '#000', textAlign: 'center' as const, marginTop: '6px' },
-    footerText: { fontSize: '8px', color: '#000', textAlign: 'center' as const, marginTop: '2px' },
-    policy: { fontSize: '7px', color: '#000', textAlign: 'center' as const, marginTop: '5px', borderTop: '1px solid #e5e7eb', paddingTop: '4px' },
+    grandLabel: { fontSize: '12px', fontWeight: 'bold' },
+    grandValue: { fontSize: '12px', fontWeight: 'bold', color: pc },
+    balanceRow: { display: 'flex', justifyContent: 'space-between', backgroundColor: pc, padding: '6px', borderRadius: '3px', marginTop: '4px', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact', colorAdjust: 'exact' } as React.CSSProperties,
+    balanceLabel: { fontSize: '10px', fontWeight: 'bold', color: '#fff' },
+    balanceValue: { fontSize: '10px', fontWeight: 'bold', color: '#fff' },
+    thankYou: { fontSize: '10px', fontWeight: 'bold', color: '#000', textAlign: 'center' as const, marginTop: '6px' },
+    footerText: { fontSize: '8.5px', color: '#000', textAlign: 'center' as const, marginTop: '2px' },
+    policy: { fontSize: '7.5px', color: '#000', textAlign: 'center' as const, marginTop: '5px', borderTop: '1px solid #e5e7eb', paddingTop: '4px' },
     footer: { margin: 0, paddingBottom: '10px' } as React.CSSProperties,
   }
 
