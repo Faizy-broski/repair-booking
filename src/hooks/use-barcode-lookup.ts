@@ -25,6 +25,7 @@ export type ScanLookupStatus = 'found' | 'not_found' | 'error'
 export interface ScanLookupResult {
   status: ScanLookupStatus
   product?: ProductWithStock
+  matchedVariant?: { id: string; name: string; barcode?: string | null; sku?: string | null; selling_price?: number; cost_price?: number }
   barcode: string          // display value (what was scanned)
   lookupKey: string        // what was actually searched in the DB
   prefill?: QuickCreatePrefill
@@ -226,6 +227,21 @@ export function useBarcodeLookup(branchId: string | null) {
         cache.current.set(cacheKey, { result: hit, ts: Date.now() })
         console.debug('[LOOKUP] ✅ FOUND product:', exact.name)
         return hit
+      }
+
+      // Fallback: search variant barcodes — variant barcodes live in product_variants, not products
+      console.debug('[LOOKUP] No product match — trying variant barcode fallback')
+      const vParams = new URLSearchParams({ barcode: lookupKey, branch_id: branchId })
+      const vRes = await fetch(`/api/products/variant-barcode?${vParams}`)
+      if (vRes.ok) {
+        const vJson = await vRes.json()
+        if (vJson.data?.product && vJson.data?.variant) {
+          const { product: vProduct, variant: vVariant } = vJson.data
+          console.debug('[LOOKUP] ✅ FOUND via variant barcode — variant:', vVariant.name, 'parent:', vProduct.name)
+          const hit: ScanLookupResult = { status: 'found', product: vProduct, matchedVariant: vVariant, barcode: displayBarcode, lookupKey }
+          cache.current.set(cacheKey, { result: hit, ts: Date.now() })
+          return hit
+        }
       }
 
       // Never cache not_found — the product may be added to inventory right after

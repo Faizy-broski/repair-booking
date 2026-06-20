@@ -476,6 +476,20 @@ export const ProductService = {
     }
   },
 
+  async findByVariantBarcode(businessId: string, barcode: string) {
+    const { data, error } = await db
+      .from('product_variants')
+      .select('*, products!inner(*, categories(name), brands(name))')
+      .eq('products.business_id', businessId)
+      .or(`barcode.eq."${barcode}",sku.eq."${barcode}"`)
+      .limit(1)
+      .maybeSingle()
+    if (error) throw error
+    if (!data) return null
+    const { products: product, ...variant } = data
+    return { product, variant }
+  },
+
   async checkAvailability(businessId: string, params: { sku?: string | null; barcode?: string | null; excludeId?: string | null }) {
     const { sku, barcode, excludeId } = params
     const result = { skuExists: false, barcodeExists: false }

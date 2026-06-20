@@ -229,6 +229,10 @@ export function ProductsTab() {
       try {
         const res = await lookup(code)
         if (res.status === 'found' && res.product) {
+          if (res.matchedVariant) {
+            pos.addToCart(res.product as unknown as Product, res.matchedVariant as any)
+            return
+          }
           if (res.product.has_variants || (res.product.variant_count ?? 0) > 0) {
             toast.info(`Scanned ${res.product.name}. Please select variant.`)
             setVariantProduct(res.product as unknown as ProductWithStock)
@@ -515,6 +519,11 @@ export function ProductsTab() {
                     e.stopPropagation()
                     const res = await lookup(val)
                     if (res.status === 'found' && res.product) {
+                      if (res.matchedVariant) {
+                        pos.addToCart(res.product as unknown as Product, res.matchedVariant as any)
+                        setAllProductsSearch('')
+                        return
+                      }
                       if (res.product.has_variants || (res.product.variant_count ?? 0) > 0) {
                         toast.info(`Scanned ${res.product.name}. Please select variant.`)
                         setVariantProduct(res.product as unknown as ProductWithStock)

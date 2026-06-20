@@ -2,9 +2,10 @@
 import { useState, useEffect } from 'react'
 import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
-import { Printer, Loader2 } from 'lucide-react'
+import { Printer, FileText, Loader2 } from 'lucide-react'
 import { pdf } from '@react-pdf/renderer'
 import { InvoicePdf } from '@/components/pdf/invoice-pdf'
+import { RepairReceiptHtml } from '@/components/repairs/repair-receipt-html'
 import { DEFAULT_INVOICE_SETTINGS, type InvoiceSettings } from '@/types/invoice-settings'
 
 interface Props {
@@ -15,9 +16,18 @@ interface Props {
   branch: any
 }
 
+interface ReceiptData {
+  items: Array<{ description: string; quantity: number; unit_price: number }>
+  invoiceTotal: number
+  amountPaid: number
+  mergedSettings: InvoiceSettings
+  customerName: string
+}
+
 export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: Props) {
   const [instance, setInstance] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null)
 
   useEffect(() => {
     if (!open || !repair) return
@@ -60,12 +70,18 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
 
         const itemsTotal = items.reduce((s: number, it: any) => s + it.quantity * it.unit_price, 0)
         const invoiceTotal = repairItems.length > 0 ? itemsTotal : (repair.estimated_cost ?? 0)
+        const amountPaid = repair.deposit_paid ?? 0
+        const customerName = customer ? `${customer.first_name} ${customer.last_name ?? ''}`.trim() : 'Walk-In'
 
         const mergedSettings: InvoiceSettings = {
           ...DEFAULT_INVOICE_SETTINGS,
           ...settings,
           logo_url: settings.logo_url ?? branch?.logo_url ?? null,
           show_logo: settings.show_logo !== false && !!(settings.logo_url ?? branch?.logo_url),
+        }
+
+        if (!cancelled) {
+          setReceiptData({ items, invoiceTotal, amountPaid, mergedSettings, customerName })
         }
 
         const doc = (
@@ -80,7 +96,7 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
             branchAddress={branch?.address}
             branchPhone={branch?.phone}
             branchEmail={branch?.email}
-            customerName={customer ? `${customer.first_name} ${customer.last_name ?? ''}`.trim() : 'Walk-In'}
+            customerName={customerName}
             customerEmail={customer?.email}
             customerPhone={customer?.phone}
             customerAddress={customer?.address}
@@ -89,7 +105,7 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
             discount={0}
             tax={0}
             total={invoiceTotal}
-            amountPaid={repair.deposit_paid ?? 0}
+            amountPaid={amountPaid}
             notes={repair.notes}
           />
         )
@@ -117,14 +133,18 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
     if (!open) {
       setInstance(null)
       setLoading(false)
+      setReceiptData(null)
     }
   }, [open])
 
   if (!repair) return null
 
+  const isReceiptFormat = receiptData?.mergedSettings.paper_size === 'Receipt80' || receiptData?.mergedSettings.paper_size === 'Receipt58'
+
   return (
-    <Modal open={open} onClose={onClose} title={`Invoice - ${repair.job_number}`} size="xl">
-      <div className="flex flex-col h-[75vh]">
+    <Modal open={open} onClose={onClose} title={`Invoice - ${repair.job_number}`} size="xl" printable>
+      {/* Screen-only: PDF preview iframe — hidden during print */}
+      <div className="flex flex-col h-[75vh] print:hidden">
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-500">
             <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
@@ -140,18 +160,51 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
             Failed to load preview.
           </div>
         )}
+      </div>
 
-        <div className="mt-4 flex justify-between items-center gap-3 border-t border-gray-100 pt-4">
-          <p className="text-xs text-gray-400">Preview uses your Invoice Design settings</p>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose}>Close</Button>
-            {instance && (
-              <Button onClick={() => window.open(instance)}>
-                <Printer className="h-4 w-4 mr-2" />
-                Print / Open Full
-              </Button>
-            )}
-          </div>
+      {/* Print-only: unconstrained HTML receipt that breaks out of modal bounds */}
+      {receiptData && isReceiptFormat && (
+        <div className="hidden print:block print:absolute print:left-0 print:top-0 print:w-full print:h-auto print:overflow-visible print:bg-white print:m-0 print:p-0">
+          <RepairReceiptHtml
+            settings={receiptData.mergedSettings}
+            invoiceNumber={repair.job_number}
+            status={repair.status}
+            issuedAt={repair.created_at}
+            businessName={branch?.name || 'Business'}
+            branchName={branch?.name}
+            branchAddress={branch?.address}
+            branchPhone={branch?.phone}
+            customerName={receiptData.customerName}
+            items={receiptData.items}
+            subtotal={receiptData.invoiceTotal}
+            total={receiptData.invoiceTotal}
+            amountPaid={receiptData.amountPaid}
+          />
+        </div>
+      )}
+
+      {/* Bottom bar — hidden during print */}
+      <div className="mt-4 flex justify-between items-center gap-3 border-t border-gray-100 pt-4 print:hidden">
+        <p className="text-xs text-gray-400">Preview uses your Invoice Design settings</p>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onClose}>Close</Button>
+          {instance && (
+            <Button variant="outline" onClick={() => window.open(instance)}>
+              <FileText className="h-4 w-4 mr-2" />
+              Open PDF
+            </Button>
+          )}
+          {isReceiptFormat && receiptData ? (
+            <Button onClick={() => window.print()}>
+              <Printer className="h-4 w-4 mr-2" />
+              Print
+            </Button>
+          ) : instance ? (
+            <Button onClick={() => window.open(instance)}>
+              <Printer className="h-4 w-4 mr-2" />
+              Print / Open Full
+            </Button>
+          ) : null}
         </div>
       </div>
     </Modal>

@@ -371,6 +371,10 @@ export function CartPanel({ mobileView }: Props) {
     if (!val) return
     const res = await lookup(val)
     if (res.status === 'found' && res.product) {
+      if (res.matchedVariant) {
+        pos.addToCart(res.product as any, res.matchedVariant as any)
+        return
+      }
       setScannerDefaultState('found')
       setScannerDefaultBarcode(val)
       setScannerDefaultProduct(res.product)

@@ -82,6 +82,17 @@ export const ProductController = {
     }
   },
 
+  async findByVariantBarcode(request: NextRequest, ctx: RequestContext) {
+    const barcode = request.nextUrl.searchParams.get('barcode')
+    if (!barcode) return ok(null)
+    try {
+      const result = await ProductService.findByVariantBarcode(ctx.businessId, barcode)
+      return ok(result)
+    } catch (err) {
+      return serverError('Failed to lookup variant barcode', err)
+    }
+  },
+
   async getStats(request: NextRequest, ctx: RequestContext) {
     const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? undefined
     try {
