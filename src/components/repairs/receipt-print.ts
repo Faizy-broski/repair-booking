@@ -41,10 +41,11 @@ function buildHtml(d: ReceiptPrintData): string {
     items, subtotal, discount = 0, tax = 0, total, amountPaid = 0, currency = 'GBP',
   } = d
 
-  const pc  = settings.primary_color ?? '#0f766e'
-  const bal = Math.max(0, total - amountPaid)
-  const w   = settings.paper_size === 'Receipt58' ? '58mm' : '80mm'
-  const date = new Date(issuedAt).toLocaleDateString('en-GB')
+  const pc       = settings.primary_color ?? '#0f766e'
+  const bal      = Math.max(0, total - amountPaid)
+  const w        = settings.paper_size === 'Receipt58' ? '58mm' : '80mm'
+  const date     = new Date(issuedAt).toLocaleDateString('en-GB')
+  const thankYou = settings.thank_you_message || 'Thank you for your business!'
 
   const socials = Object.entries(settings.social_links ?? {})
     .filter(([, v]) => v)
@@ -118,7 +119,7 @@ ${L(amountPaid > 0, `<div class="tr"><span class="tl">Paid</span><span class="tv
 ${L(bal > 0, `<div class="bar"><span class="bl">Balance Due</span><span class="bv">${money(bal, currency)}</span></div>`)}
 <div class="ft">
   <hr>
-  ${L(settings.thank_you_message, `<div class="ty">${esc(settings.thank_you_message)}</div>`)}
+  <div class="ty">${esc(thankYou)}</div>
   ${footerLines.map(l => `<div class="fl">${esc(l)}</div>`).join('')}
   ${socials.map(s => `<div class="fl">${esc(s.label)}: ${esc(s.val)}</div>`).join('')}
   ${L(settings.policy_text, `<div class="pl">${esc(settings.policy_text)}</div>`)}

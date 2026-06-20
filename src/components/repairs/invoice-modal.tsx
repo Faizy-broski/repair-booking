@@ -6,6 +6,7 @@ import { Printer, FileText, Loader2 } from 'lucide-react'
 import { pdf } from '@react-pdf/renderer'
 import { InvoicePdf } from '@/components/pdf/invoice-pdf'
 import { RepairReceiptHtml } from '@/components/repairs/repair-receipt-html'
+import { printReceipt } from '@/components/repairs/receipt-print'
 import { DEFAULT_INVOICE_SETTINGS, type InvoiceSettings } from '@/types/invoice-settings'
 
 interface Props {
@@ -128,17 +129,21 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
 
   function handlePrint() {
     if (!receiptData) return
-    const w = receiptData.mergedSettings.paper_size === 'Receipt58' ? '58mm' : '80mm'
-    const styleEl = document.createElement('style')
-    styleEl.id = 'receipt-page-size'
-    // size: auto height tells the browser to fit the page to content length
-    // so the thermal printer cuts exactly at end of receipt, not at a fixed page boundary
-    styleEl.textContent = `@page { size: ${w} auto; margin: 0; }`
-    document.head.appendChild(styleEl)
-    window.print()
-    window.addEventListener('afterprint', () => {
-      document.getElementById('receipt-page-size')?.remove()
-    }, { once: true })
+    printReceipt({
+      settings:      receiptData.mergedSettings,
+      invoiceNumber: repair.job_number,
+      status:        repair.status,
+      issuedAt:      repair.created_at,
+      businessName:  branch?.name ?? 'Business',
+      branchName:    branch?.name,
+      branchAddress: branch?.address,
+      branchPhone:   branch?.phone,
+      customerName:  receiptData.customerName,
+      items:         receiptData.items,
+      subtotal:      receiptData.invoiceTotal,
+      total:         receiptData.invoiceTotal,
+      amountPaid:    receiptData.amountPaid,
+    })
   }
 
   if (!repair) return null
