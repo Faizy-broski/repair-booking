@@ -2,10 +2,10 @@
 import { useState, useEffect } from 'react'
 import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
-import { Printer, Loader2 } from 'lucide-react'
+import { Printer, FileText, Loader2 } from 'lucide-react'
 import { pdf } from '@react-pdf/renderer'
 import { InvoicePdf } from '@/components/pdf/invoice-pdf'
-import { printReceipt } from '@/components/repairs/receipt-print'
+import { RepairReceiptHtml } from '@/components/repairs/repair-receipt-html'
 import { DEFAULT_INVOICE_SETTINGS, type InvoiceSettings } from '@/types/invoice-settings'
 
 interface Props {
@@ -16,14 +16,19 @@ interface Props {
   branch: any
 }
 
-interface GeneratedData {
-  pdfUrl: string
-  receiptArgs: Parameters<typeof printReceipt>[0]
+
+interface ReceiptData {
+  items: Array<{ description: string; quantity: number; unit_price: number }>
+  invoiceTotal: number
+  amountPaid: number
+  mergedSettings: InvoiceSettings
+  customerName: string
 }
 
 export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: Props) {
-  const [data, setData]       = useState<GeneratedData | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [pdfUrl, setPdfUrl]           = useState<string | null>(null)
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null)
+  const [loading, setLoading]         = useState(false)
 
   useEffect(() => {
     if (!open || !repair) return
@@ -58,8 +63,10 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
               unit_price:  repair.estimated_cost ?? 0,
             }]
 
-        const itemsTotal   = items.reduce((s: number, it: any) => s + it.quantity * it.unit_price, 0)
-        const invoiceTotal = repairItems.length > 0 ? itemsTotal : (repair.estimated_cost ?? 0)
+        const invoiceTotal = repairItems.length > 0
+          ? items.reduce((s: number, it: any) => s + it.quantity * it.unit_price, 0)
+          : (repair.estimated_cost ?? 0)
+
         const amountPaid   = repair.deposit_paid ?? 0
         const customerName = customer
           ? `${customer.first_name} ${customer.last_name ?? ''}`.trim()
@@ -72,7 +79,11 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
           show_logo: settings.show_logo !== false && !!(settings.logo_url ?? branch?.logo_url),
         }
 
-        // Build the PDF preview blob
+        if (!cancelled) {
+          setReceiptData({ items, invoiceTotal, amountPaid, mergedSettings, customerName })
+        }
+
+        // Build PDF for preview
         const doc = (
           <InvoicePdf
             settings={mergedSettings}
@@ -98,28 +109,8 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
             notes={repair.notes}
           />
         )
-        const blob   = await pdf(doc).toBlob()
-        if (cancelled) return
-        const pdfUrl = URL.createObjectURL(blob)
-
-        setData({
-          pdfUrl,
-          receiptArgs: {
-            settings:     mergedSettings,
-            invoiceNumber: repair.job_number,
-            status:       repair.status,
-            issuedAt:     repair.created_at,
-            businessName: branch?.name || 'Business',
-            branchName:   branch?.name,
-            branchAddress: branch?.address,
-            branchPhone:  branch?.phone,
-            customerName,
-            items,
-            subtotal:     invoiceTotal,
-            total:        invoiceTotal,
-            amountPaid,
-          },
-        })
+        const blob = await pdf(doc).toBlob()
+        if (!cancelled) setPdfUrl(URL.createObjectURL(blob))
       } catch (err) {
         if (!cancelled) console.error('Failed to generate invoice:', err)
       } finally {
@@ -132,22 +123,38 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
   }, [open, repair, settings, branch])
 
   useEffect(() => {
-    if (!open) { setData(null); setLoading(false) }
+    if (!open) { setPdfUrl(null); setReceiptData(null); setLoading(false) }
   }, [open])
+
+  function handlePrint() {
+    if (!receiptData) return
+    const w = receiptData.mergedSettings.paper_size === 'Receipt58' ? '58mm' : '80mm'
+    const styleEl = document.createElement('style')
+    styleEl.id = 'receipt-page-size'
+    // size: auto height tells the browser to fit the page to content length
+    // so the thermal printer cuts exactly at end of receipt, not at a fixed page boundary
+    styleEl.textContent = `@page { size: ${w} auto; margin: 0; }`
+    document.head.appendChild(styleEl)
+    window.print()
+    window.addEventListener('afterprint', () => {
+      document.getElementById('receipt-page-size')?.remove()
+    }, { once: true })
+  }
 
   if (!repair) return null
 
   return (
-    <Modal open={open} onClose={onClose} title={`Invoice - ${repair.job_number}`} size="xl">
-      <div className="flex flex-col h-[75vh]">
+    <Modal open={open} onClose={onClose} title={`Invoice - ${repair.job_number}`} size="xl" printable>
+      {/* Screen: PDF preview — hidden during print */}
+      <div className="flex flex-col h-[75vh] print:hidden">
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-500">
             <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
             <p className="text-sm font-medium">Generating invoice...</p>
           </div>
-        ) : data ? (
+        ) : pdfUrl ? (
           <iframe
-            src={`${data.pdfUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+            src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0`}
             className="flex-1 w-full rounded-lg border border-gray-200"
           />
         ) : (
@@ -157,12 +164,40 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
         )}
       </div>
 
-      <div className="mt-4 flex justify-between items-center gap-3 border-t border-gray-100 pt-4">
+      {/* Print: HTML receipt — visible only during print, positioned at page root */}
+      {receiptData && (
+        <div className="hidden print:block print:absolute print:left-0 print:top-0 print:w-full print:h-auto print:overflow-visible print:bg-white print:m-0 print:p-0">
+          <RepairReceiptHtml
+            settings={receiptData.mergedSettings}
+            invoiceNumber={repair.job_number}
+            status={repair.status}
+            issuedAt={repair.created_at}
+            businessName={branch?.name ?? 'Business'}
+            branchName={branch?.name}
+            branchAddress={branch?.address}
+            branchPhone={branch?.phone}
+            customerName={receiptData.customerName}
+            items={receiptData.items}
+            subtotal={receiptData.invoiceTotal}
+            total={receiptData.invoiceTotal}
+            amountPaid={receiptData.amountPaid}
+          />
+        </div>
+      )}
+
+      {/* Buttons — hidden during print */}
+      <div className="mt-4 flex justify-between items-center gap-3 border-t border-gray-100 pt-4 print:hidden">
         <p className="text-xs text-gray-400">Preview uses your Invoice Design settings</p>
         <div className="flex gap-2">
           <Button variant="outline" onClick={onClose}>Close</Button>
-          {data && (
-            <Button onClick={() => printReceipt(data.receiptArgs)}>
+          {pdfUrl && (
+            <Button variant="outline" onClick={() => window.open(pdfUrl)}>
+              <FileText className="h-4 w-4 mr-2" />
+              Open PDF
+            </Button>
+          )}
+          {receiptData && (
+            <Button onClick={handlePrint}>
               <Printer className="h-4 w-4 mr-2" />
               Print
             </Button>
