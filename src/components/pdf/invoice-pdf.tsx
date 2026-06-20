@@ -101,7 +101,7 @@ function calcReceiptPageHeight(opts: {
     h += 15 + policyWrappedLines * 8 // border-top + padding + fontSize 6 text
   }
 
-  h += 100 // bottom breathing room — generous buffer so printer never clips footer
+  h += 20 // bottom breathing room — reduced to avoid too much blank space
   return Math.max(h, 150)
 }
 
@@ -572,9 +572,9 @@ function ReceiptPdf({
     balanceRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: pc, padding: 6, borderRadius: 3, marginTop: 4 },
     balanceLabel: { fontSize: 9, fontFamily: bold, color: '#ffffff' },
     balanceValue: { fontSize: 9, fontFamily: bold, color: '#ffffff' },
-    thankYou: { fontSize: 8, fontFamily: bold, color: pc, textAlign: 'center', marginTop: 6 },
-    footerText: { fontSize: 7, color: '#6b7280', textAlign: 'center', marginTop: 1.5 },
-    policy: { fontSize: 6, color: '#9ca3af', textAlign: 'center', marginTop: 5, borderTop: '0.5 solid #e5e7eb', paddingTop: 4 },
+    thankYou: { fontSize: 8, fontFamily: bold, color: '#000000', textAlign: 'center', marginTop: 6 },
+    footerText: { fontSize: 8, color: '#000000', textAlign: 'center', marginTop: 1.5 },
+    policy: { fontSize: 7, color: '#000000', textAlign: 'center', marginTop: 5, borderTop: '0.5 solid #e5e7eb', paddingTop: 4 },
   })
 
   return (

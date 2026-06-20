@@ -106,9 +106,9 @@ export function Receipt({
         </div>
       </div>
 
-      <hr className="my-2 border-dashed border-gray-300" />
+      <hr className="my-1 border-dashed border-gray-300" />
 
-      <p className="text-center text-gray-400">Thank you for your business!</p>
+      <p className="text-center font-bold text-black mt-2">Thank you for your business!</p>
     </div>
   )
 }
