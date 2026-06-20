@@ -166,7 +166,7 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
 
       {/* Print: HTML receipt — visible only during print, positioned at page root */}
       {receiptData && (
-        <div className="hidden print:block print:absolute print:left-0 print:top-0 print:w-full print:h-auto print:overflow-visible print:bg-white print:m-0 print:p-0">
+        <div className="hidden print:block print:w-full print:h-auto print:overflow-visible print:bg-white print:m-0 print:p-0">
           <RepairReceiptHtml
             settings={receiptData.mergedSettings}
             invoiceNumber={repair.job_number}
