@@ -131,27 +131,38 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
     if (!receiptData) return
 
     const paperSize = receiptData.mergedSettings.paper_size ?? 'A4'
-    const isReceipt  = paperSize === 'Receipt80' || paperSize === 'Receipt58'
-    const pw         = paperSize === 'Receipt58' ? '58mm' : '80mm'
+    const isReceipt = paperSize === 'Receipt80' || paperSize === 'Receipt58'
+    const pw        = paperSize === 'Receipt58' ? '58mm' : '80mm'
 
-    // ── Page size strategy ────────────────────────────────────────────────────
-    // THERMAL (Receipt80 / Receipt58):
-    //   Use 3276mm height — this matches the EPSON TM-T88V "Roll Paper 80 x 3276mm"
-    //   Windows driver setting. The driver with "Paper Save" enabled cuts after the
-    //   last printed line, not at the end of the roll. DO NOT use a measured px
-    //   height here — the EPSON driver rejects non-standard custom page sizes.
-    //
-    // A4 / A5 / LETTER:
-    //   Use standard CSS page size keywords. Content is measured to avoid excess.
     let pageRule: string
+
     if (isReceipt) {
-      pageRule = `@page { size: ${pw} 3276mm; margin: 0; }`
+      // ── Thermal receipt: measure actual content height ──────────────────────
+      // Temporarily render the hidden receipt div off-screen to get its real
+      // scrollHeight. This gives us the exact page height so:
+      //  (a) the print preview looks correct (not blank from 3276mm page)
+      //  (b) the EPSON driver gets a single small page it can print+cut cleanly
+      const el = document.getElementById('receipt-print-el')
+      let contentHeight = '130mm' // safe fallback (~typical receipt)
+      if (el) {
+        const saved = el.style.cssText
+        el.style.cssText = 'display:block;visibility:hidden;position:absolute;top:-9999px;left:0;width:' + pw
+        const h = el.scrollHeight
+        el.style.cssText = saved
+        if (h > 50) {
+          // Add 10px breathing room so the last line is never clipped
+          contentHeight = `${h + 10}px`
+        }
+        console.log('[RECEIPT] measured height:', h, 'px → @page', pw, contentHeight)
+      }
+      pageRule = `@page { size: ${pw} ${contentHeight}; margin: 0; }`
     } else {
+      // ── Standard paper: A4 / A5 / Letter ───────────────────────────────────
       const sizeKeyword = paperSize === 'A5' ? 'A5' : paperSize === 'Letter' ? 'letter' : 'A4'
       pageRule = `@page { size: ${sizeKeyword}; margin: 10mm; }`
     }
 
-    console.log('[RECEIPT] paper_size:', paperSize, '| injecting:', pageRule)
+    console.log('[RECEIPT] injecting:', pageRule)
 
     const styleId = 'receipt-page-size-style'
     document.getElementById(styleId)?.remove()
@@ -166,6 +177,7 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
       document.getElementById(styleId)?.remove()
     }, { once: true })
   }
+
 
 
 
