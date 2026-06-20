@@ -10,7 +10,6 @@ interface ModalProps {
   description?: string
   children: React.ReactNode
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full'
-  printable?: boolean
 }
 
 const SIZE_CLASSES = {
@@ -22,14 +21,11 @@ const SIZE_CLASSES = {
   full: 'max-w-none',
 }
 
-export function Modal({ open, onClose, title, description, children, size = 'md', printable }: ModalProps) {
+export function Modal({ open, onClose, title, description, children, size = 'md' }: ModalProps) {
   return (
     <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className={cn(
-          "fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-          printable && "print:hidden"
-        )} />
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <Dialog.Content
           className={cn(
             // Positioning: center by default, but fullscreen should cover viewport
@@ -43,12 +39,10 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
             'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
             SIZE_CLASSES[size],
-            'p-6',
-            // Print isolation: remove all visual constraints so the receipt can break free
-            printable && 'print:static print:max-h-none print:overflow-visible print:h-auto print:max-w-none print:w-auto print:shadow-none print:p-0 print:rounded-none print:translate-x-0 print:translate-y-0'
+            'p-6'
           )}
         >
-          <div className={cn("mb-4 flex items-start justify-between", printable && "print:hidden")}>
+          <div className="mb-4 flex items-start justify-between">
             <div>
               <Dialog.Title className="text-lg font-semibold text-gray-900">{title}</Dialog.Title>
               {description && (

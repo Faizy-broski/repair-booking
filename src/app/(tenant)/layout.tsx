@@ -277,7 +277,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
 
   return (
     <Providers>
-      <div className="flex h-screen overflow-hidden bg-surface-container-low print:hidden" style={getBrandStyle(brandColor)}>
+      <div className="flex h-screen overflow-hidden bg-surface-container-low" style={getBrandStyle(brandColor)}>
         <div className="hidden lg:flex">
           <Suspense fallback={null}>
             <Sidebar collapsed={collapsed} />
