@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
 import { Printer, FileText, Loader2 } from 'lucide-react'
@@ -28,11 +28,11 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
   const [instance, setInstance] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
 
   useEffect(() => {
     if (!open || !repair) return
 
-    // Show spinner while settings are still loading from the server
     if (!settings) {
       setLoading(true)
       return
@@ -46,7 +46,6 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
         const customer = repair.customers
         const cf = (repair.custom_fields as any) ?? {}
 
-        // Fetch full repair data with repair_items
         let repairItems: any[] = []
         try {
           const res = await fetch(`/api/repairs/${repair.id}`)
@@ -122,13 +121,9 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
     }
 
     generate()
-
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [open, repair, settings, branch])
 
-  // Reset state when modal closes
   useEffect(() => {
     if (!open) {
       setInstance(null)
@@ -137,13 +132,40 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
     }
   }, [open])
 
+  function handlePrint() {
+    const ps = receiptData?.mergedSettings.paper_size ?? 'A4'
+    const isReceipt = ps === 'Receipt80' || ps === 'Receipt58'
+
+    if (isReceipt) {
+      // Thermal: inject @page size, then defer window.print() by one frame so
+      // Chrome has time to apply the stylesheet before opening the print dialog.
+      const paperWidth = ps === 'Receipt58' ? '58mm' : '80mm'
+      const styleEl = document.createElement('style')
+      styleEl.id = 'receipt-page-size'
+      styleEl.textContent = `@page { size: ${paperWidth} auto; margin: 0; }`
+      document.head.appendChild(styleEl)
+      setTimeout(() => {
+        window.print()
+        window.addEventListener('afterprint', () => {
+          document.getElementById('receipt-page-size')?.remove()
+        }, { once: true })
+      }, 50)
+    } else {
+      // A4 / A5 / Letter: print the high-fidelity PDF already loaded in the iframe
+      iframeRef.current?.contentWindow?.print()
+    }
+  }
+
   if (!repair) return null
 
-  const isReceiptFormat = receiptData?.mergedSettings.paper_size === 'Receipt80' || receiptData?.mergedSettings.paper_size === 'Receipt58'
+  const isReceiptFormat = receiptData?.mergedSettings.paper_size === 'Receipt80'
+    || receiptData?.mergedSettings.paper_size === 'Receipt58'
+
+  const canPrint = isReceiptFormat ? !!receiptData : !!instance
 
   return (
     <Modal open={open} onClose={onClose} title={`Invoice - ${repair.job_number}`} size="xl" printable>
-      {/* Screen-only: PDF preview iframe — hidden during print */}
+      {/* Screen-only: PDF preview — hidden during print */}
       <div className="flex flex-col h-[75vh] print:hidden">
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-500">
@@ -152,6 +174,7 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
           </div>
         ) : instance ? (
           <iframe
+            ref={iframeRef}
             src={`${instance}#toolbar=0&navpanes=0&scrollbar=0`}
             className="flex-1 w-full rounded-lg border border-gray-200"
           />
@@ -162,9 +185,13 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
         )}
       </div>
 
-      {/* Print-only: unconstrained HTML receipt that breaks out of modal bounds */}
+      {/* Print-only: HTML receipt for thermal sizes.
+          No absolute positioning needed — Dialog.Content is print:static so
+          this div is already in normal document flow, which lets the browser
+          measure its height and compute @page { size: 80mm auto } correctly.
+          Normal flow = exact page height = no extra blank paper at bottom. */}
       {receiptData && isReceiptFormat && (
-        <div className="hidden print:block print:absolute print:left-0 print:top-0 print:w-full print:h-auto print:overflow-visible print:bg-white print:m-0 print:p-0">
+        <div className="hidden print:block print:w-full print:h-auto print:overflow-visible print:bg-white print:m-0 print:p-0">
           <RepairReceiptHtml
             settings={receiptData.mergedSettings}
             invoiceNumber={repair.job_number}
@@ -194,17 +221,12 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
               Open PDF
             </Button>
           )}
-          {isReceiptFormat && receiptData ? (
-            <Button onClick={() => window.print()}>
+          {canPrint && (
+            <Button onClick={handlePrint}>
               <Printer className="h-4 w-4 mr-2" />
               Print
             </Button>
-          ) : instance ? (
-            <Button onClick={() => window.open(instance)}>
-              <Printer className="h-4 w-4 mr-2" />
-              Print / Open Full
-            </Button>
-          ) : null}
+          )}
         </div>
       </div>
     </Modal>
