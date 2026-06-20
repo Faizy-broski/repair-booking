@@ -149,11 +149,16 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
       iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;visibility:hidden;'
       document.body.appendChild(iframe)
 
+      // Side margins match the Epson TM-T88V physical printable area (~4mm each side).
+      // 297mm height = Roll Paper setting; the Epson auto-cuts after the last printed line
+      // so no blank paper is wasted even though the "page" is 297mm tall.
+      const sideMargin = ps === 'Receipt58' ? '5mm' : '4mm'
+
       const doc = iframe.contentDocument!
       doc.open()
       doc.write(
         `<!DOCTYPE html><html><head>` +
-        `<style>@page{size:${paperWidth} auto;margin:0;}` +
+        `<style>@page{size:${paperWidth} 297mm;margin:0 ${sideMargin};}` +
         `*{-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;}` +
         `body{margin:0;padding:0;}</style>` +
         `</head><body>${html}</body></html>`

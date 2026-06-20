@@ -64,10 +64,10 @@ export function RepairReceiptHtml({
   const paperWidth = settings.paper_size === 'Receipt58' ? '58mm' : '80mm'
 
   // All styles are inline so Tailwind purging never removes them in print context.
-  // width: 100% + maxWidth lets the iframe's @page size define the physical width —
-  // avoids right-side clipping from hardcoded mm values vs printer physical margins.
+  // width: 100% fills the content area defined by @page margins (72mm after 4mm side margins).
+  // No maxWidth needed — the @page side margins already cap the physical printable width.
   const s = {
-    page: { width: '100%', maxWidth: paperWidth, margin: '0 auto', padding: '10px', fontFamily: 'Helvetica, Arial, sans-serif', fontSize: '9px', color: '#000', backgroundColor: '#fff', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact', colorAdjust: 'exact' } as React.CSSProperties,
+    page: { width: '100%', margin: '0', padding: '10px', fontFamily: 'Helvetica, Arial, sans-serif', fontSize: '9px', color: '#000', backgroundColor: '#fff', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact', colorAdjust: 'exact' } as React.CSSProperties,
     center: { textAlign: 'center' as const },
     logo: { display: 'block', margin: '0 auto 6px', width: '48px', height: '48px', objectFit: 'contain' as const },
     businessName: { fontSize: '12px', fontWeight: 'bold', textAlign: 'center' as const, marginBottom: '1px' },
