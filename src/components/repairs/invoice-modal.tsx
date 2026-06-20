@@ -28,7 +28,8 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
   const [instance, setInstance] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null)
-  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const pdfIframeRef = useRef<HTMLIFrameElement>(null)
+  const receiptRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open || !repair) return
@@ -137,22 +138,43 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
     const isReceipt = ps === 'Receipt80' || ps === 'Receipt58'
 
     if (isReceipt) {
-      // Thermal: inject @page size, then defer window.print() by one frame so
-      // Chrome has time to apply the stylesheet before opening the print dialog.
+      // Thermal: write the receipt HTML into a fresh isolated iframe and print that.
+      // This avoids window.print() entirely — no modal CSS, no layout constraints,
+      // no @page fighting with the printer driver. The iframe is its own document
+      // whose height is exactly the receipt content height.
+      if (!receiptRef.current) return
       const paperWidth = ps === 'Receipt58' ? '58mm' : '80mm'
-      const styleEl = document.createElement('style')
-      styleEl.id = 'receipt-page-size'
-      styleEl.textContent = `@page { size: ${paperWidth} auto; margin: 0; }`
-      document.head.appendChild(styleEl)
+      const html = receiptRef.current.innerHTML
+
+      const iframe = document.createElement('iframe')
+      iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;visibility:hidden;'
+      document.body.appendChild(iframe)
+
+      const doc = iframe.contentDocument!
+      doc.open()
+      doc.write(
+        `<!DOCTYPE html><html><head>` +
+        `<style>` +
+        `@page{size:${paperWidth} auto;margin:0;}` +
+        `*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;color-adjust:exact;}` +
+        `body{margin:0;padding:0;}` +
+        `</style>` +
+        `</head><body>${html}</body></html>`
+      )
+      doc.close()
+
+      // Give the iframe time to load images and lay out before printing
       setTimeout(() => {
-        window.print()
-        window.addEventListener('afterprint', () => {
-          document.getElementById('receipt-page-size')?.remove()
-        }, { once: true })
-      }, 50)
+        iframe.contentWindow?.print()
+        const cleanup = () => {
+          if (document.body.contains(iframe)) document.body.removeChild(iframe)
+        }
+        iframe.contentWindow?.addEventListener('afterprint', cleanup, { once: true })
+        setTimeout(cleanup, 5000) // fallback if afterprint never fires
+      }, 300)
     } else {
       // A4 / A5 / Letter: print the high-fidelity PDF already loaded in the iframe
-      iframeRef.current?.contentWindow?.print()
+      pdfIframeRef.current?.contentWindow?.print()
     }
   }
 
@@ -164,9 +186,9 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
   const canPrint = isReceiptFormat ? !!receiptData : !!instance
 
   return (
-    <Modal open={open} onClose={onClose} title={`Invoice - ${repair.job_number}`} size="xl" printable>
-      {/* Screen-only: PDF preview — hidden during print */}
-      <div className="flex flex-col h-[75vh] print:hidden">
+    <Modal open={open} onClose={onClose} title={`Invoice - ${repair.job_number}`} size="xl">
+      {/* PDF preview (screen only) */}
+      <div className="flex flex-col h-[75vh]">
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-500">
             <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
@@ -174,7 +196,7 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
           </div>
         ) : instance ? (
           <iframe
-            ref={iframeRef}
+            ref={pdfIframeRef}
             src={`${instance}#toolbar=0&navpanes=0&scrollbar=0`}
             className="flex-1 w-full rounded-lg border border-gray-200"
           />
@@ -185,13 +207,10 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
         )}
       </div>
 
-      {/* Print-only: HTML receipt for thermal sizes.
-          No absolute positioning needed — Dialog.Content is print:static so
-          this div is already in normal document flow, which lets the browser
-          measure its height and compute @page { size: 80mm auto } correctly.
-          Normal flow = exact page height = no extra blank paper at bottom. */}
+      {/* Hidden receipt HTML — kept in DOM so receiptRef.current.innerHTML is readable.
+          Never shown on screen or in print; we copy it into an isolated iframe instead. */}
       {receiptData && isReceiptFormat && (
-        <div className="hidden print:block print:w-full print:h-auto print:overflow-visible print:bg-white print:m-0 print:p-0">
+        <div ref={receiptRef} className="hidden" aria-hidden="true">
           <RepairReceiptHtml
             settings={receiptData.mergedSettings}
             invoiceNumber={repair.job_number}
@@ -210,8 +229,8 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
         </div>
       )}
 
-      {/* Bottom bar — hidden during print */}
-      <div className="mt-4 flex justify-between items-center gap-3 border-t border-gray-100 pt-4 print:hidden">
+      {/* Bottom bar */}
+      <div className="mt-4 flex justify-between items-center gap-3 border-t border-gray-100 pt-4">
         <p className="text-xs text-gray-400">Preview uses your Invoice Design settings</p>
         <div className="flex gap-2">
           <Button variant="outline" onClick={onClose}>Close</Button>
