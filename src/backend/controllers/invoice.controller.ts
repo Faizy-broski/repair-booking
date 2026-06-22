@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { InvoiceService } from '@/backend/services/invoice.service'
-import { ok, created, notFound, serverError } from '@/backend/utils/api-response'
+import { ok, created, notFound, serverError, badRequest } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
 import { NextResponse } from 'next/server'
@@ -72,16 +72,55 @@ export const InvoiceController = {
   },
 
   async updateStatus(request: NextRequest, ctx: RequestContext, id: string) {
-    const { data, error } = await validateBody(request, updateStatusSchema)
-    if (error) return error
     const branchId = ctx.auth.branchId ?? null
+    const body = await request.json().catch(() => ({}))
+
+    // Full update (edit invoice) — sent when body includes 'items' or 'subtotal'
+    if (body.items !== undefined || body.subtotal !== undefined) {
+      const fullSchema = z.object({
+        customer_id: z.string().uuid().nullable().optional(),
+        items: z.array(z.object({
+          description: z.string().min(1),
+          quantity: z.number().positive(),
+          unit_price: z.number().min(0),
+        })).optional(),
+        subtotal: z.number().min(0).optional(),
+        discount: z.number().min(0).optional(),
+        tax: z.number().min(0).optional(),
+        total: z.number().min(0).optional(),
+        notes: z.string().nullable().optional(),
+        status: z.enum(['issued', 'paid', 'unpaid', 'partial', 'refunded']).optional(),
+      })
+      const parsed = fullSchema.safeParse(body)
+      if (!parsed.success) return badRequest('Invalid invoice update data')
+      try {
+        const invoice = await InvoiceService.update(id, branchId, parsed.data)
+        PdfCacheService.invalidate('invoices', id).catch(() => {})
+        return ok(invoice)
+      } catch (err) {
+        return serverError('Failed to update invoice', err)
+      }
+    }
+
+    // Status-only update (existing behaviour)
+    const parsed = updateStatusSchema.safeParse(body)
+    if (!parsed.success) return badRequest('Invalid status')
     try {
-      const invoice = await InvoiceService.updateStatus(id, branchId, data.status)
-      // Status change affects the PDF watermark/stamp — invalidate cached copy.
+      const invoice = await InvoiceService.updateStatus(id, branchId, parsed.data.status)
       PdfCacheService.invalidate('invoices', id).catch(() => {})
       return ok(invoice)
     } catch (err) {
       return serverError('Failed to update invoice status', err)
+    }
+  },
+
+  async deleteInvoice(_request: NextRequest, ctx: RequestContext, id: string) {
+    const branchId = ctx.auth.branchId ?? null
+    try {
+      await InvoiceService.delete(id, branchId)
+      return ok({ deleted: true })
+    } catch (err) {
+      return serverError('Failed to delete invoice', err)
     }
   },
 

@@ -124,6 +124,112 @@ export const PosService = {
     if (error) throw error
   },
 
+  async updateSale(
+    saleId: string,
+    payload: {
+      customer_id?: string | null
+      payment_method?: string
+      payment_status?: string
+      notes?: string | null
+      discount?: number
+      tax?: number
+      items?: Array<{
+        id: string
+        quantity: number
+        unit_price: number
+        discount: number
+        total: number
+      }>
+    },
+    businessId: string,
+    userId: string
+  ): Promise<void> {
+    // Fetch current sale + items; verify it belongs to this business via branches join
+    const { data: currentSale, error: fetchErr } = await adminSupabase
+      .from('sales')
+      .select('*, sale_items(*), branches!branch_id(business_id)')
+      .eq('id', saleId)
+      .single()
+    if (fetchErr || !currentSale) throw new Error('Sale not found')
+    const saleBusinessId = (currentSale as any).branches?.business_id
+    if (saleBusinessId && saleBusinessId !== businessId) throw new Error('Sale not found')
+    if ((currentSale as any).is_refund) throw new Error('Cannot edit a refund record')
+    // Use the sale's own branch_id for downstream inventory operations
+    const branchId: string = (currentSale as any).branch_id
+
+    const currentItems: any[] = (currentSale as any).sale_items ?? []
+
+    // Handle item updates if provided
+    if (payload.items && payload.items.length > 0) {
+      for (const updItem of payload.items) {
+        const orig = currentItems.find((i: any) => i.id === updItem.id)
+        if (!orig) continue
+
+        // Update sale_item row
+        const { error: itemErr } = await adminSupabase
+          .from('sale_items')
+          .update({
+            quantity: updItem.quantity,
+            unit_price: updItem.unit_price,
+            discount: updItem.discount,
+            total: updItem.total,
+          })
+          .eq('id', updItem.id)
+        if (itemErr) throw itemErr
+
+        // Adjust inventory for product items when quantity changes
+        const qtyDelta = updItem.quantity - orig.quantity
+        if (qtyDelta !== 0 && orig.product_id) {
+          const { data: inv } = await adminSupabase
+            .from('inventory')
+            .select('id, quantity')
+            .eq('branch_id', branchId)
+            .eq('product_id', orig.product_id)
+            .maybeSingle()
+
+          if (inv) {
+            // Negative delta = sold more, deduct; positive delta = sold less, restore
+            const newQty = Math.max(0, (inv as any).quantity - qtyDelta)
+            await adminSupabase.from('inventory').update({ quantity: newQty }).eq('id', (inv as any).id)
+            await adminSupabase.from('stock_movements').insert({
+              branch_id: branchId,
+              product_id: orig.product_id,
+              variant_id: orig.variant_id ?? null,
+              type: 'adjustment',
+              quantity: -qtyDelta,
+              note: `Sale edit: qty changed from ${orig.quantity} to ${updItem.quantity} on sale ${saleId.slice(-8).toUpperCase()}`,
+              created_by: userId,
+            })
+          }
+        }
+      }
+
+      // Recalculate subtotal from updated items
+      const { data: freshItems } = await adminSupabase.from('sale_items').select('total').eq('sale_id', saleId)
+      const newSubtotal = (freshItems ?? []).reduce((s: number, i: any) => s + Number(i.total), 0)
+      const disc = payload.discount ?? Number((currentSale as any).discount ?? 0)
+      const tax = payload.tax ?? Number((currentSale as any).tax ?? 0)
+      const newTotal = newSubtotal - disc + tax
+      payload = { ...payload, discount: disc, tax, subtotal: newSubtotal, total: newTotal } as any
+    }
+
+    // Build sale-level update
+    const saleUpdate: Record<string, any> = {}
+    if (payload.customer_id !== undefined) saleUpdate.customer_id = payload.customer_id
+    if (payload.payment_method !== undefined) saleUpdate.payment_method = payload.payment_method
+    if (payload.payment_status !== undefined) saleUpdate.payment_status = payload.payment_status
+    if (payload.notes !== undefined) saleUpdate.notes = payload.notes
+    if ((payload as any).subtotal !== undefined) saleUpdate.subtotal = (payload as any).subtotal
+    if (payload.discount !== undefined) saleUpdate.discount = payload.discount
+    if (payload.tax !== undefined) saleUpdate.tax = payload.tax
+    if ((payload as any).total !== undefined) saleUpdate.total = (payload as any).total
+
+    if (Object.keys(saleUpdate).length > 0) {
+      const { error: updateErr } = await adminSupabase.from('sales').update(saleUpdate).eq('id', saleId)
+      if (updateErr) throw updateErr
+    }
+  },
+
   async processRefund(payload: {
     original_sale_id: string
     branch_id: string

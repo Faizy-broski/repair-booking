@@ -3,6 +3,7 @@ import {
 } from '@react-pdf/renderer'
 import type { InvoiceSettings } from '@/types/invoice-settings'
 import { DEFAULT_INVOICE_SETTINGS } from '@/types/invoice-settings'
+import { formatCurrency } from '@/lib/utils'
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
@@ -177,10 +178,10 @@ export function SaleReceiptPdf({
   items, subtotal, discount, tax, total,
   isRefund, refundReason, paymentSplits, notes,
   branchName, branchAddress, branchPhone, branchEmail, logoUrl,
-  currency = '£', taxRate, isRushJob,
+  currency = 'GBP', taxRate, isRushJob,
   settings = DEFAULT_INVOICE_SETTINGS,
 }: SaleReceiptPdfProps) {
-  const fmt = (n: number) => `${currency}${Number(n).toFixed(2)}`
+  const fmt = (n: number) => formatCurrency(n, currency)
   const statusColor = STATUS_COLORS[paymentStatus] ?? C.muted
 
   const isReceipt = settings.paper_size?.startsWith('Receipt')

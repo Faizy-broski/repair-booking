@@ -1,9 +1,9 @@
 'use client'
-import { useState, useEffect, useRef, memo } from 'react'
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, memo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Search, Plus, X, Package, ShoppingBag, Tag, Phone,
-  Layers, ChevronRight, Check, ShieldCheck, ExternalLink, ArrowLeft,
+  Layers, ChevronRight, ShieldCheck, ExternalLink, ArrowLeft, Loader2,
 } from 'lucide-react'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
@@ -35,7 +35,7 @@ const ProductCard = memo(function ProductCard({
   product: ProductWithStock
   size?: 'sm' | 'md'
   onAdd: (product: ProductWithStock) => void
-  onVariantSelect: (product: ProductWithStock) => void
+  onVariantSelect: (product: ProductWithStock, e: React.MouseEvent<HTMLButtonElement>) => void
   onVariantHover?: (product: ProductWithStock) => void
 }) {
   const hasVariants = product.has_variants || (product.variant_count ?? 0) > 0
@@ -44,7 +44,7 @@ const ProductCard = memo(function ProductCard({
     <button
       disabled={outOfStock}
       onMouseEnter={() => hasVariants && onVariantHover?.(product)}
-      onClick={() => hasVariants ? onVariantSelect(product) : onAdd(product)}
+      onClick={(e) => hasVariants ? onVariantSelect(product, e) : onAdd(product)}
       className={`relative flex w-full flex-col overflow-hidden rounded-xl border bg-white p-3 text-left transition-all ${outOfStock
           ? 'border-gray-100 opacity-50 cursor-not-allowed'
           : 'border-gray-200 hover:border-brand-teal hover:shadow-sm cursor-pointer'
@@ -88,6 +88,191 @@ const ProductCard = memo(function ProductCard({
         </div>
       </div>
     </button>
+  )
+})
+
+// ── Variant Popover ──────────────────────────────────────────────────────────
+const VariantPopover = memo(function VariantPopover({
+  product,
+  variants,
+  loading,
+  fetching,
+  anchorRect,
+  onAdd,
+  onClose,
+}: {
+  product: ProductWithStock
+  variants: ProductVariant[]
+  loading: boolean
+  fetching: boolean
+  anchorRect: DOMRect | null
+  onAdd: (variant: ProductVariant) => void
+  onClose: () => void
+}) {
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  // Calculate position and reveal the panel in a single synchronous layout pass.
+  // Starting with visibility:hidden prevents the -9999px flash; the animation
+  // keyframe origin is computed from the final coordinates, not the hidden position.
+  useLayoutEffect(() => {
+    const el = panelRef.current
+    if (!el) return
+
+    if (!anchorRect) {
+      // Centered fallback (scanner path) — position already set via inline style
+      el.style.visibility = 'visible'
+      return
+    }
+
+    const ph = el.offsetHeight
+    const pw = el.offsetWidth
+    let top  = anchorRect.bottom + 8
+    let left = anchorRect.left
+    if (top + ph > window.innerHeight)  top  = anchorRect.top - ph - 8
+    if (left + pw > window.innerWidth)  left = anchorRect.right - pw
+    left = Math.max(8, left)
+    top  = Math.max(8, top)
+    el.style.top        = `${top}px`
+    el.style.left       = `${left}px`
+    el.style.visibility = 'visible'
+  }, [anchorRect])
+
+  // Dismiss on background scroll/swipe — prevents floating ghost when grid scrolls
+  useEffect(() => {
+    const dismiss = () => onClose()
+    window.addEventListener('wheel', dismiss, { passive: true })
+    window.addEventListener('touchmove', dismiss, { passive: true })
+    return () => {
+      window.removeEventListener('wheel', dismiss)
+      window.removeEventListener('touchmove', dismiss)
+    }
+  }, [onClose])
+
+  // Dismiss on Escape
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  // For the scanner/centered fallback (no anchorRect), seed the position so
+  // useLayoutEffect only needs to set visibility. For the card-anchored path,
+  // position is written directly to el.style — no initial coordinates here so
+  // there is nothing to tween from.
+  const initialStyle: React.CSSProperties = anchorRect
+    ? { visibility: 'hidden' }
+    : { visibility: 'hidden', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }
+
+  return (
+    <>
+      {/* Dimmed + blurred backdrop — pushes the grid layer backwards */}
+      <div className="fixed inset-0 z-40 animate-in fade-in duration-150 bg-slate-900/20 backdrop-blur-[2px]" onClick={onClose} />
+
+      {/* Popover panel — no transition-* classes so top/left snap instantly */}
+      <div
+        ref={panelRef}
+        style={initialStyle}
+        className="fixed z-50 w-[320px] animate-in fade-in slide-in-from-top-2 duration-150 origin-top rounded-2xl border border-slate-200 bg-white shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] ring-1 ring-black/5"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between rounded-t-2xl border-b border-slate-200 bg-slate-50/80 px-4 pt-4 pb-3 backdrop-blur">
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400 mb-0.5">Select variant</p>
+            <p className="truncate text-sm font-semibold text-slate-800">{product.name}</p>
+          </div>
+          <div className="ml-3 flex items-center gap-2 shrink-0">
+            {fetching && variants.length > 0 && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-300" />}
+            <button
+              onClick={onClose}
+              className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="max-h-[260px] overflow-y-auto p-3">
+          {loading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-[58px] animate-pulse rounded-xl bg-slate-100/70" />
+              ))}
+            </div>
+          ) : variants.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">No variants found</p>
+          ) : (
+            <div className="space-y-1.5">
+              {variants.map(v => {
+                const oos = typeof v.stock === 'number' && v.stock <= 0
+                return (
+                  <button
+                    key={v.id}
+                    onClick={() => !oos && onAdd(v)}
+                    className={`flex w-full items-center justify-between rounded-xl border p-3 text-left transition-all ${
+                      oos
+                        ? 'pointer-events-none border-dashed border-slate-200 bg-slate-100/40 opacity-60'
+                        : 'border-transparent bg-slate-50/50 hover:border-brand-teal/30 hover:bg-teal-50/60 cursor-pointer'
+                    }`}
+                  >
+                    {/* Left: image + name + attributes */}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {v.image_url ? (
+                        <img
+                          src={v.image_url}
+                          alt={v.name}
+                          className="h-9 w-9 shrink-0 rounded-lg border border-slate-100 object-cover"
+                        />
+                      ) : (
+                        <div className="h-9 w-9 shrink-0 rounded-lg border border-dashed border-slate-200 bg-slate-50" />
+                      )}
+                      <div className="min-w-0">
+                        <p className={`truncate text-sm font-medium ${oos ? 'text-slate-400' : 'text-slate-700'}`}>
+                          {v.name}
+                        </p>
+                        {Object.keys(v.attributes ?? {}).length > 0 && (
+                          <div className="mt-0.5 flex flex-wrap gap-1">
+                            {Object.entries(v.attributes).map(([k, val]) => (
+                              <span
+                                key={k}
+                                className="rounded-full bg-white/80 px-1.5 py-px text-[10px] font-medium text-slate-500 ring-1 ring-slate-200/70"
+                              >
+                                {k}: {val}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right: price + stock */}
+                    <div className="ml-3 shrink-0 text-right">
+                      {oos ? (
+                        <span className="text-[11px] font-medium text-slate-400">Out of stock</span>
+                      ) : (
+                        <>
+                          <p className="text-sm font-semibold text-slate-900">{formatCurrency(v.selling_price)}</p>
+                          {typeof v.stock === 'number' && (
+                            <p className="text-[11px] text-slate-400">{v.stock} left</p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer hint */}
+        {!loading && variants.length > 0 && (
+          <p className="px-4 pb-3 pt-1 text-[11px] text-slate-400">
+            Tap a variant to add it to the cart
+          </p>
+        )}
+      </div>
+    </>
   )
 })
 
@@ -181,11 +366,11 @@ export function ProductsTab() {
   const [scannerDefaultBarcode, setScannerDefaultBarcode] = useState<string>()
   const [scannerDefaultProduct, setScannerDefaultProduct] = useState<ProductWithStock | null>(null)
 
-  // ── Variant modal ──────────────────────────────────────────────────────────
+  // ── Variant popover ────────────────────────────────────────────────────────
   const [variantProduct, setVariantProduct] = useState<ProductWithStock | null>(null)
-  const [selectedVariantIds, setSelectedVariantIds] = useState<Set<string>>(new Set())
+  const [variantAnchorRect, setVariantAnchorRect] = useState<DOMRect | null>(null)
 
-  const { data: variantData, isFetching: variantLoading } = useQuery<ProductVariant[]>({
+  const { data: variantData, isFetching: variantFetching } = useQuery<ProductVariant[]>({
     queryKey: ['pos-variants', variantProduct?.id, activeBranch?.id],
     queryFn: async () => {
       const params = new URLSearchParams()
@@ -195,9 +380,12 @@ export function ProductsTab() {
       return j.data ?? []
     },
     enabled: !!variantProduct?.id,
-    staleTime: 0,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
   })
   const variantList = variantData ?? []
+  // True loading = no cached data yet; otherwise show stale data + background refresh
+  const variantLoading = variantFetching && variantList.length === 0
 
   // ── Advanced search ────────────────────────────────────────────────────────
   const [advSearchOpen, setAdvSearchOpen] = useState(false)
@@ -258,39 +446,34 @@ export function ProductsTab() {
   })
 
   // ── Helpers ────────────────────────────────────────────────────────────────
-  function openVariantSelect(product: ProductWithStock) {
+  const openVariantSelect = useCallback((product: ProductWithStock, e?: React.MouseEvent<HTMLElement>) => {
+    setVariantAnchorRect(e ? e.currentTarget.getBoundingClientRect() : null)
     setVariantProduct(product)
-    setSelectedVariantIds(new Set())
-  }
+  }, [])
 
-  function toggleVariantSelected(variantId: string) {
-    setSelectedVariantIds(prev => {
-      const next = new Set(prev)
-      if (next.has(variantId)) next.delete(variantId)
-      else next.add(variantId)
-      return next
-    })
+  const closeVariantPopover = useCallback(() => {
+    setVariantProduct(null)
+    setVariantAnchorRect(null)
+  }, [])
+
+  function addSingleVariantToCart(variant: ProductVariant) {
+    if (!variantProduct) return
+    if (typeof variant.stock === 'number' && variant.stock <= 0) return
+    pos.addToCart(variantProduct as unknown as Product, variant as any)
   }
 
   function prefetchVariants(product: ProductWithStock) {
     queryClient.prefetchQuery({
-      queryKey: ['pos-variants', product.id],
+      queryKey: ['pos-variants', product.id, activeBranch?.id],
       queryFn: async () => {
-        const res = await fetch(`/api/products/${product.id}/variants`)
+        const params = new URLSearchParams()
+        if (activeBranch?.id) params.set('branch_id', activeBranch.id)
+        const res = await fetch(`/api/products/${product.id}/variants?${params}`)
         const j = await res.json()
         return j.data ?? []
       },
-      staleTime: 0,
+      staleTime: 30_000,
     })
-  }
-
-  function addVariantToCart() {
-    if (!variantProduct || selectedVariantIds.size === 0) return
-    for (const variantId of selectedVariantIds) {
-      const variant = variantList.find(v => v.id === variantId)
-      if (variant) pos.addToCart(variantProduct as unknown as Product, variant as any)
-    }
-    setVariantProduct(null); setSelectedVariantIds(new Set())
   }
 
   function addMiscItem() {
@@ -479,6 +662,7 @@ export function ProductsTab() {
                 <button
                   key={view}
                   onClick={() => {
+                    closeVariantPopover()
                     setProductsView(view as ProductsView)
                     if (view === 'by_products' && catBreadcrumb.length === 0) loadCatLevel('device_types')
                     if (view === 'by_parts' && partBreadcrumb.length === 0) loadPartLevel('device_types')
@@ -582,7 +766,7 @@ export function ProductsTab() {
               </div>
             ) : allProductsList.length > 0 ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={openVariantSelect} onVariantHover={prefetchVariants} />)}
+                {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} />)}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -649,7 +833,7 @@ export function ProductsTab() {
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}</div>
                 ) : categoryProducts.length > 0 ? (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                    {categoryProducts.map(product => <ProductCard key={product.id} product={product} size="sm" onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={openVariantSelect} onVariantHover={prefetchVariants} />)}
+                    {categoryProducts.map(product => <ProductCard key={product.id} product={product} size="sm" onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} />)}
                   </div>
                 ) : (
                   <p className="py-4 text-center text-sm text-gray-400">No products for this model</p>
@@ -687,7 +871,7 @@ export function ProductsTab() {
                     const hasVariants = product.has_variants || (product as any).variant_count > 0
                     const oos = !hasVariants && typeof product.on_hand === 'number' && product.on_hand <= 0
                     return (
-                      <button key={product.id} disabled={oos} onClick={() => hasVariants ? openVariantSelect(product) : pos.addToCart(product as unknown as Product)}
+                      <button key={product.id} disabled={oos} onClick={(e) => hasVariants ? openVariantSelect(product, e) : pos.addToCart(product as unknown as Product)}
                         className={`relative flex flex-col items-center rounded-xl border bg-white p-3 text-center transition-all w-full overflow-hidden ${oos ? 'border-gray-100 opacity-50 cursor-not-allowed' : 'border-gray-200 hover:border-brand-teal hover:shadow-sm cursor-pointer'}`}>
                         {oos && (
                           <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/60">
@@ -784,7 +968,7 @@ export function ProductsTab() {
                   </div>
                 ) : allProductsList.length > 0 ? (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                    {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={openVariantSelect} onVariantHover={prefetchVariants} />)}
+                    {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} />)}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -810,69 +994,18 @@ export function ProductsTab() {
         )}
       </div>
 
-      {/* ── Variant Selection Modal ── */}
-      <Modal
-        open={!!variantProduct}
-        onClose={() => { setVariantProduct(null); setSelectedVariantIds(new Set()) }}
-        title={variantProduct ? `Select Variant — ${variantProduct.name}` : 'Select Variant'}
-      >
-        <div className="space-y-3">
-          {variantLoading ? (
-            <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-12 animate-pulse rounded-lg bg-gray-100" />)}</div>
-          ) : variantList.length === 0 ? (
-            <p className="py-6 text-center text-sm text-gray-400">No variants found</p>
-          ) : (
-            <>
-              <p className="text-xs text-gray-400">Select one or more variants to add to the cart.</p>
-              <div className="space-y-2 max-h-80 overflow-y-auto">
-                {variantList.map(v => {
-                  const selected = selectedVariantIds.has(v.id)
-                  const oos = typeof v.stock === 'number' && v.stock <= 0
-                  return (
-                    <button key={v.id} disabled={oos} onClick={() => !oos && toggleVariantSelected(v.id)}
-                      className={`relative flex w-full items-center justify-between rounded-lg border-2 px-4 py-3 text-left transition-colors ${oos ? 'border-gray-100 opacity-50 cursor-not-allowed' : selected ? 'border-brand-teal bg-brand-teal-light cursor-pointer' : 'border-gray-200 hover:border-gray-300 cursor-pointer'}`}>
-                      {oos && (
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-600">Out of Stock</span>
-                      )}
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${selected && !oos ? 'border-brand-teal bg-brand-teal' : 'border-gray-300 bg-white'}`}>
-                          {selected && !oos && <Check className="h-3.5 w-3.5 text-white" />}
-                        </div>
-                        {v.image_url ? (
-                          <img src={v.image_url} alt={v.name} className="h-12 w-12 shrink-0 rounded-lg border border-gray-200 object-cover" />
-                        ) : (
-                          <div className="h-12 w-12 shrink-0 rounded-lg border border-dashed border-gray-200 bg-gray-50" />
-                        )}
-                        <div className="min-w-0">
-                          <p className="font-medium text-gray-900 text-sm">{v.name}</p>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {Object.entries(v.attributes ?? {}).map(([k, val]) => (
-                              <span key={k} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">{k}: {val}</span>
-                            ))}
-                          </div>
-                          {v.sku && <p className="text-xs text-gray-400 mt-0.5">SKU: {v.sku}</p>}
-                          {typeof v.stock === 'number' && !oos && <p className="text-xs text-gray-400 mt-0.5">{v.stock} on hand</p>}
-                        </div>
-                      </div>
-                      {!oos && (
-                        <div className="shrink-0 ml-3 text-right">
-                          <p className="font-bold text-brand-teal">{formatCurrency(v.selling_price)}</p>
-                        </div>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            </>
-          )}
-          <div className="flex justify-end gap-2 pt-1">
-            <Button variant="outline" onClick={() => { setVariantProduct(null); setSelectedVariantIds(new Set()) }}>Cancel</Button>
-            <Button className="bg-brand-teal hover:bg-brand-teal-dark" disabled={selectedVariantIds.size === 0} onClick={addVariantToCart}>
-              Add to Cart{selectedVariantIds.size > 1 ? ` (${selectedVariantIds.size})` : ''}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      {/* ── Variant Popover ── */}
+      {variantProduct && (
+        <VariantPopover
+          product={variantProduct}
+          variants={variantList}
+          loading={variantLoading}
+          fetching={variantFetching}
+          anchorRect={variantAnchorRect}
+          onAdd={addSingleVariantToCart}
+          onClose={closeVariantPopover}
+        />
+      )}
 
       {/* ── Advanced Search Modal ── */}
       {advSearchOpen && (
@@ -953,7 +1086,7 @@ export function ProductsTab() {
                                 <button
                                   disabled={advOos}
                                   title={advOos ? 'Out of stock' : undefined}
-                                  onClick={() => { if ((p.has_variants || (p.variant_count ?? 0) > 0)) { openVariantSelect(p); setAdvSearchOpen(false) } else { pos.addToCart(p as unknown as Product); setAdvSearchOpen(false) } }}
+                                  onClick={() => { if ((p.has_variants || (p.variant_count ?? 0) > 0)) { setAdvSearchOpen(false); openVariantSelect(p) } else { pos.addToCart(p as unknown as Product); setAdvSearchOpen(false) } }}
                                   className={`flex h-7 w-7 items-center justify-center rounded border text-gray-500 ${advOos ? 'border-gray-100 opacity-40 cursor-not-allowed' : 'border-gray-200 hover:border-brand-teal hover:text-brand-teal'}`}
                                 >
                                   <Plus className="h-3.5 w-3.5" />

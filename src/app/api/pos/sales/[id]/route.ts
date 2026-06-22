@@ -6,6 +6,11 @@ export const GET = withMiddleware(
   { requiredRole: 'cashier' }
 )
 
+export const PATCH = withMiddleware(
+  (req, ctx, { params }) => params.then((p) => PosController.updateSale(req, ctx, p.id)),
+  { requiredRole: 'branch_manager', module: 'pos' }
+)
+
 export const DELETE = withMiddleware(
   (req, ctx, { params }) => params.then((p) => PosController.deleteSale(req, ctx, p.id)),
   { requiredRole: 'branch_manager', module: 'pos' }

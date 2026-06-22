@@ -91,20 +91,6 @@ export function Topbar({ onMenuClick }: TopbarProps) {
       <div className="flex-1" />
 
       <div className="flex items-center gap-2 ml-auto">
-        <Link
-          href="/repairs?new=true"
-          className="relative hidden items-center justify-center overflow-hidden rounded-xl p-[1.5px] transition-all hover:scale-[1.02] active:scale-95 sm:flex shadow-[0_0_20px_-5px_var(--primary)]"
-        >
-          {/* Rotating gradient background using high-contrast brand colors */}
-          <span className="absolute inset-[-1000%] animate-[spin_4s_linear_infinite] bg-[conic-gradient(from_90deg_at_50%_50%,var(--on-primary)_0%,var(--primary-fixed)_50%,var(--on-primary)_100%)]" />
-
-          {/* Inner button content using brand teal instead of black */}
-          <span className="relative flex items-center gap-2 rounded-[11px] bg-primary px-6 py-2.5 text-[12px] font-extrabold uppercase tracking-widest text-on-primary backdrop-blur-3xl">
-
-            Book a Repair
-          </span>
-        </Link>
-
         {/* ── System Announcements (Megaphone) ── */}
         <div ref={announceRef} className="relative">
           <button

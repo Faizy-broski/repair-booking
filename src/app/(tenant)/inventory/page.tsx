@@ -625,22 +625,22 @@ export default function InventoryPage() {
         ].map((s) => {
           const Icon = s.icon
           return (
-            <div key={s.label} className="relative overflow-hidden rounded-xl border border-gray-200 bg-white pb-4 pt-5 px-5 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">{s.label}</p>
+            <div key={s.label} className="relative overflow-hidden rounded-xl border border-gray-200 bg-white pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm">
+              <div className="flex items-start justify-between gap-2 sm:gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-gray-500 truncate">{s.label}</p>
                   {s.value !== null ? (
-                    <p className="mt-2 text-3xl font-bold text-gray-900">{s.value}</p>
+                    <p className="mt-2 text-base sm:text-2xl lg:text-3xl font-bold text-gray-900 truncate" title={String(s.value)}>{s.value}</p>
                   ) : (
                     <div className="mt-2 h-8 w-24 rounded bg-gray-100 animate-pulse" />
                   )}
                 </div>
-                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${s.iconBg}`}>
-                  <Icon className={`h-5 w-5 ${s.iconColor}`} />
+                <div className={`flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl ${s.iconBg}`}>
+                  <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${s.iconColor}`} />
                 </div>
               </div>
               {s.value !== null ? (
-                <p className={`mt-3 text-xs font-medium ${s.iconColor}`}>
+                <p className={`mt-2 sm:mt-3 text-[10px] sm:text-xs font-medium truncate ${s.iconColor}`}>
                   {s.subtitle}
                 </p>
               ) : (

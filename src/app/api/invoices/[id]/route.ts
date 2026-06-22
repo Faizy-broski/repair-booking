@@ -9,3 +9,7 @@ export const PATCH = withMiddleware(
   (req, ctx, { params }) => params.then((p) => InvoiceController.updateStatus(req, ctx, p.id)),
   { requiredRole: 'staff' }
 )
+export const DELETE = withMiddleware(
+  (req, ctx, { params }) => params.then((p) => InvoiceController.deleteInvoice(req, ctx, p.id)),
+  { requiredRole: 'branch_manager' }
+)

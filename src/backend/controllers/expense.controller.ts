@@ -54,10 +54,29 @@ export const ExpenseController = {
     }
   },
 
-  async deleteExpense(request: NextRequest, ctx: RequestContext, id: string) {
-    const branchId = ctx.auth.branchId ?? null
+  async updateExpense(request: NextRequest, ctx: RequestContext, id: string) {
+    const updateSchema = z.object({
+      title: z.string().min(1).optional(),
+      amount: z.number().positive().optional(),
+      expense_date: z.string().optional(),
+      category_id: z.string().uuid().optional().nullable(),
+      notes: z.string().optional().nullable(),
+    })
+    const { data, error } = await validateBody(request, updateSchema)
+    if (error) return error
+    const businessId = ctx.businessId
     try {
-      await ExpenseService.delete(id, branchId)
+      const updated = await ExpenseService.update(id, businessId, data)
+      return ok(updated)
+    } catch (err) {
+      return serverError('Failed to update expense', err)
+    }
+  },
+
+  async deleteExpense(request: NextRequest, ctx: RequestContext, id: string) {
+    const businessId = ctx.businessId
+    try {
+      await ExpenseService.delete(id, businessId)
       return ok({ deleted: true })
     } catch (err) {
       return serverError('Failed to delete expense', err)

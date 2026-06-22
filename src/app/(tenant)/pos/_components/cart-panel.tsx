@@ -236,7 +236,7 @@ export function CartPanel({ mobileView }: Props) {
           branchPhone={activeBranch?.phone ?? undefined}
           branchEmail={activeBranch?.email ?? undefined}
           logoUrl={(activeBranch as any)?.logo_url ?? undefined}
-          currency="£"
+          currency={currency}
           taxRate={pos.taxRate > 0 ? pos.taxRate : undefined}
           settings={invoiceSettings ?? undefined}
         />

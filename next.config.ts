@@ -4,8 +4,10 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  serverActions: {
-    bodySizeLimit: '10mb',
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
   },
   // Allow images from any HTTPS host.
   // Product/brand/model images are user-supplied URLs — we can't enumerate all origins.

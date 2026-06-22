@@ -48,6 +48,14 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
     setCurrency, setBrandColor, setSubscriptionStatus, setVerticalTemplateSlug, clear,
     profile: cachedProfile, brandColor,
   } = useAuthStore()
+
+  // Mirror brand CSS vars to <html> so Dialog.Portal modals (rendered to document.body)
+  // also inherit the tenant brand color.
+  useEffect(() => {
+    const style = getBrandStyle(brandColor)
+    const root = document.documentElement
+    Object.entries(style).forEach(([k, v]) => root.style.setProperty(k, v as string))
+  }, [brandColor])
   const { fetchConfigs, invalidate: invalidateConfigs } = useModuleConfigStore()
   const { setLoaded: setBroadcastsLoaded, addBroadcast, syncBroadcast, reset: resetBroadcasts } = useBroadcastsStore()
   const broadcastsBusinessId = useAuthStore((s) => s.profile?.business_id ?? '')

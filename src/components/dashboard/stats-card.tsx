@@ -36,7 +36,7 @@ export function StatsCard({ title, value, subtitle, icon, trend, color = 'blue',
       </div>
 
       {/* Row 2: large value — always full width, never blocked by icon */}
-      <p className="mt-2 text-xl sm:text-2xl font-bold tracking-tight text-gray-900 leading-none">{value}</p>
+      <p className="mt-2 text-base sm:text-2xl font-bold tracking-tight text-gray-900 leading-none truncate" title={String(value)}>{value}</p>
 
       {/* Row 3: subtitle / trend */}
       {subtitle && (

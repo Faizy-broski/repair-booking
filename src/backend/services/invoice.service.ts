@@ -99,6 +99,35 @@ export const InvoiceService = {
     return summary
   },
 
+  async update(id: string, branchId: string | null, payload: {
+    customer_id?: string | null
+    items?: Array<{ description: string; quantity: number; unit_price: number }>
+    subtotal?: number; discount?: number; tax?: number; total?: number
+    notes?: string | null; status?: string
+  }) {
+    const updates: Record<string, any> = {}
+    if (payload.customer_id !== undefined) updates.customer_id = payload.customer_id
+    if (payload.items !== undefined) updates.items = payload.items
+    if (payload.subtotal !== undefined) updates.subtotal = payload.subtotal
+    if (payload.discount !== undefined) updates.discount = payload.discount
+    if (payload.tax !== undefined) updates.tax = payload.tax
+    if (payload.total !== undefined) updates.total = payload.total
+    if (payload.notes !== undefined) updates.notes = payload.notes
+    if (payload.status !== undefined) updates.status = payload.status
+    let q = adminSupabase.from('invoices').update(updates).eq('id', id)
+    if (branchId && branchId !== 'null') q = q.eq('branch_id', branchId)
+    const { data, error } = await q.select().single()
+    if (error) throw error
+    return data
+  },
+
+  async delete(id: string, branchId: string | null) {
+    let q = adminSupabase.from('invoices').delete().eq('id', id)
+    if (branchId && branchId !== 'null') q = q.eq('branch_id', branchId)
+    const { error } = await q
+    if (error) throw error
+  },
+
   async generatePdf(id: string, businessId?: string): Promise<Buffer> {
     const { data, error } = await adminSupabase
       .from('invoices')
@@ -117,10 +146,15 @@ export const InvoiceService = {
     const bizId = businessId ?? branch?.business_id
     const items = Array.isArray(data.items) ? (data.items as any[]) : []
 
-    // Fetch branding settings (branch override falls back to business default)
-    const settings = bizId
-      ? await InvoiceSettingsService.get(bizId, branch?.id ?? null)
-      : (await import('@/types/invoice-settings')).DEFAULT_INVOICE_SETTINGS
+    // Fetch branding settings + business currency in parallel
+    const [settings, bizRow] = await Promise.all([
+      bizId
+        ? InvoiceSettingsService.get(bizId, branch?.id ?? null)
+        : (await import('@/types/invoice-settings')).DEFAULT_INVOICE_SETTINGS,
+      bizId
+        ? adminSupabase.from('businesses').select('currency').eq('id', bizId).single().then(r => r.data)
+        : Promise.resolve(null),
+    ])
 
     // Use branch logo as fallback if no logo_url in settings
     const effectiveSettings = {
@@ -151,6 +185,7 @@ export const InvoiceService = {
       total: data.total ?? 0,
       amountPaid: data.amount_paid ?? 0,
       notes: data.notes ?? null,
+      currency: bizRow?.currency ?? 'GBP',
     })
 
     return await renderToBuffer(doc as any)

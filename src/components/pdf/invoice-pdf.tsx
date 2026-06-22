@@ -1,11 +1,11 @@
 import { Document, Page, Text, View, Image, StyleSheet, Font } from '@react-pdf/renderer'
 import type { InvoiceSettings, SocialLinks } from '@/types/invoice-settings'
+import { formatCurrency } from '@/lib/utils'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function fmt(n: number, currency = 'GBP') {
-  const sym = currency === 'GBP' ? '£' : currency === 'EUR' ? '€' : '$'
-  return `${sym}${n.toFixed(2)}`
+function fmt(n: number, currency?: string) {
+  return formatCurrency(n, currency)
 }
 
 function hexToRgba(hex: string | undefined | null, alpha: number): string {

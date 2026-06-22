@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Plus, Search, LayoutGrid, List, Wrench, DollarSign, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail, RefreshCw, MoreHorizontal } from 'lucide-react'
+import { Plus, Search, LayoutGrid, List, Wrench, Banknote, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail, RefreshCw, MoreHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
 import { AsyncEmployeeSelect } from '@/components/shared/async-employee-select'
@@ -1219,18 +1219,18 @@ export default function RepairsPage() {
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {/* Total Repairs */}
-        <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-5 px-5 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Total Repairs</p>
+        <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm">
+          <div className="flex items-start justify-between gap-2 sm:gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Total Repairs</p>
               {repairStats ? (
-                <p className="mt-2 text-3xl font-bold text-on-surface">{repairStats.total_repairs}</p>
+                <p className="mt-2 text-base sm:text-2xl lg:text-3xl font-bold text-on-surface truncate" title={String(repairStats.total_repairs)}>{repairStats.total_repairs}</p>
               ) : (
                 <div className="mt-2 h-8 w-24 rounded bg-surface-container animate-pulse" />
               )}
             </div>
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-container">
-              <Wrench className="h-5 w-5 text-primary" />
+            <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl bg-primary-container">
+              <Wrench className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
             </div>
           </div>
           {repairStats ? (
@@ -1245,18 +1245,18 @@ export default function RepairsPage() {
         </div>
 
         {/* Revenue */}
-        <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-5 px-5 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Revenue</p>
+        <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm">
+          <div className="flex items-start justify-between gap-2 sm:gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Revenue</p>
               {repairStats ? (
-                <p className="mt-2 text-2xl font-bold text-on-surface">{formatCurrency(repairStats.total_sales)}</p>
+                <p className="mt-2 text-base sm:text-xl lg:text-2xl font-bold text-on-surface truncate" title={formatCurrency(repairStats.total_sales)}>{formatCurrency(repairStats.total_sales)}</p>
               ) : (
                 <div className="mt-2 h-8 w-28 rounded bg-surface-container animate-pulse" />
               )}
             </div>
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-tertiary-container/40">
-              <DollarSign className="h-5 w-5 text-tertiary" />
+            <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl bg-tertiary-container/40">
+              <Banknote className="h-4 w-4 sm:h-5 sm:w-5 text-tertiary" />
             </div>
           </div>
           {repairStats ? (
@@ -1271,20 +1271,20 @@ export default function RepairsPage() {
         </div>
 
         {/* Profit */}
-        <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-5 px-5 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Profit</p>
+        <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm">
+          <div className="flex items-start justify-between gap-2 sm:gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Profit</p>
               {repairStats ? (
-                <p className={`mt-2 text-2xl font-bold ${repairStats.repairs_profit >= 0 ? 'text-green-600' : 'text-error'}`}>
+                <p className={`mt-2 text-base sm:text-xl lg:text-2xl font-bold truncate ${repairStats.repairs_profit >= 0 ? 'text-green-600' : 'text-error'}`} title={formatCurrency(repairStats.repairs_profit)}>
                   {formatCurrency(repairStats.repairs_profit)}
                 </p>
               ) : (
                 <div className="mt-2 h-8 w-28 rounded bg-surface-container animate-pulse" />
               )}
             </div>
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-green-50">
-              <TrendingUp className="h-5 w-5 text-green-600" />
+            <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl bg-green-50">
+              <TrendingUp className="h-4 w-4 sm:h-5 w-5 text-green-600" />
             </div>
           </div>
           {repairStats ? (
@@ -1299,18 +1299,18 @@ export default function RepairsPage() {
         </div>
 
         {/* Open Jobs */}
-        <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-5 px-5 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Open Jobs</p>
+        <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm">
+          <div className="flex items-start justify-between gap-2 sm:gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Open Jobs</p>
               {repairStats ? (
-                <p className="mt-2 text-3xl font-bold text-on-surface">{repairStats.repairs_open}</p>
+                <p className="mt-2 text-base sm:text-2xl lg:text-3xl font-bold text-on-surface truncate" title={String(repairStats.repairs_open)}>{repairStats.repairs_open}</p>
               ) : (
                 <div className="mt-2 h-8 w-16 rounded bg-surface-container animate-pulse" />
               )}
             </div>
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-yellow-light">
-              <Wrench className="h-5 w-5 text-[#b45309]" />
+            <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl bg-brand-yellow-light">
+              <Wrench className="h-4 w-4 sm:h-5 sm:w-5 text-[#b45309]" />
             </div>
           </div>
           {repairStats ? (
@@ -1324,18 +1324,18 @@ export default function RepairsPage() {
         </div>
 
         {/* Completed Jobs */}
-        <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-5 px-5 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">Completed Jobs</p>
+        <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm">
+          <div className="flex items-start justify-between gap-2 sm:gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Completed Jobs</p>
               {repairStats ? (
-                <p className="mt-2 text-3xl font-bold text-on-surface">{repairStats.repairs_completed}</p>
+                <p className="mt-2 text-base sm:text-2xl lg:text-3xl font-bold text-on-surface truncate" title={String(repairStats.repairs_completed)}>{repairStats.repairs_completed}</p>
               ) : (
                 <div className="mt-2 h-8 w-12 rounded bg-surface-container animate-pulse" />
               )}
             </div>
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-container">
-              <CheckCircle className="h-5 w-5 text-primary" />
+            <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl bg-primary-container">
+              <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
             </div>
           </div>
           {repairStats ? (
@@ -2111,7 +2111,7 @@ export default function RepairsPage() {
               {/* Row C: Total | Deposit | Remaining | Assigned To */}
               <div>
                 <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
-                  <DollarSign className="h-2.5 w-2.5" /> Financials & Assignment
+                  <Banknote className="h-2.5 w-2.5" /> Financials & Assignment
                 </p>
                 {/* Price Pending toggle */}
                 <label className="mb-2 flex cursor-pointer items-center gap-2.5 w-fit">

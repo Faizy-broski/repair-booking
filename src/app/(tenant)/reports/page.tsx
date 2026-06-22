@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  TrendingUp, TrendingDown, DollarSign, ShoppingCart, Wrench, RefreshCw,
+  TrendingUp, TrendingDown, Banknote, ShoppingCart, Wrench, RefreshCw,
   Receipt, PieChart, Users, FileText, CreditCard, Package, BarChart2, Lock,
   ChevronRight,
 } from 'lucide-react'
@@ -80,7 +80,7 @@ export default function ReportsOverviewPage() {
   })
 
   const statsCards = [
-    { label: 'Total Revenue', value: formatCurrency(stats.total_revenue), icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
+    { label: 'Total Revenue', value: formatCurrency(stats.total_revenue), icon: Banknote, color: 'text-green-600', bg: 'bg-green-50' },
     { label: 'Transactions',  value: String(stats.total_transactions),    icon: ShoppingCart, color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'Repairs',       value: String(stats.total_repairs),         icon: Wrench,       color: 'text-purple-600', bg: 'bg-purple-50' },
     {

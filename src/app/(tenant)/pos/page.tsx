@@ -183,23 +183,45 @@ export default function PosPage() {
     setSessionProcessing(false)
   }
 
-  async function handleCashMovement() {
+  async function handleCashMovement(expenseCategoryId: string | null) {
     if (!pos.session || !cashMovementAmount) return
     setCashMovementSaving(true)
+    const amount = parseFloat(cashMovementAmount)
+
     const res = await fetch('/api/pos/session/movements', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         session_id: pos.session.id,
         branch_id: activeBranch?.id,
         type: cashMovementType,
-        amount: parseFloat(cashMovementAmount),
+        amount,
         notes: cashMovementNotes || undefined,
       }),
     })
+
     if (res.ok) {
+      // Cash out is always recorded as an expense
+      if (cashMovementType === 'cash_out' && activeBranch?.id) {
+        await fetch('/api/expenses', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            branch_id: activeBranch.id,
+            category_id: expenseCategoryId || null,
+            title: cashMovementNotes?.trim() || 'POS Cash Out',
+            amount,
+            expense_date: new Date().toISOString().split('T')[0],
+            notes: cashMovementNotes?.trim() || null,
+          }),
+        })
+        toast.success(`Cash out of ${formatCurrency(amount)} recorded as expense`)
+      } else {
+        toast.success(`Cash in of ${formatCurrency(amount)} recorded`)
+      }
       setCashMovementOpen(false)
       setCashMovementAmount('')
       setCashMovementNotes('')
+    } else {
+      toast.error('Failed to record cash movement')
     }
     setCashMovementSaving(false)
   }
@@ -285,21 +307,23 @@ export default function PosPage() {
         <div className={`flex-1 flex-col overflow-hidden ${mobileView === 'browse' ? 'flex' : 'hidden lg:flex'}`}>
 
           {/* Tab bar */}
-          <div className="flex shrink-0 items-center bg-brand-teal">
-            {TABS.map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`flex flex-1 items-center justify-center gap-2 border-b-2 px-4 py-2.5 lg:py-4 text-sm lg:text-base font-semibold whitespace-nowrap transition-all ${
-                  activeTab === tab.key
-                    ? 'border-white text-white bg-white/10'
-                    : 'border-transparent text-white/60 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                {tab.icon}{tab.label}
-              </button>
-            ))}
-          </div>
+          {TABS.length > 1 && (
+            <div className="flex shrink-0 items-center bg-brand-teal">
+              {TABS.map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`flex flex-1 items-center justify-center gap-2 border-b-2 px-4 py-2.5 lg:py-4 text-sm lg:text-base font-semibold whitespace-nowrap transition-all ${
+                    activeTab === tab.key
+                      ? 'border-white text-white bg-white/10'
+                      : 'border-transparent text-white/60 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  {tab.icon}{tab.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Tab content */}
           <div className="flex flex-1 flex-col overflow-hidden bg-gray-50">
@@ -356,6 +380,7 @@ export default function PosPage() {
         setCashMovementNotes={setCashMovementNotes}
         cashMovementSaving={cashMovementSaving}
         handleCashMovement={handleCashMovement}
+        businessId={activeBranch?.business_id}
       />
 
       <PinModal />

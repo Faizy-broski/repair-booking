@@ -2,10 +2,10 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { Plus, Download, CreditCard, RotateCcw, Loader2, UserPlus } from 'lucide-react'
+import { Plus, Download, CreditCard, RotateCcw, Loader2, UserPlus, MoreVertical, Pencil, Trash2 } from 'lucide-react'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/ui/modal'
 import { DataTable } from '@/components/shared/data-table'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
@@ -18,15 +18,21 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { toast } from 'sonner'
 import { PhoneInput } from '@/components/ui/phone-input'
 
+interface LineItem { description: string; quantity: number; unit_price: number }
+
 interface InvoiceRow {
   id: string
   invoice_number: string
   status: string
   subtotal: number
   tax: number
+  discount: number
   total: number
   amount_paid: number
   created_at: string
+  customer_id: string | null
+  notes: string | null
+  items: LineItem[] | null
   customers?: { first_name: string; last_name: string | null } | null
 }
 
@@ -65,17 +71,20 @@ type FormData = z.infer<typeof schema>
 
 export default function InvoicesPage() {
   const router = useRouter()
-  const { activeBranch } = useAuthStore()
-  const currSymbol = getCurrencySymbol()
+  const { activeBranch, currency } = useAuthStore()
+  const currSymbol = getCurrencySymbol(currency)
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(20)
   const [statusFilter, setStatusFilter] = useState('')
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [editingInvoice, setEditingInvoice] = useState<InvoiceRow | null>(null)
   const [lineItems, setLineItems] = useState([{ description: '', quantity: 1, unit_price: 0 }])
   const [paymentModal, setPaymentModal] = useState<{ invoiceId: string; remaining: number } | null>(null)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [recordingPayment, setRecordingPayment] = useState(false)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [newCustOpen, setNewCustOpen] = useState(false)
   const [newCustSaving, setNewCustSaving] = useState(false)
   const [newCust, setNewCust] = useState({ first_name: '', last_name: '', email: '', phone: '', address: '', business_name: '' })
@@ -152,6 +161,37 @@ export default function InvoicesPage() {
     }
   }
 
+  function openEdit(inv: InvoiceRow) {
+    const items = (inv.items ?? []).length > 0
+      ? inv.items!
+      : [{ description: '', quantity: 1, unit_price: 0 }]
+    setLineItems(items)
+    reset({
+      customer_id: inv.customer_id ?? '',
+      tax_rate: 0,
+      discount_value: inv.discount ?? 0,
+      discount_type: 'flat',
+      notes: inv.notes ?? '',
+      items,
+    })
+    setEditingInvoice(inv)
+    setSheetOpen(true)
+  }
+
+  async function deleteInvoice(id: string) {
+    setDeleting(true)
+    const res = await fetch(`/api/invoices/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      toast.success('Invoice deleted')
+      setDeleteConfirmId(null)
+      queryClient.invalidateQueries({ queryKey: ['invoices', activeBranch?.id] })
+    } else {
+      const err = await res.json()
+      toast.error(err?.error?.message ?? 'Failed to delete invoice')
+    }
+    setDeleting(false)
+  }
+
   function addLineItem() {
     const updated = [...lineItems, { description: '', quantity: 1, unit_price: 0 }]
     setLineItems(updated)
@@ -171,7 +211,38 @@ export default function InvoicesPage() {
       ? subtotal * (data.discount_value / 100)
       : (data.discount_value ?? 0)
     const discounted = Math.max(0, subtotal - discountAmt)
-    const tax = discounted * (data.tax_rate / 100)
+    const tax = editingInvoice
+      ? (editingInvoice.tax ?? 0)
+      : discounted * (data.tax_rate / 100)
+
+    if (editingInvoice) {
+      const res = await fetch(`/api/invoices/${editingInvoice.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: data.customer_id || null,
+          items: data.items,
+          subtotal,
+          discount: discountAmt,
+          tax,
+          total: discounted + tax,
+          notes: data.notes || null,
+        }),
+      })
+      if (res.ok) {
+        toast.success('Invoice updated')
+        setEditingInvoice(null)
+        reset({ tax_rate: 0, discount_value: 0, discount_type: 'flat', items: [{ description: '', quantity: 1, unit_price: 0 }] })
+        setLineItems([{ description: '', quantity: 1, unit_price: 0 }])
+        setSheetOpen(false)
+        queryClient.invalidateQueries({ queryKey: ['invoices', activeBranch?.id] })
+      } else {
+        const err = await res.json()
+        toast.error(err?.error?.message ?? 'Failed to update invoice')
+      }
+      return
+    }
+
     const res = await fetch('/api/invoices', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -269,7 +340,7 @@ export default function InvoicesPage() {
     {
       accessorKey: 'total',
       header: 'Total',
-      cell: ({ getValue }) => <span className="font-semibold">{formatCurrency(getValue() as number)}</span>,
+      cell: ({ getValue }) => <span className="font-semibold">{formatCurrency(getValue() as number, currency)}</span>,
     },
     {
       accessorKey: 'status',
@@ -301,12 +372,12 @@ export default function InvoicesPage() {
     },
     {
       id: 'actions',
-      header: '',
+      header: 'Actions',
       cell: ({ row }) => {
         const inv = row.original
         const remaining = inv.total - (inv.amount_paid ?? 0)
         return (
-          <div className="flex gap-1">
+          <div className="flex items-center gap-1.5">
             {(inv.status === 'unpaid' || inv.status === 'partial') && remaining > 0 && (
               <Button
                 size="sm"
@@ -328,19 +399,40 @@ export default function InvoicesPage() {
                 Refund
               </Button>
             )}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => downloadPdf(row.original.id)}
-              onMouseEnter={() => prefetchPdf(`/api/invoices/${row.original.id}/pdf`)}
-              onFocus={() => prefetchPdf(`/api/invoices/${row.original.id}/pdf`)}
-              disabled={downloadingId === row.original.id}
-              title="Download PDF"
-            >
-              {downloadingId === row.original.id
-                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                : <Download className="h-3.5 w-3.5" />}
-            </Button>
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger asChild>
+                <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none">
+                  <MoreVertical className="h-4 w-4 stroke-[2.5]" />
+                </button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content align="end" sideOffset={4} className="z-50 min-w-[160px] overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                  <DropdownMenu.Item
+                    onSelect={() => downloadPdf(inv.id)}
+                    onMouseEnter={() => prefetchPdf(`/api/invoices/${inv.id}/pdf`)}
+                    className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-50"
+                  >
+                    {downloadingId === inv.id
+                      ? <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                      : <Download className="h-4 w-4 text-gray-400" />}
+                    Download PDF
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    onSelect={() => openEdit(inv)}
+                    className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-blue-600 outline-none hover:bg-blue-50"
+                  >
+                    <Pencil className="h-4 w-4" /> Edit Invoice
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Separator className="my-1 border-t border-gray-100" />
+                  <DropdownMenu.Item
+                    onSelect={() => setDeleteConfirmId(inv.id)}
+                    className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-red-600 outline-none hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4" /> Delete Invoice
+                  </DropdownMenu.Item>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
           </div>
         )
       },
@@ -380,7 +472,7 @@ export default function InvoicesPage() {
               <p className={`text-2xl font-bold ${card.text}`}>{card.count}</p>
               <p className="text-xs text-gray-500">{card.label}</p>
               {card.total !== null && (
-                <p className={`text-xs font-medium ${card.text}`}>{formatCurrency(card.total)}</p>
+                <p className={`text-xs font-medium ${card.text}`}>{formatCurrency(card.total, currency)}</p>
               )}
             </button>
           ))}
@@ -399,7 +491,19 @@ export default function InvoicesPage() {
         emptyMessage="No invoices yet."
       />
 
-      <InlineFormSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="New Invoice" side="right">
+      <InlineFormSheet
+        open={sheetOpen}
+        onClose={() => {
+          setSheetOpen(false)
+          if (editingInvoice) {
+            setEditingInvoice(null)
+            reset({ tax_rate: 0, discount_value: 0, discount_type: 'flat', items: [{ description: '', quantity: 1, unit_price: 0 }] })
+            setLineItems([{ description: '', quantity: 1, unit_price: 0 }])
+          }
+        }}
+        title={editingInvoice ? `Edit Invoice ${editingInvoice.invoice_number}` : 'New Invoice'}
+        side="right"
+      >
         <form onSubmit={handleSubmit(onCreate)} className="space-y-4">
           <div>
             <div className="mb-1 flex items-center justify-between">
@@ -538,7 +642,9 @@ export default function InvoicesPage() {
             </div>
           </div>
 
-          <Input label="Tax Rate (%)" type="number" step="0.1" min="0" max="100" {...register('tax_rate')} />
+          {!editingInvoice && (
+            <Input label="Tax Rate (%)" type="number" step="0.1" min="0" max="100" {...register('tax_rate')} />
+          )}
 
           {/* Totals summary */}
           {(() => {
@@ -547,28 +653,28 @@ export default function InvoicesPage() {
               ? lineItemSubtotal * (discountValue / 100)
               : discountValue
             const discounted = Math.max(0, lineItemSubtotal - discountAmt)
-            const tax = discounted * (taxRate / 100)
+            const tax = editingInvoice ? (editingInvoice.tax ?? 0) : discounted * (taxRate / 100)
             return (
               <div className="rounded-lg bg-gray-50 p-3 space-y-1.5 text-sm">
                 <div className="flex justify-between text-gray-500">
                   <span>Subtotal</span>
-                  <span>{formatCurrency(lineItemSubtotal)}</span>
+                  <span>{formatCurrency(lineItemSubtotal, currency)}</span>
                 </div>
                 {discountAmt > 0 && (
                   <div className="flex justify-between text-green-600 font-medium">
                     <span>Discount</span>
-                    <span>-{formatCurrency(discountAmt)}</span>
+                    <span>-{formatCurrency(discountAmt, currency)}</span>
                   </div>
                 )}
-                {taxRate > 0 && (
+                {tax > 0 && (
                   <div className="flex justify-between text-gray-500">
-                    <span>Tax ({taxRate}%)</span>
-                    <span>{formatCurrency(tax)}</span>
+                    <span>Tax{!editingInvoice && taxRate > 0 ? ` (${taxRate}%)` : ''}</span>
+                    <span>{formatCurrency(tax, currency)}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-bold text-gray-900 border-t border-gray-200 pt-1.5">
                   <span>Total</span>
-                  <span>{formatCurrency(discounted + tax)}</span>
+                  <span>{formatCurrency(discounted + tax, currency)}</span>
                 </div>
               </div>
             )
@@ -579,7 +685,9 @@ export default function InvoicesPage() {
             <textarea rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" {...register('notes')} />
           </div>
 
-          <Button type="submit" className="w-full" loading={isSubmitting}>Create Invoice</Button>
+          <Button type="submit" className="w-full" loading={isSubmitting}>
+            {editingInvoice ? 'Save Changes' : 'Create Invoice'}
+          </Button>
         </form>
       </InlineFormSheet>
 
@@ -662,7 +770,7 @@ export default function InvoicesPage() {
             <div className="rounded-lg bg-gray-50 p-3">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Remaining balance</span>
-                <span className="font-semibold text-gray-900">{formatCurrency(paymentModal.remaining)}</span>
+                <span className="font-semibold text-gray-900">{formatCurrency(paymentModal.remaining, currency)}</span>
               </div>
             </div>
           )}
@@ -682,6 +790,27 @@ export default function InvoicesPage() {
           >
             Record Payment
           </Button>
+        </div>
+      </Modal>
+      {/* Delete Confirm Modal */}
+      <Modal
+        open={!!deleteConfirmId}
+        onClose={() => setDeleteConfirmId(null)}
+        title="Delete Invoice"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">Are you sure you want to delete this invoice? This action cannot be undone.</p>
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
+            <Button
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              loading={deleting}
+              onClick={() => deleteConfirmId && deleteInvoice(deleteConfirmId)}
+            >
+              Delete
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>

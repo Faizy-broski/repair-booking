@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { toast } from 'sonner'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { useAuthStore } from '@/store/auth.store'
 
 type Tab = 'overview' | 'repairs' | 'sales' | 'invoices' | 'assets' | 'credits'
 
@@ -76,6 +77,8 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   const router = useRouter()
   const queryClient = useQueryClient()
   const [tab, setTab] = useState<Tab>('overview')
+  const { verticalTemplateSlug } = useAuthStore()
+  const isRetailStore = verticalTemplateSlug === 'retail-store'
 
   // Assets
   const [assetModal,  setAssetModal]  = useState<{ open: boolean; editing: Asset | null }>({ open: false, editing: null })
@@ -230,10 +233,10 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
   const TABS: { id: Tab; label: string; count?: number }[] = [
     { id: 'overview',  label: 'Overview' },
-    { id: 'repairs',   label: 'Repairs',  count: customer.stats.repair_count },
+    ...(!isRetailStore ? [{ id: 'repairs' as Tab, label: 'Repairs', count: customer.stats.repair_count }] : []),
     { id: 'sales',     label: 'Sales',    count: customer.stats.sale_count },
     { id: 'invoices',  label: 'Invoices', count: customer.stats.invoice_count },
-    { id: 'assets',    label: 'Devices',  count: assets.length },
+    ...(!isRetailStore ? [{ id: 'assets' as Tab, label: 'Devices', count: assets.length }] : []),
     { id: 'credits',   label: 'Credits & Points' },
   ]
 
@@ -314,7 +317,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
             <CardContent className="pt-4">
               <h3 className="mb-3 text-sm font-semibold text-gray-700">Activity</h3>
               <div className="grid grid-cols-2 gap-3">
-                <Stat label="Repairs" value={customer.stats.repair_count} icon={<Wrench className="h-4 w-4" />} />
+                {!isRetailStore && <Stat label="Repairs" value={customer.stats.repair_count} icon={<Wrench className="h-4 w-4" />} />}
                 <Stat label="Sales" value={customer.stats.sale_count} icon={<ShoppingBag className="h-4 w-4" />} />
                 <Stat label="Invoices" value={customer.stats.invoice_count} icon={<FileText className="h-4 w-4" />} />
                 <Stat label="Total Spend" value={formatCurrency(customer.stats.total_spend)} />

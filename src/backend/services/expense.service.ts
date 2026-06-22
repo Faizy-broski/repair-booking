@@ -37,12 +37,42 @@ export const ExpenseService = {
     return data
   },
 
-  async delete(id: string, branchId: string) {
+  async update(id: string, businessId: string, payload: { title?: string; amount?: number; expense_date?: string; category_id?: string | null; notes?: string | null }) {
+    // Verify the expense belongs to this business before updating
+    const { data: existing, error: fetchErr } = await adminSupabase
+      .from('expenses')
+      .select('id, branches!branch_id(business_id)')
+      .eq('id', id)
+      .single()
+    if (fetchErr || !existing) throw new Error('Expense not found')
+    const expBusinessId = (existing as any).branches?.business_id
+    if (expBusinessId && expBusinessId !== businessId) throw new Error('Forbidden')
+
+    const { data, error } = await adminSupabase
+      .from('expenses')
+      .update(payload)
+      .eq('id', id)
+      .select('*, expense_categories(name)')
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async delete(id: string, businessId: string) {
+    // Verify ownership via business before deleting
+    const { data: existing, error: fetchErr } = await adminSupabase
+      .from('expenses')
+      .select('id, branches!branch_id(business_id)')
+      .eq('id', id)
+      .single()
+    if (fetchErr || !existing) throw new Error('Expense not found')
+    const expBusinessId = (existing as any).branches?.business_id
+    if (expBusinessId && expBusinessId !== businessId) throw new Error('Forbidden')
+
     const { error } = await adminSupabase
       .from('expenses')
       .delete()
       .eq('id', id)
-      .eq('branch_id', branchId)
     if (error) throw error
   },
 

@@ -8,6 +8,7 @@ import { ChevronLeft, Save, Trash2, Store, Plus, RefreshCw, Layers, Barcode } fr
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
+import { CreatableCombobox } from '@/components/ui/creatable-combobox'
 import { Modal } from '@/components/ui/modal'
 import { ImageUpload } from '@/components/ui/image-upload'
 import { formatCurrency, getCurrencySymbol } from '@/lib/utils'
@@ -320,6 +321,30 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     }
   }
 
+  async function createCategory(name: string) {
+    const res = await fetch('/api/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
+    if (!res.ok) return
+    const json = await res.json()
+    qc.setQueryData<Category[]>(['inv-categories'], (prev = []) => [...prev, json.data])
+    setCategoryId(json.data.id); setBrandId(''); setModelId(''); setPartType('')
+  }
+
+  async function editCategory(id: string, name: string) {
+    const res = await fetch(`/api/categories/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
+    if (!res.ok) { toast.error('Failed to rename category'); return }
+    const updated: Category = (await res.json()).data
+    qc.setQueryData<Category[]>(['inv-categories'], (prev = []) => prev.map(c => c.id === id ? { ...c, name: updated.name } : c))
+    toast.success('Category renamed')
+  }
+
+  async function deleteCategory(id: string) {
+    const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Failed to delete category — it may be in use'); return }
+    qc.setQueryData<Category[]>(['inv-categories'], (prev = []) => prev.filter(c => c.id !== id))
+    if (categoryId === id) { setCategoryId(''); setBrandId(''); setModelId(''); setPartType('') }
+    toast.success('Category deleted')
+  }
+
   async function handleAddBrand() {
     if (!newBrandName.trim()) return
     const res = await fetch('/api/brands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newBrandName.trim(), category_id: categoryId || null }) })
@@ -329,6 +354,30 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       setBrandId(json.data.id)
       setNewBrandName(''); setAddingBrand(false)
     }
+  }
+
+  async function createBrand(name: string) {
+    const res = await fetch('/api/brands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, category_id: categoryId || null }) })
+    if (!res.ok) return
+    const json = await res.json()
+    qc.setQueryData<Brand[]>(['inv-brands'], (prev = []) => [...prev, json.data])
+    setBrandId(json.data.id); setModelId('')
+  }
+
+  async function editBrand(id: string, name: string) {
+    const res = await fetch(`/api/brands/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
+    if (!res.ok) { toast.error('Failed to rename brand'); return }
+    const updated: Brand = (await res.json()).data
+    qc.setQueryData<Brand[]>(['inv-brands'], (prev = []) => prev.map(b => b.id === id ? { ...b, name: updated.name } : b))
+    toast.success('Brand renamed')
+  }
+
+  async function deleteBrand(id: string) {
+    const res = await fetch(`/api/brands/${id}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Failed to delete brand — it may be in use'); return }
+    qc.setQueryData<Brand[]>(['inv-brands'], (prev = []) => prev.filter(b => b.id !== id))
+    if (brandId === id) { setBrandId(''); setModelId('') }
+    toast.success('Brand deleted')
   }
 
   async function handleAddDevice() {
@@ -558,20 +607,20 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="flex min-h-screen flex-col">
-      <div className="sticky top-0 z-30 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-3">
-        <div className="flex items-center gap-3">
-          <Link href="/inventory" className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800">
-            <ChevronLeft className="h-4 w-4" /> Back to Inventory
+      <div className="sticky top-0 z-30 flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-4 sm:px-6 py-3 gap-3 sm:gap-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <Link href="/inventory" className="flex shrink-0 items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800">
+            <ChevronLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back to Inventory</span><span className="sm:hidden">Back</span>
           </Link>
-          <span className="text-gray-300">/</span>
-          <span className="text-sm font-medium text-gray-900">{product.name}</span>
+          <span className="text-gray-300 shrink-0">/</span>
+          <span className="text-sm font-medium text-gray-900 truncate">{product.name}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" className="text-red-600 hover:bg-red-50" onClick={() => setDeleteModal(true)}>
-            <Trash2 className="h-4 w-4" /> Delete
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" className="text-red-600 hover:bg-red-50 px-3 sm:px-4" onClick={() => setDeleteModal(true)}>
+            <Trash2 className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Delete</span>
           </Button>
-          <Button onClick={handleSave} loading={saving} disabled={skuConflict || barcodeConflict}>
-            <Save className="h-4 w-4" /> Save Changes
+          <Button onClick={handleSave} loading={saving} disabled={skuConflict || barcodeConflict} className="px-3 sm:px-4">
+            <Save className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Save Changes</span><span className="sm:hidden">Save</span>
           </Button>
         </div>
       </div>
@@ -604,24 +653,40 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             <div className="space-y-4">
               <ImageUpload label={itemType === 'part' ? 'Part image' : 'Product image'} value={imageUrl} onChange={setImageUrl} />
               <Input label="Name *" required value={name} onChange={e => setName(e.target.value)} />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-sm font-medium text-gray-700">{hasRepairs ? 'Device Type' : 'Category'}</label>
-                    <button type="button" onClick={() => setAddingCategory(true)} className="text-xs text-brand-teal hover:underline">+ Add</button>
-                  </div>
-                  <Select options={[{ value: '', label: 'Select type...' }, ...categories.map(c => ({ value: c.id, label: c.name }))]} value={categoryId} onValueChange={v => { setCategoryId(v); setBrandId(''); setModelId(''); setPartType('') }} />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {hasRepairs ? 'Device Type' : 'Category'} <span className="text-xs font-normal text-gray-400">(select or create)</span>
+                  </label>
+                  <CreatableCombobox
+                    options={categories.map(c => ({ value: c.id, label: c.name }))}
+                    value={categoryId}
+                    onChange={(v) => { setCategoryId(v); setBrandId(''); setModelId(''); setPartType('') }}
+                    onCreate={createCategory}
+                    onEdit={editCategory}
+                    onDelete={deleteCategory}
+                    placeholder={`Select or type to create...`}
+                    createLabel={hasRepairs ? 'Add device type' : 'Add category'}
+                  />
                 </div>
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-sm font-medium text-gray-700">Brand</label>
-                    <button type="button" onClick={() => setAddingBrand(true)} className="text-xs text-brand-teal hover:underline">+ Add</button>
-                  </div>
-                  <Select options={[{ value: '', label: 'Select brand...' }, ...brands.map(b => ({ value: b.id, label: b.name }))]} value={brandId} onValueChange={v => { setBrandId(v); setModelId('') }} />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Brand <span className="text-xs font-normal text-gray-400">(select or create)</span>
+                  </label>
+                  <CreatableCombobox
+                    options={brands.map(b => ({ value: b.id, label: b.name }))}
+                    value={brandId}
+                    onChange={(v) => { setBrandId(v); setModelId('') }}
+                    onCreate={createBrand}
+                    onEdit={editBrand}
+                    onDelete={deleteBrand}
+                    placeholder="Select or type to create..."
+                    createLabel="Add brand"
+                  />
                 </div>
               </div>
               {hasRepairs && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="block text-sm font-medium text-gray-700">Model</label>
@@ -637,7 +702,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   )}
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input label="SKU" value={sku} onChange={e => setSku(e.target.value)} error={skuConflict ? 'This SKU is already in use' : undefined} />
                 <div className="flex items-end gap-2">
                   <div className="flex-1">
@@ -880,7 +945,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               )}
             </div>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input label="Cost Price ({currSymbol})" type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
                 <Input label="Selling Price ({currSymbol})" type="number" step="0.01" min="0" placeholder="0.00" required value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
               </div>
@@ -901,13 +966,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             </div>
             <div className="space-y-4">
               {allVariants.length === 0 && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input label="Quantity" type="number" min="0" value={onHand} onChange={e => setOnHand(e.target.value)} />
                   <Input label="Low Stock Alert" type="number" min="0" value={lowStockAlert} onChange={e => setLowStockAlert(e.target.value)} />
                 </div>
               )}
               {allVariants.length > 0 && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Input label="Low Stock Alert" type="number" min="0" value={lowStockAlert} onChange={e => setLowStockAlert(e.target.value)} />
                 </div>
               )}
@@ -982,7 +1047,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   </label>
                 </div>
                 {commissionEnabled && (
-                  <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-2 gap-4">
+                  <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
                       <Select options={[{ value: 'percentage', label: 'Percentage (%)' }, { value: 'fixed', label: 'Fixed Amount ({currSymbol})' }]} value={commissionType} onValueChange={setCommissionType} />
@@ -1025,25 +1090,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </Modal>
 
-      <Modal open={addingCategory} onClose={() => { setAddingCategory(false); setNewCategoryName('') }} title="Add Device Type" size="sm">
-        <div className="space-y-4">
-          <Input label="Device Type Name" placeholder="e.g. Phones, Laptops" required value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddCategory())} />
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => { setAddingCategory(false); setNewCategoryName('') }}>Cancel</Button>
-            <Button onClick={handleAddCategory}>Add</Button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal open={addingBrand} onClose={() => { setAddingBrand(false); setNewBrandName('') }} title="Add Brand" size="sm">
-        <div className="space-y-4">
-          <Input label="Brand Name" placeholder="e.g. Apple, Samsung" required value={newBrandName} onChange={e => setNewBrandName(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddBrand())} />
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => { setAddingBrand(false); setNewBrandName('') }}>Cancel</Button>
-            <Button onClick={handleAddBrand}>Add</Button>
-          </div>
-        </div>
-      </Modal>
 
       <Modal open={addingDevice} onClose={() => { setAddingDevice(false); setNewDeviceName('') }} title="Add Model" size="sm">
         <div className="space-y-4">

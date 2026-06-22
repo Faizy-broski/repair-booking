@@ -8,6 +8,7 @@ import { InvoicePdf } from '@/components/pdf/invoice-pdf'
 import { RepairReceiptHtml } from '@/components/repairs/repair-receipt-html'
 import { printReceipt, previewReceiptHtml } from '@/components/repairs/receipt-print'
 import { DEFAULT_INVOICE_SETTINGS, type InvoiceSettings } from '@/types/invoice-settings'
+import { useAuthStore } from '@/store/auth.store'
 
 interface Props {
   open: boolean
@@ -30,6 +31,7 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
   const [pdfUrl, setPdfUrl]           = useState<string | null>(null)
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null)
   const [loading, setLoading]         = useState(false)
+  const { currency }                  = useAuthStore()
 
   useEffect(() => {
     if (!open || !repair) return
@@ -108,6 +110,7 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
             total={invoiceTotal}
             amountPaid={amountPaid}
             notes={repair.notes}
+            currency={currency}
           />
         )
         const blob = await pdf(doc).toBlob()
@@ -221,6 +224,7 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
             subtotal={receiptData.invoiceTotal}
             total={receiptData.invoiceTotal}
             amountPaid={receiptData.amountPaid}
+            currency={currency}
           />
         </div>
       )}
@@ -251,6 +255,7 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
               subtotal: receiptData.invoiceTotal,
               total: receiptData.invoiceTotal,
               amountPaid: receiptData.amountPaid,
+              currency,
             })}>
               Debug HTML
             </Button>

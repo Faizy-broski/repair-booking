@@ -157,11 +157,43 @@ export default function NewInventoryPage() {
     setCategories(p => [...p, created]); setCategoryId(created.id); setBrandId(''); setModelId(''); setPartType('')
   }
 
+  async function editCategory(id: string, name: string) {
+    const res = await fetch(`/api/categories/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
+    if (!res.ok) { toast.error('Failed to rename category'); return }
+    const updated: Category = (await res.json()).data
+    setCategories(p => p.map(c => c.id === id ? { ...c, name: updated.name } : c))
+    toast.success('Category renamed')
+  }
+
+  async function deleteCategory(id: string) {
+    const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Failed to delete category — it may be in use'); return }
+    setCategories(p => p.filter(c => c.id !== id))
+    if (categoryId === id) { setCategoryId(''); setBrandId(''); setModelId(''); setPartType('') }
+    toast.success('Category deleted')
+  }
+
   async function createBrand(inputName: string) {
     const res = await fetch('/api/brands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: inputName, category_id: categoryId || null }) })
     if (!res.ok) return
     const created: Brand = (await res.json()).data
     setAllBrands(p => [...p, created]); setBrandId(created.id); setModelId('')
+  }
+
+  async function editBrand(id: string, name: string) {
+    const res = await fetch(`/api/brands/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
+    if (!res.ok) { toast.error('Failed to rename brand'); return }
+    const updated: Brand = (await res.json()).data
+    setAllBrands(p => p.map(b => b.id === id ? { ...b, name: updated.name } : b))
+    toast.success('Brand renamed')
+  }
+
+  async function deleteBrand(id: string) {
+    const res = await fetch(`/api/brands/${id}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Failed to delete brand — it may be in use'); return }
+    setAllBrands(p => p.filter(b => b.id !== id))
+    if (brandId === id) { setBrandId(''); setModelId(''); setPartType('') }
+    toast.success('Brand deleted')
   }
 
   async function createModel(inputName: string) {
@@ -180,6 +212,22 @@ export default function NewInventoryPage() {
     setAllDevices(p => [...p, created]); setModelId(created.id)
   }
 
+  async function editModel(id: string, name: string) {
+    const res = await fetch(`/api/services/devices/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
+    if (!res.ok) { toast.error('Failed to rename model'); return }
+    const updated: ServiceDevice = (await res.json()).data
+    setAllDevices(p => p.map(d => d.id === id ? { ...d, name: updated.name } : d))
+    toast.success('Model renamed')
+  }
+
+  async function deleteModel(id: string) {
+    const res = await fetch(`/api/services/devices/${id}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Failed to delete model — it may be in use'); return }
+    setAllDevices(p => p.filter(d => d.id !== id))
+    if (modelId === id) { setModelId(''); setPartType('') }
+    toast.success('Model deleted')
+  }
+
   async function createSupplier(inputName: string) {
     const res = await fetch('/api/suppliers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: inputName }) })
     if (!res.ok) return
@@ -187,11 +235,47 @@ export default function NewInventoryPage() {
     setSuppliers(p => [...p, created]); setSupplierId(created.id)
   }
 
+  async function editSupplier(id: string, name: string) {
+    const res = await fetch(`/api/suppliers/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
+    if (!res.ok) { toast.error('Failed to rename supplier'); return }
+    const updated: Supplier = (await res.json()).data
+    setSuppliers(p => p.map(s => s.id === id ? { ...s, name: updated.name } : s))
+    toast.success('Supplier renamed')
+  }
+
+  async function deleteSupplier(id: string) {
+    const res = await fetch(`/api/suppliers/${id}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Failed to delete supplier — it may be in use'); return }
+    setSuppliers(p => p.filter(s => s.id !== id))
+    if (supplierId === id) setSupplierId('')
+    toast.success('Supplier deleted')
+  }
+
   async function createPartType(inputName: string) {
     const res = await fetch('/api/part-types', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: inputName, device_id: modelId || null }) })
     if (!res.ok) return
     const created: PartType = (await res.json()).data
     setAllPartTypes(p => [...p, created]); setPartType(created.name)
+  }
+
+  async function editPartType(oldName: string, newName: string) {
+    const pt = allPartTypes.find(p => p.name === oldName)
+    if (!pt) return
+    const res = await fetch(`/api/part-types/${pt.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName }) })
+    if (!res.ok) { toast.error('Failed to rename part type'); return }
+    setAllPartTypes(p => p.map(t => t.id === pt.id ? { ...t, name: newName } : t))
+    if (partType === oldName) setPartType(newName)
+    toast.success('Part type renamed')
+  }
+
+  async function deletePartType(name: string) {
+    const pt = allPartTypes.find(p => p.name === name)
+    if (!pt) return
+    const res = await fetch(`/api/part-types/${pt.id}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Failed to delete part type — it may be in use'); return }
+    setAllPartTypes(p => p.filter(t => t.id !== pt.id))
+    if (partType === name) setPartType('')
+    toast.success('Part type deleted')
   }
 
   // ── Variant helpers ────────────────────────────────────────────────────────
@@ -377,15 +461,15 @@ export default function NewInventoryPage() {
               <ImageUpload label={itemType === 'part' ? 'Part image' : 'Product image'} value={imageUrl} onChange={setImageUrl} />
               <Input label="Name" placeholder={itemType === 'part' ? 'Part name' : 'Product name'} required value={name} onChange={e => setName(e.target.value)} />
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">{hasRepairs ? 'Device Type' : 'Category'} <span className="text-red-500">*</span> <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
-                  <CreatableCombobox options={categoryOptions} value={categoryId} onChange={(id) => { setCategoryId(id); setBrandId(''); setModelId(''); setPartType('') }} onCreate={createCategory} placeholder="Select or type to create..." createLabel={hasRepairs ? 'Add device type' : 'Add category'} />
+                  <CreatableCombobox options={categoryOptions} value={categoryId} onChange={(id) => { setCategoryId(id); setBrandId(''); setModelId(''); setPartType('') }} onCreate={createCategory} onEdit={editCategory} onDelete={deleteCategory} placeholder="Select or type to create..." createLabel={hasRepairs ? 'Add device type' : 'Add category'} />
                 </div>
                 <div>
                   <label className={`block text-sm font-medium mb-1 ${!categoryId ? 'text-gray-400' : 'text-gray-700'}`}>Brand <span className="text-red-500">*</span> <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
                   {categoryId ? (
-                    <CreatableCombobox options={brandOptions} value={brandId} onChange={(id) => { setBrandId(id); setModelId(''); setPartType('') }} onCreate={createBrand} placeholder="Select or type to create..." createLabel="Add brand" />
+                    <CreatableCombobox options={brandOptions} value={brandId} onChange={(id) => { setBrandId(id); setModelId(''); setPartType('') }} onCreate={createBrand} onEdit={editBrand} onDelete={deleteBrand} placeholder="Select or type to create..." createLabel="Add brand" />
                   ) : (
                     <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
                       <Lock className="h-3.5 w-3.5 shrink-0" /> {hasRepairs ? 'Select device type first' : 'Select category first'}
@@ -395,11 +479,11 @@ export default function NewInventoryPage() {
               </div>
 
               {hasRepairs && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className={`block text-sm font-medium mb-1 ${!brandId ? 'text-gray-400' : 'text-gray-700'}`}>Model <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
                     {brandId ? (
-                      <CreatableCombobox options={deviceOptions} value={modelId} onChange={(id) => { setModelId(id); setPartType('') }} onCreate={createModel} placeholder="Select or type to create..." createLabel="Add model" />
+                      <CreatableCombobox options={deviceOptions} value={modelId} onChange={(id) => { setModelId(id); setPartType('') }} onCreate={createModel} onEdit={editModel} onDelete={deleteModel} placeholder="Select or type to create..." createLabel="Add model" />
                     ) : (
                       <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
                         <Lock className="h-3.5 w-3.5 shrink-0" /> Select brand first
@@ -410,7 +494,7 @@ export default function NewInventoryPage() {
                     <div>
                       <label className={`block text-sm font-medium mb-1 ${!modelId ? 'text-gray-400' : 'text-gray-700'}`}>Part Type <span className="text-red-500">*</span> <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
                       {modelId ? (
-                        <CreatableCombobox options={partTypeOptions} value={partType} onChange={setPartType} onCreate={createPartType} placeholder="Select or type to create..." createLabel="Add part type" />
+                        <CreatableCombobox options={partTypeOptions} value={partType} onChange={(v) => setPartType(v)} onCreate={createPartType} onEdit={editPartType} onDelete={deletePartType} placeholder="Select or type to create..." createLabel="Add part type" />
                       ) : (
                         <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
                           <Lock className="h-3.5 w-3.5 shrink-0" /> Select model first
@@ -421,7 +505,7 @@ export default function NewInventoryPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input label="SKU" placeholder="Optional" value={sku} onChange={e => setSku(e.target.value)} error={skuConflict ? 'This SKU is already in use' : undefined} />
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Barcode / UPC</label>
@@ -600,7 +684,7 @@ export default function NewInventoryPage() {
               {hasVariants && <p className="text-xs text-gray-500 mt-0.5">Pre-filled into all generated variants — override each one above.</p>}
             </div>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input label={`Cost Price (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
                 <Input label={`Selling Price (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0.00" required={!hasVariants} value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
               </div>
@@ -620,7 +704,7 @@ export default function NewInventoryPage() {
               <h2 className="text-base font-semibold text-gray-900">Stock</h2>
             </div>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {!hasVariants && (
                   <Input label="Opening Stock" type="number" min="0" value={initialStock} onChange={e => setInitialStock(e.target.value)} />
                 )}
@@ -635,7 +719,7 @@ export default function NewInventoryPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Supplier <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
-                <CreatableCombobox options={supplierOptions} value={supplierId} onChange={setSupplierId} onCreate={createSupplier} placeholder="Select or type to create..." createLabel="Add supplier" />
+                <CreatableCombobox options={supplierOptions} value={supplierId} onChange={(v) => setSupplierId(v)} onCreate={createSupplier} onEdit={editSupplier} onDelete={deleteSupplier} placeholder="Select or type to create..." createLabel="Add supplier" />
               </div>
             </div>
           </section>
@@ -658,7 +742,7 @@ export default function NewInventoryPage() {
                   </label>
                 </div>
                 {commissionEnabled && (
-                  <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-2 gap-4">
+                  <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
                       <Select options={[{ value: 'percentage', label: 'Percentage (%)' }, { value: 'fixed', label: `Fixed Amount (${currSymbol})` }]} value={commissionType} onValueChange={setCommissionType} />

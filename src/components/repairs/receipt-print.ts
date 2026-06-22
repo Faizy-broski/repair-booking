@@ -1,13 +1,13 @@
 import type { InvoiceSettings, SocialLinks } from '@/types/invoice-settings'
+import { formatCurrency } from '@/lib/utils'
 
 const SOCIAL_LABELS: Record<keyof SocialLinks, string> = {
   website: 'Web', facebook: 'FB', instagram: 'IG',
   twitter: 'TW', whatsapp: 'WA', tiktok: 'TT',
 }
 
-function money(n: number, currency = 'GBP') {
-  const sym = currency === 'GBP' ? '£' : currency === 'EUR' ? '€' : '$'
-  return `${sym}${n.toFixed(2)}`
+function money(n: number, currency?: string) {
+  return formatCurrency(n, currency)
 }
 
 function esc(s: string | null | undefined): string {

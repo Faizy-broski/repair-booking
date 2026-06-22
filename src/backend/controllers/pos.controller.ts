@@ -10,11 +10,12 @@ import { adminSupabase } from '@/backend/config/supabase'
 
 // ── Shared receipt PDF generator (used by both on-demand and background warm) ──
 async function buildReceiptBuffer(saleId: string, branchId: string | null, businessId: string | null) {
-  const [sale, renderToBuffer, { SaleReceiptPdf }, { InvoiceSettingsService }, React] = await Promise.all([
+  const [sale, renderToBuffer, { SaleReceiptPdf }, { InvoiceSettingsService }, { getCurrencySymbol }, React] = await Promise.all([
     PosService.getSaleById(saleId, branchId),
     import('@react-pdf/renderer').then((m) => m.renderToBuffer),
     import('@/components/pdf/sale-receipt-pdf'),
     import('@/backend/services/invoice-settings.service'),
+    import('@/lib/utils'),
     import('react').then((m) => m.default),
   ])
 
@@ -22,9 +23,12 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
 
   const s = sale as any
 
-  const settings = businessId
-    ? await InvoiceSettingsService.get(businessId, s.branch_id ?? null)
-    : null
+  const [settings, businessRow] = await Promise.all([
+    businessId ? InvoiceSettingsService.get(businessId, s.branch_id ?? null) : Promise.resolve(null),
+    businessId
+      ? adminSupabase.from('businesses').select('currency').eq('id', businessId).single().then(r => r.data)
+      : Promise.resolve(null),
+  ])
 
   const doc = React.createElement(SaleReceiptPdf, {
     saleId: s.id,
@@ -53,7 +57,7 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
     branchPhone: s.branch_phone ?? null,
     branchEmail: s.branch_email ?? null,
     logoUrl: s.branch_logo_url ?? null,
-    currency: s.business_currency ?? '£',
+    currency: businessRow?.currency ?? undefined,
     settings,
   })
 
@@ -179,6 +183,35 @@ export const PosController = {
       })
     } catch (err) {
       return serverError('Failed to generate receipt PDF', err)
+    }
+  },
+
+  async updateSale(request: NextRequest, ctx: RequestContext, id: string) {
+    const updateSaleSchema = z.object({
+      customer_id: z.string().uuid().optional().nullable(),
+      payment_method: z.enum(['cash', 'card', 'gift_card', 'split']).optional(),
+      payment_status: z.enum(['paid', 'partial', 'refunded']).optional(),
+      notes: z.string().optional().nullable(),
+      discount: z.number().min(0).optional(),
+      tax: z.number().min(0).optional(),
+      items: z.array(z.object({
+        id: z.string().uuid(),
+        quantity: z.number().int().positive(),
+        unit_price: z.number().min(0),
+        discount: z.number().min(0),
+        total: z.number().min(0),
+      })).optional(),
+    })
+    const { data, error } = await validateBody(request, updateSaleSchema)
+    if (error) return error
+    const businessId = ctx.businessId
+    try {
+      await PosService.updateSale(id, data, businessId, ctx.auth.userId ?? '')
+      return ok({ updated: true })
+    } catch (err: any) {
+      if (err?.message?.includes('not found')) return notFound('Sale not found')
+      if (err?.message?.includes('Cannot edit')) return badRequest(err.message)
+      return serverError('Failed to update sale', err)
     }
   },
 

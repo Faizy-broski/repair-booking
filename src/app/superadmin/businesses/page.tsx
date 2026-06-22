@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye, Trash2, MoreVertical, Users, Wrench, Package, X, Download, ChevronDown, CreditCard, Plus } from 'lucide-react'
+import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye, Trash2, MoreVertical, Users, Wrench, Package, X, Download, ChevronDown, CreditCard, Plus, Loader2 } from 'lucide-react'
 import { EditSubscriptionModal } from '@/components/superadmin/edit-subscription-modal'
 import type { PlanOption } from '@/components/superadmin/edit-subscription-modal'
 import type { SubscriptionRow } from '@/app/api/admin/subscriptions/route'
@@ -247,10 +247,9 @@ function ModuleSheet({
         </p>
 
         {loadingModules ? (
-          <div className="space-y-2">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-14 animate-pulse rounded-lg bg-gray-100" />
-            ))}
+          <div className="flex flex-col items-center justify-center gap-3 py-12 text-gray-500">
+            <Loader2 className="h-8 w-8 animate-spin text-brand-teal" />
+            <p className="text-sm font-medium">Loading modules…</p>
           </div>
         ) : (
           <div className="space-y-2">
