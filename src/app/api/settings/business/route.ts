@@ -15,6 +15,7 @@ const schema = z.object({
   reply_to_email: z.string().email().optional().or(z.literal('')).nullable(),
   brand_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Must be a hex color').optional(),
   logo_url: z.string().url().optional().or(z.literal('')).nullable(),
+  delete_pin: z.string().regex(/^\d{4,6}$/, 'PIN must be 4–6 digits').optional().nullable(),
 })
 
 async function getHandler(_request: NextRequest, ctx: RequestContext) {
@@ -22,11 +23,13 @@ async function getHandler(_request: NextRequest, ctx: RequestContext) {
   try {
     const { data: business, error: err } = await supabase
       .from('businesses')
-      .select('id, name, email, phone, country, currency, timezone, reply_to_email, brand_color, logo_url')
+      .select('id, name, email, phone, country, currency, timezone, reply_to_email, brand_color, logo_url, delete_pin')
       .eq('id', ctx.auth.businessId)
       .single()
     if (err) throw err
-    return ok(business)
+    // Never expose the raw PIN to the client — return a boolean flag only
+    const { delete_pin, ...rest } = business as any
+    return ok({ ...rest, has_delete_pin: !!delete_pin })
   } catch (err) {
     return serverError('Failed to fetch business settings', err)
   }

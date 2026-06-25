@@ -3,6 +3,12 @@ import { createServerClient } from '@supabase/ssr'
 import { verifyImpersonationJwt } from '@/lib/impersonation'
 
 const PUBLIC_PATHS = ['/api/auth/', '/api/webhooks/', '/api/public/', '/book/', '/_next/', '/favicon.ico', '/images/', '/api/google-reviews/oauth/callback']
+
+// Cache business existence checks so we don't hit the DB on every request.
+// Business records change rarely (creation, suspension). The cache expires
+// after 5 minutes — an acceptable delay for status changes on a VPS deployment.
+const businessCache = new Map<string, { id: string; is_active: boolean; is_suspended: boolean; cachedAt: number }>()
+const BUSINESS_CACHE_TTL_MS = 5 * 60 * 1000
 const SUPERADMIN_SUBDOMAIN = 'admin'
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'repairbooking.co.uk'
 
@@ -96,7 +102,12 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  // getSession() reads + locally verifies the JWT from cookies — zero network calls
+  // in the common case (fresh token). The subsequent DB queries (profile.business_id
+  // check, subscription check) provide the real security validation. getUser() adds
+  // an extra round-trip to Supabase Auth on every request (~80-200 ms on a VPS).
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user ?? null
 
   function redirectToLogin(loginPath: string): NextResponse {
     const url = new URL(request.url)
@@ -185,11 +196,20 @@ export async function middleware(request: NextRequest) {
       }
     )
 
-    const { data: business } = await anonSupabase
-      .from('businesses')
-      .select('id, is_active, is_suspended')
-      .eq('subdomain', subdomain)
-      .single()
+    const cached = businessCache.get(subdomain)
+    let business: { id: string; is_active: boolean; is_suspended: boolean } | null = null
+    if (cached && Date.now() - cached.cachedAt < BUSINESS_CACHE_TTL_MS) {
+      const { cachedAt: _t, ...rest } = cached
+      business = rest
+    } else {
+      const { data } = await anonSupabase
+        .from('businesses')
+        .select('id, is_active, is_suspended')
+        .eq('subdomain', subdomain)
+        .single()
+      business = data
+      if (data) businessCache.set(subdomain, { ...data, cachedAt: Date.now() })
+    }
 
     if (!business) {
       const marketingUrl = process.env.NODE_ENV === 'development'

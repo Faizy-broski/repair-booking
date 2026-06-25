@@ -15,6 +15,8 @@ interface AsyncEmployeeSelectProps {
   /** Controlled selected employee ID */
   value: string
   onChange: (id: string) => void
+  /** Optional: also receive the full employee object on selection */
+  onEmployeeChange?: (emp: EmployeeOption | null) => void
   error?: string
   label?: string
   placeholder?: string
@@ -35,6 +37,7 @@ export function AsyncEmployeeSelect({
   branchId,
   value,
   onChange,
+  onEmployeeChange,
   error,
   label = 'Employee',
   placeholder = 'Type to search employees…',
@@ -89,12 +92,14 @@ export function AsyncEmployeeSelect({
     setQuery('')
     setOpen(false)
     onChange(emp.id)
+    onEmployeeChange?.(emp)
   }
 
   function clear() {
     setSelected(null)
     setQuery('')
     onChange('')
+    onEmployeeChange?.(null)
   }
 
   return (

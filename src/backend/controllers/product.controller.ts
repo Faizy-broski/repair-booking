@@ -72,6 +72,7 @@ export const ProductController = {
         supplierId: searchParams.get('supplier_id') ?? undefined,
         valuation: searchParams.get('valuation') ?? undefined,
         hideOutOfStock: searchParams.get('hide_out_of_stock') === 'true',
+        lowStockOnly: searchParams.get('low_stock_only') === 'true',
         itemType: searchParams.get('item_type') ?? undefined,
         modelId: searchParams.get('model_id') ?? undefined,
         partType: searchParams.get('part_type') ?? undefined,

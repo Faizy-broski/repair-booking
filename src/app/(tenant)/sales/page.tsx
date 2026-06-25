@@ -1,12 +1,13 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Eye, X, Download, Printer, Loader2, Trash2, RotateCcw, RefreshCw, Pencil, MoreVertical } from 'lucide-react'
+import { Eye, X, Download, Printer, Loader2, Trash2, RotateCcw, RefreshCw, Pencil, MoreVertical, Package, DollarSign, ArrowLeftRight, Search, Plus, Minus, ChevronRight, ChevronLeft } from 'lucide-react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
 import { Modal } from '@/components/ui/modal'
 import { useAuthStore } from '@/store/auth.store'
+import { usePinPrompt } from '@/components/ui/pin-prompt'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { ColumnDef } from '@tanstack/react-table'
@@ -26,12 +27,24 @@ interface SaleRow {
   payment_status: string
   payment_splits: { method: string; amount: number }[] | null
   is_refund: boolean
+  is_exchange: boolean
   refund_reason: string | null
   original_sale_id: string | null
+  exchange_original_id: string | null
   notes: string | null
   created_at: string
   customers?: { first_name: string; last_name: string | null } | null
   profiles?: { full_name: string | null } | null
+}
+
+interface ExchangeNewItem {
+  product_id: string | null
+  variant_id: string | null
+  name: string
+  quantity: number
+  unit_price: number
+  total: number
+  is_service: boolean
 }
 
 interface SaleItem {
@@ -41,22 +54,43 @@ interface SaleItem {
   unit_price: number
   discount: number
   total: number
+  product_id: string | null
+  variant_id: string | null
 }
 
 interface SaleDetail extends SaleRow {
   sale_items: SaleItem[]
-  refund_records?: { id: string; is_refund: boolean; sale_items: { name: string; quantity: number }[] }[]
+  refund_records?: { id: string; is_refund: boolean; total: number; sale_items: { name: string; quantity: number }[] }[]
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 const PAYMENT_LABELS: Record<string, string> = {
   cash: 'Cash', card: 'Card', gift_card: 'Gift Card', split: 'Split', voucher: 'Voucher',
+  on_account: 'On Account',
 }
 const STATUS_COLORS: Record<string, string> = {
   paid: 'bg-green-100 text-green-800',
   refunded: 'bg-red-100 text-red-800',
   partial: 'bg-orange-100 text-orange-700',
+  on_account: 'bg-purple-100 text-purple-700',
+  exchange: 'bg-indigo-100 text-indigo-700',
+  exchange_return: 'bg-orange-100 text-orange-700',
+}
+
+function getRowBadge(row: SaleRow): { label: string; cls: string } {
+  if (row.is_exchange) return { label: 'Exchange', cls: STATUS_COLORS.exchange }
+  if (row.is_refund && row.refund_reason === 'Product exchange') return { label: 'Exchange Return', cls: STATUS_COLORS.exchange_return }
+  const label = getStatusLabel(row.payment_status, row.payment_method)
+  return { label, cls: STATUS_COLORS[row.payment_status] ?? 'bg-gray-100 text-gray-800' }
+}
+const STATUS_LABELS: Record<string, string> = {
+  paid: 'Paid', refunded: 'Refunded', partial: 'Partial Refund', on_account: 'On Account',
+}
+
+function getStatusLabel(status: string, paymentMethod?: string) {
+  if (status === 'partial' && paymentMethod === 'on_account') return 'Credit (Partial)'
+  return STATUS_LABELS[status] ?? status
 }
 
 function customerName(c: SaleRow['customers']) {
@@ -67,7 +101,7 @@ function customerName(c: SaleRow['customers']) {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function SalesPage() {
-  const { activeBranch, profile } = useAuthStore()
+  const { activeBranch, profile, verticalTemplateSlug } = useAuthStore()
   const queryClient = useQueryClient()
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(20)
@@ -96,6 +130,26 @@ export default function SalesPage() {
   const [refundQtys, setRefundQtys] = useState<Record<string, number>>({})
   const [refundReason, setRefundReason] = useState('')
   const [refundPaymentMethod, setRefundPaymentMethod] = useState<'cash' | 'card' | 'store_credit'>('cash')
+  const [refundMode, setRefundMode] = useState<'items' | 'amount'>('items')
+  const [refundItemAmounts, setRefundItemAmounts] = useState<Record<string, number>>({})
+
+  // Exchange
+  const [exchangeOpen, setExchangeOpen] = useState(false)
+  const [exchangeStep, setExchangeStep] = useState<1 | 2 | 3>(1)
+  const [exchangeReturnQtys, setExchangeReturnQtys] = useState<Record<string, number>>({})
+  const [exchangeNewItems, setExchangeNewItems] = useState<ExchangeNewItem[]>([])
+  const [exchangeProductSearch, setExchangeProductSearch] = useState('')
+  const [exchangeProductResults, setExchangeProductResults] = useState<any[]>([])
+  const [exchangeSearching, setExchangeSearching] = useState(false)
+  const [exchangePayMethod, setExchangePayMethod] = useState<'cash' | 'card' | 'on_account'>('cash')
+  const [exchangeRefundMethod, setExchangeRefundMethod] = useState<'cash' | 'card' | 'store_credit'>('cash')
+  const [exchangeDepositAmount, setExchangeDepositAmount] = useState('')
+  const [exchangeDepositMethod, setExchangeDepositMethod] = useState<'cash' | 'card'>('cash')
+  const [exchangeVariantNames, setExchangeVariantNames] = useState<Record<string, string>>({})
+  const [exchangeVariantFor, setExchangeVariantFor] = useState<any | null>(null)
+  const [exchangeVariants, setExchangeVariants] = useState<any[]>([])
+  const [exchangeVariantsLoading, setExchangeVariantsLoading] = useState(false)
+  const [pendingExchange, setPendingExchange] = useState(false)
 
   // Edit sale
   const [editOpen, setEditOpen] = useState(false)
@@ -115,6 +169,8 @@ export default function SalesPage() {
 
   // When Edit is clicked from the table row, fetch the detail first, then open edit modal
   const [pendingEdit, setPendingEdit] = useState(false)
+  // Same pattern for Refund — detail must load before openRefund() is called
+  const [pendingRefund, setPendingRefund] = useState(false)
 
   // Customer picker inside the Edit modal
   const [editCustomerSearch, setEditCustomerSearch] = useState('')
@@ -126,6 +182,27 @@ export default function SalesPage() {
   const customerInputRef = useRef<HTMLInputElement>(null)
 
   const canDelete = ['business_owner', 'branch_manager', 'super_admin'].includes(profile?.role ?? '')
+  const isRetailTemplate = verticalTemplateSlug === 'retail-store'
+  const { requestPin: requestDeletePin, PinModal: DeletePinModal } = usePinPrompt({
+    verifyUrl: '/api/settings/business/verify-delete-pin',
+  })
+  const [deletePinRequired, setDeletePinRequired] = useState(false)
+
+  useEffect(() => {
+    if (!isRetailTemplate) return
+    fetch('/api/settings/business')
+      .then(r => r.json())
+      .then(j => setDeletePinRequired(!!j.data?.has_delete_pin))
+      .catch(() => {})
+  }, [isRetailTemplate])
+
+  async function handleDeleteSale(saleId: string) {
+    if (isRetailTemplate && deletePinRequired) {
+      const ok = await requestDeletePin('Enter the delete protection PIN to continue')
+      if (!ok) return
+    }
+    setDeleteConfirmId(saleId)
+  }
 
   // ── Fetch selected sale detail (must be declared before mutations that reference it) ──
   const { data: detail = null, isLoading: detailLoading } = useQuery<SaleDetail | null>({
@@ -137,7 +214,7 @@ export default function SalesPage() {
       const json = await res.json()
       return json.data ?? null
     },
-    enabled: !!detailId && (detailOpen || pendingEdit)
+    enabled: !!detailId && (detailOpen || pendingEdit || pendingRefund || pendingExchange)
   })
 
   const deleteMutation = useMutation({
@@ -160,22 +237,47 @@ export default function SalesPage() {
   const refundMutation = useMutation({
     mutationFn: async () => {
       if (!detail) return
-      const items = (detail.sale_items ?? [])
-        .filter(i => (refundQtys[i.id] ?? 0) > 0)
-        .map(i => {
-          const effectiveUnitPrice = Number(i.total) / i.quantity
-          return {
-            product_id: (i as any).product_id ?? null,
-            variant_id: (i as any).variant_id ?? null,
-            name: i.name,
-            quantity: refundQtys[i.id],
-            unit_price: effectiveUnitPrice,
-            total: effectiveUnitPrice * refundQtys[i.id],
-            is_service: false,
-          }
-        })
-      if (!items.length) throw new Error('Select at least one item to refund')
-      const subtotal = items.reduce((s, i) => s + i.total, 0)
+      let items: { product_id: string | null; variant_id: string | null; name: string; quantity: number; unit_price: number; total: number; is_service: boolean }[]
+      let subtotal: number
+
+      if (refundMode === 'items') {
+        items = (detail.sale_items ?? [])
+          .filter(i => (refundQtys[i.id] ?? 0) > 0)
+          .map(i => {
+            const effectiveUnitPrice = Number(i.total) / i.quantity
+            return {
+              product_id: i.product_id,
+              variant_id: i.variant_id,
+              name: i.name,
+              quantity: refundQtys[i.id],
+              unit_price: effectiveUnitPrice,
+              total: effectiveUnitPrice * refundQtys[i.id],
+              is_service: false,
+            }
+          })
+        if (!items.length) throw new Error('Select at least one item to refund')
+        subtotal = items.reduce((s, i) => s + i.total, 0)
+      } else {
+        const amountTotal = Object.values(refundItemAmounts).reduce((s, v) => s + (v || 0), 0)
+        if (amountTotal <= 0) throw new Error('Enter a refund amount greater than zero')
+        // Build one line per item that has a non-zero amount (no inventory restock)
+        items = Object.entries(refundItemAmounts)
+          .filter(([, amt]) => amt > 0)
+          .map(([itemId, amt]) => {
+            const saleItem = (detail.sale_items ?? []).find(i => i.id === itemId)
+            return {
+              product_id: saleItem?.product_id ?? null,
+              variant_id: saleItem?.variant_id ?? null,
+              name: saleItem ? `${saleItem.name} (amount refund)` : 'Amount Refund',
+              quantity: 1,
+              unit_price: amt,
+              total: amt,
+              is_service: true,
+            }
+          })
+        subtotal = amountTotal
+      }
+
       const res = await fetch('/api/pos/refund', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -201,9 +303,12 @@ export default function SalesPage() {
       setRefundQtys({})
       setRefundReason('')
       setRefundPaymentMethod('cash')
+      setRefundMode('items')
+      setRefundItemAmounts({})
       queryClient.invalidateQueries({ queryKey: ['sales'] })
       queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
       queryClient.invalidateQueries({ queryKey: ['sale-detail', detail?.id] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
     onError: (err: Error) => { toast.error(err.message) },
   })
@@ -284,6 +389,14 @@ export default function SalesPage() {
     }
   }, [pendingEdit, detail]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // When coming via the table Refund button (pendingRefund=true), open refund modal once data arrives
+  useEffect(() => {
+    if (pendingRefund && detail) {
+      setPendingRefund(false)
+      openRefund()
+    }
+  }, [pendingRefund, detail]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function editItemField(id: string, field: 'quantity' | 'unit_price' | 'discount', value: number) {
     setEditForm(prev => {
       if (!prev) return prev
@@ -317,6 +430,10 @@ export default function SalesPage() {
       .reduce((sum, s) => sum + s.quantity, 0)
   }
 
+  function getAlreadyRefundedTotal(): number {
+    return (detail?.refund_records ?? []).reduce((s, r) => s + Number(r.total), 0)
+  }
+
   function openRefund() {
     if (!detail) return
     const initial: Record<string, number> = {}
@@ -327,8 +444,127 @@ export default function SalesPage() {
     setRefundQtys(initial)
     setRefundReason('')
     setRefundPaymentMethod('cash')
+    setRefundMode('items')
+    setRefundItemAmounts({})
     setRefundOpen(true)
   }
+
+  function openExchange() {
+    if (!detail) return
+    const initial: Record<string, number> = {}
+    detail.sale_items?.forEach(i => {
+      const remaining = i.quantity - getAlreadyRefunded(i)
+      if (remaining > 0) initial[i.id] = 0
+    })
+    setExchangeReturnQtys(initial)
+    setExchangeNewItems([])
+    setExchangeProductSearch('')
+    setExchangeProductResults([])
+    setExchangeStep(1)
+    setExchangePayMethod('cash')
+    setExchangeRefundMethod('cash')
+    setExchangeDepositAmount('')
+    setExchangeDepositMethod('cash')
+    setExchangeVariantFor(null)
+    setExchangeVariants([])
+    setExchangeOpen(true)
+  }
+
+  useEffect(() => {
+    if (pendingExchange && detail) {
+      setPendingExchange(false)
+      openExchange()
+    }
+  }, [pendingExchange, detail]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!exchangeProductSearch.trim()) { setExchangeProductResults([]); return }
+    const t = setTimeout(async () => {
+      setExchangeSearching(true)
+      try {
+        const params = new URLSearchParams({ search: exchangeProductSearch.trim(), limit: '12', show_on_pos: 'true' })
+        if (activeBranch?.id) params.set('branch_id', activeBranch.id)
+        const res = await fetch(`/api/products?${params}`)
+        const json = await res.json()
+        setExchangeProductResults(json.data ?? [])
+      } finally { setExchangeSearching(false) }
+    }, 350)
+    return () => clearTimeout(t)
+  }, [exchangeProductSearch, activeBranch?.id])
+
+  async function loadVariants(product: any) {
+    setExchangeVariantFor(product)
+    setExchangeVariants([])
+    setExchangeVariantsLoading(true)
+    try {
+      const res = await fetch(`/api/products/${product.id}/variants?branch_id=${activeBranch?.id ?? ''}`)
+      const json = await res.json()
+      setExchangeVariants(json.data ?? [])
+    } finally { setExchangeVariantsLoading(false) }
+  }
+
+  function addExchangeNewItem(product: any, variant?: any) {
+    const unitPrice = variant?.selling_price ?? product.selling_price ?? 0
+    const name = variant ? `${product.name} – ${variant.name}` : product.name
+    const key = `${product.id}__${variant?.id ?? 'null'}`
+    setExchangeNewItems(prev => {
+      const existing = prev.find(i => i.product_id === product.id && i.variant_id === (variant?.id ?? null))
+      if (existing) {
+        return prev.map(i => i === existing ? { ...i, quantity: i.quantity + 1, total: unitPrice * (i.quantity + 1) } : i)
+      }
+      return [...prev, { product_id: product.id, variant_id: variant?.id ?? null, name, quantity: 1, unit_price: unitPrice, total: unitPrice, is_service: product.is_service ?? false }]
+    })
+    setExchangeVariantFor(null)
+  }
+
+  const exchangeMutation = useMutation({
+    mutationFn: async () => {
+      if (!detail) throw new Error('No sale selected')
+      const returnedItems = (detail.sale_items ?? [])
+        .filter(i => (exchangeReturnQtys[i.id] ?? 0) > 0)
+        .map(i => {
+          const qty = exchangeReturnQtys[i.id]
+          const unitPrice = Number(i.total) / i.quantity
+          return { product_id: i.product_id, variant_id: i.variant_id, name: i.name, quantity: qty, unit_price: unitPrice, total: unitPrice * qty, is_service: false }
+        })
+      if (!returnedItems.length) throw new Error('Select at least one item to return')
+      if (!exchangeNewItems.length) throw new Error('Select at least one replacement item')
+
+      const returnedTotal = returnedItems.reduce((s, i) => s + i.total, 0)
+      const newTotal = exchangeNewItems.reduce((s, i) => s + i.total, 0)
+      const net = newTotal - returnedTotal
+
+      const res = await fetch('/api/pos/exchange', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          original_sale_id: detail.id,
+          branch_id: detail.branch_id,
+          cashier_id: profile?.id,
+          customer_id: detail.customer_id ?? null,
+          returned_items: returnedItems,
+          new_items: exchangeNewItems,
+          payment_method: net > 0 ? exchangePayMethod : 'cash',
+          amount_paid: exchangePayMethod === 'on_account' ? (parseFloat(exchangeDepositAmount) || 0) : 0,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error?.message ?? 'Exchange failed')
+      return json.data as { exchange_sale_id: string; net_difference: number }
+    },
+    onSuccess: (result) => {
+      toast.success('Exchange processed successfully')
+      setExchangeOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['sales'] })
+      queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['sale-detail', detail?.id] })
+      queryClient.invalidateQueries({ queryKey: ['credits'] })
+      if (result?.exchange_sale_id) {
+        setTimeout(() => triggerReceiptDownload(result.exchange_sale_id, () => {}), 500)
+      }
+    },
+    onError: (err: Error) => { toast.error(err.message) },
+  })
 
   const { data: salesData, isLoading: loading, isFetching } = useQuery({
     queryKey: ['sales', activeBranch?.id, page, pageSize, dateFrom, dateTo, statusFilter, search],
@@ -478,11 +714,11 @@ export default function SalesPage() {
     {
       accessorKey: 'payment_status',
       header: 'Status',
-      cell: ({ getValue }) => {
-        const status = getValue() as string
+      cell: ({ row }) => {
+        const badge = getRowBadge(row.original)
         return (
-          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[status] ?? 'bg-gray-100 text-gray-800'}`}>
-            {status}
+          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${badge.cls}`}>
+            {badge.label}
           </span>
         )
       },
@@ -496,55 +732,109 @@ export default function SalesPage() {
         return (
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
-              <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none">
-                <MoreVertical className="h-4 w-4 stroke-[2.5]" />
+              <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400 shadow-sm transition-all hover:border-gray-300 hover:bg-gray-50 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-200">
+                <MoreVertical className="h-4 w-4" />
               </button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
               <DropdownMenu.Content
                 align="end"
                 sideOffset={4}
-                className="z-50 min-w-[160px] overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+                className="z-50 min-w-[188px] overflow-hidden rounded-xl border border-gray-100 bg-white p-1 shadow-xl shadow-black/10 ring-1 ring-black/5"
               >
+                {/* View Details */}
                 <DropdownMenu.Item
                   onSelect={() => viewDetail(sale.id)}
-                  className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-50"
+                  className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-none transition-colors hover:bg-gray-50"
                 >
-                  <Eye className="h-4 w-4 text-gray-400" />
-                  View Details
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 transition-colors group-hover:bg-gray-200">
+                    <Eye className="h-3.5 w-3.5 text-gray-500" />
+                  </span>
+                  <span className="font-medium">View Details</span>
                 </DropdownMenu.Item>
 
+                <DropdownMenu.Separator className="my-1 -mx-1 border-t border-gray-100" />
+
+                {/* Edit Sale */}
                 {canDelete && !sale.is_refund && (
                   <DropdownMenu.Item
                     onSelect={() => { setDetailId(sale.id); setPendingEdit(true) }}
-                    className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-blue-600 outline-none hover:bg-blue-50"
+                    className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-blue-50"
                   >
-                    <Pencil className="h-4 w-4" />
-                    Edit Sale
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-blue-100 transition-colors group-hover:bg-blue-200">
+                      <Pencil className="h-3.5 w-3.5 text-blue-600" />
+                    </span>
+                    <span className="font-medium text-blue-700">Edit Sale</span>
                   </DropdownMenu.Item>
                 )}
 
+                {/* Process Refund */}
+                {canDelete && !sale.is_refund && !sale.is_exchange && sale.payment_status !== 'refunded' && (
+                  <DropdownMenu.Item
+                    onSelect={() => { setDetailId(sale.id); setPendingRefund(true) }}
+                    className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-amber-50"
+                  >
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-100 transition-colors group-hover:bg-amber-200">
+                      <RotateCcw className="h-3.5 w-3.5 text-amber-600" />
+                    </span>
+                    <span className="font-medium text-amber-700">Process Refund</span>
+                  </DropdownMenu.Item>
+                )}
+
+                {/* Exchange */}
+                {canDelete && !sale.is_refund && !sale.is_exchange && sale.payment_status !== 'refunded' && (
+                  <DropdownMenu.Item
+                    onSelect={() => { setDetailId(sale.id); setPendingExchange(true) }}
+                    className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-indigo-50"
+                  >
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-indigo-100 transition-colors group-hover:bg-indigo-200">
+                      <ArrowLeftRight className="h-3.5 w-3.5 text-indigo-600" />
+                    </span>
+                    <span className="font-medium text-indigo-700">Exchange Items</span>
+                  </DropdownMenu.Item>
+                )}
+                {/* Exchange sale row — shortcut back to original sale */}
+                {canDelete && sale.is_exchange && sale.exchange_original_id && (
+                  <DropdownMenu.Item
+                    onSelect={() => { setDetailId(sale.exchange_original_id!); setPendingExchange(true) }}
+                    className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-indigo-50"
+                  >
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-indigo-100 transition-colors group-hover:bg-indigo-200">
+                      <ArrowLeftRight className="h-3.5 w-3.5 text-indigo-600" />
+                    </span>
+                    <span className="font-medium text-indigo-700">Exchange More Items</span>
+                  </DropdownMenu.Item>
+                )}
+
+                <DropdownMenu.Separator className="my-1 -mx-1 border-t border-gray-100" />
+
+                {/* Download Receipt */}
                 <DropdownMenu.Item
                   onSelect={() => fetchAndDownloadReceipt(sale.id)}
                   onMouseEnter={() => prefetchPdf(`/api/pos/sales/${sale.id}/pdf`)}
                   disabled={isDownloading}
-                  className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-50 disabled:opacity-50"
+                  className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-none transition-colors hover:bg-gray-50 disabled:opacity-40"
                 >
-                  {isDownloading
-                    ? <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                    : <Download className="h-4 w-4 text-gray-400" />}
-                  Download Receipt
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 transition-colors group-hover:bg-gray-200">
+                    {isDownloading
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-500" />
+                      : <Download className="h-3.5 w-3.5 text-gray-500" />}
+                  </span>
+                  <span className="font-medium">{isDownloading ? 'Generating…' : 'Download Receipt'}</span>
                 </DropdownMenu.Item>
 
+                {/* Delete Sale */}
                 {canDelete && !sale.is_refund && (
                   <>
-                    <DropdownMenu.Separator className="my-1 border-t border-gray-100" />
+                    <DropdownMenu.Separator className="my-1 -mx-1 border-t border-gray-100" />
                     <DropdownMenu.Item
-                      onSelect={() => setDeleteConfirmId(sale.id)}
-                      className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-red-600 outline-none hover:bg-red-50"
+                      onSelect={() => handleDeleteSale(sale.id)}
+                      className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-red-50"
                     >
-                      <Trash2 className="h-4 w-4" />
-                      Delete Sale
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-red-100 transition-colors group-hover:bg-red-200">
+                        <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                      </span>
+                      <span className="font-medium text-red-600">Delete Sale</span>
                     </DropdownMenu.Item>
                   </>
                 )}
@@ -641,8 +931,9 @@ export default function SalesPage() {
           <select className="rounded-md border px-3 py-1.5 text-sm" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0) }}>
             <option value="">All</option>
             <option value="paid">Paid</option>
+            <option value="partial">Partial Refund</option>
+            <option value="on_account">On Account (Credit)</option>
             <option value="refunded">Refunded</option>
-            <option value="partial">Partial</option>
           </select>
         </div>
         {(dateFrom || dateTo || statusFilter || search) && (
@@ -680,9 +971,7 @@ export default function SalesPage() {
               <div><span className="text-gray-500">Payment</span><br />{PAYMENT_LABELS[detail.payment_method] ?? detail.payment_method}</div>
               <div>
                 <span className="text-gray-500">Status</span><br />
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[detail.payment_status] ?? 'bg-gray-100 text-gray-800'}`}>
-                  {detail.payment_status}
-                </span>
+                {(() => { const b = getRowBadge(detail as unknown as SaleRow); return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${b.cls}`}>{b.label}</span> })()}
               </div>
             </div>
 
@@ -705,6 +994,22 @@ export default function SalesPage() {
                 ))}
               </div>
             ) : null}
+
+            {/* Exchange info */}
+            {detail.is_exchange && (
+              <div className="rounded-md border border-indigo-200 bg-indigo-50 p-3 text-sm space-y-1">
+                <p className="font-medium text-indigo-700">Exchange Transaction</p>
+                {detail.exchange_original_id && (
+                  <button
+                    className="flex items-center gap-1 text-xs font-medium text-indigo-700 underline underline-offset-2 hover:text-indigo-900"
+                    onClick={() => { setDetailId(detail.exchange_original_id!) }}
+                  >
+                    <ArrowLeftRight className="h-3 w-3" />
+                    View original sale →
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Refund info + navigate to original sale */}
             {detail.is_refund && (
@@ -785,10 +1090,29 @@ export default function SalesPage() {
                 Edit Sale
               </Button>
             )}
-            {canDelete && !detail.is_refund && detail.payment_status !== 'refunded' && (
+            {canDelete && !detail.is_refund && !detail.is_exchange && detail.payment_status !== 'refunded' && (
               <Button className="w-full bg-orange-500 hover:bg-orange-600 text-white" onClick={openRefund}>
                 <RotateCcw className="mr-2 h-4 w-4" />
                 Process Refund
+              </Button>
+            )}
+            {canDelete && !detail.is_refund && !detail.is_exchange && detail.payment_status !== 'refunded' && (
+              <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white" onClick={openExchange}>
+                <ArrowLeftRight className="mr-2 h-4 w-4" />
+                Exchange Items
+              </Button>
+            )}
+            {/* Exchange sale — let cashier exchange more items from the original sale */}
+            {canDelete && detail.is_exchange && detail.exchange_original_id && (
+              <Button
+                className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200"
+                onClick={() => {
+                  setDetailId(detail.exchange_original_id!)
+                  setPendingExchange(true)
+                }}
+              >
+                <ArrowLeftRight className="mr-2 h-4 w-4" />
+                Exchange More Items from Original Sale
               </Button>
             )}
             <Button className="w-full bg-teal-700 hover:bg-teal-800 text-white" onClick={() => downloadReceipt(detail, true)} disabled={downloadingDetail}>
@@ -805,114 +1129,188 @@ export default function SalesPage() {
 
       {/* Refund modal */}
       <Modal open={refundOpen} onClose={() => setRefundOpen(false)} title="Process Refund" size="md">
-        {detail && (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-500">Select items and quantities to refund.</p>
+        {detail && (() => {
+          const maxRefundableAmount = Math.max(0, Number(detail.total) - getAlreadyRefundedTotal())
+          const itemsRefundTotal = (detail.sale_items ?? []).reduce((s, i) => s + (Number(i.total) / i.quantity) * (refundQtys[i.id] ?? 0), 0)
+          const isItemsDisabled = refundMode === 'items' && Object.values(refundQtys).every(v => v === 0)
+          const amountModeTotal = Object.values(refundItemAmounts).reduce((s, v) => s + (v || 0), 0)
+          const isAmountDisabled = refundMode === 'amount' && (amountModeTotal <= 0 || amountModeTotal > maxRefundableAmount)
+          return (
+            <div className="space-y-4">
+              {/* Mode toggle */}
+              <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-sm">
+                <button
+                  onClick={() => setRefundMode('items')}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 font-semibold transition-all ${refundMode === 'items' ? 'bg-orange-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  <Package className="h-3.5 w-3.5" /> Return Items
+                </button>
+                <button
+                  onClick={() => setRefundMode('amount')}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 font-semibold transition-all ${refundMode === 'amount' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  <DollarSign className="h-3.5 w-3.5" /> Refund Amount
+                </button>
+              </div>
 
-            {/* Item qty selectors */}
-            <div className="divide-y rounded-md border">
-              {(detail.sale_items ?? []).map(item => {
-                const alreadyRefunded = getAlreadyRefunded(item)
-                const remaining = item.quantity - alreadyRefunded
-                if (remaining <= 0) return (
-                  <div key={item.id} className="flex items-center justify-between px-3 py-2 opacity-40">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate line-through">{item.name}</p>
-                      <p className="text-xs text-red-500">Already refunded</p>
-                    </div>
+              {refundMode === 'items' ? (
+                <>
+                  <p className="text-sm text-gray-500">Select items and quantities to return. Inventory will be restocked.</p>
+                  {/* Item qty selectors */}
+                  <div className="divide-y rounded-md border">
+                    {(detail.sale_items ?? []).map(item => {
+                      const alreadyRefunded = getAlreadyRefunded(item)
+                      const remaining = item.quantity - alreadyRefunded
+                      if (remaining <= 0) return (
+                        <div key={item.id} className="flex items-center justify-between px-3 py-2 opacity-40">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate line-through">{item.name}</p>
+                            <p className="text-xs text-red-500">Already refunded</p>
+                          </div>
+                        </div>
+                      )
+                      return (
+                        <div key={item.id} className="flex items-center justify-between px-3 py-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{item.name}</p>
+                            <p className="text-xs text-gray-500">
+                              {formatCurrency(Number(item.total) / item.quantity)} × {item.quantity}
+                              {Number(item.discount) > 0 && <span className="ml-1 text-green-600">(-{formatCurrency(Number(item.discount))} disc)</span>}
+                              {alreadyRefunded > 0 && <span className="ml-1 text-orange-500">({alreadyRefunded} already refunded)</span>}
+                            </p>
+                          </div>
+                          <div className="ml-3 flex items-center gap-2">
+                            <button
+                              className="flex h-6 w-6 items-center justify-center rounded border text-gray-500 hover:bg-gray-50 disabled:opacity-30"
+                              onClick={() => setRefundQtys(q => ({ ...q, [item.id]: Math.max(0, (q[item.id] ?? 0) - 1) }))}
+                              disabled={(refundQtys[item.id] ?? 0) <= 0}
+                            >−</button>
+                            <span className="w-6 text-center text-sm font-medium">{refundQtys[item.id] ?? 0}</span>
+                            <button
+                              className="flex h-6 w-6 items-center justify-center rounded border text-gray-500 hover:bg-gray-50 disabled:opacity-30"
+                              onClick={() => setRefundQtys(q => ({ ...q, [item.id]: Math.min(remaining, (q[item.id] ?? 0) + 1) }))}
+                              disabled={(refundQtys[item.id] ?? 0) >= remaining}
+                            >+</button>
+                          </div>
+                          <div className="ml-3 w-16 text-right text-sm font-medium">
+                            {formatCurrency((Number(item.total) / item.quantity) * (refundQtys[item.id] ?? 0))}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
-                )
-                return (
-                  <div key={item.id} className="flex items-center justify-between px-3 py-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{item.name}</p>
-                      <p className="text-xs text-gray-500">
-                        {formatCurrency(Number(item.total) / item.quantity)} × {item.quantity}
-                        {Number(item.discount) > 0 && <span className="ml-1 text-green-600">(-{formatCurrency(Number(item.discount))} disc)</span>}
-                        {alreadyRefunded > 0 && <span className="ml-1 text-orange-500">({alreadyRefunded} already refunded)</span>}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 ml-3">
-                      <button
-                        className="flex h-6 w-6 items-center justify-center rounded border text-gray-500 hover:bg-gray-50 disabled:opacity-30"
-                        onClick={() => setRefundQtys(q => ({ ...q, [item.id]: Math.max(0, (q[item.id] ?? 0) - 1) }))}
-                        disabled={(refundQtys[item.id] ?? 0) <= 0}
-                      >−</button>
-                      <span className="w-6 text-center text-sm font-medium">{refundQtys[item.id] ?? 0}</span>
-                      <button
-                        className="flex h-6 w-6 items-center justify-center rounded border text-gray-500 hover:bg-gray-50 disabled:opacity-30"
-                        onClick={() => setRefundQtys(q => ({ ...q, [item.id]: Math.min(remaining, (q[item.id] ?? 0) + 1) }))}
-                        disabled={(refundQtys[item.id] ?? 0) >= remaining}
-                      >+</button>
-                    </div>
-                    <div className="w-16 text-right text-sm font-medium ml-3">
-                      {formatCurrency((Number(item.total) / item.quantity) * (refundQtys[item.id] ?? 0))}
-                    </div>
+                  {/* Refund total */}
+                  <div className="flex justify-between rounded-md bg-orange-50 px-3 py-2 text-sm font-semibold">
+                    <span>Refund Total</span>
+                    <span className="text-orange-700">{formatCurrency(itemsRefundTotal)}</span>
                   </div>
-                )
-              })}
-            </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-500">Enter the amount to refund per item. Stock will <strong>not</strong> be restocked.</p>
+                  <div className="divide-y rounded-md border">
+                    {(detail.sale_items ?? []).map(item => {
+                      const itemMax = Number(item.total)
+                      const itemAmt = refundItemAmounts[item.id] ?? 0
+                      const currencySymbol = formatCurrency(0).replace(/[\d.,\s]/g, '').trim() || '€'
+                      return (
+                        <div key={item.id} className="flex items-center gap-3 px-3 py-2.5">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{item.name}</p>
+                            <p className="text-xs text-gray-500">
+                              {formatCurrency(Number(item.unit_price))} × {item.quantity}
+                              {' · '}<span className="text-gray-400">max {formatCurrency(itemMax)}</span>
+                            </p>
+                          </div>
+                          <div className="relative w-28 shrink-0">
+                            <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-gray-400 text-sm">{currencySymbol}</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={itemMax}
+                              step={0.01}
+                              className={`w-full rounded-md border py-1.5 pl-6 pr-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 ${itemAmt > itemMax ? 'border-red-400' : ''}`}
+                              placeholder="0.00"
+                              value={itemAmt || ''}
+                              onChange={e => {
+                                const val = Math.max(0, Number(e.target.value))
+                                setRefundItemAmounts(prev => ({ ...prev, [item.id]: Math.min(itemMax, val) }))
+                              }}
+                            />
+                          </div>
+                          <div className="w-16 shrink-0 text-right text-sm font-semibold text-blue-700">
+                            {itemAmt > 0 ? formatCurrency(itemAmt) : <span className="text-gray-300">—</span>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {(() => {
+                    const amountTotal = Object.values(refundItemAmounts).reduce((s, v) => s + (v || 0), 0)
+                    return (
+                      <div className="flex justify-between rounded-md bg-orange-50 px-3 py-2 text-sm font-semibold">
+                        <span>Refund Total</span>
+                        <span className={amountTotal > maxRefundableAmount ? 'text-red-600' : 'text-orange-700'}>
+                          {formatCurrency(amountTotal)}
+                          {amountTotal > maxRefundableAmount && <span className="ml-1 text-xs font-normal">exceeds max</span>}
+                        </span>
+                      </div>
+                    )
+                  })()}
+                </>
+              )}
 
-            {/* Refund total */}
-            <div className="flex justify-between rounded-md bg-orange-50 px-3 py-2 text-sm font-semibold">
-              <span>Refund Total</span>
-              <span className="text-orange-700">
-                {formatCurrency(
-                  (detail.sale_items ?? []).reduce((s, i) => s + (Number(i.total) / i.quantity) * (refundQtys[i.id] ?? 0), 0)
-                )}
-              </span>
-            </div>
+              {/* Reason */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Reason (optional)</label>
+                <input
+                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g. Customer changed mind, defective item…"
+                  value={refundReason}
+                  onChange={e => setRefundReason(e.target.value)}
+                />
+              </div>
 
-            {/* Reason */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">Reason (optional)</label>
-              <input
-                className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g. Customer changed mind, defective item…"
-                value={refundReason}
-                onChange={e => setRefundReason(e.target.value)}
-              />
-            </div>
+              {/* Return payment method */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">Return Via</label>
+                <select
+                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={refundPaymentMethod}
+                  onChange={e => setRefundPaymentMethod(e.target.value as 'cash' | 'card' | 'store_credit')}
+                >
+                  <option value="cash">Cash</option>
+                  <option value="card">Card</option>
+                  <option value="store_credit">Store Credit</option>
+                </select>
+              </div>
 
-            {/* Return payment method */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">Return Via</label>
-              <select
-                className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={refundPaymentMethod}
-                onChange={e => setRefundPaymentMethod(e.target.value as 'cash' | 'card' | 'store_credit')}
-              >
-                <option value="cash">Cash</option>
-                <option value="card">Card</option>
-                <option value="store_credit">Store Credit</option>
-              </select>
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={() => setRefundOpen(false)} disabled={refundMutation.isPending}>
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-orange-500 hover:bg-orange-600 text-white"
+                  onClick={() => refundMutation.mutate()}
+                  disabled={refundMutation.isPending || isItemsDisabled || isAmountDisabled}
+                >
+                  {refundMutation.isPending
+                    ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    : <RotateCcw className="mr-2 h-4 w-4" />}
+                  {refundMutation.isPending ? 'Processing…' : 'Confirm Refund'}
+                </Button>
+              </div>
             </div>
-
-            <div className="flex gap-3 justify-end">
-              <Button variant="outline" onClick={() => setRefundOpen(false)} disabled={refundMutation.isPending}>
-                Cancel
-              </Button>
-              <Button
-                className="bg-orange-500 hover:bg-orange-600 text-white"
-                onClick={() => refundMutation.mutate()}
-                disabled={refundMutation.isPending || Object.values(refundQtys).every(v => v === 0)}
-              >
-                {refundMutation.isPending
-                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  : <RotateCcw className="mr-2 h-4 w-4" />}
-                {refundMutation.isPending ? 'Processing…' : 'Confirm Refund'}
-              </Button>
-            </div>
-          </div>
-        )}
+          )
+        })()}
       </Modal>
 
       {/* Edit Sale modal */}
       <Modal open={editOpen} onClose={() => { setEditOpen(false); setEditForm(null) }} title="Edit Sale" size="lg">
         {editForm && detail && (
           <div className="space-y-5">
-            {/* Warning for partially refunded sales */}
-            {detail.payment_status === 'partial' && (
+            {/* Warning for partially refunded sales (not credit) */}
+            {detail.payment_status === 'partial' && detail.payment_method !== 'on_account' && (
               <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-700">
                 This sale has partial refunds. Editing quantities will adjust inventory; already-refunded quantities cannot be reduced below what was refunded.
               </div>
@@ -1030,8 +1428,13 @@ export default function SalesPage() {
                   onChange={e => setEditForm(f => f ? { ...f, payment_status: e.target.value } : f)}
                 >
                   <option value="paid">Paid</option>
-                  <option value="partial">Partial</option>
                   <option value="refunded">Refunded</option>
+                  {/* on_account / partial are computed by the system — not manually settable */}
+                  {(editForm.payment_status === 'partial' || editForm.payment_status === 'on_account') && (
+                    <option value={editForm.payment_status} disabled>
+                      {getStatusLabel(editForm.payment_status, detail.payment_method)} (system-managed)
+                    </option>
+                  )}
                 </select>
               </div>
             </div>
@@ -1217,6 +1620,360 @@ export default function SalesPage() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Delete PIN modal (retail template only) */}
+      <DeletePinModal />
+
+      {/* ── Exchange Modal ─────────────────────────────────────────────────────── */}
+      <Modal open={exchangeOpen} onClose={() => setExchangeOpen(false)} title="Exchange Items" size="2xl">
+        {detail && (() => {
+          const returnedTotal = (detail.sale_items ?? []).reduce((s, i) => s + (Number(i.total) / i.quantity) * (exchangeReturnQtys[i.id] ?? 0), 0)
+          const newTotal = exchangeNewItems.reduce((s, i) => s + i.total, 0)
+          const net = newTotal - returnedTotal
+          const hasReturns = Object.values(exchangeReturnQtys).some(v => v > 0)
+          const hasNew = exchangeNewItems.length > 0
+
+          return (
+            <div className="space-y-4">
+              {/* Stepper */}
+              <div className="flex items-center gap-0 rounded-xl border border-gray-200 bg-gray-50 p-0.5 text-sm">
+                {(['Return Items', 'Replacement', 'Settlement'] as const).map((label, idx) => {
+                  const step = (idx + 1) as 1 | 2 | 3
+                  const active = exchangeStep === step
+                  const done = exchangeStep > step
+                  return (
+                    <div key={label} className="flex flex-1 items-center">
+                      <button
+                        className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 font-semibold transition-all
+                          ${active ? 'bg-indigo-600 text-white shadow-sm' : done ? 'text-indigo-600' : 'text-gray-400'}`}
+                        onClick={() => { if (done || active) setExchangeStep(step) }}
+                        disabled={step === 2 && !hasReturns || step === 3 && !hasNew}
+                      >
+                        <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold
+                          ${active ? 'bg-white/20' : done ? 'bg-indigo-100' : 'bg-gray-200'}`}>
+                          {step}
+                        </span>
+                        {label}
+                      </button>
+                      {idx < 2 && <ChevronRight className="h-3 w-3 shrink-0 text-gray-300" />}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* ── Step 1: Return Items ─────────────────────────────────────────── */}
+              {exchangeStep === 1 && (
+                <>
+                  <p className="text-sm text-gray-500">Select items and quantities to return. Inventory will be restocked.</p>
+                  <div className="divide-y rounded-md border max-h-72 overflow-y-auto">
+                    {(detail.sale_items ?? []).map(item => {
+                      const alreadyRefunded = getAlreadyRefunded(item)
+                      const remaining = item.quantity - alreadyRefunded
+                      if (remaining <= 0) return (
+                        <div key={item.id} className="flex items-center px-3 py-2 opacity-40">
+                          <p className="flex-1 text-sm line-through truncate">{item.name}</p>
+                          <span className="text-xs text-red-500">Fully returned</span>
+                        </div>
+                      )
+                      const qty = exchangeReturnQtys[item.id] ?? 0
+                      const unitPrice = Number(item.total) / item.quantity
+                      return (
+                        <div key={item.id} className="flex items-center gap-3 px-3 py-2.5">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-sm font-medium truncate">{item.name}</p>
+                              {item.variant_id && !item.name.includes('–') && (
+                                <span className="shrink-0 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-mono text-indigo-500 border border-indigo-100">
+                                  VAR-{item.variant_id.slice(-6).toUpperCase()}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500">
+                              {formatCurrency(unitPrice)} × {item.quantity}
+                              {alreadyRefunded > 0 && <span className="ml-1 text-orange-500">({alreadyRefunded} already returned)</span>}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <button className="flex h-6 w-6 items-center justify-center rounded border text-gray-500 hover:bg-gray-50 disabled:opacity-30"
+                              onClick={() => setExchangeReturnQtys(q => ({ ...q, [item.id]: Math.max(0, (q[item.id] ?? 0) - 1) }))}
+                              disabled={qty <= 0}>
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="w-5 text-center text-sm font-medium">{qty}</span>
+                            <button className="flex h-6 w-6 items-center justify-center rounded border text-gray-500 hover:bg-gray-50 disabled:opacity-30"
+                              onClick={() => setExchangeReturnQtys(q => ({ ...q, [item.id]: Math.min(remaining, (q[item.id] ?? 0) + 1) }))}
+                              disabled={qty >= remaining}>
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
+                          <span className="w-16 text-right text-sm font-semibold text-indigo-700">
+                            {qty > 0 ? formatCurrency(unitPrice * qty) : <span className="text-gray-300">—</span>}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div className="flex items-center justify-between rounded-md bg-indigo-50 px-3 py-2 text-sm font-semibold">
+                    <span>Credit from return</span>
+                    <span className="text-indigo-700">{formatCurrency(returnedTotal)}</span>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => setExchangeStep(2)} disabled={!hasReturns}>
+                      Next <ChevronRight className="ml-1 h-4 w-4" />
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              {/* ── Step 2: Select Replacement ───────────────────────────────────── */}
+              {exchangeStep === 2 && (
+                <>
+                  {/* Variant picker overlay */}
+                  {exchangeVariantFor ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => setExchangeVariantFor(null)} className="text-gray-400 hover:text-gray-600">
+                          <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        <p className="text-sm font-semibold">{exchangeVariantFor.name} — Select variant</p>
+                      </div>
+                      {exchangeVariantsLoading ? (
+                        <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-indigo-500" /></div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto">
+                          {exchangeVariants.map((v: any) => (
+                            <button key={v.id} onClick={() => addExchangeNewItem(exchangeVariantFor, v)}
+                              className="flex flex-col items-start rounded-lg border p-2.5 text-left text-sm hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
+                              <span className="font-medium">{v.name}</span>
+                              <span className="text-xs text-gray-500">{formatCurrency(v.selling_price ?? exchangeVariantFor.selling_price)}</span>
+                              {v.stock != null && <span className={`text-[10px] ${v.stock <= 0 ? 'text-red-500' : 'text-gray-400'}`}>{v.stock <= 0 ? 'Out of stock' : `${v.stock} in stock`}</span>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      {/* Product search */}
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <input
+                          className="w-full rounded-md border py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                          placeholder="Search products to add as replacement…"
+                          value={exchangeProductSearch}
+                          onChange={e => setExchangeProductSearch(e.target.value)}
+                          autoFocus
+                        />
+                        {exchangeSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />}
+                      </div>
+
+                      {/* Results grid */}
+                      {exchangeProductResults.length > 0 && (
+                        <div className="grid grid-cols-3 gap-2 max-h-44 overflow-y-auto">
+                          {exchangeProductResults.map((p: any) => (
+                            <button key={p.id}
+                              onClick={() => {
+                                if (p.has_variants) { loadVariants(p) }
+                                else addExchangeNewItem(p)
+                              }}
+                              className="flex flex-col items-start rounded-lg border p-2.5 text-left text-sm hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
+                              <span className="font-medium truncate w-full">{p.name}</span>
+                              <span className="text-xs text-gray-500">{formatCurrency(p.selling_price ?? 0)}</span>
+                              {p.has_variants && <span className="text-[10px] text-indigo-500">Select variant →</span>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {!exchangeSearching && exchangeProductSearch && exchangeProductResults.length === 0 && (
+                        <p className="py-4 text-center text-sm text-gray-400">No products found</p>
+                      )}
+
+                      {/* Selected new items */}
+                      {exchangeNewItems.length > 0 && (
+                        <>
+                          <div className="border-t pt-3">
+                            <p className="mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Selected replacements</p>
+                            <div className="divide-y rounded-md border">
+                              {exchangeNewItems.map((item, idx) => (
+                                <div key={idx} className="flex items-center gap-2 px-3 py-2">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">{item.name}</p>
+                                    <p className="text-xs text-gray-500">{formatCurrency(item.unit_price)}</p>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <button className="flex h-5 w-5 items-center justify-center rounded border text-gray-400 hover:bg-gray-50 disabled:opacity-30"
+                                      onClick={() => setExchangeNewItems(prev => prev.map((i, n) => n === idx && i.quantity > 1 ? { ...i, quantity: i.quantity - 1, total: i.unit_price * (i.quantity - 1) } : i))}
+                                      disabled={item.quantity <= 1}>
+                                      <Minus className="h-2.5 w-2.5" />
+                                    </button>
+                                    <span className="w-4 text-center text-xs font-medium">{item.quantity}</span>
+                                    <button className="flex h-5 w-5 items-center justify-center rounded border text-gray-400 hover:bg-gray-50"
+                                      onClick={() => setExchangeNewItems(prev => prev.map((i, n) => n === idx ? { ...i, quantity: i.quantity + 1, total: i.unit_price * (i.quantity + 1) } : i))}>
+                                      <Plus className="h-2.5 w-2.5" />
+                                    </button>
+                                  </div>
+                                  <span className="w-14 text-right text-sm font-semibold">{formatCurrency(item.total)}</span>
+                                  <button className="text-gray-300 hover:text-red-400 transition-colors"
+                                    onClick={() => setExchangeNewItems(prev => prev.filter((_, n) => n !== idx))}>
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between rounded-md bg-indigo-50 px-3 py-2 text-sm font-semibold">
+                            <span>New items total</span>
+                            <span className="text-indigo-700">{formatCurrency(newTotal)}</span>
+                          </div>
+                        </>
+                      )}
+                    </>
+                  )}
+
+                  <div className="flex justify-between">
+                    <Button variant="outline" onClick={() => setExchangeStep(1)}>
+                      <ChevronLeft className="mr-1 h-4 w-4" /> Back
+                    </Button>
+                    <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => setExchangeStep(3)} disabled={!hasNew}>
+                      Next <ChevronRight className="ml-1 h-4 w-4" />
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              {/* ── Step 3: Settlement ──────────────────────────────────────────── */}
+              {exchangeStep === 3 && (
+                <>
+                  {/* Summary card */}
+                  <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Return credit</span>
+                      <span className="font-semibold text-green-700">− {formatCurrency(returnedTotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">New items</span>
+                      <span className="font-semibold text-blue-700">+ {formatCurrency(newTotal)}</span>
+                    </div>
+                    <div className="border-t pt-2 mt-1 flex justify-between text-base font-bold">
+                      <span>{net > 0 ? 'Customer pays' : net < 0 ? 'Customer receives' : 'No payment needed'}</span>
+                      <span className={net > 0 ? 'text-red-600' : net < 0 ? 'text-green-700' : 'text-gray-500'}>
+                        {net === 0 ? '—' : formatCurrency(Math.abs(net))}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Payment method (if customer pays more) */}
+                  {net > 0 && (
+                    <div>
+                      <p className="mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Customer pays via</p>
+                      <div className="flex gap-2">
+                        {(['cash', 'card', 'on_account'] as const).map(m => (
+                          <button key={m}
+                            onClick={() => setExchangePayMethod(m)}
+                            className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-all
+                              ${exchangePayMethod === m ? m === 'on_account' ? 'bg-purple-600 text-white border-purple-600' : 'bg-indigo-600 text-white border-indigo-600' : 'text-gray-500 hover:bg-gray-50'}`}>
+                            {m === 'cash' ? 'Cash' : m === 'card' ? 'Card' : 'Credit'}
+                          </button>
+                        ))}
+                      </div>
+                      {exchangePayMethod === 'on_account' && (
+                        <div className="mt-3 space-y-3 rounded-xl border border-purple-100 bg-purple-50/60 p-3">
+                          <p className="text-xs text-purple-600">Customer pays part now, rest goes to credit balance.</p>
+
+                          {/* Deposit amount */}
+                          <div>
+                            <label className="mb-1 block text-xs font-semibold text-gray-500">Deposit amount (optional)</label>
+                            <div className="relative">
+                              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-gray-400">
+                                {formatCurrency(0).replace(/[\d.,\s]/g, '').trim() || '€'}
+                              </span>
+                              <input
+                                type="number"
+                                min={0}
+                                max={net}
+                                step={0.01}
+                                placeholder="0.00"
+                                className="w-full rounded-lg border border-purple-200 bg-white py-2 pl-7 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                                value={exchangeDepositAmount}
+                                onChange={e => {
+                                  const v = Math.min(parseFloat(e.target.value) || 0, net)
+                                  setExchangeDepositAmount(v > 0 ? String(v) : e.target.value)
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Deposit payment method */}
+                          {parseFloat(exchangeDepositAmount) > 0 && (
+                            <div>
+                              <label className="mb-1 block text-xs font-semibold text-gray-500">Deposit paid via</label>
+                              <div className="flex gap-2">
+                                {(['cash', 'card'] as const).map(m => (
+                                  <button key={m} onClick={() => setExchangeDepositMethod(m)}
+                                    className={`flex-1 rounded-lg border py-1.5 text-sm font-semibold transition-all
+                                      ${exchangeDepositMethod === m ? 'bg-purple-600 text-white border-purple-600' : 'text-gray-500 hover:bg-gray-50'}`}>
+                                    {m === 'cash' ? 'Cash' : 'Card'}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Balance preview */}
+                          <div className="flex justify-between border-t border-purple-100 pt-2 text-sm">
+                            <span className="text-gray-500">Outstanding balance</span>
+                            <span className="font-bold text-purple-700">
+                              {formatCurrency(Math.max(0, net - (parseFloat(exchangeDepositAmount) || 0)))}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Refund method (if customer gets money back) */}
+                  {net < 0 && (
+                    <div>
+                      <p className="mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Customer refund via</p>
+                      <div className="flex gap-2">
+                        {(['cash', 'card', 'store_credit'] as const).map(m => (
+                          <button key={m}
+                            onClick={() => setExchangeRefundMethod(m)}
+                            className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-all
+                              ${exchangeRefundMethod === m ? 'bg-green-600 text-white border-green-600' : 'text-gray-500 hover:bg-gray-50'}`}>
+                            {m === 'cash' ? 'Cash' : m === 'card' ? 'Card' : 'Store Credit'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {net === 0 && (
+                    <div className="flex items-center justify-center gap-2 rounded-lg bg-green-50 border border-green-200 py-2.5 text-sm font-semibold text-green-700">
+                      No payment required — straight exchange
+                    </div>
+                  )}
+
+                  <div className="flex justify-between gap-3">
+                    <Button variant="outline" onClick={() => setExchangeStep(2)} disabled={exchangeMutation.isPending}>
+                      <ChevronLeft className="mr-1 h-4 w-4" /> Back
+                    </Button>
+                    <Button
+                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white"
+                      onClick={() => exchangeMutation.mutate()}
+                      disabled={exchangeMutation.isPending}
+                    >
+                      {exchangeMutation.isPending
+                        ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing…</>
+                        : <><ArrowLeftRight className="mr-2 h-4 w-4" /> Confirm Exchange</>}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })()}
       </Modal>
     </div>
   )

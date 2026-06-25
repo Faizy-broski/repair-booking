@@ -1,20 +1,7 @@
 'use client'
-/**
- * PinPrompt — reusable PIN verification modal.
- *
- * Usage:
- *   const { requestPin, PinModal } = usePinPrompt()
- *
- *   // In event handler:
- *   const ok = await requestPin('Applying discount requires manager PIN')
- *   if (ok) { // proceed with gated action }
- *
- *   // In JSX:
- *   <PinModal />
- */
-
 import { useState, useCallback, useRef } from 'react'
 import { ShieldCheck, X, Delete, Loader2 } from 'lucide-react'
+import { useAuthStore } from '@/store/auth.store'
 
 const DIGITS = ['1','2','3','4','5','6','7','8','9','','0','⌫'] as const
 
@@ -23,7 +10,7 @@ interface PinPromptOptions {
   message?: string
 }
 
-export function usePinPrompt() {
+export function usePinPrompt(options?: { verifyUrl?: string }) {
   const [open, setOpen] = useState(false)
   const [pin, setPin] = useState('')
   const [message, setMessage] = useState('Enter your PIN to continue')
@@ -57,7 +44,7 @@ export function usePinPrompt() {
     setLoading(true)
     setError('')
 
-    const res = await fetch('/api/users/verify-pin', {
+    const res = await fetch(options?.verifyUrl ?? '/api/users/verify-pin', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin }),
@@ -84,14 +71,19 @@ export function usePinPrompt() {
   }
 
   function PinModal() {
+    const { brandColor } = useAuthStore()
     if (!open) return null
+
+    // Derive a slightly darker shade for hover states
+    const hex = brandColor ?? '#008080'
+
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
         <div className="w-full max-w-xs rounded-2xl bg-white shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
             <div className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-blue-600" />
+              <ShieldCheck className="h-5 w-5" style={{ color: hex }} />
               <span className="font-semibold text-gray-900">PIN Required</span>
             </div>
             <button onClick={handleCancel} className="text-gray-400 hover:text-gray-600">
@@ -107,9 +99,8 @@ export function usePinPrompt() {
               {Array.from({ length: 6 }).map((_, i) => (
                 <div
                   key={i}
-                  className={`h-3 w-3 rounded-full transition-colors ${
-                    i < pin.length ? 'bg-blue-600' : 'bg-gray-200'
-                  }`}
+                  className="h-3 w-3 rounded-full transition-colors"
+                  style={{ backgroundColor: i < pin.length ? hex : '#e5e7eb' }}
                 />
               ))}
             </div>
@@ -130,8 +121,11 @@ export function usePinPrompt() {
                     className={`h-12 rounded-xl text-lg font-semibold transition-colors ${
                       d === '⌫'
                         ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        : 'bg-gray-50 text-gray-900 hover:bg-blue-50 hover:text-blue-700'
+                        : 'bg-gray-50 text-gray-900'
                     }`}
+                    style={d !== '⌫' ? { ['--hover-bg' as string]: hex + '18' } : undefined}
+                    onMouseEnter={e => { if (d !== '⌫') (e.currentTarget as HTMLButtonElement).style.backgroundColor = hex + '18' }}
+                    onMouseLeave={e => { if (d !== '⌫') (e.currentTarget as HTMLButtonElement).style.backgroundColor = '' }}
                   >
                     {d === '⌫' ? <Delete className="mx-auto h-5 w-5" /> : d}
                   </button>
@@ -142,7 +136,8 @@ export function usePinPrompt() {
             <button
               onClick={handleSubmit}
               disabled={pin.length < 4 || loading}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              style={{ backgroundColor: hex }}
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm'}
             </button>

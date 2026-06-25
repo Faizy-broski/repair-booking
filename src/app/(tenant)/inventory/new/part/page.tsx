@@ -589,8 +589,8 @@ export default function NewPartPage() {
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input label="Cost Price ({currSymbol})" type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
-                <Input label="Selling Price ({currSymbol})" type="number" step="0.01" min="0" placeholder="0.00" required={!hasVariants} value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
+                <Input label={`Cost Price (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
+                <Input label={`Selling Price (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0.00" required={!hasVariants} value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
               </div>
               {hasMargin && (
                 <div className="rounded-lg bg-green-50 border border-green-100 px-4 py-2.5 flex items-center gap-4 text-sm">
@@ -651,9 +651,9 @@ export default function NewPartPage() {
                   <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
-                      <Select options={[{ value: 'percentage', label: 'Percentage (%)' }, { value: 'fixed', label: 'Fixed Amount ({currSymbol})' }]} value={commissionType} onValueChange={setCommissionType} />
+                      <Select options={[{ value: 'percentage', label: 'Percentage (%)' }, { value: 'fixed', label: `Fixed Amount (${currSymbol})` }]} value={commissionType} onValueChange={setCommissionType} />
                     </div>
-                    <Input label={commissionType === 'percentage' ? 'Rate (%)' : 'Amount ({currSymbol})'} type="number" step="0.01" min="0" placeholder="0" value={commissionRate} onChange={e => setCommissionRate(e.target.value)} />
+                    <Input label={commissionType === 'percentage' ? 'Rate (%)' : `Amount (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0" value={commissionRate} onChange={e => setCommissionRate(e.target.value)} />
                   </div>
                 )}
               </div>

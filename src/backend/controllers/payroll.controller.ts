@@ -73,6 +73,15 @@ export const PayrollController = {
       return serverError('Failed to mark payroll as paid', err)
     }
   },
+
+  async reopen(request: NextRequest, ctx: RequestContext, id: string) {
+    try {
+      const period = await PayrollService.reopen(id, ctx.auth.branchId ?? undefined)
+      return ok(period)
+    } catch (err) {
+      return serverError('Failed to reopen payroll period', err)
+    }
+  },
 }
 
 // ── Commission Rules ──────────────────────────────────────────────────────────

@@ -45,6 +45,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard',      href: '/dashboard',      icon: LayoutDashboard, requiredRole: 'cashier' },
   { label: 'POS',            href: '/pos',             icon: ShoppingCart,    requiredRole: 'cashier',        module: 'pos' },
   { label: 'Sales',          href: '/sales',           icon: Receipt,         requiredRole: 'cashier',        module: 'pos',  subItem: true },
+  { label: 'Customer Credit', href: '/credits',         icon: CreditCard,      requiredRole: 'branch_manager', module: 'pos',  subItem: true },
   { label: 'POS Settings',   href: '/pos/settings',    icon: Settings2,       requiredRole: 'business_owner', module: 'pos',  subItem: true },
   { label: 'Repairs',        href: '/repairs',         icon: Wrench,          requiredRole: 'staff',          module: 'repairs' },
   { label: 'Service Catalogue', href: '/repairs/service-catalogue', icon: BookOpen, requiredRole: 'branch_manager', module: 'repairs', subItem: true },

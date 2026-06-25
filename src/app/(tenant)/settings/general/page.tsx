@@ -1,8 +1,9 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Save, Store, ChevronRight, Star } from 'lucide-react'
+import { Save, Store, ChevronRight, Star, ShieldCheck, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 import { useAuthStore } from '@/store/auth.store'
 import { useForm, Controller } from 'react-hook-form'
 import { Select } from '@/components/ui/select'
@@ -11,6 +12,7 @@ import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
 import Link from 'next/link'
 import { ImageUpload } from '@/components/ui/image-upload'
+import { toast } from 'sonner'
 
 const businessSchema = z.object({
   name: z.string().min(1),
@@ -24,9 +26,21 @@ const businessSchema = z.object({
 type BusinessFormData = z.infer<typeof businessSchema>
 
 export default function GeneralSettingsPage() {
-  const { setCurrency } = useAuthStore()
+  const { setCurrency, verticalTemplateSlug } = useAuthStore()
+  const isRetailTemplate = verticalTemplateSlug === 'retail-store'
+
   const [savedBusiness, setSavedBusiness] = useState(false)
   const businessForm = useForm<BusinessFormData>({ resolver: zodResolver(businessSchema) })
+
+  // ── Delete PIN state ─────────────────────────────────────────────────────
+  const [hasPinSet, setHasPinSet] = useState(false)
+  const [pinModalMode, setPinModalMode] = useState<'set' | 'change' | null>(null)
+  const [newPin, setNewPin] = useState('')
+  const [confirmPin, setConfirmPin] = useState('')
+  const [showNewPin, setShowNewPin] = useState(false)
+  const [showConfirmPin, setShowConfirmPin] = useState(false)
+  const [pinSaving, setPinSaving] = useState(false)
+  const [pinError, setPinError] = useState('')
 
   useEffect(() => {
     async function fetchBusinessInfo() {
@@ -42,6 +56,7 @@ export default function GeneralSettingsPage() {
           timezone: json.data.timezone ?? 'Europe/London',
           logo_url: json.data.logo_url ?? '',
         })
+        setHasPinSet(!!json.data.has_delete_pin)
       }
     }
     fetchBusinessInfo()
@@ -56,6 +71,45 @@ export default function GeneralSettingsPage() {
     if (data.currency) setCurrency(data.currency)
     setSavedBusiness(true)
     setTimeout(() => setSavedBusiness(false), 2000)
+  }
+
+  async function savePin() {
+    setPinError('')
+    if (!/^\d{4,6}$/.test(newPin)) { setPinError('PIN must be 4–6 digits'); return }
+    if (newPin !== confirmPin) { setPinError('PINs do not match'); return }
+    setPinSaving(true)
+    const res = await fetch('/api/settings/business', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ delete_pin: newPin }),
+    })
+    setPinSaving(false)
+    if (res.ok) {
+      setHasPinSet(true)
+      setPinModalMode(null)
+      setNewPin(''); setConfirmPin('')
+      toast.success('Delete protection PIN saved')
+    } else {
+      const j = await res.json().catch(() => ({}))
+      setPinError(j?.error?.message ?? 'Failed to save PIN')
+    }
+  }
+
+  async function clearPin() {
+    const res = await fetch('/api/settings/business', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ delete_pin: null }),
+    })
+    if (res.ok) {
+      setHasPinSet(false)
+      toast.success('Delete protection PIN removed')
+    }
+  }
+
+  function closePinModal() {
+    setPinModalMode(null)
+    setNewPin(''); setConfirmPin(''); setPinError('')
   }
 
   return (
@@ -119,6 +173,108 @@ export default function GeneralSettingsPage() {
           </Button>
         </form>
       </div>
+
+      {/* ── Delete Protection PIN (retail template only) ── */}
+      {isRetailTemplate && (
+        <div className="rounded-xl border border-gray-200 bg-white p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-red-500" />
+            <h3 className="font-semibold text-gray-900">Delete Protection PIN</h3>
+          </div>
+          <p className="text-sm text-gray-500 max-w-md">
+            When set, this PIN must be entered by any manager before a sale can be deleted. Protects against accidental or unauthorized deletions.
+          </p>
+          {hasPinSet ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge variant="success">PIN active</Badge>
+              <Button size="sm" variant="outline" onClick={() => { setPinModalMode('change'); setPinError('') }}>
+                Change PIN
+              </Button>
+              <Button size="sm" variant="destructive" onClick={clearPin}>
+                Remove PIN
+              </Button>
+            </div>
+          ) : (
+            <Button size="sm" onClick={() => { setPinModalMode('set'); setPinError('') }}>
+              Set Delete PIN
+            </Button>
+          )}
+
+          {/* ── PIN set/change modal ── */}
+          {pinModalMode && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+              <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl">
+                <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5 text-red-500" />
+                    <span className="font-semibold text-gray-900">
+                      {pinModalMode === 'set' ? 'Set Delete PIN' : 'Change Delete PIN'}
+                    </span>
+                  </div>
+                  <button onClick={closePinModal} className="text-gray-400 hover:text-gray-600">✕</button>
+                </div>
+                <div className="p-5 space-y-4">
+                  <p className="text-sm text-gray-500">
+                    Choose a 4–6 digit PIN. You will need this PIN each time a sale is deleted.
+                  </p>
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">New PIN</label>
+                      <input
+                        type={showNewPin ? 'text' : 'password'}
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={newPin}
+                        onChange={e => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="4–6 digits"
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 text-sm tracking-widest focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPin(v => !v)}
+                        className="absolute right-3 top-7 text-gray-400 hover:text-gray-600"
+                      >
+                        {showNewPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Confirm PIN</label>
+                      <input
+                        type={showConfirmPin ? 'text' : 'password'}
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={confirmPin}
+                        onChange={e => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="Re-enter PIN"
+                        className="w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 text-sm tracking-widest focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPin(v => !v)}
+                        className="absolute right-3 top-7 text-gray-400 hover:text-gray-600"
+                      >
+                        {showConfirmPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {pinError && <p className="text-xs text-red-600">{pinError}</p>}
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <Button variant="outline" className="flex-1" onClick={closePinModal}>Cancel</Button>
+                    <Button
+                      className="flex-1 bg-red-600 hover:bg-red-700"
+                      loading={pinSaving}
+                      onClick={savePin}
+                      disabled={newPin.length < 4}
+                    >
+                      Save PIN
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Quick links */}
       <div className="rounded-xl border border-gray-200 bg-white divide-y">

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, memo } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
 import {
   Search, Plus, X, Package, ShoppingBag, Tag, Phone,
   Layers, ChevronRight, ShieldCheck, ExternalLink, ArrowLeft, Loader2,
@@ -19,6 +19,13 @@ import type {
   ProductWithStock, ProductVariant,
   CatLevel, PartLevel, ProductsView,
 } from '../_types'
+
+interface ProductsPage {
+  data: ProductWithStock[]
+  meta: { page: number; limit: number; total: number }
+}
+
+const PAGE_SIZE = 24
 import { ScanButton } from '@/components/scanner/scan-button'
 import { ScannerModal } from '@/components/scanner/scanner-modal'
 import { useBarcodeLookup, type ProductWithStock as ScannedProduct } from '@/hooks/use-barcode-lookup'
@@ -323,22 +330,40 @@ export function ProductsTab() {
     staleTime: 30 * 60_000, // categories change very rarely
   })
 
-  // All Products — fires once per unique [branchId, search, type, cat]
-  const { data: allProductsList = [], isFetching: allProductsLoading } = useQuery<ProductWithStock[]>({
+  // All Products — paginated; pages accumulate until "Load More" is exhausted
+  const {
+    data: allProductsPages,
+    isFetching: allProductsLoading,
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage,
+  } = useInfiniteQuery<ProductsPage>({
     queryKey: ['pos-products', activeBranch?.id, debouncedSearch, allProductsItemType, allProductsCategoryId],
-    queryFn: async () => {
-      const params = new URLSearchParams({ limit: '150', branch_id: activeBranch!.id })
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
+      const params = new URLSearchParams({
+        limit: String(PAGE_SIZE),
+        page: String(pageParam),
+        branch_id: activeBranch!.id,
+      })
       if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim())
       if (allProductsItemType !== 'all') params.set('item_type', allProductsItemType)
       if (allProductsCategoryId) params.set('category_id', allProductsCategoryId)
       const res = await fetch(`/api/products?${params}`)
       const j = await res.json()
-      return j.data ?? []
+      return { data: j.data ?? [], meta: j.meta ?? { page: pageParam as number, limit: PAGE_SIZE, total: 0 } }
     },
-    enabled: !!activeBranch && productsView === 'all_products',
+    getNextPageParam: (lastPage) => {
+      const loaded = lastPage.meta.page * lastPage.meta.limit
+      return loaded < lastPage.meta.total ? lastPage.meta.page + 1 : undefined
+    },
+    enabled: !!activeBranch && (productsView === 'all_products' || productsView === 'by_category'),
     staleTime: 5 * 60_000,
-    placeholderData: (prev) => prev, // keep previous data while fetching
+    placeholderData: (prev) => prev,
   })
+
+  const allProductsList = allProductsPages?.pages.flatMap(p => p.data) ?? []
+  const allProductsTotal = allProductsPages?.pages[0]?.meta.total ?? 0
 
   // ── By Products hierarchy ──────────────────────────────────────────────────
   const [catLevel, setCatLevel] = useState<CatLevel>('device_types')
@@ -394,6 +419,7 @@ export function ProductsTab() {
   const [advSearchCatIds, setAdvSearchCatIds] = useState<Set<string>>(new Set())
   const [advSearchResults, setAdvSearchResults] = useState<ProductWithStock[]>([])
   const [advSearching, setAdvSearching] = useState(false)
+  const [advSearchHasMore, setAdvSearchHasMore] = useState(false)
 
   // ── Warranty modal ─────────────────────────────────────────────────────────
   const [warrantyOpen, setWarrantyOpen] = useState(false)
@@ -575,12 +601,12 @@ export function ProductsTab() {
 
   // ── Advanced search ────────────────────────────────────────────────────────
   function openAdvSearch() {
-    setAdvSearchOpen(true); setAdvSearchResults([]); setAdvSearchName(''); setAdvSearchSku(''); setAdvSearchCatIds(new Set())
+    setAdvSearchOpen(true); setAdvSearchResults([]); setAdvSearchName(''); setAdvSearchSku(''); setAdvSearchCatIds(new Set()); setAdvSearchHasMore(false)
   }
 
   async function runAdvSearch() {
     setAdvSearching(true)
-    const params = new URLSearchParams({ limit: '200', show_on_pos: 'true' })
+    const params = new URLSearchParams({ limit: '100', show_on_pos: 'true' })
     if (activeBranch) params.set('branch_id', activeBranch.id)
     const nameTerm = advSearchName.trim()
     const skuTerm = advSearchSku.trim()
@@ -606,7 +632,9 @@ export function ProductsTab() {
     }
     // Category filter
     if (advSearchCatIds.size > 0) results = results.filter(p => p.category_id && advSearchCatIds.has(p.category_id as string))
-    setAdvSearchResults(results); setAdvSearching(false)
+    setAdvSearchResults(results)
+    setAdvSearchHasMore((j.meta?.total ?? 0) > results.length)
+    setAdvSearching(false)
   }
 
   function toggleAdvCat(id: string) {
@@ -758,16 +786,31 @@ export function ProductsTab() {
                   <X className="h-3 w-3" /> Clear
                 </button>
               )}
-              {!allProductsLoading && <span className="ml-auto text-xs text-gray-400">{allProductsList.length} item{allProductsList.length !== 1 ? 's' : ''}</span>}
+              {!allProductsLoading && <span className="ml-auto text-xs text-gray-400">{allProductsList.length} of {allProductsTotal} item{allProductsTotal !== 1 ? 's' : ''}</span>}
             </div>
-            {allProductsLoading ? (
+            {allProductsLoading && allProductsList.length === 0 ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                 {Array.from({ length: 10 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}
               </div>
             ) : allProductsList.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} />)}
-              </div>
+              <>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                  {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} />)}
+                </div>
+                {hasNextPage && (
+                  <div className="flex justify-center pt-2 pb-1">
+                    <button
+                      onClick={() => fetchNextPage()}
+                      disabled={isFetchingNextPage}
+                      className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                    >
+                      {isFetchingNextPage
+                        ? <><Loader2 className="h-4 w-4 animate-spin" /> Loading…</>
+                        : `Load More (${allProductsTotal - allProductsList.length} remaining)`}
+                    </button>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <Package className="h-12 w-12 text-gray-200 mb-3" />
@@ -962,14 +1005,29 @@ export function ProductsTab() {
                   <ChevronRight className="h-3 w-3 text-gray-400" />
                   <span className="font-semibold text-gray-800">{allCats.find(c => c.id === allProductsCategoryId)?.name}</span>
                 </div>
-                {allProductsLoading ? (
+                {allProductsLoading && allProductsList.length === 0 ? (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                     {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}
                   </div>
                 ) : allProductsList.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                    {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} />)}
-                  </div>
+                  <>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                      {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} />)}
+                    </div>
+                    {hasNextPage && (
+                      <div className="flex justify-center pt-2 pb-1">
+                        <button
+                          onClick={() => fetchNextPage()}
+                          disabled={isFetchingNextPage}
+                          className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                        >
+                          {isFetchingNextPage
+                            ? <><Loader2 className="h-4 w-4 animate-spin" /> Loading…</>
+                            : `Load More (${allProductsTotal - allProductsList.length} remaining)`}
+                        </button>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
                     <Package className="h-12 w-12 text-gray-200 mb-3" />
@@ -1044,6 +1102,9 @@ export function ProductsTab() {
               </div>
               <div className="flex-1 overflow-y-auto px-5 py-3">
                 <p className="mb-2 text-xs text-gray-500">Results ({advSearchResults.length})</p>
+                {advSearchHasMore && (
+                  <p className="mb-2 text-xs text-amber-600">Showing first 100 results — refine your search to narrow results.</p>
+                )}
                 {advSearching ? (
                   <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-12 animate-pulse rounded bg-gray-100" />)}</div>
                 ) : advSearchResults.length === 0 ? (

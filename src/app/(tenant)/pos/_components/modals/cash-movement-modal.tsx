@@ -18,7 +18,7 @@ interface Props {
   cashMovementNotes: string
   setCashMovementNotes: (v: string) => void
   cashMovementSaving: boolean
-  handleCashMovement: (expenseCategoryId: string | null) => void
+  handleCashMovement: (expenseCategoryId: string | null, addToExpense: boolean) => void
   businessId: string | null | undefined
 }
 
@@ -34,21 +34,22 @@ export function CashMovementModal({
   const [categories, setCategories] = useState<ExpenseCategory[]>([])
   const [categoryId, setCategoryId] = useState('')
   const [catsLoading, setCatsLoading] = useState(false)
+  const [addToExpense, setAddToExpense] = useState(false)
 
-  // Fetch expense categories when switching to cash out
+  // Fetch expense categories only when user opts in
   useEffect(() => {
-    if (!isCashOut || !businessId || categories.length > 0) return
+    if (!addToExpense || !businessId || categories.length > 0) return
     setCatsLoading(true)
     fetch(`/api/expenses/categories?business_id=${businessId}`)
       .then(r => r.json())
       .then(j => setCategories(j.data ?? []))
       .catch(() => {})
       .finally(() => setCatsLoading(false))
-  }, [isCashOut, businessId]) // eslint-disable-line
+  }, [addToExpense, businessId]) // eslint-disable-line
 
-  // Reset category when switching to cash in
+  // Reset expense opts when switching type
   useEffect(() => {
-    if (!isCashOut) setCategoryId('')
+    if (!isCashOut) { setAddToExpense(false); setCategoryId('') }
   }, [isCashOut])
 
   async function createCategory(name: string) {
@@ -66,12 +67,14 @@ export function CashMovementModal({
 
   function handleClose() {
     setCategoryId('')
+    setAddToExpense(false)
     onClose()
   }
 
   function handleTypeChange(t: 'cash_in' | 'cash_out') {
     setCashMovementType(t)
     setCategoryId('')
+    setAddToExpense(false)
   }
 
   return (
@@ -102,27 +105,6 @@ export function CashMovementModal({
           onChange={e => setCashMovementAmount(e.target.value)}
         />
 
-        {/* Expense category — only for cash out */}
-        {isCashOut && (
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Expense Category <span className="text-xs font-normal text-gray-400">(select or create)</span>
-            </label>
-            {catsLoading ? (
-              <div className="h-9 animate-pulse rounded-lg bg-gray-100" />
-            ) : (
-              <CreatableCombobox
-                options={categories.map(c => ({ value: c.id, label: c.name }))}
-                value={categoryId}
-                onChange={v => setCategoryId(v)}
-                onCreate={createCategory}
-                placeholder="Select or type to create..."
-                createLabel="Add category"
-              />
-            )}
-          </div>
-        )}
-
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">
             {isCashOut ? 'Description' : 'Notes'} <span className="text-xs font-normal text-gray-400">(optional)</span>
@@ -136,11 +118,39 @@ export function CashMovementModal({
           />
         </div>
 
-        {/* Cash out info banner */}
+        {/* Optional expense recording — cash out only */}
         {isCashOut && (
-          <p className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
-            This cash out will automatically be recorded as an expense and appear in Reports.
-          </p>
+          <div className="space-y-3">
+            <label className="flex cursor-pointer items-center gap-2.5">
+              <input
+                type="checkbox"
+                checked={addToExpense}
+                onChange={e => { setAddToExpense(e.target.checked); if (!e.target.checked) setCategoryId('') }}
+                className="h-4 w-4 rounded border-gray-300 accent-brand-teal"
+              />
+              <span className="text-sm text-gray-700">Also record as an expense</span>
+            </label>
+
+            {addToExpense && (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Expense Category <span className="text-xs font-normal text-gray-400">(select or create)</span>
+                </label>
+                {catsLoading ? (
+                  <div className="h-9 animate-pulse rounded-lg bg-gray-100" />
+                ) : (
+                  <CreatableCombobox
+                    options={categories.map(c => ({ value: c.id, label: c.name }))}
+                    value={categoryId}
+                    onChange={v => setCategoryId(v)}
+                    onCreate={createCategory}
+                    placeholder="Select or type to create..."
+                    createLabel="Add category"
+                  />
+                )}
+              </div>
+            )}
+          </div>
         )}
 
         <div className="flex gap-2">
@@ -149,7 +159,7 @@ export function CashMovementModal({
             className={`flex-1 ${isCashOut ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}
             loading={cashMovementSaving}
             disabled={!cashMovementAmount || parseFloat(cashMovementAmount) <= 0}
-            onClick={() => handleCashMovement(isCashOut ? categoryId || null : null)}
+            onClick={() => handleCashMovement(addToExpense ? categoryId || null : null, addToExpense)}
           >
             {isCashOut ? 'Record Cash Out' : 'Add Cash'}
           </Button>

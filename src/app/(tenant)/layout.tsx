@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Topbar } from '@/components/layout/topbar'
 import { NotificationToasts } from '@/components/layout/notification-toasts'
-import { BrandSpinner } from '@/components/ui/brand-spinner'
 import { MessageBadge } from '@/components/layout/message-badge'
 import { BroadcastBanner } from '@/components/layout/broadcast-banner'
 import { TourGuide } from '@/components/shared/tour-guide'
@@ -12,8 +11,6 @@ import { useAuthStore } from '@/store/auth.store'
 import { useModuleConfigStore } from '@/store/module-config.store'
 import { useBroadcastsStore } from '@/store/broadcasts.store'
 import { useRealtime } from '@/hooks/use-realtime'
-import { createClient } from '@/lib/supabase/client'
-import { getSubdomain } from '@/lib/utils'
 import { Toaster } from 'sonner'
 import { getBrandStyle } from '@/lib/brand-theme'
 import type { Profile, Branch } from '@/types/database'
@@ -59,6 +56,9 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
   const { fetchConfigs, invalidate: invalidateConfigs } = useModuleConfigStore()
   const { setLoaded: setBroadcastsLoaded, addBroadcast, syncBroadcast, reset: resetBroadcasts } = useBroadcastsStore()
   const broadcastsBusinessId = useAuthStore((s) => s.profile?.business_id ?? '')
+  // Stable callback for Realtime invalidation — avoids resubscribing on every render.
+  // Zustand actions are stable references, so this callback never changes.
+  const onModuleConfigChange = useCallback(() => invalidateConfigs(), [invalidateConfigs])
   const broadcastsFetched = useRef(false)
 
   // Load broadcasts once profile+business is available.
@@ -81,6 +81,19 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
     table: 'system_broadcasts',
     onInsert: (b) => addBroadcast(b as unknown as SystemBroadcast, broadcastsBusinessId),
     onUpdate: (b) => syncBroadcast(b as unknown as SystemBroadcast, broadcastsBusinessId),
+  })
+
+  // Realtime: when an admin toggles a module in Settings, branch_module_overrides
+  // changes → invalidate the client-side config cache so the sidebar updates immediately.
+  // Subscription is skipped until activeBranch is known (filterValue guards against it).
+  const activeBranchId = useAuthStore((s) => s.activeBranch?.id ?? '')
+  useRealtime({
+    table: 'branch_module_overrides',
+    filterColumn: 'branch_id',
+    filterValue: activeBranchId,
+    onInsert: onModuleConfigChange,
+    onUpdate: onModuleConfigChange,
+    onDelete: onModuleConfigChange,
   })
 
   useEffect(() => {
@@ -124,17 +137,8 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
         return
       }
 
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (!user) {
-        clear()
-        window.location.replace('/login')
-        return
-      }
-
-      setSessionVerified(true)
-
+      // Handle post-upgrade redirect before fetching context so invalidateConfigs()
+      // forces a fresh module config fetch if the plan just changed.
       const urlParams = new URLSearchParams(window.location.search)
       if (urlParams.get('upgraded') === '1') {
         const sessionId = urlParams.get('session_id')
@@ -151,120 +155,78 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
         invalidateConfigs()
       }
 
-      // 2. Clear stale state synchronously if there's a user mismatch
+      // Single server-side API call replaces 4-5 sequential client-side Supabase
+      // round-trips. All DB queries run in parallel server-side with connection pooling.
+      const res = await fetch('/api/auth/session-context').catch(() => null)
+
+      if (!res || res.status === 401) {
+        clear()
+        window.location.replace('/login')
+        return
+      }
+
+      if (!res.ok) {
+        // Non-auth error — let the user in with whatever cached state we have
+        setSessionVerified(true)
+        setLoading(false)
+        return
+      }
+
+      const json = await res.json()
+      const {
+        profile,
+        branches,
+        subscriptionStatus,
+        currency: fetchedCurrency,
+        brandColor: fetchedBrandColor,
+      } = json.data as {
+        profile: Profile & { verticalTemplateSlug: string | null }
+        branches: Branch[]
+        subscriptionStatus: SubscriptionStatus
+        currency: string
+        brandColor: string
+      }
+
+      if (!profile) {
+        clear()
+        window.location.replace('/login')
+        return
+      }
+
+      // Clear stale store if a different user logged in on this device
       const currentProfile = useAuthStore.getState().profile
-      if (currentProfile && currentProfile.id !== user.id) {
+      if (currentProfile && currentProfile.id !== profile.id) {
         clear()
       }
 
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      const profile = profileData as Profile | null
-      if (!profile) return
-
-      const subdomain = getSubdomain(window.location.hostname)
-      if (subdomain && profile.business_id) {
-        const { data: subBiz, error: bizError } = await supabase
-          .from('businesses')
-          .select('id')
-          .eq('subdomain', subdomain)
-          .maybeSingle()
-
-        if (!bizError && subBiz && subBiz.id !== profile.business_id) {
-          await supabase.auth.signOut({ scope: 'local' })
-          clear()
-          window.location.replace('/login?error=wrong_tenant')
-          return
-        }
-      }
-
+      // Set all store values synchronously — avoids multiple re-renders
       setProfile(profile)
+      setVerticalTemplateSlug(profile.verticalTemplateSlug ?? null)
+      setCurrency(fetchedCurrency ?? 'GBP')
+      setBrandColor(fetchedBrandColor ?? '#008080')
+      setSubscriptionStatus(subscriptionStatus)
 
-      // Non-critical: fire in background, don't block setLoading
-      if (profile.business_id) {
-        supabase
-          .from('businesses')
-          .select('currency, brand_color')
-          .eq('id', profile.business_id)
-          .single()
-          .then(({ data }) => {
-            if (data?.currency) setCurrency(data.currency)
-            if (data?.brand_color) setBrandColor(data.brand_color)
-          })
+      // Reveal the layout immediately — sidebar and page content can render now
+      setSessionVerified(true)
 
-        supabase
-          .from('businesses')
-          .select('business_vertical_templates(slug)')
-          .eq('id', profile.business_id)
-          .single()
-          .then(({ data }) => {
-            const slug = (data?.business_vertical_templates as { slug?: string } | null)?.slug ?? null
-            setVerticalTemplateSlug(slug)
-          })
+      if (branches?.length) {
+        setBranches(branches)
+        const persistedActiveBranch = useAuthStore.getState().activeBranch
+        let resolvedBranch: Branch | null = null
+        if (profile.branch_id) {
+          resolvedBranch = branches.find((b) => b.id === profile.branch_id) ?? null
+        } else {
+          resolvedBranch = persistedActiveBranch
+            ? branches.find((b) => b.id === persistedActiveBranch.id) ?? branches[0]
+            : branches[0]
+        }
 
-        supabase
-          .from('subscriptions')
-          .select('status, trial_ends_at, current_period_end, stripe_sub_id, plans(name, plan_type)')
-          .eq('business_id', profile.business_id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-          .then(({ data: sub }) => {
-            const plans = sub?.plans as { name?: string; plan_type?: string } | null
-            const planType = (plans?.plan_type ?? null) as SubscriptionStatus['planType']
-            const planName = plans?.name ?? null
-            const trialEndsAt = sub?.trial_ends_at ?? null
-            const currentPeriodEnd = (sub as any)?.current_period_end ?? null
-            const freeTrialExpired = planType === 'free' && trialEndsAt && new Date(trialEndsAt) < new Date()
-            const paidSubInactive = planType === 'paid' && sub?.status && !['active', 'trialing'].includes(sub.status)
-            // Manual subscriptions (no Stripe) expire when current_period_end passes
-            const manualSubExpired = !(sub as any)?.stripe_sub_id && currentPeriodEnd && new Date(currentPeriodEnd) < new Date()
-            setSubscriptionStatus({
-              status: sub?.status ?? null,
-              planType,
-              planName,
-              trialEndsAt,
-              currentPeriodEnd,
-              hasAccess: !freeTrialExpired && !paidSubInactive && !manualSubExpired,
-            })
-          })
-      }
-
-      if (profile.business_id) {
-        const { data: branchData } = await supabase
-          .from('branches')
-          .select('*')
-          .eq('business_id', profile.business_id)
-          .eq('is_active', true)
-          .order('is_main', { ascending: false })
-
-        const branches = branchData as Branch[] | null
-
-        if (branches?.length) {
-          setBranches(branches)
-          const persistedActiveBranch = useAuthStore.getState().activeBranch
-          let resolvedBranch: Branch | null = null
-          if (profile.branch_id) {
-            resolvedBranch = branches.find((b) => b.id === profile.branch_id) ?? null
-          } else {
-            resolvedBranch = persistedActiveBranch
-              ? branches.find((b) => b.id === persistedActiveBranch.id) ?? branches[0]
-              : branches[0]
+        if (resolvedBranch) {
+          if (resolvedBranch.id !== persistedActiveBranch?.id) {
+            setActiveBranch(resolvedBranch)
           }
-
-          if (resolvedBranch) {
-            if (resolvedBranch.id !== persistedActiveBranch?.id) {
-              setActiveBranch(resolvedBranch)
-            }
-          }
-
-          if (resolvedBranch) {
-            fetchConfigs(resolvedBranch.id)
-          }
+          // TTL-cached: returns immediately if configs are < 5 min old
+          fetchConfigs(resolvedBranch.id)
         }
       }
 
@@ -277,8 +239,34 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
 
   if (!isHydrated || !sessionVerified) {
     return (
-      <div className="flex h-screen items-center justify-center bg-surface-container-low">
-        <BrandSpinner size="lg" />
+      <div className="flex h-screen overflow-hidden bg-surface-container-low">
+        {/* Sidebar skeleton */}
+        <div className="hidden lg:flex w-64 flex-shrink-0 flex-col bg-surface-container border-r border-outline-variant">
+          <div className="h-14 border-b border-outline-variant px-4 flex items-center">
+            <div className="h-6 w-32 rounded bg-surface-container-high animate-pulse" />
+          </div>
+          <div className="flex-1 p-3 space-y-1">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="h-9 rounded-lg bg-surface-container-high animate-pulse" style={{ opacity: 1 - i * 0.08 }} />
+            ))}
+          </div>
+        </div>
+        {/* Main area skeleton */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <div className="h-14 border-b border-outline-variant bg-surface-container px-4 flex items-center gap-3">
+            <div className="h-6 w-6 rounded bg-surface-container-high animate-pulse" />
+            <div className="h-5 w-40 rounded bg-surface-container-high animate-pulse" />
+          </div>
+          <div className="flex-1 p-6 space-y-4 overflow-hidden">
+            <div className="h-8 w-48 rounded bg-surface-container animate-pulse" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-24 rounded-xl bg-surface-container animate-pulse" />
+              ))}
+            </div>
+            <div className="h-48 rounded-xl bg-surface-container animate-pulse" />
+          </div>
+        </div>
       </div>
     )
   }

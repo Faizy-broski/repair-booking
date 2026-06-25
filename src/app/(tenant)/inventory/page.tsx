@@ -181,6 +181,7 @@ export default function InventoryPage() {
   const [supplierFilter, setSupplierFilter] = useState('')
   const [valuationFilter, setValuationFilter] = useState('')
   const [hideOutOfStock, setHideOutOfStock] = useState(false)
+  const [lowStockOnly, setLowStockOnly] = useState(false)
 
   // Bulk select
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -205,7 +206,7 @@ export default function InventoryPage() {
 
   // ── Products Query — fires immediately, table shows as soon as this returns ──
   const { data: productResponse, isLoading: loading } = useQuery({
-    queryKey: ['inventory', branchId, page, pageSize, search, categoryFilter, brandFilter, supplierFilter, valuationFilter, hideOutOfStock, typeFilter],
+    queryKey: ['inventory', branchId, page, pageSize, search, categoryFilter, brandFilter, supplierFilter, valuationFilter, hideOutOfStock, typeFilter, lowStockOnly],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page + 1), limit: String(pageSize), branch_id: branchId!, include_drafts: 'true' })
       if (search) params.set('search', search)
@@ -214,6 +215,7 @@ export default function InventoryPage() {
       if (supplierFilter) params.set('supplier_id', supplierFilter)
       if (valuationFilter) params.set('valuation', valuationFilter)
       if (hideOutOfStock) params.set('hide_out_of_stock', 'true')
+      if (lowStockOnly) params.set('low_stock_only', 'true')
       if (typeFilter === 'product') params.set('item_type', 'product')
       if (typeFilter === 'part') params.set('item_type', 'part')
 
@@ -294,7 +296,7 @@ export default function InventoryPage() {
   async function handleDelete() {
     if (!deleteTarget) return
     const target = { ...deleteTarget }
-    const invKey = ['inventory', branchId, page, pageSize, search, categoryFilter, brandFilter, supplierFilter, valuationFilter, hideOutOfStock, typeFilter] as const
+    const invKey = ['inventory', branchId, page, pageSize, search, categoryFilter, brandFilter, supplierFilter, valuationFilter, hideOutOfStock, typeFilter, lowStockOnly] as const
     const prev = queryClient.getQueryData(invKey)
     setDeleteTarget(null)
     queryClient.setQueryData(invKey, (old: any) => {
@@ -309,6 +311,7 @@ export default function InventoryPage() {
     const qs = branchId ? `?branch_id=${branchId}` : ''
     const res = await fetch(`/api/products/${target.id}${qs}`, { method: 'DELETE' })
     if (res.ok) {
+      toast.success(`"${target.name}" deleted successfully`)
       queryClient.invalidateQueries({ queryKey: ['inventory'] })
       queryClient.invalidateQueries({ queryKey: ['inventory-stats'] })
     } else {
@@ -320,7 +323,7 @@ export default function InventoryPage() {
 
   async function handleBulkDelete() {
     const toDelete = new Set(selectedIds)
-    const invKey = ['inventory', branchId, page, pageSize, search, categoryFilter, brandFilter, supplierFilter, valuationFilter, hideOutOfStock, typeFilter] as const
+    const invKey = ['inventory', branchId, page, pageSize, search, categoryFilter, brandFilter, supplierFilter, valuationFilter, hideOutOfStock, typeFilter, lowStockOnly] as const
     const prev = queryClient.getQueryData(invKey)
     setShowBulkDeleteConfirm(false)
     setSelectedIds(new Set())
@@ -353,11 +356,12 @@ export default function InventoryPage() {
     setSupplierFilter('')
     setValuationFilter('')
     setHideOutOfStock(false)
+    setLowStockOnly(false)
     setTypeFilter('all')
     setPage(0)
   }
 
-  const hasActiveFilters = search || categoryFilter || brandFilter || supplierFilter || valuationFilter || hideOutOfStock || typeFilter !== 'all'
+  const hasActiveFilters = search || categoryFilter || brandFilter || supplierFilter || valuationFilter || hideOutOfStock || lowStockOnly || typeFilter !== 'all'
 
   const displayProducts = products
 
@@ -612,6 +616,11 @@ export default function InventoryPage() {
             iconBg: 'bg-amber-100',
             borderColor: 'bg-amber-500',
             subtitle: 'needs reordering',
+            onClick: () => {
+              setLowStockOnly((prev: boolean) => !prev);
+              setPage(0);
+            },
+            isActive: lowStockOnly
           },
           {
             label: 'In Purchase Order',
@@ -622,10 +631,14 @@ export default function InventoryPage() {
             borderColor: 'bg-emerald-500',
             subtitle: 'incoming stock',
           },
-        ].map((s) => {
+        ].map((s: any) => {
           const Icon = s.icon
           return (
-            <div key={s.label} className="relative overflow-hidden rounded-xl border border-gray-200 bg-white pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm">
+            <div 
+              key={s.label} 
+              onClick={s.onClick}
+              className={`relative overflow-hidden rounded-xl border bg-white pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm ${s.onClick ? 'cursor-pointer hover:shadow-md transition-all' : ''} ${s.isActive ? 'border-amber-500 ring-1 ring-amber-500' : 'border-gray-200'}`}
+            >
               <div className="flex items-start justify-between gap-2 sm:gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-gray-500 truncate">{s.label}</p>
@@ -758,15 +771,24 @@ export default function InventoryPage() {
                 />
               </div>
             )}
-            <div className="flex items-end pb-1">
+            <div className="flex items-end pb-1 gap-4">
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
                   type="checkbox"
                   checked={hideOutOfStock}
                   onChange={(e) => { setHideOutOfStock(e.target.checked); setPage(0) }}
-                  className="rounded"
+                  className="rounded border-gray-300"
                 />
                 <span className="text-sm text-gray-700">Hide out of stock</span>
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={lowStockOnly}
+                  onChange={(e) => { setLowStockOnly(e.target.checked); setPage(0) }}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-sm text-gray-700">Low stock</span>
               </label>
             </div>
           </div>

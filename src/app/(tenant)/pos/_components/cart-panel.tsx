@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Search, Plus, Minus, Trash2, UserPlus, X, AlertTriangle,
   Gift, Phone, Mail, ExternalLink, CheckCircle2, DollarSign,
-  Banknote, SplitSquareHorizontal, Check, ChevronUp, ChevronDown,
+  Banknote, SplitSquareHorizontal, Check, ChevronUp, ChevronDown, CreditCard, Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -210,14 +210,14 @@ export function CartPanel({ mobileView }: Props) {
   }
 
   // ── Receipt helper ─────────────────────────────────────────────────────────
-  async function printReceipt(saleId: string, paymentMethod: string, paymentSplits?: PaymentSplit[]) {
+  async function printReceipt(saleId: string, paymentMethod: string, paymentSplits?: PaymentSplit[], paymentStatus?: string, amountPaid?: number) {
     try {
       const customerName = pos.customer
         ? `${pos.customer.first_name} ${pos.customer.last_name ?? ''}`.trim()
         : 'Walk-In Customer'
       const cartSnapshot = pos.cart.map(item => ({
-        name: item.product.name, quantity: item.quantity,
-        unit_price: item.unitPrice, discount: item.discount,
+        name: item.variant ? `${item.product.name} – ${item.variant.name}` : item.product.name,
+        quantity: item.quantity, unit_price: item.unitPrice, discount: item.discount,
         total: (item.unitPrice - item.discount) * item.quantity,
       }))
       const blob = await pdf(
@@ -227,7 +227,8 @@ export function CartPanel({ mobileView }: Props) {
           customerName={customerName}
           cashierName={profile?.full_name ?? '—'}
           paymentMethod={paymentMethod}
-          paymentStatus="paid"
+          paymentStatus={paymentStatus ?? 'paid'}
+          amountPaid={amountPaid}
           items={cartSnapshot}
           subtotal={subtotal} discount={discountAmt} tax={taxAmt} total={total}
           paymentSplits={paymentSplits?.map(s => ({ method: s.method, amount: s.amount }))}
@@ -272,7 +273,8 @@ export function CartPanel({ mobileView }: Props) {
       commission_type: servedByEmployeeId && commissionAmount ? commissionType : null,
       items: pos.cart.map(item => ({
         product_id: item.product.id, variant_id: item.variant?.id ?? null,
-        name: item.product.name, quantity: item.quantity, unit_price: item.unitPrice,
+        name: item.variant ? `${item.product.name} – ${item.variant.name}` : item.product.name,
+        quantity: item.quantity, unit_price: item.unitPrice,
         discount: item.discount, total: (item.unitPrice - item.discount) * item.quantity,
         is_service: item.product.is_service,
       })),
@@ -353,6 +355,89 @@ export function CartPanel({ mobileView }: Props) {
       const errJson = await res.json().catch(() => ({}))
       const msg = errJson?.error?.message ?? errJson?.message ?? 'Payment failed. Please try again.'
       toast.error(msg)
+      setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
+    }
+    setProcessing(false)
+  }
+
+  // ── Credit (on-account) payment state ─────────────────────────────────────
+  const [creditOpen, setCreditOpen] = useState(false)
+  const [creditDepositAmount, setCreditDepositAmount] = useState('')
+  const [creditDepositMethod, setCreditDepositMethod] = useState<'cash' | 'card'>('cash')
+  const [creditIsEmployee, setCreditIsEmployee] = useState(false)
+  const [creditEmployeeId, setCreditEmployeeId] = useState('')
+  const [creditEmployeeName, setCreditEmployeeName] = useState('')
+  const [creditCustomerSearch, setCreditCustomerSearch] = useState('')
+  const [creditCustomerResults, setCreditCustomerResults] = useState<Customer[]>([])
+  const [creditCustomerSearching, setCreditCustomerSearching] = useState(false)
+
+  useEffect(() => {
+    if (!creditCustomerSearch.trim()) { setCreditCustomerResults([]); return }
+    const t = setTimeout(async () => {
+      setCreditCustomerSearching(true)
+      try {
+        const res = await fetch(`/api/customers?search=${encodeURIComponent(creditCustomerSearch)}&limit=6`)
+        const json = await res.json()
+        setCreditCustomerResults((json.data ?? []) as Customer[])
+      } finally { setCreditCustomerSearching(false) }
+    }, 300)
+    return () => clearTimeout(t)
+  }, [creditCustomerSearch])
+
+  async function processCreditPayment() {
+    if (!activeBranch || !profile || pos.cart.length === 0) return
+    if (!creditIsEmployee && !pos.customer) return
+    if (creditIsEmployee && !creditEmployeeId) { toast.error('Select an employee'); return }
+    const deposit = Math.max(0, parseFloat(creditDepositAmount) || 0)
+    setProcessing(true)
+
+    const cartSnapshot = [...pos.cart]
+    const itemsPayload = pos.cart.map(item => ({
+      product_id: item.product.id, variant_id: item.variant?.id ?? null,
+      name: item.variant ? `${item.product.name} – ${item.variant.name}` : item.product.name,
+      quantity: item.quantity, unit_price: item.unitPrice,
+      discount: item.discount, total: (item.unitPrice - item.discount) * item.quantity,
+      is_service: item.product.is_service,
+    }))
+
+    setCreditOpen(false)
+    setSuccess(true)
+    pos.clearCart()
+    setCreditDepositAmount('')
+
+    const res = await fetch('/api/pos/sales', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        branch_id: activeBranch.id, cashier_id: profile.id,
+        customer_id: creditIsEmployee ? null : pos.customer?.id,
+        employee_id: creditIsEmployee ? creditEmployeeId || null : null,
+        subtotal, discount: discountAmt, tax: taxAmt, total,
+        payment_method: 'on_account',
+        amount_paid: deposit,
+        payment_splits: deposit > 0 ? [{ method: creditDepositMethod, amount: deposit }] : [],
+        served_by_employee_id: servedByEmployeeId || null,
+        commission_amount: servedByEmployeeId && commissionAmount ? parseFloat(commissionAmount) : null,
+        commission_type: servedByEmployeeId && commissionAmount ? commissionType : null,
+        items: itemsPayload,
+      }),
+    })
+
+    if (res.ok) {
+      const saleJson = await res.json()
+      setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
+      queryClient.invalidateQueries({ queryKey: ['sales'] })
+      queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['credits'] })
+      const creditStatus = deposit <= 0 ? 'on_account' : deposit >= total ? 'paid' : 'partial'
+      const depositSplits = deposit > 0 ? [{ method: creditDepositMethod as PaymentSplit['method'], amount: deposit }] : undefined
+      await printReceipt(saleJson.data?.sale_id ?? 'unknown', 'on_account', depositSplits, creditStatus, deposit)
+      setTimeout(() => { setSuccess(false) }, 2500)
+    } else {
+      pos.restoreCart(cartSnapshot)
+      setSuccess(false)
+      setCreditOpen(true)
+      const errJson = await res.json().catch(() => ({}))
+      toast.error(errJson?.error?.message ?? 'Payment failed. Please try again.')
       setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
     }
     setProcessing(false)
@@ -686,33 +771,177 @@ export function CartPanel({ mobileView }: Props) {
       </div>
 
       {/* Payment buttons */}
-      <div className="shrink-0 border-t border-gray-200 bg-white px-4 py-3">
-        <div className="flex gap-2">
+      <div className="shrink-0 border-t border-gray-200 bg-white px-3 py-2.5">
+        <div className="flex gap-1.5">
           <button
             onClick={() => { pos.setPaymentMethod('split'); setSplits({ cash: '', card: '' }); pos.cart.length > 0 && setPaymentOpen(true) }}
             disabled={pos.cart.length === 0}
-            className="flex flex-1 items-center justify-center gap-2 rounded-lg border-2 border-[#1a3c40] bg-[#1a3c40] py-3.5 text-base font-bold text-white hover:bg-[#15332e] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border-2 border-[#1a3c40] bg-[#1a3c40] py-2.5 text-sm font-bold text-white hover:bg-[#15332e] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            <SplitSquareHorizontal className="h-5 w-5" /> Multiple Pay
+            <SplitSquareHorizontal className="h-4 w-4 shrink-0" /> Multiple Pay
           </button>
           <button
             onClick={processCashPayment}
             disabled={pos.cart.length === 0 || processing}
-            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-green-600 py-3.5 text-base font-bold text-white hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-green-600 py-2.5 text-sm font-bold text-white hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            <Banknote className="h-5 w-5" /> Cash
+            <Banknote className="h-4 w-4 shrink-0" /> Cash
+          </button>
+          <button
+            onClick={() => { if (pos.cart.length > 0 && !processing) setCreditOpen(true) }}
+            disabled={pos.cart.length === 0 || processing}
+            title="Sell on credit — customer or employee"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-purple-600 py-2.5 text-sm font-bold text-white hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <CreditCard className="h-4 w-4 shrink-0" /> Credit
           </button>
           <button
             onClick={() => { pos.clearCart(); setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat') }}
             disabled={pos.cart.length === 0}
-            className="flex items-center justify-center rounded-lg bg-red-600 px-4 py-3.5 text-base font-bold text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center justify-center rounded-lg bg-red-500 px-3 py-2.5 text-sm font-bold text-white hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
+        {!pos.customer && pos.cart.length > 0 && (
+          <p className="mt-1 text-center text-xs text-gray-400">Select a customer to enable Credit payment</p>
+        )}
       </div>
 
       {/* ── MODALS ── */}
+
+      {/* Credit (On-Account) Payment Modal */}
+      <Modal open={creditOpen} onClose={() => { if (!processing) { setCreditOpen(false); setCreditIsEmployee(false); setCreditEmployeeId(''); setCreditEmployeeName(''); setCreditCustomerSearch(''); setCreditCustomerResults([]) } }} title="Credit Payment" size="sm">
+        <div className="space-y-4">
+          {/* Customer vs Employee toggle */}
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm font-medium">
+            <button
+              onClick={() => { setCreditIsEmployee(false); setCreditEmployeeId(''); setCreditEmployeeName('') }}
+              className={`flex-1 py-2 transition-colors ${!creditIsEmployee ? 'bg-purple-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+            >
+              Customer Credit
+            </button>
+            <button
+              onClick={() => setCreditIsEmployee(true)}
+              className={`flex-1 py-2 transition-colors ${creditIsEmployee ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+            >
+              Employee Purchase
+            </button>
+          </div>
+
+          {/* Who is buying */}
+          {creditIsEmployee ? (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">Employee</label>
+              <AsyncEmployeeSelect
+                value={creditEmployeeId}
+                onChange={id => setCreditEmployeeId(id)}
+                onEmployeeChange={emp => setCreditEmployeeName(emp ? `${emp.first_name} ${emp.last_name ?? ''}`.trim() : '')}
+                branchId={activeBranch?.id ?? ''}
+                placeholder="Search employee…"
+              />
+            </div>
+          ) : pos.customer ? (
+            <div className="flex items-center justify-between rounded-lg bg-purple-50 px-4 py-3 text-sm">
+              <div>
+                <p className="font-semibold text-purple-900">{pos.customer.first_name} {pos.customer.last_name ?? ''}</p>
+                <p className="mt-0.5 text-purple-700">Sale Total: <span className="font-bold">{formatCurrency(total)}</span></p>
+              </div>
+              <button onClick={() => { pos.setCustomer(null); setCreditCustomerSearch(''); setCreditCustomerResults([]) }}
+                className="text-xs text-purple-400 hover:text-purple-700 underline">Change</button>
+            </div>
+          ) : (
+            <div className="relative">
+              <label className="mb-1 block text-xs font-medium text-gray-600">Customer</label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search customer by name…"
+                  className="w-full rounded-lg border py-2 pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  value={creditCustomerSearch}
+                  onChange={e => setCreditCustomerSearch(e.target.value)}
+                  autoFocus
+                />
+                {creditCustomerSearching && (
+                  <Loader2 className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-gray-400" />
+                )}
+              </div>
+              {creditCustomerResults.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+                  {creditCustomerResults.map(c => (
+                    <button key={c.id}
+                      onClick={() => { pos.setCustomer(c); setCreditCustomerSearch(''); setCreditCustomerResults([]) }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-purple-50">
+                      <span className="font-medium">{c.first_name} {c.last_name ?? ''}</span>
+                      {c.email && <span className="text-xs text-gray-400">{c.email}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Summary strip */}
+          {creditIsEmployee && creditEmployeeId && (
+            <div className="rounded-lg bg-indigo-50 px-4 py-3 text-sm">
+              <p className="font-semibold text-indigo-900">{creditEmployeeName}</p>
+              <p className="mt-0.5 text-indigo-700">Sale Total: <span className="font-bold">{formatCurrency(total)}</span></p>
+            </div>
+          )}
+
+          {/* Deposit input */}
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">
+              Deposit paid now <span className="font-normal text-gray-400">(enter 0 for full credit)</span>
+            </label>
+            <input
+              type="number" min={0} max={total} step={0.01}
+              className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+              placeholder="0.00"
+              value={creditDepositAmount}
+              onChange={e => setCreditDepositAmount(e.target.value)}
+            />
+          </div>
+
+          {parseFloat(creditDepositAmount) > 0 && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">Deposit paid via</label>
+              <div className="flex gap-2">
+                {(['cash', 'card'] as const).map(m => (
+                  <button key={m} onClick={() => setCreditDepositMethod(m)}
+                    className={`flex-1 rounded-lg border py-2 text-sm font-medium capitalize transition-colors ${creditDepositMethod === m ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between rounded-md bg-amber-50 px-4 py-2.5 text-sm">
+            <span className="font-medium text-amber-800">{creditIsEmployee ? 'Employee' : 'Customer'} will owe</span>
+            <span className="font-bold text-amber-700">{formatCurrency(Math.max(0, total - (parseFloat(creditDepositAmount) || 0)))}</span>
+          </div>
+
+          <p className="text-xs text-gray-400">
+            {creditIsEmployee
+              ? 'Amount tracked under employee profile and deductible from payroll.'
+              : 'Payment can be recorded later from the Customer Credit page.'}
+          </p>
+
+          <div className="flex justify-end gap-3">
+            <button onClick={() => { setCreditOpen(false); setCreditIsEmployee(false); setCreditEmployeeId(''); setCreditEmployeeName(''); setCreditCustomerSearch(''); setCreditCustomerResults([]) }} disabled={processing}
+              className="rounded-lg border px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40">
+              Cancel
+            </button>
+            <button onClick={processCreditPayment} disabled={processing || (creditIsEmployee ? !creditEmployeeId : !pos.customer)}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold text-white disabled:opacity-40 ${creditIsEmployee ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-purple-600 hover:bg-purple-700'}`}>
+              <CreditCard className="h-4 w-4" />
+              {processing ? 'Processing…' : 'Confirm Credit Sale'}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* New Customer Modal */}
       <Modal open={newCustomerOpen} onClose={() => setNewCustomerOpen(false)} title="Create New Customer" size="sm">

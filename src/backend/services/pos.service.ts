@@ -6,15 +6,46 @@ export interface PaymentSplit {
   amount: number
 }
 
+export interface ExchangeItem {
+  product_id?: string | null
+  variant_id?: string | null
+  name: string
+  quantity: number
+  unit_price: number
+  total: number
+  is_service?: boolean
+}
+
+export interface ExchangePayload {
+  original_sale_id: string
+  branch_id: string
+  cashier_id: string
+  customer_id?: string | null
+  returned_items: ExchangeItem[]
+  new_items: ExchangeItem[]
+  payment_method: 'cash' | 'card' | 'on_account'
+  amount_paid?: number
+}
+
+export interface ExchangeResult {
+  refund_id: string
+  exchange_sale_id: string
+  returned_total: number
+  new_total: number
+  net_difference: number
+}
+
 export interface SalePayload {
   branch_id: string
   cashier_id: string
   customer_id?: string | null
+  employee_id?: string | null
   subtotal: number
   discount: number
   tax: number
   total: number
   payment_method: string
+  amount_paid?: number
   payment_splits?: PaymentSplit[]
   gift_card_id?: string | null
   gift_card_amount?: number
@@ -40,11 +71,21 @@ export const PosService = {
     return data as string
   },
 
-  async getSales(branchId: string, params: { page?: number; limit?: number; from?: string; to?: string; status?: string; search?: string }) {
-    const { page = 1, limit = 20, from, to, status, search } = params
+  async recordCreditPayment(saleId: string, amount: number, method: string): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (adminSupabase.rpc as any)('record_credit_payment', {
+      p_sale_id: saleId,
+      p_amount: amount,
+      p_method: method,
+    })
+    if (error) throw error
+  },
+
+  async getSales(branchId: string, params: { page?: number; limit?: number; from?: string; to?: string; status?: string; search?: string; paymentMethod?: string; outstandingOnly?: boolean; employeeId?: string; employeePurchasesOnly?: boolean }) {
+    const { page = 1, limit = 20, from, to, status, search, paymentMethod, outstandingOnly, employeeId, employeePurchasesOnly } = params
     let q = adminSupabase
       .from('sales')
-      .select('*, customers(first_name,last_name), profiles!cashier_id(full_name)', { count: 'exact' })
+      .select('*, customers(first_name,last_name), profiles!cashier_id(full_name), employees!sales_employee_id_fkey(first_name,last_name), sale_items(name,quantity)', { count: 'exact' })
       .eq('branch_id', branchId)
       .order('created_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1)
@@ -52,6 +93,10 @@ export const PosService = {
     if (from) q = q.gte('created_at', from)
     if (to) q = q.lte('created_at', to)
     if (status) q = q.eq('payment_status', status)
+    if (paymentMethod) q = q.eq('payment_method', paymentMethod)
+    if (outstandingOnly) q = q.neq('payment_status', 'paid')
+    if (employeeId) q = q.eq('employee_id', employeeId)
+    if (employeePurchasesOnly) q = q.not('employee_id', 'is', null)
     if (search) {
       const term = `%${search}%`
       // Resolve customer IDs matching the name first (PostgREST can't filter
@@ -112,7 +157,7 @@ export const PosService = {
     // Fetch refund records separately to avoid unreliable self-join
     const { data: refundRecords } = await adminSupabase
       .from('sales')
-      .select('id, is_refund, sale_items(name, quantity)')
+      .select('id, is_refund, total, sale_items(name, quantity)')
       .eq('original_sale_id', id)
       .eq('is_refund', true)
 
@@ -120,7 +165,8 @@ export const PosService = {
   },
 
   async deleteSale(saleId: string): Promise<void> {
-    const { error } = await adminSupabase.rpc('delete_sale', { p_sale_id: saleId })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (adminSupabase.rpc as any)('delete_sale', { p_sale_id: saleId })
     if (error) throw error
   },
 
@@ -228,6 +274,13 @@ export const PosService = {
       const { error: updateErr } = await adminSupabase.from('sales').update(saleUpdate).eq('id', saleId)
       if (updateErr) throw updateErr
     }
+  },
+
+  async processExchange(payload: ExchangePayload): Promise<ExchangeResult> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (adminSupabase.rpc as any)('process_exchange', { p_data: payload })
+    if (error) throw error
+    return data as ExchangeResult
   },
 
   async processRefund(payload: {

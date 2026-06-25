@@ -1,7 +1,7 @@
 'use client'
 import { useState, useCallback, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Clock, LogIn, LogOut, DollarSign, CalendarDays, TrendingUp, Pencil, Trash2, BarChart2, Users } from 'lucide-react'
+import { Plus, Clock, LogIn, LogOut, DollarSign, CalendarDays, TrendingUp, Pencil, Trash2, BarChart2, Users, ShoppingBag, CheckCircle2, Loader2 } from 'lucide-react'
 import * as Tabs from '@radix-ui/react-tabs'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -38,6 +38,7 @@ interface ShiftRow {
 interface PayrollRow {
   id: string; start_date: string; end_date: string; status: string
   gross_pay: number | null; total_hours: number | null; base_salary?: number | null
+  purchase_deductions?: number | null
   employees?: { first_name: string; last_name: string | null } | null
 }
 interface CommissionRow {
@@ -228,6 +229,60 @@ function EmployeesPageInner() {
     staleTime: 30_000,
   })
 
+  // ── Employee Purchases state ──────────────────────────────────────────────
+  const [purchaseEmployeeFilter, setPurchaseEmployeeFilter] = useState('')
+  const [settlingPurchase, setSettlingPurchase] = useState<string | null>(null)
+  const [settleMethod, setSettleMethod] = useState<Record<string, 'cash' | 'card'>>({})
+
+  interface PaymentSplitEntry { method: string; amount: number; payroll_period_id?: string }
+  interface EmployeePurchaseRow {
+    id: string; created_at: string; total: number; amount_paid: number
+    payment_status: string; notes: string | null
+    employee_id: string
+    payment_splits?: PaymentSplitEntry[] | null
+    employees?: { first_name: string; last_name: string | null } | null  // alias: employees!sales_employee_id_fkey
+    sale_items?: { name: string; quantity: number }[]
+  }
+
+  function getPurchaseSettlementStatus(p: EmployeePurchaseRow): 'pending' | 'payroll' | 'direct' {
+    if (p.payment_status !== 'paid' && p.payment_status !== 'partial') return 'pending'
+    const hasPayrollDeduction = (p.payment_splits ?? []).some(s => s.method === 'payroll_deduction')
+    if (hasPayrollDeduction && p.payment_status === 'paid') return 'payroll'
+    if (p.payment_status === 'paid') return 'direct'
+    return 'pending'
+  }
+
+  const { data: employeePurchases = [], isLoading: loadingPurchases, refetch: refetchPurchases } = useQuery({
+    queryKey: ['employee-purchases', activeBranch?.id, purchaseEmployeeFilter],
+    queryFn: async () => {
+      if (!activeBranch) return []
+      const params = new URLSearchParams({ branch_id: activeBranch.id, employee_purchases: 'true' })
+      if (purchaseEmployeeFilter) params.set('employee_id', purchaseEmployeeFilter)
+      const res = await fetch(`/api/pos/sales?${params}`)
+      const json = await res.json()
+      return (json.data ?? []) as EmployeePurchaseRow[]
+    },
+    enabled: !!activeBranch && activeTab === 'purchases',
+    staleTime: 30_000,
+  })
+
+  async function settlePurchase(saleId: string, outstanding: number, method: 'cash' | 'card' = 'cash') {
+    setSettlingPurchase(saleId)
+    try {
+      const res = await fetch(`/api/pos/sales/${saleId}/payment`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: outstanding, payment_method: method }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      await refetchPurchases()
+      toast.success('Purchase settled directly')
+    } catch {
+      toast.error('Could not settle purchase')
+    } finally {
+      setSettlingPurchase(null)
+    }
+  }
+
   function openCreateSheet() {
     setEditingEmployee(null)
     reset({ first_name: '', last_name: '', email: '', phone: '', role: '', hourly_rate: undefined, base_salary: undefined })
@@ -397,11 +452,19 @@ function EmployeesPageInner() {
     }
   }
 
-  async function handlePayrollAction(id: string, action: 'approve' | 'paid') {
+  async function handlePayrollAction(id: string, action: 'approve' | 'paid' | 'reopen') {
     setPayrollAction(id)
-    await fetch(`/api/employees/payroll/${id}/${action}`, { method: 'POST' })
+    const res = await fetch(`/api/employees/payroll/${id}/${action}`, { method: 'POST' })
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      toast.error(j?.error?.message ?? `Failed to ${action} payroll`)
+    } else {
+      if (action === 'paid') toast.success('Payroll marked paid — purchases settled automatically')
+      if (action === 'reopen') toast.success('Payroll reopened — purchase settlements reversed')
+    }
     setPayrollAction(null)
     queryClient.invalidateQueries({ queryKey: ['employees-payroll', activeBranch?.id] })
+    queryClient.invalidateQueries({ queryKey: ['employee-purchases', activeBranch?.id] })
   }
 
   const empColumns: ColumnDef<EmployeeRow>[] = [
@@ -526,6 +589,21 @@ function EmployeesPageInner() {
     { accessorKey: 'gross_pay', header: 'Gross Pay', cell: ({ getValue }) => {
       const v = getValue() as number | null; return v != null ? formatCurrency(v) : '—'
     }},
+    { id: 'deductions', header: 'Deductions', cell: ({ row }) => {
+      const d = row.original.purchase_deductions
+      if (!d || d <= 0) return <span className="text-gray-300">—</span>
+      return (
+        <span className="text-red-600 font-medium" title="Store purchase deductions">
+          -{formatCurrency(d)}
+        </span>
+      )
+    }},
+    { id: 'net_pay', header: 'Net Pay', cell: ({ row }) => {
+      const gross = row.original.gross_pay ?? 0
+      const deductions = row.original.purchase_deductions ?? 0
+      const net = Math.max(0, gross - deductions)
+      return <span className="font-bold text-teal-700">{formatCurrency(net)}</span>
+    }},
     { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => (
       <Badge variant={statusVariant(getValue() as string)}>{getValue() as string}</Badge>
     )},
@@ -538,6 +616,10 @@ function EmployeesPageInner() {
         {row.original.status === 'approved' && (
           <Button size="sm" variant="secondary" loading={payrollAction === row.original.id}
             onClick={() => handlePayrollAction(row.original.id, 'paid')}>Mark Paid</Button>
+        )}
+        {(row.original.status === 'approved' || row.original.status === 'paid') && (
+          <Button size="sm" variant="outline" loading={payrollAction === row.original.id}
+            onClick={() => handlePayrollAction(row.original.id, 'reopen')}>Reopen</Button>
         )}
       </div>
     )},
@@ -584,6 +666,7 @@ function EmployeesPageInner() {
     { value: 'shifts',           label: 'Shifts',          icon: CalendarDays },
     { value: 'payroll',          label: 'Payroll',         icon: DollarSign },
     { value: 'commissions',      label: 'Commissions',     icon: TrendingUp },
+    { value: 'purchases',        label: 'Purchases',       icon: ShoppingBag },
     { value: 'employee-report',  label: 'Employee Report', icon: BarChart2 },
   ] as const
 
@@ -753,6 +836,104 @@ function EmployeesPageInner() {
           <DataTable data={commissions} columns={commColumns} isLoading={loadingCommissions} emptyMessage="No commissions recorded." />
         </Tabs.Content>
 
+        {/* ── Employee Purchases ── */}
+        <Tabs.Content value="purchases" className="">
+          <div className="mb-4 flex flex-wrap items-end gap-3">
+            <div className="w-56">
+              {activeBranch && (
+                <AsyncEmployeeSelect
+                  branchId={activeBranch.id}
+                  value={purchaseEmployeeFilter}
+                  onChange={setPurchaseEmployeeFilter}
+                  label="Employee"
+                  placeholder="All employees"
+                />
+              )}
+            </div>
+            {purchaseEmployeeFilter && (
+              <Button size="sm" variant="outline" onClick={() => setPurchaseEmployeeFilter('')}>Clear</Button>
+            )}
+            <div className="ml-auto rounded-lg bg-red-50 border border-red-100 px-4 py-2 text-sm">
+              <span className="text-gray-600">Total outstanding: </span>
+              <span className="font-bold text-red-700">
+                {formatCurrency(employeePurchases.filter(p => getPurchaseSettlementStatus(p) === 'pending').reduce((s, p) => s + Math.max(0, p.total - (p.amount_paid ?? 0)), 0))}
+              </span>
+            </div>
+          </div>
+
+          <div className="mb-3 rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 text-xs text-blue-700">
+            Outstanding purchases are automatically deducted when a payroll period is marked <strong>Paid</strong>. Use <strong>Settle Directly</strong> only for out-of-payroll cash/card payments.
+          </div>
+
+          {loadingPurchases ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
+          ) : employeePurchases.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-200 py-12 text-center text-sm text-gray-400">
+              No employee purchases found
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100 rounded-xl border border-gray-200 overflow-hidden">
+              {employeePurchases.map(p => {
+                const outstanding = Math.max(0, p.total - (p.amount_paid ?? 0))
+                const settlementStatus = getPurchaseSettlementStatus(p)
+                const method = settleMethod[p.id] ?? 'cash'
+                return (
+                  <div key={p.id} className={`flex items-center gap-4 px-4 py-3 bg-white hover:bg-gray-50/50 ${settlementStatus !== 'pending' ? 'opacity-60' : ''}`}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-gray-900">
+                          {p.employees ? `${p.employees.first_name} ${p.employees.last_name ?? ''}` : '—'}
+                        </span>
+                        {settlementStatus === 'payroll' && (
+                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700 font-medium">Settled via Payroll</span>
+                        )}
+                        {settlementStatus === 'direct' && (
+                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 font-medium">Settled Directly</span>
+                        )}
+                        {settlementStatus === 'pending' && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 font-medium">Pending</span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        {formatDateTime(p.created_at)}
+                        {p.sale_items && p.sale_items.length > 0 && (
+                          <span className="ml-2">{p.sale_items.map(i => `${i.name} ×${i.quantity}`).join(', ')}</span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-gray-900">{formatCurrency(p.total)}</p>
+                      {settlementStatus === 'pending' && <p className="text-xs text-red-600">Owed: {formatCurrency(outstanding)}</p>}
+                    </div>
+                    {settlementStatus === 'pending' && (
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <select
+                          value={method}
+                          onChange={e => setSettleMethod(prev => ({ ...prev, [p.id]: e.target.value as 'cash' | 'card' }))}
+                          className="h-7 rounded border border-gray-200 px-1.5 text-xs text-gray-700 focus:outline-none"
+                        >
+                          <option value="cash">Cash</option>
+                          <option value="card">Card</option>
+                        </select>
+                        <button
+                          onClick={() => settlePurchase(p.id, outstanding, method)}
+                          disabled={settlingPurchase === p.id}
+                          className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                          {settlingPurchase === p.id
+                            ? <Loader2 className="h-3 w-3 animate-spin" />
+                            : <CheckCircle2 className="h-3 w-3" />}
+                          Settle Directly
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </Tabs.Content>
+
         {/* ── Employee Report ── */}
         <Tabs.Content value="employee-report" className="">
           {activeBranch && <EmployeeReportTab branchId={activeBranch.id} />}
@@ -781,10 +962,11 @@ function EmployeesPageInner() {
             error={errors.phone?.message}
           />
           <Input label="Role/Position" placeholder="Technician, Cashier..." {...register('role')} />
-          <Input label="Hourly Rate (£)" type="number" step="0.01" {...register('hourly_rate')} />
-          {isRetailTemplate && (
-            <Input label="Base Salary (£)" type="number" step="0.01" min="0" placeholder="Monthly fixed pay (optional)" {...register('base_salary')} />
-          )}
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="Monthly Base Salary" type="number" step="0.01" min="0" placeholder="0.00" {...register('base_salary')} />
+            <Input label="Hourly Rate" type="number" step="0.01" min="0" placeholder="0.00" {...register('hourly_rate')} />
+          </div>
+          <p className="text-xs text-gray-400 -mt-2">Set one or both. Base salary is pro-rated for partial months.</p>
           <Button type="submit" className="w-full" loading={isSubmitting}>
             {editingEmployee ? 'Save Changes' : 'Add Employee'}
           </Button>

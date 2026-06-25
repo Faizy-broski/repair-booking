@@ -44,6 +44,14 @@ export default function PosPage() {
   const [joinShiftOpen, setJoinShiftOpen] = useState(false)
   const [prevClosingBalance, setPrevClosingBalance] = useState<number | null>(null)
 
+  // Refs to avoid stale closure deps in fetchSession without re-creating it on every store change
+  const activeBranchRef = useRef(activeBranch)
+  const profileRef = useRef(profile)
+  const fetchAbortRef = useRef<AbortController | null>(null)
+  const openingInFlight = useRef(false)
+  useEffect(() => { activeBranchRef.current = activeBranch }, [activeBranch])
+  useEffect(() => { profileRef.current = profile }, [profile])
+
   // ── Opening denomination counting ─────────────────────────────────────────────
   const [openingFloat, setOpeningFloat] = useState('')
   const [openingDenoms, setOpeningDenoms] = useState<Record<string, number>>({})
@@ -66,36 +74,52 @@ export default function PosPage() {
 
   // ── Session fetch ─────────────────────────────────────────────────────────────
 
+  // fetchSession has stable [] deps — reads branch/profile from refs, store via getState().
+  // This prevents the useEffect from firing on every Zustand store update (cart changes, etc.)
+  // and eliminates the spurious "Loading session..." flash the user sees as a "reload".
   const fetchSession = useCallback(async () => {
-    if (!activeBranch) return
-    if (!pos.sessionLoaded) setSessionLoading(true)
-    
-    const [sessionRes, prevRes] = await Promise.all([
-      fetch(`/api/pos/session?branch_id=${activeBranch.id}`),
-      fetch(`/api/reports?branch_id=${activeBranch.id}&type=sessions&from=${new Date(Date.now() - 7 * 86400000).toISOString()}&to=${new Date().toISOString()}`),
-    ])
-    if (sessionRes.ok) {
-      const j = await sessionRes.json()
-      const s = j.data ?? null
-      pos.setExistingSession(s)
-      if (s && profile) {
-        const members: Array<{ profile_id: string }> = s.register_session_members ?? []
-        const isMember = s.cashier_id === profile.id || members.some((m: { profile_id: string }) => m.profile_id === profile.id)
-        pos.setSession(isMember ? s : null)
-        if (!isMember) setJoinShiftOpen(true)
-      } else {
-        pos.setSession(s)
+    const branch = activeBranchRef.current
+    const user = profileRef.current
+    if (!branch) return
+
+    fetchAbortRef.current?.abort()
+    const ctrl = new AbortController()
+    fetchAbortRef.current = ctrl
+
+    const store = usePosStore.getState()
+    if (!store.sessionLoaded) setSessionLoading(true)
+
+    try {
+      const [sessionRes, prevRes] = await Promise.all([
+        fetch(`/api/pos/session?branch_id=${branch.id}`, { signal: ctrl.signal }),
+        fetch(`/api/reports?branch_id=${branch.id}&type=sessions&from=${new Date(Date.now() - 7 * 86400000).toISOString()}&to=${new Date().toISOString()}`, { signal: ctrl.signal }),
+      ])
+      if (sessionRes.ok) {
+        const j = await sessionRes.json()
+        const s = j.data ?? null
+        store.setExistingSession(s)
+        if (s && user) {
+          const members: Array<{ profile_id: string }> = s.register_session_members ?? []
+          const isMember = s.cashier_id === user.id || members.some((m: { profile_id: string }) => m.profile_id === user.id)
+          store.setSession(isMember ? s : null)
+          if (!isMember) setJoinShiftOpen(true)
+        } else {
+          store.setSession(s)
+        }
       }
+      if (prevRes.ok) {
+        const j = await prevRes.json()
+        const sessions = j.data ?? []
+        const lastClosed = sessions.find((s: any) => s.status === 'closed')
+        setPrevClosingBalance(lastClosed?.closing_cash ?? null)
+      }
+      store.setSessionLoaded(true)
+      setSessionLoading(false)
+    } catch (e: any) {
+      if (e?.name === 'AbortError') return
+      setSessionLoading(false)
     }
-    if (prevRes.ok) {
-      const j = await prevRes.json()
-      const sessions = j.data ?? []
-      const lastClosed = sessions.find((s: any) => s.status === 'closed')
-      setPrevClosingBalance(lastClosed?.closing_cash ?? null)
-    }
-    pos.setSessionLoaded(true)
-    setSessionLoading(false)
-  }, [activeBranch, profile, pos])
+  }, [])
 
   useEffect(() => { 
     if (shiftRequired && !pos.sessionLoaded) fetchSession() 
@@ -104,37 +128,42 @@ export default function PosPage() {
   // ── Register handlers ─────────────────────────────────────────────────────────
 
   async function handleOpenRegister() {
-    if (!activeBranch) return
+    if (!activeBranch || openingInFlight.current) return
+    openingInFlight.current = true
     setSessionProcessing(true)
-    const DENOMINATIONS = [
-      { value: 50 }, { value: 20 }, { value: 10 }, { value: 5 },
-      { value: 2 }, { value: 1 }, { value: 0.50 }, { value: 0.20 },
-      { value: 0.10 }, { value: 0.05 }, { value: 0.02 }, { value: 0.01 },
-    ]
-    const total = DENOMINATIONS.reduce((sum, d) => sum + (openingDenoms[String(d.value)] ?? 0) * d.value, 0)
-    const res = await fetch('/api/pos/session/open', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        opening_float: total || parseFloat(openingFloat) || 0,
-        branch_id: activeBranch.id,
-        opening_note: openingNote || undefined,
-        opening_denominations: openingDenoms,
-      }),
-    })
-    if (res.ok) {
-      const j = await res.json()
-      const returned = j.data ?? null
-      if (returned && returned.cashier_id !== profile?.id) {
-        pos.setExistingSession(returned)
-        setJoinShiftOpen(true)
-      } else {
-        await fetchSession()
-        setOpeningFloat('')
-        setOpeningDenoms({})
-        setOpeningNote('')
+    try {
+      const DENOMINATIONS = [
+        { value: 50 }, { value: 20 }, { value: 10 }, { value: 5 },
+        { value: 2 }, { value: 1 }, { value: 0.50 }, { value: 0.20 },
+        { value: 0.10 }, { value: 0.05 }, { value: 0.02 }, { value: 0.01 },
+      ]
+      const total = DENOMINATIONS.reduce((sum, d) => sum + (openingDenoms[String(d.value)] ?? 0) * d.value, 0)
+      const res = await fetch('/api/pos/session/open', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          opening_float: total || parseFloat(openingFloat) || 0,
+          branch_id: activeBranch.id,
+          opening_note: openingNote || undefined,
+          opening_denominations: openingDenoms,
+        }),
+      })
+      if (res.ok) {
+        const j = await res.json()
+        const returned = j.data ?? null
+        if (returned && returned.cashier_id !== profile?.id) {
+          pos.setExistingSession(returned)
+          setJoinShiftOpen(true)
+        } else {
+          await fetchSession()
+          setOpeningFloat('')
+          setOpeningDenoms({})
+          setOpeningNote('')
+        }
       }
+    } finally {
+      openingInFlight.current = false
+      setSessionProcessing(false)
     }
-    setSessionProcessing(false)
   }
 
   async function handleJoinShift() {
@@ -183,7 +212,7 @@ export default function PosPage() {
     setSessionProcessing(false)
   }
 
-  async function handleCashMovement(expenseCategoryId: string | null) {
+  async function handleCashMovement(expenseCategoryId: string | null, addToExpense: boolean) {
     if (!pos.session || !cashMovementAmount) return
     setCashMovementSaving(true)
     const amount = parseFloat(cashMovementAmount)
@@ -200,8 +229,7 @@ export default function PosPage() {
     })
 
     if (res.ok) {
-      // Cash out is always recorded as an expense
-      if (cashMovementType === 'cash_out' && activeBranch?.id) {
+      if (cashMovementType === 'cash_out' && addToExpense && activeBranch?.id) {
         await fetch('/api/expenses', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -214,6 +242,8 @@ export default function PosPage() {
           }),
         })
         toast.success(`Cash out of ${formatCurrency(amount)} recorded as expense`)
+      } else if (cashMovementType === 'cash_out') {
+        toast.success(`Cash out of ${formatCurrency(amount)} recorded`)
       } else {
         toast.success(`Cash in of ${formatCurrency(amount)} recorded`)
       }

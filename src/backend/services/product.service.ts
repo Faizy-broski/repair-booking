@@ -10,11 +10,11 @@ export const ProductService = {
     branchId?: string; includeInactive?: boolean; includeDrafts?: boolean
     brandId?: string; supplierId?: string; valuation?: string
     hideOutOfStock?: boolean; itemType?: string; modelId?: string; partType?: string
-    barcode?: string  // exact match on barcode or sku — used by scanner (not ilike)
+    barcode?: string; lowStockOnly?: boolean // exact match on barcode or sku — used by scanner (not ilike)
   }) {
     const { page = 1, limit = 20, search, categoryId, branchId, includeInactive, includeDrafts,
             brandId, supplierId, valuation, hideOutOfStock, itemType, modelId, partType,
-            barcode } = params
+            barcode, lowStockOnly } = params
 
     const inventorySelect = branchId
       ? `*, categories(name), brands(name), inventory!left(quantity, low_stock_alert, branch_id, variant_id), product_variants(id), suppliers(name), service_devices(name), branch_products!inner(is_enabled)`
@@ -62,12 +62,25 @@ export const ProductService = {
       }
       const branchInv = (p.inventory as Array<{ branch_id: string; quantity: number; low_stock_alert: number | null; variant_id: string | null }>)
         .find((i) => i.branch_id === branchId && i.variant_id === null)
+      
+      const hasLowStockVariant = p.has_variants 
+        ? (p.inventory as Array<any>).some(i => i.branch_id === branchId && i.variant_id !== null && i.quantity <= (i.low_stock_alert ?? 5))
+        : false;
+
       const on_hand = branchInv?.quantity ?? 0
-      return { ...p, on_hand, low_stock_alert: branchInv?.low_stock_alert ?? null, inventory: undefined, branch_products: undefined, variant_count: variantCount, product_variants: undefined }
+      return { ...p, on_hand, low_stock_alert: branchInv?.low_stock_alert ?? null, has_low_stock_variant: hasLowStockVariant, inventory: undefined, branch_products: undefined, variant_count: variantCount, product_variants: undefined }
     })
 
     if (hideOutOfStock) {
-      enriched = enriched.filter((p: any) => p.is_service || (p.on_hand ?? 0) > 0)
+      enriched = enriched.filter((p: any) => p.is_service || (p.on_hand ?? 0) > 0 || p.has_variants)
+    }
+
+    if (lowStockOnly) {
+      enriched = enriched.filter((p: any) => {
+        if (p.is_service) return false;
+        if (p.has_variants) return p.has_low_stock_variant;
+        return (p.on_hand ?? 0) <= (p.low_stock_alert ?? 5);
+      })
     }
 
     return { data: enriched, count }
@@ -301,11 +314,11 @@ export const ProductService = {
             .eq('branch_id', branchId)
             .is('variant_id', null)
         : Promise.resolve({ data: null }),
-      // Variant rows — use each variant's own selling_price/cost_price, not the parent's
+      // Variant rows — prefer variant's own price, fall back to parent product price
       branchId
         ? adminSupabase
             .from('inventory')
-            .select('quantity, low_stock_alert, product_variants!inner(selling_price, cost_price, products!inner(is_service, is_active))')
+            .select('quantity, low_stock_alert, product_variants!inner(selling_price, cost_price, products!inner(is_service, is_active, selling_price, cost_price))')
             .eq('branch_id', branchId)
             .not('variant_id', 'is', null)
         : Promise.resolve({ data: null }),
@@ -332,13 +345,15 @@ export const ProductService = {
     }
 
     if (branchId && variantInvResult.data) {
-      // Variant rows — each variant has its own price (e.g. black=£40, blue=£50, white=£80)
       ;(variantInvResult.data as any[]).forEach((row: any) => {
         const v = row.product_variants
         const p = v?.products
         if (!p?.is_active || p?.is_service) return
-        stockRetailValue += (v.selling_price ?? 0) * row.quantity
-        stockCostValue   += (v.cost_price   ?? 0) * row.quantity
+        // Prefer the variant's own price; fall back to the parent product's price
+        const sellPrice = v.selling_price ?? p.selling_price ?? 0
+        const costPrice = v.cost_price   ?? p.cost_price   ?? 0
+        stockRetailValue += sellPrice * row.quantity
+        stockCostValue   += costPrice  * row.quantity
         const threshold = row.low_stock_alert ?? 5
         if (row.quantity <= threshold) lowStockCount++
       })

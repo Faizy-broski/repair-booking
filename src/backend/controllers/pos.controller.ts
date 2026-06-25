@@ -30,6 +30,31 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
       : Promise.resolve(null),
   ])
 
+  // For exchange sales, fetch the returned items from the associated refund record
+  let exchangeReturnedItems: { name: string; quantity: number; unit_price: number; discount: number; total: number }[] = []
+  let exchangeReturnedTotal = 0
+  if (s.is_exchange && s.exchange_original_id) {
+    const { data: refundRecord } = await adminSupabase
+      .from('sales')
+      .select('total, sale_items(name, quantity, unit_price, total)')
+      .eq('original_sale_id', s.exchange_original_id)
+      .eq('is_refund', true)
+      .eq('refund_reason', 'Product exchange')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (refundRecord) {
+      exchangeReturnedItems = ((refundRecord as any).sale_items ?? []).map((i: any) => ({
+        name: i.name,
+        quantity: Math.abs(i.quantity),
+        unit_price: Number(i.unit_price),
+        discount: 0,
+        total: Math.abs(Number(i.total)),
+      }))
+      exchangeReturnedTotal = Math.abs(Number((refundRecord as any).total))
+    }
+  }
+
   const doc = React.createElement(SaleReceiptPdf, {
     saleId: s.id,
     date: new Date(s.created_at).toLocaleString('en-GB'),
@@ -48,17 +73,24 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
     discount: Number(s.discount ?? 0),
     tax: Number(s.tax ?? 0),
     total: Number(s.total ?? 0),
+    amountPaid: Number(s.amount_paid ?? 0),
     isRefund: s.is_refund ?? false,
+    isExchange: s.is_exchange ?? false,
+    exchangeReturnedItems,
+    exchangeReturnedTotal,
     refundReason: s.refund_reason ?? null,
     paymentSplits: s.payment_splits ?? null,
-    notes: s.notes ?? null,
+    notes: s.notes
+      ? s.notes.replace(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi,
+          (uuid: string) => `#${uuid.slice(-8).toUpperCase()}`)
+      : null,
     branchName: s.branch_name ?? null,
     branchAddress: s.branch_address ?? null,
     branchPhone: s.branch_phone ?? null,
     branchEmail: s.branch_email ?? null,
     logoUrl: s.branch_logo_url ?? null,
     currency: businessRow?.currency ?? undefined,
-    settings,
+    settings: settings ?? undefined,
   })
 
   return { buffer: await renderToBuffer(doc as any), createdAt: s.created_at }
@@ -88,11 +120,13 @@ const createSaleSchema = z.object({
   discount: z.number().min(0).default(0),
   tax: z.number().min(0).default(0),
   total: z.number().min(0),
-  payment_method: z.enum(['cash', 'card', 'gift_card', 'split']),
+  payment_method: z.enum(['cash', 'card', 'gift_card', 'split', 'on_account']),
+  amount_paid: z.number().min(0).default(0),
   payment_splits: z.array(paymentSplitSchema).optional(),
   gift_card_id: z.string().uuid().optional().nullable(),
   gift_card_amount: z.number().min(0).optional(),
   notes: z.string().optional().nullable(),
+  employee_id: z.string().uuid().optional().nullable(),
   served_by_employee_id: z.string().uuid().optional().nullable(),
   // Cashier-entered commission for the served_by employee on this specific
   // sale (retail-store flow). Takes priority over any business-wide
@@ -124,6 +158,7 @@ export const PosController = {
   async listSales(request: NextRequest, ctx: RequestContext) {
     const { searchParams } = request.nextUrl
     const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
+    if (!branchId) return badRequest('branch_id required')
     const { page, limit } = getPagination(searchParams)
     try {
       const { data, count } = await PosService.getSales(branchId, {
@@ -133,10 +168,29 @@ export const PosController = {
         to: searchParams.get('to') ?? undefined,
         status: searchParams.get('status') ?? undefined,
         search: searchParams.get('search') ?? undefined,
+        paymentMethod: searchParams.get('payment_method') ?? undefined,
+        outstandingOnly: searchParams.get('outstanding_only') === 'true',
+        employeeId: searchParams.get('employee_id') ?? undefined,
+        employeePurchasesOnly: searchParams.get('employee_purchases') === 'true',
       })
       return ok(data, { page, limit, total: count ?? 0 })
     } catch (err) {
       return serverError('Failed to fetch sales', err)
+    }
+  },
+
+  async recordCreditPayment(request: NextRequest, _ctx: RequestContext, saleId: string) {
+    const schema = z.object({
+      amount: z.number().positive(),
+      payment_method: z.enum(['cash', 'card']),
+    })
+    const { data, error } = await validateBody(request, schema)
+    if (error) return error
+    try {
+      await PosService.recordCreditPayment(saleId, data.amount, data.payment_method)
+      return ok({})
+    } catch (err: any) {
+      return badRequest(err?.message ?? 'Failed to record payment')
     }
   },
 
@@ -174,7 +228,7 @@ export const PosController = {
       if (!result) return notFound()
 
       const filename = `receipt-${id.slice(-8)}.pdf`
-      return new NextResponse(result.buffer, {
+      return new NextResponse(result.buffer as unknown as BodyInit, {
         status: 200,
         headers: {
           'Content-Type': 'application/pdf',
@@ -223,6 +277,37 @@ export const PosController = {
       if (err?.message?.includes('not found')) return notFound('Sale not found')
       if (err?.message?.includes('Cannot delete a refund')) return badRequest(err.message)
       return serverError('Failed to delete sale', err)
+    }
+  },
+
+  async processExchange(request: NextRequest, ctx: RequestContext) {
+    const exchangeItemSchema = z.object({
+      product_id: z.string().uuid().optional().nullable(),
+      variant_id: z.string().uuid().optional().nullable(),
+      name: z.string().min(1),
+      quantity: z.number().int().positive(),
+      unit_price: z.number().min(0),
+      total: z.number().min(0),
+      is_service: z.boolean().default(false),
+    })
+    const schema = z.object({
+      original_sale_id: z.string().uuid(),
+      branch_id: z.string().uuid(),
+      cashier_id: z.string().uuid(),
+      customer_id: z.string().uuid().optional().nullable(),
+      returned_items: z.array(exchangeItemSchema).min(1),
+      new_items: z.array(exchangeItemSchema).min(1),
+      payment_method: z.enum(['cash', 'card', 'on_account']),
+      amount_paid: z.number().min(0).default(0),
+    })
+    const { data, error } = await validateBody(request, schema)
+    if (error) return error
+    try {
+      const result = await PosService.processExchange(data)
+      return created(result)
+    } catch (err: any) {
+      if (err?.code === 'P0001' && err?.message) return badRequest(err.message, 'EXCHANGE_ERROR')
+      return serverError('Failed to process exchange', err)
     }
   },
 
