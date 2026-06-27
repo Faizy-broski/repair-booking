@@ -6,7 +6,7 @@ import { Printer, FileText, Loader2 } from 'lucide-react'
 import { pdf } from '@react-pdf/renderer'
 import { InvoicePdf } from '@/components/pdf/invoice-pdf'
 import { RepairReceiptHtml } from '@/components/repairs/repair-receipt-html'
-import { printReceipt, previewReceiptHtml } from '@/components/repairs/receipt-print'
+import { printReceipt } from '@/components/repairs/receipt-print'
 import { DEFAULT_INVOICE_SETTINGS, type InvoiceSettings } from '@/types/invoice-settings'
 import { useAuthStore } from '@/store/auth.store'
 
@@ -134,44 +134,46 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
     if (!receiptData) return
 
     const paperSize = receiptData.mergedSettings.paper_size ?? 'A4'
-    const isReceipt = paperSize === 'Receipt80' || paperSize === 'Receipt58'
-    const pw        = paperSize === 'Receipt58' ? '58mm' : '80mm'
-
-    let pageRule: string
+    const isReceipt = paperSize === 'Receipt80' || paperSize === 'Receipt58' || paperSize === 'Custom'
 
     if (isReceipt) {
-      // ── Thermal receipt: measure actual content height ──────────────────────
-      // Temporarily render the hidden receipt div off-screen to get its real
-      // scrollHeight. This gives us the exact page height so:
-      //  (a) the print preview looks correct (not blank from 3276mm page)
-      //  (b) the EPSON driver gets a single small page it can print+cut cleanly
-      const el = document.getElementById('receipt-print-el')
-      let contentHeight = '130mm' // safe fallback (~typical receipt)
-      if (el) {
-        const saved = el.style.cssText
-        el.style.cssText = 'display:block;visibility:hidden;position:absolute;top:-9999px;left:0;width:' + pw
-        const h = el.scrollHeight
-        el.style.cssText = saved
-        if (h > 50) {
-          // Add 10px breathing room so the last line is never clipped
-          contentHeight = `${h + 10}px`
-        }
-        console.log('[RECEIPT] measured height:', h, 'px → @page', pw, contentHeight)
-      }
-      pageRule = `@page { size: ${pw} ${contentHeight}; margin: 0; }`
-    } else {
-      // ── Standard paper: A4 / A5 / Letter ───────────────────────────────────
-      const sizeKeyword = paperSize === 'A5' ? 'A5' : paperSize === 'Letter' ? 'letter' : 'A4'
-      pageRule = `@page { size: ${sizeKeyword}; margin: 10mm; }`
+      // ── Popup approach for all receipt/thermal/custom sizes ────────────────
+      // Avoids three bugs in the window.print() approach:
+      //  1) @page inside @media print is silently ignored by browsers
+      //  2) scrollHeight measurement is unreliable inside a hidden Modal parent
+      //  3) window.print() captures the whole page including the modal backdrop
+      // printReceipt() opens a clean isolated HTML popup, measures height there,
+      // and injects @page at the top level — production-proven for EPSON TM-T88V.
+      printReceipt({
+        settings:      receiptData.mergedSettings,
+        invoiceNumber: repair.job_number,
+        status:        repair.status,
+        issuedAt:      repair.created_at,
+        businessName:  branch?.name ?? 'Business',
+        branchName:    branch?.name,
+        branchAddress: branch?.address,
+        branchPhone:   branch?.phone,
+        customerName:  receiptData.customerName,
+        items:         receiptData.items,
+        subtotal:      receiptData.invoiceTotal,
+        total:         receiptData.invoiceTotal,
+        amountPaid:    receiptData.amountPaid,
+        currency,
+      })
+      return
     }
 
-    console.log('[RECEIPT] injecting:', pageRule)
+    // ── Standard paper: A4 / A5 / Letter — use window.print() ────────────────
+    // FIX: @page must be a top-level rule, never nested inside @media print.
+    // Browsers silently ignore @page when nested, leaving the page size unchanged.
+    const sizeKeyword = paperSize === 'A5' ? 'A5' : paperSize === 'Letter' ? 'letter' : 'A4'
+    const pageRule    = `@page { size: ${sizeKeyword}; margin: 10mm; }`
 
     const styleId = 'receipt-page-size-style'
     document.getElementById(styleId)?.remove()
     const style = document.createElement('style')
     style.id = styleId
-    style.textContent = `@media print { ${pageRule} }`
+    style.textContent = pageRule
     document.head.appendChild(style)
 
     window.print()
@@ -238,26 +240,6 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
             <Button variant="outline" onClick={() => window.open(pdfUrl)}>
               <FileText className="h-4 w-4 mr-2" />
               Open PDF
-            </Button>
-          )}
-          {receiptData && (
-            <Button variant="outline" onClick={() => previewReceiptHtml({
-              settings: receiptData.mergedSettings,
-              invoiceNumber: repair.job_number,
-              status: repair.status,
-              issuedAt: repair.created_at,
-              businessName: branch?.name ?? 'Business',
-              branchName: branch?.name,
-              branchAddress: branch?.address,
-              branchPhone: branch?.phone,
-              customerName: receiptData.customerName,
-              items: receiptData.items,
-              subtotal: receiptData.invoiceTotal,
-              total: receiptData.invoiceTotal,
-              amountPaid: receiptData.amountPaid,
-              currency,
-            })}>
-              Debug HTML
             </Button>
           )}
           {receiptData && (

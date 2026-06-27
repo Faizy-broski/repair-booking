@@ -13,7 +13,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { formatCurrency, formatDateTime, formatDate, formatStatus } from '@/lib/utils'
+import { formatCurrency, getCurrencySymbol, formatDateTime, formatDate, formatStatus } from '@/lib/utils'
 import { Select } from '@/components/ui/select'
 import type { ColumnDef, VisibilityState } from '@tanstack/react-table'
 import type { Repair } from '@/types/database'
@@ -308,7 +308,8 @@ function exportPDF(repairs: RepairRow[]) {
 }
 
 export default function RepairsPage() {
-  const { activeBranch } = useAuthStore()
+  const { activeBranch, verticalTemplateSlug } = useAuthStore()
+  const isRetail = verticalTemplateSlug === 'retail-store'
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -363,6 +364,13 @@ export default function RepairsPage() {
   const [quickPartCost, setQuickPartCost] = useState('')
   const [deviceError, setDeviceError] = useState('')
 
+  // Retail-mode state
+  const [retailCategories, setRetailCategories] = useState<{ id: string; name: string }[]>([])
+  const [retailBrands, setRetailBrands] = useState<{ id: string; name: string }[]>([])
+  const [retailCategoryId, setRetailCategoryId] = useState('')
+  const [categoryAttrs, setCategoryAttrs] = useState<{ name: string; values: string[] }[]>([])
+  const [itemAttributes, setItemAttributes] = useState<Record<string, string>>({})
+
   const [emailPrompt, setEmailPrompt] = useState<{ repairId: string; jobNumber: string; currentStatus: string } | null>(null)
   const [slipRepair, setSlipRepair] = useState<RepairRow | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, jobNumber: string } | null>(null)
@@ -402,6 +410,25 @@ export default function RepairsPage() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  // Fetch categories + brands for retail mode
+  useEffect(() => {
+    if (!isRetail) return
+    fetch('/api/categories').then(r => r.json()).then(j => setRetailCategories(j.data ?? []))
+    fetch('/api/brands').then(r => r.json()).then(j => setRetailBrands(j.data ?? []))
+  }, [isRetail])
+
+  // Fetch category attributes when category changes (retail)
+  useEffect(() => {
+    if (!isRetail || !retailCategoryId) { setCategoryAttrs([]); return }
+    fetch(`/api/categories/${retailCategoryId}/attributes`)
+      .then(r => r.json())
+      .then(j => {
+        const attrs = (j.data ?? []) as { name: string; product_attribute_values?: { value: string }[] }[]
+        setCategoryAttrs(attrs.map(a => ({ name: a.name, values: (a.product_attribute_values ?? []).map(v => v.value) })))
+        setItemAttributes({})
+      })
+  }, [isRetail, retailCategoryId])
 
   const queryClient = useQueryClient()
   const repairsQueryKey     = ['repairs', activeBranch?.id, page, pageSize, search, statusFilter, view] as const
@@ -673,6 +700,9 @@ export default function RepairsPage() {
     setShowPartDrop(false)
     setQuickPartPrice('')
     setQuickPartCost('')
+    setRetailCategoryId('')
+    setCategoryAttrs([])
+    setItemAttributes({})
     setModalOpen(true)
     // Pre-fetch recent customers so the dropdown is instant on focus
     if (recentCustCache.current.length === 0) {
@@ -758,7 +788,7 @@ export default function RepairsPage() {
     setPartSearchLoading(true)
     partSearchRef.current = setTimeout(async () => {
       try {
-        const params = new URLSearchParams({ item_type: 'part', branch_id: activeBranch!.id, search: q, limit: '8' })
+        const params = new URLSearchParams({ branch_id: activeBranch!.id, search: q, limit: '8' })
         const res = await fetch(`/api/products?${params}`)
         const json = await res.json()
         setPartResults(json.data ?? [])
@@ -824,8 +854,13 @@ export default function RepairsPage() {
 
   async function createRepair() {
     if (!activeBranch) return
-    // Device selection required
-    if (!jobData.device_type || !jobData.device_brand || !jobData.device_model) {
+    // Device / item selection required
+    if (isRetail) {
+      if (!jobData.device_type) {
+        setDeviceError('Category is required.')
+        return
+      }
+    } else if (!jobData.device_type || !jobData.device_brand || !jobData.device_model) {
       setDeviceError('Device Type, Brand and Model are all required.')
       return
     }
@@ -895,6 +930,7 @@ export default function RepairsPage() {
           customer_note: jobData.customer_note || null,
           staff_note: jobData.staff_note || null,
           price_pending: jobData.price_pending || undefined,
+          ...(isRetail && Object.keys(itemAttributes).length > 0 ? { item_attributes: itemAttributes } : {}),
         },
         parts: repairParts.map((p) => ({
           product_id: p.product_id,
@@ -1802,77 +1838,156 @@ export default function RepairsPage() {
           return (
             <div className="space-y-2.5">
 
-              {/* Row A: Device Type | Brand | Model | IMEI */}
+              {/* Row A: Device / Item identification */}
               <div>
                 <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
-                  <Smartphone className="h-2.5 w-2.5" /> Device
+                  <Smartphone className="h-2.5 w-2.5" /> {isRetail ? 'Item' : 'Device'}
                 </p>
-                <div className="grid grid-cols-4 gap-2">
-                  {/* TYPE */}
-                  <div>
-                    <label className={lbl}>Type <span className="text-red-400">*</span></label>
-                    <CreatableCombobox
-                      options={deviceData.types.map(t => ({ value: t, label: t }))}
-                      value={jobData.device_type}
-                      onChange={(v) => setJobData((p) => ({ ...p, device_type: v, device_brand: '', device_model: '' }))}
-                      onCreate={createDeviceType}
-                      placeholder="Phone…"
-                      createLabel="Add type"
-                    />
-                  </div>
 
-                  {/* BRAND — locked until type chosen */}
-                  <div>
-                    <label className={`${lbl} flex items-center gap-1`}>
-                      Brand <span className="text-red-400">*</span>
-                      {!jobData.device_type && <Lock className="h-2.5 w-2.5 text-gray-300" />}
-                    </label>
-                    {jobData.device_type ? (
-                      <CreatableCombobox
-                        options={filteredBrands.map(b => ({ value: b, label: b }))}
-                        value={jobData.device_brand}
-                        onChange={(v) => setJobData((p) => ({ ...p, device_brand: v, device_model: '' }))}
-                        onCreate={createDeviceBrand}
-                        placeholder="Apple…"
-                        createLabel="Add brand"
-                      />
-                    ) : (
-                      <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
-                        <Lock className="h-3.5 w-3.5 shrink-0" />
-                        Select type first
+                {isRetail ? (
+                  /* ── Retail: Category → Brand → Item description + optional ref ── */
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* CATEGORY */}
+                      <div>
+                        <label className={lbl}>Category <span className="text-red-400">*</span></label>
+                        <CreatableCombobox
+                          options={retailCategories.map(c => ({ value: c.id, label: c.name }))}
+                          value={retailCategoryId}
+                          onChange={(id, label) => {
+                            setRetailCategoryId(id)
+                            setJobData((p) => ({ ...p, device_type: label ?? id, device_brand: '', device_model: '' }))
+                          }}
+                          placeholder="e.g. Clothing…"
+                          createLabel=""
+                        />
+                      </div>
+                      {/* BRAND */}
+                      <div>
+                        <label className={lbl}>Brand</label>
+                        <CreatableCombobox
+                          options={retailBrands.map(b => ({ value: b.name, label: b.name }))}
+                          value={jobData.device_brand}
+                          onChange={(v) => setJobData((p) => ({ ...p, device_brand: v }))}
+                          placeholder="e.g. Nike…"
+                          createLabel=""
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* ITEM DESCRIPTION */}
+                      <div>
+                        <label className={lbl}>Item Description</label>
+                        <input value={jobData.device_model} onChange={(e) => setJobData((p) => ({ ...p, device_model: e.target.value }))} placeholder="e.g. Red Jacket…" className={inp} />
+                      </div>
+                      {/* REF / SERIAL */}
+                      <div>
+                        <label className={lbl}>Serial / Ref. No.</label>
+                        <input value={jobData.imei} onChange={(e) => setJobData((p) => ({ ...p, imei: e.target.value }))} placeholder="Optional reference…" className={inp} />
+                      </div>
+                    </div>
+
+                    {/* Dynamic category attributes */}
+                    {categoryAttrs.length > 0 && (
+                      <div>
+                        <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">Item Details</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {categoryAttrs.map(attr => (
+                            <div key={attr.name}>
+                              <label className={lbl}>{attr.name}</label>
+                              {attr.values.length > 0 ? (
+                                <select
+                                  value={itemAttributes[attr.name] ?? ''}
+                                  onChange={(e) => setItemAttributes(prev => ({ ...prev, [attr.name]: e.target.value }))}
+                                  className={sel}
+                                >
+                                  <option value="">— Select —</option>
+                                  {attr.values.map(v => <option key={v} value={v}>{v}</option>)}
+                                </select>
+                              ) : (
+                                <input
+                                  value={itemAttributes[attr.name] ?? ''}
+                                  onChange={(e) => setItemAttributes(prev => ({ ...prev, [attr.name]: e.target.value }))}
+                                  placeholder={`Enter ${attr.name}…`}
+                                  className={inp}
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
-
-                  {/* MODEL — locked until brand chosen */}
-                  <div>
-                    <label className={`${lbl} flex items-center gap-1`}>
-                      Model <span className="text-red-400">*</span>
-                      {!jobData.device_brand && <Lock className="h-2.5 w-2.5 text-gray-300" />}
-                    </label>
-                    {jobData.device_brand ? (
+                ) : (
+                  /* ── Repair shop: Type → Brand → Model → IMEI ── */
+                  <div className="grid grid-cols-4 gap-2">
+                    {/* TYPE */}
+                    <div>
+                      <label className={lbl}>Type <span className="text-red-400">*</span></label>
                       <CreatableCombobox
-                        options={filteredModels.map(m => ({ value: m, label: m }))}
-                        value={jobData.device_model}
-                        onChange={(v) => setJobData((p) => ({ ...p, device_model: v }))}
-                        onCreate={createDeviceModel}
-                        placeholder="iPhone 15…"
-                        createLabel="Add model"
+                        options={deviceData.types.map(t => ({ value: t, label: t }))}
+                        value={jobData.device_type}
+                        onChange={(v) => setJobData((p) => ({ ...p, device_type: v, device_brand: '', device_model: '' }))}
+                        onCreate={createDeviceType}
+                        placeholder="Phone…"
+                        createLabel="Add type"
                       />
-                    ) : (
-                      <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
-                        <Lock className="h-3.5 w-3.5 shrink-0" />
-                        Select brand first
-                      </div>
-                    )}
-                  </div>
+                    </div>
 
-                  {/* IMEI */}
-                  <div>
-                    <label className={lbl}>IMEI / Serial</label>
-                    <input value={jobData.imei} onChange={(e) => setJobData((p) => ({ ...p, imei: e.target.value }))} placeholder="Enter IMEI…" className={inp} />
+                    {/* BRAND — locked until type chosen */}
+                    <div>
+                      <label className={`${lbl} flex items-center gap-1`}>
+                        Brand <span className="text-red-400">*</span>
+                        {!jobData.device_type && <Lock className="h-2.5 w-2.5 text-gray-300" />}
+                      </label>
+                      {jobData.device_type ? (
+                        <CreatableCombobox
+                          options={filteredBrands.map(b => ({ value: b, label: b }))}
+                          value={jobData.device_brand}
+                          onChange={(v) => setJobData((p) => ({ ...p, device_brand: v, device_model: '' }))}
+                          onCreate={createDeviceBrand}
+                          placeholder="Apple…"
+                          createLabel="Add brand"
+                        />
+                      ) : (
+                        <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                          <Lock className="h-3.5 w-3.5 shrink-0" />
+                          Select type first
+                        </div>
+                      )}
+                    </div>
+
+                    {/* MODEL — locked until brand chosen */}
+                    <div>
+                      <label className={`${lbl} flex items-center gap-1`}>
+                        Model <span className="text-red-400">*</span>
+                        {!jobData.device_brand && <Lock className="h-2.5 w-2.5 text-gray-300" />}
+                      </label>
+                      {jobData.device_brand ? (
+                        <CreatableCombobox
+                          options={filteredModels.map(m => ({ value: m, label: m }))}
+                          value={jobData.device_model}
+                          onChange={(v) => setJobData((p) => ({ ...p, device_model: v }))}
+                          onCreate={createDeviceModel}
+                          placeholder="iPhone 15…"
+                          createLabel="Add model"
+                        />
+                      ) : (
+                        <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                          <Lock className="h-3.5 w-3.5 shrink-0" />
+                          Select brand first
+                        </div>
+                      )}
+                    </div>
+
+                    {/* IMEI */}
+                    <div>
+                      <label className={lbl}>IMEI / Serial</label>
+                      <input value={jobData.imei} onChange={(e) => setJobData((p) => ({ ...p, imei: e.target.value }))} placeholder="Enter IMEI…" className={inp} />
+                    </div>
                   </div>
-                </div>
+                )}
+
                 {deviceError && (
                   <p className="mt-1.5 text-xs text-red-500 bg-red-50 border border-red-200 rounded-md px-3 py-1.5">{deviceError}</p>
                 )}
@@ -1883,10 +1998,10 @@ export default function RepairsPage() {
               {/* REPAIR PARTS */}
               <div>
                 <p className="mb-1.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
-                  <Wrench className="h-2.5 w-2.5" /> Repair Parts
+                  <Wrench className="h-2.5 w-2.5" /> {isRetail ? 'Parts & Labour' : 'Repair Parts'}
                 </p>
 
-                {(!jobData.device_type || !jobData.device_brand || !jobData.device_model) && (
+                {!isRetail && (!jobData.device_type || !jobData.device_brand || !jobData.device_model) && (
                   <p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-600">
                     Select Device Type, Brand and Model above to add repair parts.
                   </p>
@@ -1922,7 +2037,7 @@ export default function RepairsPage() {
                               onMouseDown={(e) => { e.preventDefault(); addPartFromInventory(p) }}
                             >
                               <span className="text-gray-700">{p.name}</span>
-                              <span className="text-xs font-semibold text-teal-700">£{(p.selling_price ?? 0).toFixed(2)}</span>
+                              <span className="text-xs font-semibold text-teal-700">{formatCurrency(p.selling_price ?? 0)}</span>
                             </button>
                           </li>
                         ))}
@@ -1932,7 +2047,7 @@ export default function RepairsPage() {
                               <span className="text-xs italic text-gray-500">Add &quot;{partQuery.trim()}&quot;</span>
                               <div className="flex items-center gap-2">
                                 <div className="flex flex-1 flex-col gap-0.5">
-                                  <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Cost £</span>
+                                  <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Cost {getCurrencySymbol()}</span>
                                   <input
                                     type="number"
                                     step="0.01"
@@ -1945,7 +2060,7 @@ export default function RepairsPage() {
                                   />
                                 </div>
                                 <div className="flex flex-1 flex-col gap-0.5">
-                                  <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Price £</span>
+                                  <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Price {getCurrencySymbol()}</span>
                                   <input
                                     type="number"
                                     step="0.01"
@@ -1986,8 +2101,8 @@ export default function RepairsPage() {
                         <tr className="bg-gray-50 font-semibold text-gray-500">
                           <th className="px-3 py-1.5 text-left">Part</th>
                           <th className="w-16 px-2 py-1.5 text-center">Qty</th>
-                          <th className="w-20 px-2 py-1.5 text-right text-gray-400">Cost £</th>
-                          <th className="w-20 px-2 py-1.5 text-right">Price £</th>
+                          <th className="w-20 px-2 py-1.5 text-right text-gray-400">Cost {getCurrencySymbol()}</th>
+                          <th className="w-20 px-2 py-1.5 text-right">Price {getCurrencySymbol()}</th>
                           <th className="w-20 px-2 py-1.5 text-right">Total</th>
                           <th className="w-8" />
                         </tr>
@@ -2025,7 +2140,7 @@ export default function RepairsPage() {
                                 className="h-6 w-16 rounded border border-gray-200 px-1 text-right text-xs"
                               />
                             </td>
-                            <td className="px-2 py-1.5 text-right font-semibold text-gray-700">£{(p.unit_price * p.qty).toFixed(2)}</td>
+                            <td className="px-2 py-1.5 text-right font-semibold text-gray-700">{formatCurrency(p.unit_price * p.qty)}</td>
                             <td className="px-1 py-1.5 text-center">
                               <button
                                 type="button"
@@ -2042,7 +2157,7 @@ export default function RepairsPage() {
                         <tr className="border-t border-gray-200 bg-gray-50">
                           <td colSpan={4} className="px-3 py-1.5 text-right text-xs font-bold text-gray-600">Parts Total:</td>
                           <td className="px-2 py-1.5 text-right text-xs font-bold text-gray-900">
-                            £{repairParts.reduce((s, p) => s + p.unit_price * p.qty, 0).toFixed(2)}
+                            {formatCurrency(repairParts.reduce((s, p) => s + p.unit_price * p.qty, 0))}
                           </td>
                           <td />
                         </tr>
@@ -2214,10 +2329,10 @@ export default function RepairsPage() {
                 </div>
               </div>
 
-              <div className="h-px bg-gray-100" />
+              {!isRetail && <div className="h-px bg-gray-100" />}
 
-              {/* Row D: Lock / Passcode / Pattern */}
-              <div>
+              {/* Row D: Lock / Passcode / Pattern — repair shops only */}
+              {!isRetail && <div>
                 <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
                   <Lock className="h-2.5 w-2.5" /> Device Lock
                 </p>
@@ -2264,7 +2379,7 @@ export default function RepairsPage() {
                     )}
                   </div>
                 )}
-              </div>
+              </div>}
 
               <div className="h-px bg-gray-100" />
 
@@ -2292,7 +2407,7 @@ export default function RepairsPage() {
                 </button>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => setModalOpen(false)}>Cancel</Button>
-                  <Button onClick={createRepair} loading={submitting} disabled={!jobData.device_type || !jobData.device_brand || !jobData.device_model || jobData.faults.length === 0 || (!jobData.price_pending && (!jobData.estimated_cost.trim() || isNaN(parseFloat(jobData.estimated_cost)) || parseFloat(jobData.estimated_cost) < 0))}>
+                  <Button onClick={createRepair} loading={submitting} disabled={!jobData.device_type || (!isRetail && (!jobData.device_brand || !jobData.device_model)) || jobData.faults.length === 0 || (!jobData.price_pending && (!jobData.estimated_cost.trim() || isNaN(parseFloat(jobData.estimated_cost)) || parseFloat(jobData.estimated_cost) < 0))}>
                     Create Job
                   </Button>
                 </div>

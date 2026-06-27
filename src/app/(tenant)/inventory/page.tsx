@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { Plus, Search, AlertTriangle, Upload, Download, CheckCircle2, Package, Boxes, TrendingDown, ShoppingCart, Edit2, Trash2, Layers, X, ExternalLink, Filter, ChevronDown, RefreshCw, Barcode, MoreVertical, Copy } from 'lucide-react'
+import { Plus, Search, AlertTriangle, Upload, Download, CheckCircle2, Package, Boxes, TrendingDown, ShoppingCart, Edit2, Trash2, Layers, X, ExternalLink, Filter, ChevronDown, RefreshCw, Barcode, MoreVertical, Copy, ShoppingBag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/ui/modal'
@@ -56,6 +56,7 @@ interface ProductStats {
   stockCostValue: number
   lowStockCount: number
   inPoCount: number
+  customerBoughtCount: number
 }
 
 function RowActionsMenu({
@@ -588,7 +589,7 @@ export default function InventoryPage() {
       </div>
 
       {/* Stats from API */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         {[
           {
             label: 'Stock Retail Value',
@@ -631,6 +632,15 @@ export default function InventoryPage() {
             borderColor: 'bg-emerald-500',
             subtitle: 'incoming stock',
           },
+          {
+            label: 'Customer Bought',
+            value: stats?.customerBoughtCount ?? null,
+            icon: ShoppingBag,
+            iconColor: 'text-purple-600',
+            iconBg: 'bg-purple-100',
+            borderColor: 'bg-purple-500',
+            subtitle: 'sourced from customers',
+          },
         ].map((s: any) => {
           const Icon = s.icon
           return (
@@ -643,7 +653,7 @@ export default function InventoryPage() {
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-gray-500 truncate">{s.label}</p>
                   {s.value !== null ? (
-                    <p className="mt-2 text-base sm:text-2xl lg:text-3xl font-bold text-gray-900 truncate" title={String(s.value)}>{s.value}</p>
+                    <p className="mt-2 text-base sm:text-xl lg:text-2xl font-bold text-gray-900 break-words leading-tight" title={String(s.value)}>{s.value}</p>
                   ) : (
                     <div className="mt-2 h-8 w-24 rounded bg-gray-100 animate-pulse" />
                   )}

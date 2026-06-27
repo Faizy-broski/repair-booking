@@ -30,6 +30,8 @@ const schema = z.object({
   subdomain:             z.string().min(2).max(30).regex(/^[a-z0-9-]+$/),
   email:                 z.string().email(),
   phone:                 z.string().min(5),
+  website:               z.string().optional().nullable(),
+  whatsapp:              z.string().optional().nullable(),
   fullName:              z.string().min(2),
   password:              z.string().min(8),
   mainBranchName:        z.string().min(2),
@@ -51,15 +53,17 @@ export async function POST(request: NextRequest) {
       return badRequest('Email address has not been verified. Please complete email verification first.', 'EMAIL_NOT_VERIFIED')
     }
 
-    // Look up plan type
+    // Look up plan type and name
     let planType: string | null = null
+    let planName: string | null = null
     if (data.planId) {
       const { data: plan } = await supabase
         .from('plans')
-        .select('plan_type')
+        .select('plan_type, name')
         .eq('id', data.planId)
         .single()
-      planType = (plan as { plan_type?: string } | null)?.plan_type ?? null
+      planType = (plan as { plan_type?: string; name?: string } | null)?.plan_type ?? null
+      planName  = (plan as { plan_type?: string; name?: string } | null)?.name ?? null
     }
 
     const trialEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
@@ -113,6 +117,19 @@ export async function POST(request: NextRequest) {
         phone:        data.phone,
       }).catch((err) => console.error('[register] Enterprise email failed:', err))
     }
+
+    // Notify super admin of new business registration (fire-and-forget, non-fatal)
+    EmailService.sendNewBusinessAlert({
+      businessId:   result.business.id,
+      businessName: data.businessName,
+      subdomain:    data.subdomain,
+      ownerName:    data.fullName,
+      ownerEmail:   data.email,
+      ownerPhone:   data.phone,
+      planName:     planName ?? (planType === 'enterprise' ? 'Enterprise' : 'Starter'),
+      source:       'self_registered',
+      registeredAt: new Date().toISOString(),
+    }).catch((err) => console.error('[register] Super admin alert email failed:', err))
 
     // Apply vertical template if one was chosen during onboarding (fire-and-forget)
     if (data.verticalTemplateSlug) {

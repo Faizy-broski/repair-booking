@@ -48,7 +48,9 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
 
   const pc       = settings.primary_color ?? '#0f766e'
   const bal      = Math.max(0, total - amountPaid)
-  const w        = settings.paper_size === 'Receipt58' ? '58mm' : '80mm'
+  const w        = settings.paper_size === 'Receipt58' ? '58mm'
+                 : settings.paper_size === 'Custom'    ? `${settings.custom_width ?? 80}mm`
+                 : '80mm'
   const date     = new Date(issuedAt).toLocaleDateString('en-GB')
   const thankYou = settings.thank_you_message || 'Thank you for your business!'
 
@@ -235,12 +237,15 @@ export function previewReceiptHtml(data: ReceiptPrintData): void {
  *    (right-click → Inspect) and verify the measurements.
  */
 export function printReceipt(data: ReceiptPrintData): void {
-  const paperWidthCss = data.settings.paper_size === 'Receipt58' ? '58mm' : '80mm'
-  // Paper width in screen-pixels at 96 dpi (CSS reference pixels).
-  // 1mm = 96/25.4 ≈ 3.7795px
-  const paperWidthPx = data.settings.paper_size === 'Receipt58'
-    ? Math.round(58  * 96 / 25.4)   // ≈ 219px
-    : Math.round(80  * 96 / 25.4)   // ≈ 302px
+  const isCustom      = data.settings.paper_size === 'Custom'
+  const customW       = data.settings.custom_width  ?? 80
+  const customH       = data.settings.custom_height ?? null   // null = roll (measure height)
+  const paperWidthCss = data.settings.paper_size === 'Receipt58' ? '58mm'
+                      : isCustom ? `${customW}mm`
+                      : '80mm'
+  // Paper width in screen-pixels at 96 dpi (CSS reference pixels). 1mm = 96/25.4 ≈ 3.7795px
+  const mmWidth      = data.settings.paper_size === 'Receipt58' ? 58 : isCustom ? customW : 80
+  const paperWidthPx = Math.round(mmWidth * 96 / 25.4)
 
   const html = buildHtml(data, /* debugMode= */ false)
 
@@ -287,9 +292,13 @@ export function printReceipt(data: ReceiptPrintData): void {
     console.log('paperWidthCss                  :', paperWidthCss)
 
     // ── Inject @page with exact content height ───────────────────────────────
-    // body.scrollHeight (e.g. 426px ≈ 113mm) becomes the page height.
-    // The browser creates exactly ONE page matching the content — no blank space.
-    const pageRule = `@page { size: ${paperWidthCss} ${contentHeight}px; margin: 0; }`
+    // For Custom paper with a defined height (e.g. 80×210mm) use the fixed mm
+    // dimension so the page is always exactly that size regardless of content.
+    // For thermal rolls (Receipt80/Receipt58/Custom without height) measure the
+    // actual content so the page is exactly as tall as the receipt — no blank tail.
+    const pageRule = isCustom && customH
+      ? `@page { size: ${paperWidthCss} ${customH}mm; margin: 0; }`
+      : `@page { size: ${paperWidthCss} ${contentHeight}px; margin: 0; }`
     console.log('Injecting @page rule           :', pageRule)
     console.groupEnd()
 

@@ -174,6 +174,7 @@ const PAYMENT_LABELS: Record<string, string> = {
   cash: 'Cash', card: 'Card', gift_card: 'Gift Card',
   split: 'Split Payment', voucher: 'Voucher',
   on_account: 'Credit (On Account)',
+  ebay: 'eBay', deliveroo: 'Deliveroo', website: 'Website',
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -436,7 +437,7 @@ export function SaleReceiptPdf({
                 <Text style={s.metaLabel}>Payment</Text>
                 <Text style={s.metaValue}>
                   {paymentMethod === 'split' && paymentSplits?.length
-                    ? 'Split'
+                    ? paymentSplits.map(sp => PAYMENT_LABELS[sp.method] ?? sp.method).join(' + ')
                     : PAYMENT_LABELS[paymentMethod] ?? paymentMethod}
                 </Text>
               </View>

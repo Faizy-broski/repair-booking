@@ -85,6 +85,7 @@ export default function NewInventoryPage() {
   const [lowStockAlert, setLowStockAlert] = useState('5')
   const [supplierId, setSupplierId] = useState('')
   const [physicalLocation, setPhysicalLocation] = useState('')
+  const [isTradeIn, setIsTradeIn] = useState(false)
   const [commissionEnabled, setCommissionEnabled] = useState(false)
   const [commissionType, setCommissionType] = useState('percentage')
   const [commissionRate, setCommissionRate] = useState('')
@@ -345,6 +346,7 @@ export default function NewInventoryPage() {
         low_stock_alert: parseInt(lowStockAlert) || 0,
         initial_stock: hasVariants ? 0 : (parseInt(initialStock) || 0),
         branch_id: activeBranch?.id ?? null, physical_location: physicalLocation || null,
+        is_trade_in: isTradeIn,
         commission_enabled: commissionEnabled, commission_type: commissionType,
         commission_rate: parseFloat(commissionRate) || 0, loyalty_enabled: loyaltyEnabled,
       }),
@@ -451,6 +453,26 @@ export default function NewInventoryPage() {
               </div>
             </section>
           )}
+
+          {/* Bought from Customer */}
+          <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-lg border-2 px-4 py-3 transition-colors ${isTradeIn ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}`}>
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isTradeIn ? 'bg-purple-100' : 'bg-gray-100'}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isTradeIn ? 'text-purple-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+              </div>
+              <div>
+                <p className={`text-sm font-semibold ${isTradeIn ? 'text-purple-800' : 'text-gray-900'}`}>Bought from Customer</p>
+                <p className={`text-xs ${isTradeIn ? 'text-purple-600' : 'text-gray-500'}`}>Mark if this item was purchased directly from a customer</p>
+              </div>
+            </div>
+            <div className="shrink-0 flex items-center gap-2">
+              {isTradeIn && <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-semibold text-purple-700">Active</span>}
+              <input type="checkbox" className="sr-only" checked={isTradeIn} onChange={e => setIsTradeIn(e.target.checked)} />
+              <div className={`relative h-5 w-9 rounded-full transition-colors ${isTradeIn ? 'bg-purple-600' : 'bg-gray-200'}`}>
+                <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${isTradeIn ? 'translate-x-4' : 'translate-x-0'}`} />
+              </div>
+            </div>
+          </label>
 
           {/* Item Details */}
           <section>

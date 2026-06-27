@@ -34,6 +34,7 @@ interface Product {
   categories?: { name: string } | null; brands?: { name: string } | null
   suppliers?: { name: string; id: string } | null
   service_devices?: { name: string; id: string } | null
+  is_trade_in?: boolean | null
 }
 
 interface Category { id: string; name: string }
@@ -158,6 +159,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [costPrice, setCostPrice] = useState('')
   const [sellingPrice, setSellingPrice] = useState('')
   const [supplierId, setSupplierId] = useState('')
+  const [isTradeIn, setIsTradeIn] = useState(false)
   const [onHand, setOnHand] = useState<string>('0')
   const [lowStockAlert, setLowStockAlert] = useState<string>('5')
   const [physicalLocation, setPhysicalLocation] = useState('')
@@ -220,6 +222,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     setCostPrice(p.cost_price != null ? String(p.cost_price) : '')
     setSellingPrice(p.selling_price != null ? String(p.selling_price) : '')
     setSupplierId(p.supplier_id ?? p.suppliers?.id ?? '')
+    setIsTradeIn(p.is_trade_in ?? false)
     setLowStockAlert(p.low_stock_alert != null ? String(p.low_stock_alert) : '5')
     setPhysicalLocation(p.physical_location ?? '')
     setCommissionEnabled(p.commission_enabled ?? false)
@@ -468,6 +471,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       is_service: false, part_type: itemType === 'part' ? (partType || null) : null,
       cost_price: parseFloat(costPrice) || 0, selling_price: parseFloat(sellingPrice) || 0,
       supplier_id: itemType === 'part' ? (supplierId || null) : null,
+      is_trade_in: isTradeIn,
       low_stock_alert: parseInt(lowStockAlert) || 0,
       initial_stock: parseInt(onHand) || 0,
       physical_location: physicalLocation || null, branch_id: activeBranch?.id ?? null,
@@ -644,6 +648,26 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               </button>
             </div>
           </section>
+
+          {/* Bought from Customer */}
+          <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-lg border-2 px-4 py-3 transition-colors ${isTradeIn ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}`}>
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isTradeIn ? 'bg-purple-100' : 'bg-gray-100'}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isTradeIn ? 'text-purple-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+              </div>
+              <div>
+                <p className={`text-sm font-semibold ${isTradeIn ? 'text-purple-800' : 'text-gray-900'}`}>Bought from Customer</p>
+                <p className={`text-xs ${isTradeIn ? 'text-purple-600' : 'text-gray-500'}`}>Mark if this item was purchased directly from a customer</p>
+              </div>
+            </div>
+            <div className="shrink-0 flex items-center gap-2">
+              {isTradeIn && <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-semibold text-purple-700">Active</span>}
+              <input type="checkbox" className="sr-only" checked={isTradeIn} onChange={e => setIsTradeIn(e.target.checked)} />
+              <div className={`relative h-5 w-9 rounded-full transition-colors ${isTradeIn ? 'bg-purple-600' : 'bg-gray-200'}`}>
+                <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${isTradeIn ? 'translate-x-4' : 'translate-x-0'}`} />
+              </div>
+            </div>
+          </label>
 
           {/* Item Details */}
           <section>

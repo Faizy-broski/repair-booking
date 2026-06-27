@@ -37,7 +37,9 @@ export function RepairReceiptHtml({
 }: Props) {
   const pc      = settings.primary_color ?? '#0f766e'
   const bal     = Math.max(0, total - amountPaid)
-  const width   = settings.paper_size === 'Receipt58' ? '58mm' : '80mm'
+  const width   = settings.paper_size === 'Receipt58' ? '58mm'
+               : settings.paper_size === 'Custom'    ? `${settings.custom_width ?? 80}mm`
+               : '80mm'
   const dateStr = new Date(issuedAt).toLocaleDateString('en-GB')
 
   const socials = Object.entries(settings.social_links ?? {})

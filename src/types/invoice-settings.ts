@@ -7,7 +7,7 @@ export interface SocialLinks {
   tiktok?: string
 }
 
-export type PaperSize = 'A4' | 'A5' | 'Letter' | 'Receipt80' | 'Receipt58'
+export type PaperSize = 'A4' | 'A5' | 'Letter' | 'Receipt80' | 'Receipt58' | 'Custom'
 export type Orientation = 'portrait' | 'landscape'
 
 export interface InvoiceSettings {
@@ -18,6 +18,8 @@ export interface InvoiceSettings {
   // Page
   paper_size: PaperSize
   orientation: Orientation
+  custom_width?: number | null   // mm
+  custom_height?: number | null  // mm
 
   // Branding
   logo_url: string | null
@@ -53,6 +55,8 @@ export interface InvoiceSettings {
 export const DEFAULT_INVOICE_SETTINGS: InvoiceSettings = {
   paper_size: 'A4',
   orientation: 'portrait',
+  custom_width: null,
+  custom_height: null,
   logo_url: null,
   primary_color: '#0f766e',
   secondary_color: '#f0fdfa',

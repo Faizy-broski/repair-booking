@@ -2,7 +2,7 @@ import { adminSupabase } from '@/backend/config/supabase'
 import type { Json } from '@/types/database'
 
 export interface PaymentSplit {
-  method: 'cash' | 'card' | 'gift_card'
+  method: 'cash' | 'card' | 'gift_card' | 'ebay' | 'deliveroo' | 'website'
   amount: number
 }
 

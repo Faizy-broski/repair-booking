@@ -25,6 +25,7 @@ const PAPER_OPTIONS = [
   { value: 'Letter',    label: 'US Letter',     desc: '216 × 279 mm' },
   { value: 'Receipt80', label: 'Receipt 80mm',  desc: 'Thermal printer' },
   { value: 'Receipt58', label: 'Receipt 58mm',  desc: 'Mini printer' },
+  { value: 'Custom',    label: 'Custom',        desc: 'Enter dimensions' },
 ]
 
 const FONT_OPTIONS = [
@@ -97,6 +98,7 @@ function InvoicePreview({ s, businessName, branchName }: {
   s: InvoiceSettings; businessName: string; branchName: string
 }) {
   const isReceipt = s.paper_size === 'Receipt80' || s.paper_size === 'Receipt58'
+  const isCustom = s.paper_size === 'Custom'
   const socials = Object.entries(s.social_links ?? {}).filter(([, v]) => v)
   const footerLines = [s.footer_line_1, s.footer_line_2, s.footer_line_3].filter(Boolean)
 
@@ -157,8 +159,12 @@ function InvoicePreview({ s, businessName, branchName }: {
     )
   }
 
+  const customAspect = isCustom && s.custom_width && s.custom_height
+    ? s.custom_height / s.custom_width
+    : null
+
   return (
-    <div style={{ fontFamily: fontStyle, backgroundColor: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', borderRadius: 8, overflow: 'hidden', fontSize: 9, color: s.text_color }}>
+    <div style={{ fontFamily: fontStyle, backgroundColor: '#fff', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', borderRadius: 8, overflow: 'hidden', fontSize: 9, color: s.text_color, ...(customAspect ? { aspectRatio: `1 / ${customAspect.toFixed(4)}` } : {}) }}>
       {/* Header */}
       <div style={{ backgroundColor: s.primary_color, padding: '18px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
@@ -410,7 +416,37 @@ export function InvoiceDesignTab() {
                   ))}
                 </div>
               </div>
-              {!settings.paper_size.startsWith('Receipt') && (
+              {settings.paper_size === 'Custom' && (
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-gray-600">Custom Dimensions (mm)</label>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <label className="mb-1 block text-[11px] text-gray-400">Width</label>
+                      <Input
+                        type="number"
+                        min={10}
+                        max={2000}
+                        placeholder="e.g. 100"
+                        value={settings.custom_width ?? ''}
+                        onChange={(e) => patch({ custom_width: e.target.value ? Number(e.target.value) : null })}
+                      />
+                    </div>
+                    <span className="mt-5 text-gray-400">×</span>
+                    <div className="flex-1">
+                      <label className="mb-1 block text-[11px] text-gray-400">Height</label>
+                      <Input
+                        type="number"
+                        min={10}
+                        max={2000}
+                        placeholder="e.g. 150"
+                        value={settings.custom_height ?? ''}
+                        onChange={(e) => patch({ custom_height: e.target.value ? Number(e.target.value) : null })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+              {!settings.paper_size.startsWith('Receipt') && settings.paper_size !== 'Custom' && (
                 <div>
                   <label className="mb-2 block text-xs font-medium text-gray-600">Orientation</label>
                   <div className="flex gap-2">

@@ -7,7 +7,7 @@ import { z } from 'zod'
 import {
   Building2, User, CreditCard, ClipboardList, CheckCircle,
   ChevronRight, ArrowLeft, Copy, Check, Eye, EyeOff, Sparkles, Plus,
-  RefreshCw,
+  RefreshCw, Globe,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,6 +21,8 @@ const step1Schema = z.object({
   subdomain: z.string().min(2, 'Min 2 characters').max(30).regex(/^[a-z0-9-]+$/, 'Lowercase letters, numbers, hyphens only'),
   email: z.string().email('Invalid email'),
   phone: z.string().min(5, 'Phone number is required'),
+  website: z.string().optional(),
+  whatsapp: z.string().optional(),
 })
 
 const step2Schema = z.object({
@@ -107,6 +109,7 @@ export default function OnboardBusinessPage() {
   const [serverError, setServerError] = useState('')
   const [result, setResult] = useState<OnboardResult | null>(null)
   const [copied, setCopied] = useState(false)
+  const [noWebsite, setNoWebsite] = useState(false)
 
   const subdomainTimer = useRef<NodeJS.Timeout | null>(null)
 
@@ -412,14 +415,49 @@ export default function OnboardBusinessPage() {
 
               {/* Phone */}
               <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">Phone Number</label>
                 <PhoneInput
+                  label="Phone Number"
                   value={form1.watch('phone') ?? ''}
                   onChange={v => form1.setValue('phone', v, { shouldValidate: true })}
+                  error={form1.formState.errors.phone?.message}
                 />
-                {form1.formState.errors.phone && (
-                  <p className="text-xs text-red-500">{form1.formState.errors.phone.message}</p>
-                )}
+              </div>
+
+              {/* Website */}
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Website <span className="text-gray-400 font-normal">(optional)</span></label>
+                <div className="relative">
+                  <Globe className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="url"
+                    placeholder="https://yourwebsite.com"
+                    disabled={noWebsite}
+                    className={`w-full rounded-lg border px-3 py-2 pl-9 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/40 ${noWebsite ? 'cursor-not-allowed bg-gray-50 text-gray-400' : 'border-gray-200'}`}
+                    {...form1.register('website')}
+                  />
+                </div>
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-500">
+                  <input
+                    type="checkbox"
+                    checked={noWebsite}
+                    onChange={e => {
+                      setNoWebsite(e.target.checked)
+                      if (e.target.checked) form1.setValue('website', '')
+                    }}
+                    className="h-4 w-4 rounded border-gray-300 accent-teal-600"
+                  />
+                  Don&apos;t have a website
+                </label>
+              </div>
+
+              {/* WhatsApp */}
+              <div className="space-y-1">
+                <PhoneInput
+                  label="WhatsApp Number (optional)"
+                  value={form1.watch('whatsapp') ?? ''}
+                  onChange={v => form1.setValue('whatsapp', v, { shouldValidate: true })}
+                  error={form1.formState.errors.whatsapp?.message}
+                />
               </div>
 
               <Button type="submit" className="w-full">
@@ -630,6 +668,14 @@ export default function OnboardBusinessPage() {
                   <span className="font-medium text-gray-900">{step1Data.email}</span>
                   <span className="text-gray-500">Phone</span>
                   <span className="font-medium text-gray-900">{step1Data.phone}</span>
+                  {step1Data.website && (<>
+                    <span className="text-gray-500">Website</span>
+                    <span className="font-medium text-gray-900">{step1Data.website}</span>
+                  </>)}
+                  {step1Data.whatsapp && (<>
+                    <span className="text-gray-500">WhatsApp</span>
+                    <span className="font-medium text-gray-900">{step1Data.whatsapp}</span>
+                  </>)}
                 </div>
               </div>
 

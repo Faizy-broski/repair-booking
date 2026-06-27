@@ -30,6 +30,8 @@ const PAPER_SIZES: Record<string, string | [number, number]> = {
   // Heights are computed dynamically for thermal receipts — see calcReceiptPageHeight()
   Receipt80: [227, 841],
   Receipt58: [165, 841],
+  // Custom: resolved at render time from settings.custom_width / custom_height
+  Custom: [595, 842], // fallback to A4 points if dimensions not set
 }
 
 // Calculates the minimum page height (in points) needed for a thermal receipt
@@ -327,8 +329,11 @@ export function InvoicePdf(props: InvoicePdfProps) {
     policy: { fontSize: 6.5, color: '#9ca3af', textAlign: 'center', marginTop: 7, paddingTop: 7, borderTop: '1 solid #e5e7eb', lineHeight: 1.4 },
   })
 
-  const pageSize = PAPER_SIZES[paperSizeKey] as any
-  const orient = settings.orientation === 'landscape' ? 'landscape' : 'portrait'
+  // 1 mm = 2.835 pt; for Custom size the dimensions already encode orientation
+  const pageSize = paperSizeKey === 'Custom' && settings.custom_width && settings.custom_height
+    ? [settings.custom_width * 2.835, settings.custom_height * 2.835] as [number, number]
+    : PAPER_SIZES[paperSizeKey] as any
+  const orient = paperSizeKey !== 'Custom' && settings.orientation === 'landscape' ? 'landscape' : 'portrait'
 
   return (
     <Document>

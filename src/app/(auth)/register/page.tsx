@@ -12,7 +12,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import {
   CheckCircle, Building2, User, CreditCard, Check, Zap, Mail,
   ChevronRight, ArrowLeft, Sparkles, Store, Wrench, ShoppingBag,
-  Scissors, Coffee, Monitor, Package, ShieldCheck, RotateCcw, Gift,
+  Scissors, Coffee, Monitor, Package, ShieldCheck, RotateCcw, Gift, Globe,
 } from 'lucide-react'
 
 import validations from '@/components/layout/number-validations.json'
@@ -24,6 +24,8 @@ const step1Schema = z.object({
   subdomain: z.string().min(2).max(30).regex(/^[a-z0-9-]+$/, { message: 'Only lowercase letters, numbers, and hyphens' }),
   email: z.string().email('Invalid email'),
   phone: z.string().min(5, 'Phone number is required'),
+  website: z.string().optional(),
+  whatsapp: z.string().min(5, 'WhatsApp number is required'),
 }).refine((data) => {
   if (!data.phone.startsWith('+')) return true // Basic validation already handled by min(5)
 
@@ -163,6 +165,7 @@ export default function RegisterPage() {
   const [plans, setPlans] = useState<DbPlan[]>([])
   const [plansLoading, setPlansLoading] = useState(false)
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly')
+  const [noWebsite, setNoWebsite] = useState(false)
 
   const form1 = useForm<Step1Data>({ resolver: zodResolver(step1Schema) })
   const form2 = useForm<Step2Data>({ resolver: zodResolver(step2Schema) })
@@ -265,6 +268,11 @@ export default function RegisterPage() {
         form1.setError('email', { message: 'An account with this email already exists' })
         return
       }
+    }
+
+    if (!noWebsite && !data.website?.trim()) {
+      form1.setError('website', { message: 'Enter your website URL or tick "Don\'t have a website"' })
+      return
     }
 
     setStep1Data(data)
@@ -557,7 +565,7 @@ export default function RegisterPage() {
 
       {/* ── Step 1: Business Info ─────────────────────────────────────────── */}
       {step === 1 && (
-        <div className="mx-auto max-w-md">
+        <div className="mx-auto w-full max-w-md sm:max-w-2xl">
           {/* selectedTemplate && (
             <div className="mb-4 flex items-center gap-2 rounded-xl border border-primary/20 bg-primary-container/10 px-4 py-2.5">
               {(() => { const IC = ICON_MAP[selectedTemplate.icon] ?? Store; return <IC className="h-4 w-4 text-primary shrink-0" /> })()}
@@ -581,66 +589,118 @@ export default function RegisterPage() {
                   <h2 className="text-lg font-bold text-on-surface">Tell us about your business</h2>
                   <p className="text-sm text-on-surface-variant mt-0.5">Set up your repair shop on RepairBooking</p>
                 </div>
-                <Input
-                  label="Business name"
-                  placeholder="Tech Fix Ltd"
-                  error={form1.formState.errors.businessName?.message}
-                  {...form1.register('businessName')}
-                />
-                <div>
+
+                {/* Row 1: Business name + Subdomain */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
                   <Input
-                    label="Your subdomain"
-                    placeholder="techfix"
-                    error={form1.formState.errors.subdomain?.message}
-                    {...form1.register('subdomain', {
-                      onChange: e => {
-                        const sanitized = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
-                        form1.setValue('subdomain', sanitized, { shouldValidate: true })
-                        checkSubdomain(sanitized)
-                      }
-                    })}
+                    label="Business name"
+                    placeholder="Tech Fix Ltd"
+                    error={form1.formState.errors.businessName?.message}
+                    {...form1.register('businessName')}
                   />
-                  {!form1.formState.errors.subdomain && (
-                    <p className={`mt-1 text-xs ${subdomainAvailable === true ? 'text-primary' :
-                      subdomainAvailable === false ? 'text-error' : 'text-on-surface-variant'
-                      }`}>
-                      {checkingSubdomain
-                        ? 'Checking availability…'
-                        : subdomainAvailable === true
-                          ? `✓ Available — your URL will be: ${form1.watch('subdomain') || ''}.repairbooking.co.uk`
-                          : subdomainAvailable === false
-                            ? '✗ Already taken — try another'
-                            : 'Your URL: [subdomain].repairbooking.co.uk'}
-                    </p>
-                  )}
+                  <div>
+                    <Input
+                      label="Your subdomain"
+                      placeholder="techfix"
+                      error={form1.formState.errors.subdomain?.message}
+                      {...form1.register('subdomain', {
+                        onChange: e => {
+                          const sanitized = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
+                          form1.setValue('subdomain', sanitized, { shouldValidate: true })
+                          checkSubdomain(sanitized)
+                        }
+                      })}
+                    />
+                    {!form1.formState.errors.subdomain && (
+                      <p className={`mt-1 text-xs ${subdomainAvailable === true ? 'text-primary' :
+                        subdomainAvailable === false ? 'text-error' : 'text-on-surface-variant'
+                        }`}>
+                        {checkingSubdomain
+                          ? 'Checking…'
+                          : subdomainAvailable === true
+                            ? `✓ ${form1.watch('subdomain') || ''}.repairbooking.co.uk`
+                            : subdomainAvailable === false
+                              ? '✗ Already taken'
+                              : '[subdomain].repairbooking.co.uk'}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <Input
-                    label="Business email"
-                    type="email"
-                    placeholder="hello@techfix.com"
-                    error={form1.formState.errors.email?.message}
-                    {...form1.register('email', {
-                      onChange: () => { if (emailAvailable === false) setEmailAvailable(null) },
-                      onBlur: e => checkEmail(e.target.value),
-                    })}
+
+                {/* Row 2: Email + Phone */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                  <div>
+                    <Input
+                      label="Business email"
+                      type="email"
+                      placeholder="hello@techfix.com"
+                      error={form1.formState.errors.email?.message}
+                      {...form1.register('email', {
+                        onChange: () => { if (emailAvailable === false) setEmailAvailable(null) },
+                        onBlur: e => checkEmail(e.target.value),
+                      })}
+                    />
+                    {!form1.formState.errors.email && (
+                      <p className={`mt-1 text-xs ${emailAvailable === false ? 'text-error' : checkingEmail ? 'text-on-surface-variant' : ''}`}>
+                        {checkingEmail
+                          ? 'Checking…'
+                          : emailAvailable === false
+                            ? '✗ Email already exists.'
+                            : null}
+                      </p>
+                    )}
+                  </div>
+                  <PhoneInput
+                    label="Phone number"
+                    value={form1.watch('phone') ?? ''}
+                    onChange={(val) => form1.setValue('phone', val, { shouldValidate: true })}
+                    error={form1.formState.errors.phone?.message}
                   />
-                  {!form1.formState.errors.email && (
-                    <p className={`mt-1 text-xs ${emailAvailable === false ? 'text-error' : checkingEmail ? 'text-on-surface-variant' : ''}`}>
-                      {checkingEmail
-                        ? 'Checking…'
-                        : emailAvailable === false
-                          ? '✗ An account with this email already exists. Please sign in instead.'
-                          : null}
-                    </p>
-                  )}
                 </div>
-                <PhoneInput
-                  label="Phone number"
-                  value={form1.watch('phone') ?? ''}
-                  onChange={(val) => form1.setValue('phone', val, { shouldValidate: true })}
-                  error={form1.formState.errors.phone?.message}
-                />
+
+                {/* Row 3: Website + WhatsApp */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-on-surface">Website</label>
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                        <Globe className="h-4 w-4" />
+                      </span>
+                      <input
+                        type="url"
+                        placeholder="https://yourwebsite.com"
+                        disabled={noWebsite}
+                        className={`w-full rounded-lg border px-3 py-2 pl-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 ${noWebsite ? 'cursor-not-allowed bg-gray-50 text-gray-400' : ''} ${form1.formState.errors.website ? 'border-error' : 'border-gray-300'}`}
+                        {...form1.register('website')}
+                      />
+                    </div>
+                    <label className="mt-1.5 flex cursor-pointer items-center gap-2 text-sm text-on-surface-variant">
+                      <input
+                        type="checkbox"
+                        checked={noWebsite}
+                        onChange={e => {
+                          setNoWebsite(e.target.checked)
+                          if (e.target.checked) {
+                            form1.setValue('website', '')
+                            form1.clearErrors('website')
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 accent-primary"
+                      />
+                      Don&apos;t have a website
+                    </label>
+                    {form1.formState.errors.website && (
+                      <p className="mt-1 text-xs text-error">{form1.formState.errors.website.message}</p>
+                    )}
+                  </div>
+                  <PhoneInput
+                    label="WhatsApp number"
+                    value={form1.watch('whatsapp') ?? ''}
+                    onChange={(val) => form1.setValue('whatsapp', val, { shouldValidate: true })}
+                    error={form1.formState.errors.whatsapp?.message}
+                  />
+                </div>
+
                 <div className="flex gap-2">
                   {/* <Button type="button" variant="outline" onClick={() => setStep(0)}>
                     <ArrowLeft className="h-4 w-4" /> Back

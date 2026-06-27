@@ -88,7 +88,7 @@ const ProductCard = memo(function ProductCard({
           <span className="text-sm font-bold text-brand-teal">{formatCurrency(product.selling_price)}</span>
           {product.on_hand !== undefined && !product.is_service && !hasVariants && (
             <span className={`block text-xs font-medium ${(product.on_hand ?? 0) > 0 ? 'text-gray-400' : 'text-red-500'}`}>
-              {(product.on_hand ?? 0) > 0 ? `${product.on_hand} on hand` : 'Out of stock'}
+              {(product.on_hand ?? 0) > 0 ? `${product.on_hand} in stock` : 'Out of stock'}
             </span>
           )}
           {hasVariants && <span className="block text-xs text-indigo-500 font-medium">Select variant</span>}
@@ -932,7 +932,7 @@ export function ProductsTab() {
                         <span className="text-sm font-bold text-brand-teal mt-1">{formatCurrency(Number(product.selling_price))}</span>
                         {typeof product.on_hand === 'number' && (
                           <span className={`text-xs mt-0.5 ${product.on_hand > 0 ? 'text-gray-400' : 'text-red-500 font-medium'}`}>
-                            {product.on_hand > 0 ? `${product.on_hand} on hand` : 'Out of stock'}
+                            {product.on_hand > 0 ? `${product.on_hand} in stock` : 'Out of stock'}
                           </span>
                         )}
                       </button>

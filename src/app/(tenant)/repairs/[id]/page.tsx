@@ -73,7 +73,8 @@ interface RepairDetail {
 export default function RepairDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
-  const { activeBranch } = useAuthStore()
+  const { activeBranch, verticalTemplateSlug } = useAuthStore()
+  const isRetail = verticalTemplateSlug === 'retail-store'
   const queryClient = useQueryClient()
 
   // ── UI-only state ─────────────────────────────────────────────────────────────
@@ -296,24 +297,45 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Device info */}
+        {/* Device / Item info */}
         <Card>
-          <CardHeader><CardTitle className="text-sm">Device</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-sm">{isRetail ? 'Item' : 'Device'}</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <InfoRow label="Type" value={repair.device_type} />
-            <InfoRow label="Brand" value={repair.device_brand} />
-            <InfoRow label="Model" value={repair.device_model} />
-            <InfoRow label="Serial / IMEI" value={repair.serial_number || (repair.custom_fields?.imei as string)} />
-            <InfoRow label="Issue" value={repair.issue} />
-            {repair.diagnosis && <InfoRow label="Diagnosis" value={repair.diagnosis} />}
-            {repair.lock_type === 'passcode' && <InfoRow label="Passcode" value={repair.passcode} />}
-            {repair.lock_type === 'pattern' && repair.passcode && (
-              <div className="flex gap-2">
-                <span className="w-28 shrink-0 text-gray-400">Pattern</span>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 overflow-hidden pointer-events-none w-fit">
-                  <PatternLock value={repair.passcode} size={150} readOnly />
-                </div>
-              </div>
+            {isRetail ? (
+              <>
+                <InfoRow label="Category" value={repair.device_type} />
+                <InfoRow label="Brand" value={repair.device_brand} />
+                <InfoRow label="Description" value={repair.device_model} />
+                <InfoRow label="Serial / Ref." value={repair.serial_number || (repair.custom_fields?.imei as string)} />
+                <InfoRow label="Issue" value={repair.issue} />
+                {repair.diagnosis && <InfoRow label="Diagnosis" value={repair.diagnosis} />}
+                {repair.custom_fields?.item_attributes && Object.keys(repair.custom_fields.item_attributes as Record<string, string>).length > 0 && (
+                  <>
+                    <hr className="border-gray-100" />
+                    {Object.entries(repair.custom_fields.item_attributes as Record<string, string>).map(([k, v]) => (
+                      <InfoRow key={k} label={k} value={v} />
+                    ))}
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <InfoRow label="Type" value={repair.device_type} />
+                <InfoRow label="Brand" value={repair.device_brand} />
+                <InfoRow label="Model" value={repair.device_model} />
+                <InfoRow label="Serial / IMEI" value={repair.serial_number || (repair.custom_fields?.imei as string)} />
+                <InfoRow label="Issue" value={repair.issue} />
+                {repair.diagnosis && <InfoRow label="Diagnosis" value={repair.diagnosis} />}
+                {repair.lock_type === 'passcode' && <InfoRow label="Passcode" value={repair.passcode} />}
+                {repair.lock_type === 'pattern' && repair.passcode && (
+                  <div className="flex gap-2">
+                    <span className="w-28 shrink-0 text-gray-400">Pattern</span>
+                    <div className="rounded-lg border border-gray-200 bg-gray-50 overflow-hidden pointer-events-none w-fit">
+                      <PatternLock value={repair.passcode} size={150} readOnly />
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>

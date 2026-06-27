@@ -173,6 +173,18 @@ export interface RepairStatusEmailPayload {
   note?: string
 }
 
+export interface NewBusinessAlertPayload {
+  businessId:   string
+  businessName: string
+  subdomain:    string
+  ownerName:    string
+  ownerEmail:   string
+  ownerPhone:   string
+  planName:     string
+  source:       'super_admin' | 'self_registered'
+  registeredAt: string
+}
+
 export interface TemplatedEmailPayload {
   to: string
   subject: string
@@ -542,5 +554,80 @@ export const EmailService = {
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : 'Failed to send test email' }
     }
+  },
+
+  async sendNewBusinessAlert(payload: NewBusinessAlertPayload): Promise<void> {
+    const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'repairbooking.co.uk'
+    const to          = process.env.SUPER_ADMIN_EMAIL ?? process.env.SALES_EMAIL ?? 'connect@repairbooking.co.uk'
+    const adminUrl    = `https://admin.${ROOT_DOMAIN}/superadmin/businesses/${payload.businessId}`
+    const loginUrl    = `https://${payload.subdomain}.${ROOT_DOMAIN}/login`
+    const sourceLabel = payload.source === 'super_admin' ? 'Onboarded by super admin' : 'Self-registered'
+    const sourceBg    = payload.source === 'super_admin' ? '#e6f2f2' : '#f0f4ff'
+    const sourceBorder= payload.source === 'super_admin' ? '#008080' : '#6366f1'
+    const sourceColor = payload.source === 'super_admin' ? '#008080' : '#4338ca'
+    const registeredAt = new Date(payload.registeredAt).toLocaleString('en-GB', {
+      day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    })
+
+    const transport = await getGlobalTransporter()
+    await transport.sendMail({
+      from:    globalFromAddress('RepairBooking'),
+      to,
+      subject: `New business registered — ${payload.businessName} (${sourceLabel})`,
+      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8f9fa;font-family:Arial,sans-serif;">
+        <div style="max-width:600px;margin:40px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+          <div style="background:#008080;padding:32px 24px;text-align:center;">
+            <h1 style="color:#fff;margin:0;font-size:24px;font-weight:800;letter-spacing:-0.5px;">RepairBooking</h1>
+            <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;">New business registered</p>
+          </div>
+          <div style="padding:32px 24px;">
+            <div style="background:${sourceBg};border:1px solid ${sourceBorder};border-radius:8px;padding:12px 16px;margin-bottom:28px;text-align:center;">
+              <span style="font-size:13px;font-weight:700;color:${sourceColor};">${sourceLabel}</span>
+            </div>
+
+            <p style="font-size:13px;font-weight:700;color:#374151;margin:0 0 10px;text-transform:uppercase;letter-spacing:0.05em;">Business Details</p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:24px;">
+              <tr style="border-bottom:1px solid #f3f4f6;">
+                <td style="padding:10px 14px;font-size:13px;color:#6B7280;width:38%;background:#f9fafb;">Business Name</td>
+                <td style="padding:10px 14px;font-size:13px;font-weight:600;color:#111827;">${payload.businessName}</td>
+              </tr>
+              <tr style="border-bottom:1px solid #f3f4f6;">
+                <td style="padding:10px 14px;font-size:13px;color:#6B7280;background:#f9fafb;">Login URL</td>
+                <td style="padding:10px 14px;font-size:13px;"><a href="${loginUrl}" style="color:#008080;font-weight:600;text-decoration:none;">${loginUrl}</a></td>
+              </tr>
+              <tr>
+                <td style="padding:10px 14px;font-size:13px;color:#6B7280;background:#f9fafb;">Plan</td>
+                <td style="padding:10px 14px;font-size:13px;font-weight:600;color:#111827;">${payload.planName}</td>
+              </tr>
+            </table>
+
+            <p style="font-size:13px;font-weight:700;color:#374151;margin:0 0 10px;text-transform:uppercase;letter-spacing:0.05em;">Owner Details</p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:24px;">
+              <tr style="border-bottom:1px solid #f3f4f6;">
+                <td style="padding:10px 14px;font-size:13px;color:#6B7280;width:38%;background:#f9fafb;">Full Name</td>
+                <td style="padding:10px 14px;font-size:13px;font-weight:600;color:#111827;">${payload.ownerName}</td>
+              </tr>
+              <tr style="border-bottom:1px solid #f3f4f6;">
+                <td style="padding:10px 14px;font-size:13px;color:#6B7280;background:#f9fafb;">Email</td>
+                <td style="padding:10px 14px;font-size:13px;"><a href="mailto:${payload.ownerEmail}" style="color:#008080;text-decoration:none;">${payload.ownerEmail}</a></td>
+              </tr>
+              <tr>
+                <td style="padding:10px 14px;font-size:13px;color:#6B7280;background:#f9fafb;">Phone</td>
+                <td style="padding:10px 14px;font-size:13px;font-weight:600;color:#111827;">${payload.ownerPhone}</td>
+              </tr>
+            </table>
+
+            <p style="font-size:12px;color:#9CA3AF;margin:0 0 24px;">Registered at: <strong style="color:#6B7280;">${registeredAt}</strong></p>
+
+            <div style="text-align:center;">
+              <a href="${adminUrl}" style="display:inline-block;background:#008080;color:#fff;font-weight:700;font-size:14px;padding:12px 28px;border-radius:8px;text-decoration:none;">View in Admin Dashboard →</a>
+            </div>
+          </div>
+          <div style="background:#F9FAFB;border-top:1px solid #F3F4F6;padding:16px 24px;text-align:center;">
+            <p style="color:#9CA3AF;font-size:12px;margin:0;">© ${new Date().getFullYear()} The Social Nexus Ltd · <a href="https://${ROOT_DOMAIN}" style="color:#9CA3AF;">${ROOT_DOMAIN}</a></p>
+          </div>
+        </div>
+      </body></html>`,
+    })
   },
 }

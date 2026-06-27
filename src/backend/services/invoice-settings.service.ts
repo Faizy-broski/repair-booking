@@ -32,6 +32,8 @@ export const InvoiceSettingsService = {
       branch_id: row.branch_id ?? null,
       paper_size: row.paper_size ?? DEFAULT_INVOICE_SETTINGS.paper_size,
       orientation: row.orientation ?? DEFAULT_INVOICE_SETTINGS.orientation,
+      custom_width: row.custom_width ?? null,
+      custom_height: row.custom_height ?? null,
       logo_url: row.logo_url ?? null,
       primary_color: row.primary_color ?? DEFAULT_INVOICE_SETTINGS.primary_color,
       secondary_color: row.secondary_color ?? DEFAULT_INVOICE_SETTINGS.secondary_color,

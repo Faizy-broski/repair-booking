@@ -11,7 +11,7 @@ export interface CartItem {
 }
 
 export interface PaymentSplit {
-  method: 'cash' | 'card' | 'gift_card'
+  method: 'cash' | 'card' | 'gift_card' | 'ebay' | 'deliveroo' | 'website'
   amount: number
 }
 

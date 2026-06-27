@@ -13,6 +13,8 @@ const schema = z.object({
   subdomain:            z.string().min(2).max(30).regex(/^[a-z0-9-]+$/),
   email:                z.string().email(),
   phone:                z.string().min(5),
+  website:              z.string().optional().nullable(),
+  whatsapp:             z.string().optional().nullable(),
   fullName:             z.string().min(2),
   password:             z.string().min(8),
   mainBranchName:       z.string().min(2),
@@ -99,6 +101,22 @@ async function handler(request: NextRequest, _ctx: RequestContext) {
       // Non-fatal — business is fully created; log and continue
       console.error('[admin/onboard] Welcome email failed:', err)
     }
+  }
+
+  try {
+    await EmailService.sendNewBusinessAlert({
+      businessId:   result.business.id,
+      businessName: data.businessName,
+      subdomain:    data.subdomain,
+      ownerName:    data.fullName,
+      ownerEmail:   data.email,
+      ownerPhone:   data.phone,
+      planName:     planName ?? 'Starter',
+      source:       'super_admin',
+      registeredAt: new Date().toISOString(),
+    })
+  } catch (err) {
+    console.error('[admin/onboard] Super admin alert email failed:', err)
   }
 
   if (data.verticalTemplateSlug) {

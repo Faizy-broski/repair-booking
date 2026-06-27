@@ -6,6 +6,8 @@ interface RegisterPayload {
   subdomain: string
   email: string
   phone?: string
+  website?: string | null
+  whatsapp?: string | null
   fullName: string
   password: string
   mainBranchName: string
@@ -105,6 +107,8 @@ export const AuthService = {
         subdomain,
         email: payload.email,
         phone: payload.phone ?? null,
+        website: payload.website || null,
+        whatsapp: payload.whatsapp || null,
         is_active: payload.activateNow ?? false,
         ...(payload.trialEndsAt ? { trial_ends_at: payload.trialEndsAt } : {}),
       })

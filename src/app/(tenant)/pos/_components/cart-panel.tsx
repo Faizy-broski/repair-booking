@@ -76,7 +76,13 @@ export function CartPanel({ mobileView }: Props) {
   const { activeBranch, profile, verticalTemplateSlug, currency } = useAuthStore()
   const pos = usePosStore()
   const queryClient = useQueryClient()
-  const { isModuleEnabled } = useModuleConfigStore()
+  const { isModuleEnabled, getConfig } = useModuleConfigStore()
+  const posConfig = getConfig('pos')
+  const customChannels: string[] = posConfig?.custom_payment_channels ?? []
+  const CHANNEL_LABELS: Record<string, string> = {
+    cash: 'Cash', card: 'Card', ebay: 'eBay', deliveroo: 'Deliveroo', website: 'Website',
+  }
+  const splitChannels = ['cash', 'card', ...customChannels]
   // "Served By" + per-sale commission entry is specific to the retail-store
   // vertical template, independent of any module's enabled/disabled state.
   const isRetailTemplate = verticalTemplateSlug === 'retail-store'
@@ -774,7 +780,7 @@ export function CartPanel({ mobileView }: Props) {
       <div className="shrink-0 border-t border-gray-200 bg-white px-3 py-2.5">
         <div className="flex gap-1.5">
           <button
-            onClick={() => { pos.setPaymentMethod('split'); setSplits({ cash: '', card: '' }); pos.cart.length > 0 && setPaymentOpen(true) }}
+            onClick={() => { pos.setPaymentMethod('split'); setSplits(Object.fromEntries(splitChannels.map(c => [c, '']))); pos.cart.length > 0 && setPaymentOpen(true) }}
             disabled={pos.cart.length === 0}
             className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border-2 border-[#1a3c40] bg-[#1a3c40] py-2.5 text-sm font-bold text-white hover:bg-[#15332e] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
@@ -1003,12 +1009,12 @@ export function CartPanel({ mobileView }: Props) {
                 </div>
                 <div className="flex flex-1 flex-col gap-3">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Split Amounts</p>
-                  {(['cash', 'card'] as const).map(m => (
+                  {splitChannels.map(m => (
                     <div key={m} className="flex items-center gap-3">
-                      <span className="w-20 shrink-0 text-sm text-gray-600 capitalize font-medium">{m.charAt(0).toUpperCase() + m.slice(1)}</span>
+                      <span className="w-20 shrink-0 text-sm text-gray-600 font-medium">{CHANNEL_LABELS[m] ?? m}</span>
                       <input
                         type="number" min="0" step="0.01" placeholder="0.00"
-                        value={splits[m]} onChange={e => setSplits(s => ({ ...s, [m]: e.target.value }))}
+                        value={splits[m] ?? ''} onChange={e => setSplits(s => ({ ...s, [m]: e.target.value }))}
                         className="h-9 flex-1 rounded-lg border border-gray-200 px-3 text-sm focus:border-brand-teal focus:outline-none"
                       />
                     </div>
@@ -1033,7 +1039,8 @@ export function CartPanel({ mobileView }: Props) {
                 <div className="mt-4 space-y-2">
                   <Button className="w-full bg-brand-teal hover:bg-brand-teal-dark" loading={processing} disabled={!splitValid} onClick={processPayment}>Confirm</Button>
                   <button
-                    onClick={() => setSplits({ cash: '', card: totalDue.toFixed(2) })}
+                    onClick={() => setSplits(Object.fromEntries(splitChannels.map((c, i) => [c, i === 1 ? totalDue.toFixed(2) : ''])))}
+
                     className="w-full rounded-lg border-2 border-brand-teal bg-brand-teal/10 py-2 text-sm font-semibold text-brand-teal hover:bg-brand-teal/20 transition-colors"
                   >
                     Full Payment

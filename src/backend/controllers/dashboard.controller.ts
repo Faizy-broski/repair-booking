@@ -114,17 +114,17 @@ export const DashboardController = {
       }, 0)
 
       const stats = {
-        total_sales:       totalSales,
-        sales_count:       sales.length,
-        repairs_total:     repairsTotalRes.count  ?? 0,
-        repairs_open:      repairsOpenRes.count   ?? 0,
-        repairs_completed: repairsCompleted,
-        repairs_urgent:    repairsUrgentRes.count ?? 0,
-        total_expenses:    totalExpenses,
-        low_stock_count:   lowStockCount,
-        net_profit:        totalSales + repairsRevenue - totalExpenses,
-        repairs_revenue:   repairsRevenue,
-        sales_profit:      totalSales - salesCogs,
+        total_sales:           totalSales,
+        sales_count:           sales.length,
+        repairs_total:         repairsTotalRes.count  ?? 0,
+        repairs_open:          repairsOpenRes.count   ?? 0,
+        repairs_completed:     repairsCompleted,
+        repairs_urgent:        repairsUrgentRes.count ?? 0,
+        total_expenses:        totalExpenses,
+        low_stock_count:       lowStockCount,
+        net_profit:            totalSales + repairsRevenue - totalExpenses,
+        repairs_revenue:       repairsRevenue,
+        sales_profit:          totalSales - salesCogs,
         repairs_profit:    repairsRevenue - repairsPartsCost,
       }
 

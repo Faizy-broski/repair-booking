@@ -27,6 +27,7 @@ export interface PosSettings {
   allow_discounts?: boolean
   require_customer?: boolean
   enable_split_payment?: boolean
+  custom_payment_channels?: string[]
 }
 
 export interface InventorySettings {

@@ -108,7 +108,7 @@ const saleItemSchema = z.object({
 })
 
 const paymentSplitSchema = z.object({
-  method: z.enum(['cash', 'card', 'gift_card']),
+  method: z.enum(['cash', 'card', 'gift_card', 'ebay', 'deliveroo', 'website']),
   amount: z.number().positive(),
 })
 
@@ -120,7 +120,7 @@ const createSaleSchema = z.object({
   discount: z.number().min(0).default(0),
   tax: z.number().min(0).default(0),
   total: z.number().min(0),
-  payment_method: z.enum(['cash', 'card', 'gift_card', 'split', 'on_account']),
+  payment_method: z.enum(['cash', 'card', 'gift_card', 'split', 'on_account', 'ebay', 'deliveroo', 'website']),
   amount_paid: z.number().min(0).default(0),
   payment_splits: z.array(paymentSplitSchema).optional(),
   gift_card_id: z.string().uuid().optional().nullable(),

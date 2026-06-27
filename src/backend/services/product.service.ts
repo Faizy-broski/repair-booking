@@ -361,7 +361,20 @@ export const ProductService = {
     // When no branchId, return zeros — summing raw prices without quantities
     // would produce a meaningless number that looks like real stock value.
 
-    return { stockRetailValue, stockCostValue, lowStockCount, inPoCount: poResult.count ?? 0 }
+    const customerBoughtRes = await (adminSupabase as any)
+      .from('products')
+      .select('*', { count: 'exact', head: true })
+      .eq('business_id', businessId)
+      .eq('is_trade_in', true)
+      .eq('is_active', true)
+
+    return {
+      stockRetailValue,
+      stockCostValue,
+      lowStockCount,
+      inPoCount: poResult.count ?? 0,
+      customerBoughtCount: customerBoughtRes.count ?? 0,
+    }
   },
 
   // ── Variants ──────────────────────────────────────────────────────────────

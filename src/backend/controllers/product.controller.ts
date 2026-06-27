@@ -50,6 +50,8 @@ const createSchema = z.object({
   initial_stock: z.number().int().min(0).optional(),
   low_stock_alert: z.number().int().min(0).optional().nullable(),
   branch_id: z.string().uuid().optional().nullable(),
+  // Customer-sourced item flag
+  is_trade_in: z.boolean().optional().default(false),
 })
 
 const updateSchema = createSchema.partial()

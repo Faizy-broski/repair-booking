@@ -67,7 +67,7 @@ interface SaleDetail extends SaleRow {
 
 const PAYMENT_LABELS: Record<string, string> = {
   cash: 'Cash', card: 'Card', gift_card: 'Gift Card', split: 'Split', voucher: 'Voucher',
-  on_account: 'On Account',
+  on_account: 'On Account', ebay: 'eBay', deliveroo: 'Deliveroo', website: 'Website',
 }
 const STATUS_COLORS: Record<string, string> = {
   paid: 'bg-green-100 text-green-800',
