@@ -12,7 +12,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import {
   CheckCircle, Building2, User, CreditCard, Check, Zap, Mail,
   ChevronRight, ArrowLeft, Sparkles, Store, Wrench, ShoppingBag,
-  Scissors, Coffee, Monitor, Package, ShieldCheck, RotateCcw, Gift, Globe,
+  Scissors, Coffee, Monitor, Package, ShieldCheck, RotateCcw, Gift, Globe, MapPin,
 } from 'lucide-react'
 
 import validations from '@/components/layout/number-validations.json'
@@ -26,6 +26,9 @@ const step1Schema = z.object({
   phone: z.string().min(5, 'Phone number is required'),
   website: z.string().optional(),
   whatsapp: z.string().min(5, 'WhatsApp number is required'),
+  country: z.string().min(1, 'Country is required'),
+  city: z.string().min(1, 'City is required'),
+  address: z.string().min(1, 'Address is required'),
 }).refine((data) => {
   if (!data.phone.startsWith('+')) return true // Basic validation already handled by min(5)
 
@@ -699,6 +702,66 @@ export default function RegisterPage() {
                     onChange={(val) => form1.setValue('whatsapp', val, { shouldValidate: true })}
                     error={form1.formState.errors.whatsapp?.message}
                   />
+                </div>
+
+                {/* Row 4: Country + City */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-on-surface">Country</label>
+                    <select
+                      className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 bg-white ${form1.formState.errors.country ? 'border-error' : 'border-gray-300'}`}
+                      {...form1.register('country')}
+                    >
+                      <option value="">Select country</option>
+                      <option value="GB">United Kingdom</option>
+                      <option value="US">United States</option>
+                      <option value="CA">Canada</option>
+                      <option value="AU">Australia</option>
+                      <option value="AE">United Arab Emirates</option>
+                      <option value="SA">Saudi Arabia</option>
+                      <option value="PK">Pakistan</option>
+                      <option value="IN">India</option>
+                      <option value="DE">Germany</option>
+                      <option value="FR">France</option>
+                      <option value="IE">Ireland</option>
+                      <option value="NL">Netherlands</option>
+                      <option value="SG">Singapore</option>
+                      <option value="NZ">New Zealand</option>
+                      <option value="ZA">South Africa</option>
+                      <option value="NG">Nigeria</option>
+                      <option value="GH">Ghana</option>
+                      <option value="KE">Kenya</option>
+                      <option value="OTHER">Other</option>
+                    </select>
+                    {form1.formState.errors.country && (
+                      <p className="mt-1 text-xs text-error">{form1.formState.errors.country.message}</p>
+                    )}
+                  </div>
+                  <Input
+                    label="City"
+                    placeholder="London"
+                    error={form1.formState.errors.city?.message}
+                    {...form1.register('city')}
+                  />
+                </div>
+
+                {/* Row 5: Full Address */}
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-on-surface">Full Address</label>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <MapPin className="h-4 w-4" />
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="123 High Street, London, E1 6RF"
+                      className={`w-full rounded-lg border px-3 py-2 pl-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 ${form1.formState.errors.address ? 'border-error' : 'border-gray-300'}`}
+                      {...form1.register('address')}
+                    />
+                  </div>
+                  {form1.formState.errors.address && (
+                    <p className="mt-1 text-xs text-error">{form1.formState.errors.address.message}</p>
+                  )}
                 </div>
 
                 <div className="flex gap-2">

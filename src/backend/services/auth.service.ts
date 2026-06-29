@@ -8,6 +8,9 @@ interface RegisterPayload {
   phone?: string
   website?: string | null
   whatsapp?: string | null
+  country?: string | null
+  city?: string | null
+  address?: string | null
   fullName: string
   password: string
   mainBranchName: string
@@ -109,6 +112,9 @@ export const AuthService = {
         phone: payload.phone ?? null,
         website: payload.website || null,
         whatsapp: payload.whatsapp || null,
+        country: payload.country || null,
+        city: payload.city || null,
+        address: payload.address || null,
         is_active: payload.activateNow ?? false,
         ...(payload.trialEndsAt ? { trial_ends_at: payload.trialEndsAt } : {}),
       })
@@ -128,6 +134,8 @@ export const AuthService = {
         business_id: business.id,
         name: payload.mainBranchName,
         is_main: true,
+        address: payload.address || null,
+        phone: payload.phone || null,
       })
       .select()
       .single()

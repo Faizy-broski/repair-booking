@@ -17,6 +17,8 @@ import type { PaymentSplit } from '@/store/pos.store'
 import { formatCurrency, formatDateTime, getCurrencySymbol } from '@/lib/utils'
 import { pdf } from '@react-pdf/renderer'
 import { SaleReceiptPdf } from '@/components/pdf/sale-receipt-pdf'
+import { printReceipt as printThermalReceipt, type ReceiptPrintData } from '@/components/repairs/receipt-print'
+import { DEFAULT_INVOICE_SETTINGS } from '@/types/invoice-settings'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import type { Customer, Product } from '@/types/database'
@@ -215,16 +217,75 @@ export function CartPanel({ mobileView }: Props) {
     setGcCode(''); setGcLooking(false)
   }
 
-  // ── Receipt helper ─────────────────────────────────────────────────────────
-  async function printReceipt(saleId: string, paymentMethod: string, paymentSplits?: PaymentSplit[], paymentStatus?: string, amountPaid?: number) {
+  // ── Receipt helpers ─────────────────────────────────────────────────────────
+
+  // Opens the print popup window synchronously (must be called before any await
+  // so the browser treats it as user-gesture initiated and doesn't block it).
+  // Returns null for standard paper sizes — those use window.open() in the PDF path.
+  function openPrintWindow(): Window | null {
+    const paperSize = (invoiceSettings as any)?.paper_size ?? 'Receipt80'
+    if (!['Receipt80', 'Receipt58', 'Custom'].includes(paperSize)) return null
+    const mmWidth  = paperSize === 'Receipt58' ? 58 : ((invoiceSettings as any)?.custom_width ?? 80)
+    const winWidth = Math.round(mmWidth * 96 / 25.4) + 4
+    return window.open(
+      'about:blank', '_blank',
+      `width=${winWidth},height=900,toolbar=0,location=0,menubar=0,status=0,scrollbars=1`
+    )
+  }
+
+  // Prints the receipt for a completed sale.
+  // receiptItems must be captured BEFORE pos.clearCart() is called.
+  // preWin must be opened BEFORE any await (user-gesture context) then passed here.
+  async function printReceipt(
+    saleId: string,
+    paymentMethod: string,
+    receiptItems: { description: string; quantity: number; unit_price: number }[],
+    preWin: Window | null,
+    paymentSplits?: PaymentSplit[],
+    paymentStatus?: string,
+    amountPaid?: number,
+  ) {
+    const customerName = pos.customer
+      ? `${pos.customer.first_name} ${pos.customer.last_name ?? ''}`.trim()
+      : 'Walk-In Customer'
+
+    const paperSize = (invoiceSettings as any)?.paper_size ?? 'Receipt80'
+    const isTherm   = ['Receipt80', 'Receipt58', 'Custom'].includes(paperSize)
+
+    if (isTherm) {
+      // ── Thermal / roll paper: use HTML popup path ─────────────────────────
+      // This is far more reliable than the PDF blob path for thermal printers:
+      //  • No @react-pdf/renderer rendering (which can fail silently)
+      //  • preWin was opened before any await → never blocked by popup blocker
+      //  • receipt-print.ts injects exact @page size after measuring content height
+      //  • 8s afterprint delay covers slow EPSON USB drivers
+      const data: ReceiptPrintData = {
+        settings:      { ...DEFAULT_INVOICE_SETTINGS, ...(invoiceSettings ?? {}) },
+        invoiceNumber: `#${saleId.slice(-8).toUpperCase()}`,
+        status:        paymentStatus ?? 'paid',
+        issuedAt:      new Date().toISOString(),
+        businessName:  activeBranch?.name ?? 'Business',
+        branchName:    activeBranch?.name ?? null,
+        branchAddress: activeBranch?.address ?? null,
+        branchPhone:   activeBranch?.phone ?? null,
+        customerName,
+        items:         receiptItems,
+        subtotal,
+        discount:      discountAmt,
+        tax:           taxAmt,
+        total,
+        amountPaid:    amountPaid ?? total,
+        currency,
+      }
+      printThermalReceipt(data, preWin)
+      return
+    }
+
+    // ── Standard paper (A4/A5/Letter): keep existing PDF blob path ────────────
     try {
-      const customerName = pos.customer
-        ? `${pos.customer.first_name} ${pos.customer.last_name ?? ''}`.trim()
-        : 'Walk-In Customer'
-      const cartSnapshot = pos.cart.map(item => ({
-        name: item.variant ? `${item.product.name} – ${item.variant.name}` : item.product.name,
-        quantity: item.quantity, unit_price: item.unitPrice, discount: item.discount,
-        total: (item.unitPrice - item.discount) * item.quantity,
+      const pdfItems = receiptItems.map(i => ({
+        name: i.description, quantity: i.quantity, unit_price: i.unit_price,
+        discount: 0, total: i.quantity * i.unit_price,
       }))
       const blob = await pdf(
         <SaleReceiptPdf
@@ -235,7 +296,7 @@ export function CartPanel({ mobileView }: Props) {
           paymentMethod={paymentMethod}
           paymentStatus={paymentStatus ?? 'paid'}
           amountPaid={amountPaid}
-          items={cartSnapshot}
+          items={pdfItems}
           subtotal={subtotal} discount={discountAmt} tax={taxAmt} total={total}
           paymentSplits={paymentSplits?.map(s => ({ method: s.method, amount: s.amount }))}
           branchName={activeBranch?.name}
@@ -250,8 +311,8 @@ export function CartPanel({ mobileView }: Props) {
       ).toBlob()
       const url = URL.createObjectURL(blob)
       const win = window.open(url)
-      if (win) win.addEventListener('load', () => win.print())
-      setTimeout(() => URL.revokeObjectURL(url), 10000)
+      if (win) win.addEventListener('load', () => setTimeout(() => win.print(), 500))
+      setTimeout(() => URL.revokeObjectURL(url), 30000)
     } catch { /* receipt print is best-effort */ }
   }
 
@@ -259,6 +320,15 @@ export function CartPanel({ mobileView }: Props) {
   async function processPayment() {
     if (!activeBranch || !profile) return
     setProcessing(true)
+
+    // Capture receipt items and open print window NOW, while still in the
+    // user-gesture handler and before any await — prevents popup blocker.
+    const receiptItems = pos.cart.map(item => ({
+      description: item.variant ? `${item.product.name} – ${item.variant.name}` : item.product.name,
+      quantity: item.quantity,
+      unit_price: item.unitPrice,
+    }))
+    const preWin = openPrintWindow()
 
     const cartSnapshot = [...pos.cart]
     const paymentMethod = pos.paymentMethod
@@ -301,10 +371,11 @@ export function CartPanel({ mobileView }: Props) {
       setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
       queryClient.invalidateQueries({ queryKey: ['sales'] })
       queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
-      await printReceipt(saleJson.data?.sale_id ?? 'unknown', paymentMethod, paymentSplits)
+      await printReceipt(saleJson.data?.sale_id ?? 'unknown', paymentMethod, receiptItems, preWin, paymentSplits)
       setTimeout(() => { setSuccess(false); setPaymentOpen(false) }, 2500)
     } else {
       // Rollback: restore cart and hide success screen
+      preWin?.close()
       pos.restoreCart(cartSnapshot)
       setSuccess(false)
       const errJson = await res.json().catch(() => ({}))
@@ -319,6 +390,13 @@ export function CartPanel({ mobileView }: Props) {
   async function processCashPayment() {
     if (!activeBranch || !profile || pos.cart.length === 0) return
     setProcessing(true)
+
+    const receiptItemsCash = pos.cart.map(item => ({
+      description: item.product.name,
+      quantity: item.quantity,
+      unit_price: item.unitPrice,
+    }))
+    const preWinCash = openPrintWindow()
 
     const cartSnapshot = [...pos.cart]
     const itemsPayload = pos.cart.map(item => ({
@@ -352,10 +430,11 @@ export function CartPanel({ mobileView }: Props) {
       setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
       queryClient.invalidateQueries({ queryKey: ['sales'] })
       queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
-      await printReceipt(saleJson.data?.sale_id ?? 'unknown', 'cash')
+      await printReceipt(saleJson.data?.sale_id ?? 'unknown', 'cash', receiptItemsCash, preWinCash)
       setTimeout(() => setSuccess(false), 2500)
     } else {
       // Rollback: restore cart and hide success screen
+      preWinCash?.close()
       pos.restoreCart(cartSnapshot)
       setSuccess(false)
       const errJson = await res.json().catch(() => ({}))
@@ -397,6 +476,13 @@ export function CartPanel({ mobileView }: Props) {
     const deposit = Math.max(0, parseFloat(creditDepositAmount) || 0)
     setProcessing(true)
 
+    const receiptItemsCredit = pos.cart.map(item => ({
+      description: item.variant ? `${item.product.name} – ${item.variant.name}` : item.product.name,
+      quantity: item.quantity,
+      unit_price: item.unitPrice,
+    }))
+    const preWinCredit = openPrintWindow()
+
     const cartSnapshot = [...pos.cart]
     const itemsPayload = pos.cart.map(item => ({
       product_id: item.product.id, variant_id: item.variant?.id ?? null,
@@ -434,11 +520,12 @@ export function CartPanel({ mobileView }: Props) {
       queryClient.invalidateQueries({ queryKey: ['sales'] })
       queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
       queryClient.invalidateQueries({ queryKey: ['credits'] })
-      const creditStatus = deposit <= 0 ? 'on_account' : deposit >= total ? 'paid' : 'partial'
+      const creditStatus  = deposit <= 0 ? 'on_account' : deposit >= total ? 'paid' : 'partial'
       const depositSplits = deposit > 0 ? [{ method: creditDepositMethod as PaymentSplit['method'], amount: deposit }] : undefined
-      await printReceipt(saleJson.data?.sale_id ?? 'unknown', 'on_account', depositSplits, creditStatus, deposit)
+      await printReceipt(saleJson.data?.sale_id ?? 'unknown', 'on_account', receiptItemsCredit, preWinCredit, depositSplits, creditStatus, deposit)
       setTimeout(() => { setSuccess(false) }, 2500)
     } else {
+      preWinCredit?.close()
       pos.restoreCart(cartSnapshot)
       setSuccess(false)
       setCreditOpen(true)

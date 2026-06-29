@@ -29,6 +29,8 @@ export const DashboardController = {
       const urgentCutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
       const TERMINAL_IN  = '(repaired,collected,unrepairable,refunded)'
 
+      const todayStart = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).toISOString()
+
       const [
         salesRes,
         expensesRes,
@@ -41,18 +43,20 @@ export const DashboardController = {
         repairsRevenueRes,
         salesCogsRes,
         repairsPartsRes,
+        todaySalesRes,
       ] = await Promise.all([
         adminSupabase.from('sales').select('id, total, created_at').eq('branch_id', branchId).gte('created_at', periodStart),
         adminSupabase.from('expenses').select('amount').eq('branch_id', branchId).gte('expense_date', periodStart),
         (adminSupabase as any).from('repairs').select('*', { count: 'exact', head: true }).eq('branch_id', branchId) as Promise<{ count: number | null; error: unknown }>,
         (adminSupabase as any).from('repairs').select('*', { count: 'exact', head: true }).eq('branch_id', branchId).not('status', 'in', TERMINAL_IN) as Promise<{ count: number | null; error: unknown }>,
         (adminSupabase as any).from('repairs').select('*', { count: 'exact', head: true }).eq('branch_id', branchId).not('status', 'in', TERMINAL_IN).or(`is_rush.eq.true,created_at.lt.${urgentCutoff}`) as Promise<{ count: number | null; error: unknown }>,
-        adminSupabase.from('inventory').select('id, quantity, low_stock_alert').eq('branch_id', branchId),
+        adminSupabase.from('inventory').select('id, quantity, low_stock_alert, variant_id, products!inner(name, sku, is_active, is_service, has_variants)').eq('branch_id', branchId),
         adminSupabase.from('repairs').select('id, job_number, device_brand, device_model, issue, status, created_at, is_rush, customers(first_name,last_name)').eq('branch_id', branchId).order('created_at', { ascending: false }).limit(20),
         adminSupabase.from('repair_status_history').select('id, new_status, note, created_at, repairs!inner(id, job_number, device_brand, device_model), profiles!changed_by(full_name)').eq('repairs.branch_id', branchId).order('created_at', { ascending: false }).limit(20),
         adminSupabase.from('repairs').select('status, deposit_paid, actual_cost, estimated_cost, refund_amount').eq('branch_id', branchId).gte('created_at', periodStart),
         adminSupabase.from('sale_items').select('quantity, product_id, products!product_id(cost_price), sales!inner(branch_id, created_at)').eq('sales.branch_id', branchId).gte('sales.created_at', periodStart),
         adminSupabase.from('repair_items').select('quantity, unit_cost, repairs!inner(branch_id, created_at, status, deposit_paid)').eq('repairs.branch_id', branchId).gte('repairs.created_at', periodStart),
+        adminSupabase.from('sales').select('total, payment_method, payment_splits').eq('branch_id', branchId).gte('created_at', todayStart),
       ])
 
       const sales             = salesRes.data ?? []
@@ -99,7 +103,40 @@ export const DashboardController = {
         }
       })
 
-      const lowStockCount = inventory.filter((i) => i.quantity <= (i.low_stock_alert ?? 5)).length
+      const todaySales = (todaySalesRes.data ?? []) as any[]
+      let todayCashRevenue = 0
+      let todayCardRevenue = 0
+      for (const sale of todaySales) {
+        const method = sale.payment_method as string
+        const total  = sale.total as number ?? 0
+        const splits = sale.payment_splits as { method: string; amount: number }[] | null
+        if (method === 'split' && splits?.length) {
+          for (const s of splits) {
+            if (s.method === 'cash') todayCashRevenue += s.amount
+            else if (s.method === 'card') todayCardRevenue += s.amount
+          }
+        } else if (method === 'cash') {
+          todayCashRevenue += total
+        } else if (method === 'card') {
+          todayCardRevenue += total
+        }
+      }
+
+      const lowStockItems = (inventory as any[])
+        .filter((i) => {
+          const p = i.products
+          if (!i.variant_id && p?.has_variants) return false
+          return i.quantity <= (i.low_stock_alert ?? 5)
+        })
+        .sort((a, b) => a.quantity - b.quantity)
+        .map((i) => ({
+          id: i.id,
+          name: i.products?.name ?? 'Unknown Product',
+          sku: i.products?.sku ?? null,
+          quantity: i.quantity,
+          low_stock_alert: i.low_stock_alert ?? 5,
+        }))
+      const lowStockCount = lowStockItems.length
       const totalSales    = sales.reduce((s, r) => s + (r.total ?? 0), 0)
       const totalExpenses = expenses.reduce((s, r) => s + (r.amount ?? 0), 0)
       const repairsRevenue = repairsRevenueRows.reduce((s, r) => {
@@ -125,10 +162,12 @@ export const DashboardController = {
         net_profit:            totalSales + repairsRevenue - totalExpenses,
         repairs_revenue:       repairsRevenue,
         sales_profit:          totalSales - salesCogs,
-        repairs_profit:    repairsRevenue - repairsPartsCost,
+        repairs_profit:        repairsRevenue - repairsPartsCost,
+        today_cash_revenue:    todayCashRevenue,
+        today_card_revenue:    todayCardRevenue,
       }
 
-      return ok({ stats, recentRepairs, recentActivity })
+      return ok({ stats, recentRepairs, recentActivity, lowStockItems })
     } catch (err) {
       return serverError('Failed to load dashboard', err)
     }
@@ -236,7 +275,7 @@ export const DashboardController = {
         // Low stock alerts — inventory is typically small per branch
         adminSupabase
           .from('inventory')
-          .select('id, quantity, low_stock_alert')
+          .select('id, quantity, low_stock_alert, variant_id, products!inner(is_active, is_service, has_variants)')
           .eq('branch_id', branchId),
 
         // Recent repair tickets (last 20)
@@ -323,9 +362,10 @@ export const DashboardController = {
         }
       })
 
-      const lowStockCount = inventory.filter(
-        (i) => i.quantity <= (i.low_stock_alert ?? 5)
-      ).length
+      const lowStockCount = (inventory as any[]).filter((i) => {
+        if (!i.variant_id && (i.products as any)?.has_variants) return false
+        return i.quantity <= (i.low_stock_alert ?? 5)
+      }).length
 
       const totalSales    = sales.reduce((s, r) => s + (r.total ?? 0), 0)
       const totalExpenses = expenses.reduce((s, r) => s + (r.amount ?? 0), 0)

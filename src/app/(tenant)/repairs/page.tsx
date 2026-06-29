@@ -317,7 +317,7 @@ export default function RepairsPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [pageSize, setPageSize] = useState(20)
-  const [statsPeriod, setStatsPeriod] = useState<'month' | '3months' | '6months' | 'year'>('month')
+  const [statsPeriod, setStatsPeriod] = useState<'today' | 'month' | '3months' | '6months' | 'year'>('month')
 
   // URL-based state
   const page = parseInt(searchParams.get('page') || '0', 10)
@@ -1237,7 +1237,7 @@ export default function RepairsPage() {
           <p className="text-sm text-on-surface-variant">Real-time overview of your workshop performance.</p>
         </div>
         <div className="flex items-center gap-1 rounded-lg border border-outline-variant bg-surface-container p-1">
-          {(['month', '3months', '6months', 'year'] as const).map((p) => (
+          {(['today', 'month', '3months', '6months', 'year'] as const).map((p) => (
             <button
               key={p}
               onClick={() => setStatsPeriod(p)}
@@ -1247,7 +1247,7 @@ export default function RepairsPage() {
                   : 'text-on-surface-variant hover:bg-surface-container-high'
               }`}
             >
-              {p === 'month' ? 'Month' : p === '3months' ? '3M' : p === '6months' ? '6M' : 'Year'}
+              {p === 'today' ? 'Today' : p === 'month' ? 'Month' : p === '3months' ? '3M' : p === '6months' ? '6M' : 'Year'}
             </button>
           ))}
         </div>

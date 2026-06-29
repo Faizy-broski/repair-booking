@@ -7,7 +7,7 @@ import { z } from 'zod'
 import {
   Building2, User, CreditCard, ClipboardList, CheckCircle,
   ChevronRight, ArrowLeft, Copy, Check, Eye, EyeOff, Sparkles, Plus,
-  RefreshCw, Globe,
+  RefreshCw, Globe, MapPin,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,6 +23,9 @@ const step1Schema = z.object({
   phone: z.string().min(5, 'Phone number is required'),
   website: z.string().optional(),
   whatsapp: z.string().optional(),
+  country: z.string().optional(),
+  city: z.string().optional(),
+  address: z.string().optional(),
 })
 
 const step2Schema = z.object({
@@ -460,6 +463,59 @@ export default function OnboardBusinessPage() {
                 />
               </div>
 
+              {/* Country + City */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Country <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <select
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                    {...form1.register('country')}
+                  >
+                    <option value="">Select country</option>
+                    <option value="GB">United Kingdom</option>
+                    <option value="US">United States</option>
+                    <option value="CA">Canada</option>
+                    <option value="AU">Australia</option>
+                    <option value="AE">United Arab Emirates</option>
+                    <option value="SA">Saudi Arabia</option>
+                    <option value="PK">Pakistan</option>
+                    <option value="IN">India</option>
+                    <option value="DE">Germany</option>
+                    <option value="FR">France</option>
+                    <option value="IE">Ireland</option>
+                    <option value="NL">Netherlands</option>
+                    <option value="SG">Singapore</option>
+                    <option value="NZ">New Zealand</option>
+                    <option value="ZA">South Africa</option>
+                    <option value="NG">Nigeria</option>
+                    <option value="GH">Ghana</option>
+                    <option value="KE">Kenya</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">City <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <Input
+                    {...form1.register('city')}
+                    placeholder="London"
+                  />
+                </div>
+              </div>
+
+              {/* Full Address */}
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Full Address <span className="text-gray-400 font-normal">(optional)</span></label>
+                <div className="relative">
+                  <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="123 High Street, London, E1 6RF"
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 pl-9 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                    {...form1.register('address')}
+                  />
+                </div>
+              </div>
+
               <Button type="submit" className="w-full">
                 Continue <ChevronRight className="h-4 w-4" />
               </Button>
@@ -675,6 +731,18 @@ export default function OnboardBusinessPage() {
                   {step1Data.whatsapp && (<>
                     <span className="text-gray-500">WhatsApp</span>
                     <span className="font-medium text-gray-900">{step1Data.whatsapp}</span>
+                  </>)}
+                  {step1Data.country && (<>
+                    <span className="text-gray-500">Country</span>
+                    <span className="font-medium text-gray-900">{step1Data.country}</span>
+                  </>)}
+                  {step1Data.city && (<>
+                    <span className="text-gray-500">City</span>
+                    <span className="font-medium text-gray-900">{step1Data.city}</span>
+                  </>)}
+                  {step1Data.address && (<>
+                    <span className="text-gray-500">Address</span>
+                    <span className="font-medium text-gray-900">{step1Data.address}</span>
                   </>)}
                 </div>
               </div>

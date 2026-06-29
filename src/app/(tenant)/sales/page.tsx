@@ -873,13 +873,16 @@ export default function SalesPage() {
       {/* Quick date range */}
       <div className="flex gap-1 rounded-full border p-1 w-fit">
         {([
+          { label: 'Today',      days: -2 },
           { label: 'This Month', days: 0 },
-          { label: '3 Months', days: 90 },
-          { label: '6 Months', days: 180 },
-          { label: 'This Year', days: -1 },
+          { label: '3 Months',   days: 90 },
+          { label: '6 Months',   days: 180 },
+          { label: 'This Year',  days: -1 },
         ] as const).map(({ label, days }) => {
           const getRange = () => {
             const now = new Date()
+            const today = now.toISOString().slice(0, 10)
+            if (days === -2) return { from: today, to: today }
             if (days === -1) return { from: `${now.getFullYear()}-01-01`, to: '' }
             if (days === 0) return { from: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`, to: '' }
             const from = new Date(now); from.setDate(from.getDate() - days)

@@ -213,12 +213,12 @@ export const ProductController = {
       const targetBranch = branch_id ?? ctx.auth.branchId
       if (targetBranch && low_stock_alert !== undefined) {
         const { adminSupabase } = await import('@/backend/config/supabase')
-        // Check if inventory row exists
         const { data: existing } = await adminSupabase
           .from('inventory')
           .select('id')
           .eq('branch_id', targetBranch)
           .eq('product_id', id)
+          .is('variant_id', null)
           .maybeSingle()
         if (existing) {
           const updatePayload: Record<string, unknown> = { low_stock_alert: low_stock_alert ?? 5 }
@@ -227,6 +227,7 @@ export const ProductController = {
             .update(updatePayload)
             .eq('branch_id', targetBranch)
             .eq('product_id', id)
+            .is('variant_id', null)
           if (updErr) console.error('[ProductController.update] Update inventory error:', updErr)
         } else {
           const { error: insErr } = await adminSupabase.from('inventory').insert({

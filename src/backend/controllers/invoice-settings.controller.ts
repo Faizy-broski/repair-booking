@@ -19,7 +19,7 @@ const schema = z.object({
   branch_id: z.string().uuid().nullable().optional(),
 
   // Page
-  paper_size:  z.enum(['A4','A5','Letter','Receipt80','Receipt58']).optional(),
+  paper_size:  z.enum(['A4','A5','Letter','Receipt80','Receipt58','Custom']).optional(),
   orientation: z.enum(['portrait','landscape']).optional(),
 
   // Branding

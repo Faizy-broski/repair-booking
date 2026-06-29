@@ -336,9 +336,11 @@ export const ProductService = {
       // and to get the correct per-variant selling/cost price.
       ;(invResult.data as any[]).forEach((row: any) => {
         const p = row.products
-        if (!p?.is_active || p?.is_service || p?.has_variants) return
-        stockRetailValue += (p.selling_price ?? 0) * row.quantity
-        stockCostValue   += (p.cost_price   ?? 0) * row.quantity
+        if (p?.has_variants) return
+        if (p?.is_active && !p?.is_service) {
+          stockRetailValue += (p.selling_price ?? 0) * row.quantity
+          stockCostValue   += (p.cost_price   ?? 0) * row.quantity
+        }
         const threshold = row.low_stock_alert ?? 5
         if (row.quantity <= threshold) lowStockCount++
       })
@@ -348,12 +350,12 @@ export const ProductService = {
       ;(variantInvResult.data as any[]).forEach((row: any) => {
         const v = row.product_variants
         const p = v?.products
-        if (!p?.is_active || p?.is_service) return
-        // Prefer the variant's own price; fall back to the parent product's price
-        const sellPrice = v.selling_price ?? p.selling_price ?? 0
-        const costPrice = v.cost_price   ?? p.cost_price   ?? 0
-        stockRetailValue += sellPrice * row.quantity
-        stockCostValue   += costPrice  * row.quantity
+        if (p?.is_active && !p?.is_service) {
+          const sellPrice = v.selling_price ?? p.selling_price ?? 0
+          const costPrice = v.cost_price   ?? p.cost_price   ?? 0
+          stockRetailValue += sellPrice * row.quantity
+          stockCostValue   += costPrice  * row.quantity
+        }
         const threshold = row.low_stock_alert ?? 5
         if (row.quantity <= threshold) lowStockCount++
       })

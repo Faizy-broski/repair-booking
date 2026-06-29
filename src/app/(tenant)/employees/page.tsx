@@ -12,6 +12,7 @@ import { AsyncEmployeeSelect } from '@/components/shared/async-employee-select'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
 import { EmployeeReportTab } from './_components/employee-report'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { Modal } from '@/components/ui/modal'
 import { PhoneInput } from '@/components/ui/phone-input'
 import validations from '@/components/layout/number-validations.json'
 import { useAuthStore } from '@/store/auth.store'
@@ -99,7 +100,7 @@ type PayrollForm = z.infer<typeof payrollSchema>
 
 
 function EmployeesPageInner() {
-  const { activeBranch, verticalTemplateSlug } = useAuthStore()
+  const { activeBranch, verticalTemplateSlug, currency } = useAuthStore()
   // Base salary + per-sale commission entry is specific to the retail-store
   // vertical template, independent of any module's enabled/disabled state.
   const isRetailTemplate = verticalTemplateSlug === 'retail-store'
@@ -122,6 +123,10 @@ function EmployeesPageInner() {
   const [commEmployeeFilter, setCommEmployeeFilter] = useState('')
   const [commMonthFilter, setCommMonthFilter] = useState(nowMonth)
   const [commYearFilter, setCommYearFilter]   = useState(nowYear)
+  const [editingCommission, setEditingCommission] = useState<CommissionRow | null>(null)
+  const [commEditStatus, setCommEditStatus] = useState<string>('pending')
+  const [commEditAmount, setCommEditAmount] = useState<string>('')
+  const [commEditSaving, setCommEditSaving] = useState(false)
   // ── Clock In/Out filters ─────────────────────────────────────────────────
   const [clockEmployeeFilter, setClockEmployeeFilter] = useState('')
   const [clockMonthFilter, setClockMonthFilter] = useState(nowMonth)
@@ -654,7 +659,42 @@ function EmployeesPageInner() {
       <Badge variant={(getValue() as string) === 'paid' ? 'success' : 'warning'}>{getValue() as string}</Badge>
     )},
     { accessorKey: 'created_at', header: 'Date', cell: ({ getValue }) => formatDate(getValue() as string) },
+    { id: 'actions', header: '', cell: ({ row }) => (
+      <button
+        onClick={() => {
+          setEditingCommission(row.original)
+          setCommEditStatus(row.original.status)
+          setCommEditAmount(String(row.original.amount))
+        }}
+        className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+        title="Edit commission"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+      </button>
+    )},
   ]
+
+  async function saveCommissionEdit() {
+    if (!editingCommission) return
+    const amount = parseFloat(commEditAmount)
+    if (isNaN(amount) || amount < 0) { toast.error('Invalid amount'); return }
+    setCommEditSaving(true)
+    try {
+      const res = await fetch(`/api/employees/commissions/${editingCommission.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: commEditStatus, amount }),
+      })
+      if (!res.ok) throw new Error('Failed to update')
+      queryClient.invalidateQueries({ queryKey: ['employees-commissions'] })
+      toast.success('Commission updated')
+      setEditingCommission(null)
+    } catch {
+      toast.error('Failed to update commission')
+    } finally {
+      setCommEditSaving(false)
+    }
+  }
 
   const commissionsTotal = commissions.reduce((sum, c) => sum + (c.amount ?? 0), 0)
   const currentYear = new Date().getFullYear()
@@ -1039,6 +1079,51 @@ function EmployeesPageInner() {
         confirmLabel="Remove"
         loading={!!deletingEmployee}
       />
+
+      {/* ── Edit Commission Modal ── */}
+      <Modal
+        open={!!editingCommission}
+        onClose={() => setEditingCommission(null)}
+        title="Edit Commission"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Amount</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">{currency}</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={commEditAmount}
+                onChange={(e) => setCommEditAmount(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 bg-white pl-10 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Status</label>
+            <select
+              value={commEditStatus}
+              onChange={(e) => setCommEditStatus(e.target.value)}
+              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="paid">Paid</option>
+            </select>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" size="sm" onClick={() => setEditingCommission(null)} disabled={commEditSaving}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={saveCommissionEdit} disabled={commEditSaving}>
+              {commEditSaving ? 'Saving…' : 'Save Changes'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

@@ -55,7 +55,13 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
   const thankYou = settings.thank_you_message || 'Thank you for your business!'
 
   const socials = Object.entries(settings.social_links ?? {})
-    .filter(([, v]) => v)
+    .filter(([, v]) => {
+      if (!v) return false
+      // Require at least one path segment after the domain (e.g. facebook.com/page).
+      // Bare hostnames like "example.localhost:3000" have no "/" and are skipped.
+      const stripped = String(v).replace(/^https?:\/\/(www\.)?/, '')
+      return stripped.includes('/')
+    })
     .map(([k, v]) => ({
       label: SOCIAL_LABELS[k as keyof SocialLinks],
       val: String(v).replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''),
@@ -236,7 +242,7 @@ export function previewReceiptHtml(data: ReceiptPrintData): void {
  * 4. Everything is console-logged so you can open DevTools on the popup window
  *    (right-click → Inspect) and verify the measurements.
  */
-export function printReceipt(data: ReceiptPrintData): void {
+export function printReceipt(data: ReceiptPrintData, preOpenedWin?: Window | null): void {
   const isCustom      = data.settings.paper_size === 'Custom'
   const customW       = data.settings.custom_width  ?? 80
   const customH       = data.settings.custom_height ?? null   // null = roll (measure height)
@@ -249,26 +255,40 @@ export function printReceipt(data: ReceiptPrintData): void {
 
   const html = buildHtml(data, /* debugMode= */ false)
 
-  // ── Use a Blob URL so Chrome doesn't print "about:blank" as page header ──
-  const blob    = new Blob([html], { type: 'text/html;charset=utf-8' })
-  const blobUrl = URL.createObjectURL(blob)
+  let win: Window | null
+  let blobUrl: string | null = null
 
-  // Open popup at EXACT paper width + generous height.
-  // Width must match paperWidthPx so body.scrollWidth === window.innerWidth
-  // and the browser doesn't centre the narrow body in a wide window.
-  const win = window.open(
-    blobUrl,
-    '_blank',
-    `width=${paperWidthPx + 4},height=700,toolbar=0,location=0,menubar=0,status=0,scrollbars=1`
-  )
+  if (preOpenedWin && !preOpenedWin.closed) {
+    // ── Fast path: write HTML directly into the pre-opened window ─────────────
+    // The caller opened this window synchronously inside a user-gesture handler
+    // (before any await), so it is never blocked by popup blockers.
+    // We write the receipt HTML in and close the document stream — the browser
+    // treats this as a full page load and fires 'load' normally.
+    win = preOpenedWin
+    win.document.open()
+    win.document.write(html)
+    win.document.close()
+  } else {
+    // ── Fallback: open a new Blob URL popup ────────────────────────────────────
+    // This path is used when no pre-opened window is available (e.g. repair invoice
+    // modal, or POS when the browser blocked the pre-open). Blob URL avoids Chrome
+    // printing "about:blank" as a page header on physical paper.
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+    blobUrl = URL.createObjectURL(blob)
+    win = window.open(
+      blobUrl,
+      '_blank',
+      `width=${paperWidthPx + 4},height=900,toolbar=0,location=0,menubar=0,status=0,scrollbars=1`
+    )
 
-  if (!win) {
-    alert('Please allow pop-ups for this site to enable printing.')
-    URL.revokeObjectURL(blobUrl)
-    return
+    if (!win) {
+      alert('Please allow pop-ups for this site to enable printing.')
+      URL.revokeObjectURL(blobUrl)
+      return
+    }
   }
 
-  const triggerPrint = () => {
+  const doMeasureAndPrint = () => {
     // ── Measure actual content height ────────────────────────────────────────
     // CRITICAL: Use body.scrollHeight ONLY.
     //
@@ -280,15 +300,20 @@ export function printReceipt(data: ReceiptPrintData): void {
     //
     // body.scrollHeight always returns the rendered content height regardless of
     // window size, making it the only reliable measurement here.
-    const contentHeight = win.document.body.scrollHeight
+    //
+    // +80px safety buffer: guards against sub-pixel rounding and footer padding
+    // so the last line of the receipt is never clipped by the page boundary.
+    const rawHeight     = win!.document.body.scrollHeight
+    const contentHeight = rawHeight + 80
 
     // Log everything so the developer can verify
     console.group('[RECEIPT PRINT] triggerPrint fired')
-    console.log('body.scrollHeight (used)       :', contentHeight, 'px  ← this becomes page height')
-    console.log('doc.scrollHeight  (IGNORED)    :', win.document.documentElement.scrollHeight, 'px  ← window height, do NOT use')
-    console.log('window.innerHeight             :', win.innerHeight, 'px')
-    console.log('window.innerWidth              :', win.innerWidth, 'px')
-    console.log('window.devicePixelRatio        :', win.devicePixelRatio)
+    console.log('body.scrollHeight (raw)        :', rawHeight, 'px')
+    console.log('contentHeight (+80 buffer)     :', contentHeight, 'px  ← used for @page')
+    console.log('doc.scrollHeight  (IGNORED)    :', win!.document.documentElement.scrollHeight, 'px  ← window height, do NOT use')
+    console.log('window.innerHeight             :', win!.innerHeight, 'px')
+    console.log('window.innerWidth              :', win!.innerWidth, 'px')
+    console.log('window.devicePixelRatio        :', win!.devicePixelRatio)
     console.log('paperWidthCss                  :', paperWidthCss)
 
     // ── Inject @page with exact content height ───────────────────────────────
@@ -302,41 +327,54 @@ export function printReceipt(data: ReceiptPrintData): void {
     console.log('Injecting @page rule           :', pageRule)
     console.groupEnd()
 
-    const sizeStyle = win.document.createElement('style')
+    const sizeStyle = win!.document.createElement('style')
     sizeStyle.id = 'dynamic-page-size'
     sizeStyle.textContent = pageRule
-    win.document.head.appendChild(sizeStyle)
+    win!.document.head.appendChild(sizeStyle)
 
-    win.focus()
-    win.print()
+    win!.focus()
+    win!.print()
 
-    // ── EPSON TM-T88V fix: delayed window close ───────────────────────────────
+    // ── EPSON timing fix: delayed window close ────────────────────────────────
     // `afterprint` fires the instant the user clicks "Print" in Chrome's dialog.
-    // At that moment, the job enters Windows' print spooler but the EPSON USB
-    // driver may not have finished receiving it yet.
+    // At that moment, the job enters Windows' print spooler but the USB driver
+    // (EPSON TM-T88V/VII, TM-T20III, etc.) may not have finished receiving it.
     // Calling win.close() immediately kills the connection mid-transfer → printer
     // receives nothing and outputs no paper.
     //
-    // Fix: wait 4 seconds after afterprint before destroying the window.
-    // 4s is enough for the EPSON TM-T88V to fully spool a receipt.
-    win.addEventListener('afterprint', () => {
-      console.log('[RECEIPT PRINT] afterprint fired — waiting 4s before closing popup')
+    // Fix: wait 8 seconds after afterprint before destroying the window.
+    // 8s covers even the slowest EPSON USB drivers on Windows 11.
+    win!.addEventListener('afterprint', () => {
+      console.log('[RECEIPT PRINT] afterprint fired — waiting 8s before closing popup')
       setTimeout(() => {
-        win.close()
-        URL.revokeObjectURL(blobUrl)
-        console.log('[RECEIPT PRINT] popup closed + blob URL revoked')
-      }, 4000)
+        win!.close()
+        if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = null }
+        console.log('[RECEIPT PRINT] popup closed')
+      }, 8000)
     }, { once: true })
 
     // Safety fallback: if afterprint never fires (e.g. user closes dialog without
     // printing), clean up after 60s so we do not leak the blob URL forever.
     setTimeout(() => {
-      if (!win.closed) win.close()
-      URL.revokeObjectURL(blobUrl)
+      if (win && !win.closed) win.close()
+      if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = null }
     }, 60_000)
   }
 
-  // Wait for the blob page to fully load, then 500ms extra for layout reflow.
-  win.addEventListener('load', () => setTimeout(triggerPrint, 500), { once: true })
+  const triggerPrint = () => {
+    // Re-measure fallback: if layout hasn't settled (height < 200px), wait
+    // another 600ms and try once more before printing.
+    const h = win!.document.body.scrollHeight
+    if (h < 200) {
+      console.log('[RECEIPT PRINT] scrollHeight too small (' + h + 'px) — re-measuring in 600ms')
+      setTimeout(doMeasureAndPrint, 600)
+    } else {
+      doMeasureAndPrint()
+    }
+  }
+
+  // Wait for the page to fully load, then 1000ms extra for layout reflow.
+  // 1000ms (up from 500ms) covers slow EPSON USB drivers that defer font rendering.
+  win.addEventListener('load', () => setTimeout(triggerPrint, 1000), { once: true })
 }
 

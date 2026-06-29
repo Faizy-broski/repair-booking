@@ -182,7 +182,7 @@ export default function InventoryPage() {
   const [supplierFilter, setSupplierFilter] = useState('')
   const [valuationFilter, setValuationFilter] = useState('')
   const [hideOutOfStock, setHideOutOfStock] = useState(false)
-  const [lowStockOnly, setLowStockOnly] = useState(false)
+  const [lowStockOnly, setLowStockOnly] = useState(() => searchParams.get('low_stock') === 'true')
 
   // Bulk select
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())

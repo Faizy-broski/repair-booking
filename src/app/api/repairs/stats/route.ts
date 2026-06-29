@@ -12,6 +12,7 @@ export const GET = withMiddleware(async (req, ctx) => {
   const periodStart  = period === 'year'    ? new Date(now.getFullYear(), 0, 1).toISOString()
                      : period === '6months' ? new Date(now.getFullYear(), now.getMonth() - 6, 1).toISOString()
                      : period === '3months' ? new Date(now.getFullYear(), now.getMonth() - 3, 1).toISOString()
+                     : period === 'today'   ? new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
                      :                        new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   const db           = adminSupabase as any
 

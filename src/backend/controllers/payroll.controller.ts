@@ -163,6 +163,21 @@ export const CommissionController = {
       return serverError('Failed to fetch employee commissions', err)
     }
   },
+
+  async update(request: NextRequest, ctx: RequestContext, id: string) {
+    const schema = z.object({
+      status: z.enum(['pending', 'approved', 'paid']).optional(),
+      amount: z.coerce.number().min(0).optional(),
+    })
+    const { data, error } = await validateBody(request, schema)
+    if (error) return error
+    try {
+      const updated = await CommissionService.updateCommission(id, ctx.businessId, data)
+      return ok(updated)
+    } catch (err) {
+      return serverError('Failed to update commission', err)
+    }
+  },
 }
 
 // ── Shifts ────────────────────────────────────────────────────────────────────

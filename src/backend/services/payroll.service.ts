@@ -217,6 +217,17 @@ export const CommissionService = {
     if (error) throw error
   },
 
+  async updateCommission(id: string, businessId: string, payload: { status?: string; amount?: number }) {
+    const { data, error } = await db('employee_commissions')
+      .update(payload)
+      .eq('id', id)
+      .eq('business_id', businessId)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
   async listForEmployee(employeeId: string, businessId: string, page = 1, limit = 20) {
     const from = (page - 1) * limit
     const { data, error, count } = await db('employee_commissions')
