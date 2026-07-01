@@ -2,7 +2,7 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Edit, Clock, ClipboardList, Receipt, BookOpen } from 'lucide-react'
+import { ArrowLeft, Edit, Clock, ClipboardList, Receipt, BookOpen, Printer } from 'lucide-react'
 import { BrandSpinner } from '@/components/ui/brand-spinner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,9 +14,12 @@ import { RepairEmailPrompt } from '@/components/repairs/email-prompt-modal'
 import { ConditionChecklist } from '@/components/repairs/condition-checklist'
 import { LabelPicker } from '@/components/repairs/label-picker'
 import { EstimatesPanel } from '@/components/repairs/estimates-panel'
+import { RepairInvoiceModal } from '@/components/repairs/invoice-modal'
+import { RepairSlipModal } from '@/components/repairs/slip-modal'
 import { CustomFieldRenderer, useCustomFieldDefs } from '@/components/shared/custom-field-renderer'
 import { PatternLock } from '@/components/ui/pattern-lock'
 import { toast } from 'sonner'
+import type { InvoiceSettings } from '@/types/invoice-settings'
 
 
 interface Technician {
@@ -87,6 +90,8 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
   const [showCannedPicker, setShowCannedPicker] = useState(false)
   const [assigningTech, setAssigningTech] = useState(false)
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({})
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false)
+  const [slipOpen, setSlipOpen] = useState(false)
 
   // ── Main repair data ──────────────────────────────────────────────────────────
   const { data: repair, isLoading: loading } = useQuery<RepairDetail | null>({
@@ -122,6 +127,17 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
     staleTime: Infinity,
   })
   const customStatuses = (metaData?.customStatuses ?? []) as { name: string; color: string }[]
+
+  // ── Invoice design settings — reuses the same cache as the repairs list page ──
+  const { data: invoiceSettings } = useQuery<InvoiceSettings | null>({
+    queryKey: ['invoice-settings', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/settings/invoice?branch_id=${activeBranch!.id}`)
+      const json = await res.json()
+      return (json.data as InvoiceSettings) ?? null
+    },
+    enabled: !!activeBranch && invoiceModalOpen,
+  })
 
   // ── Employees — shared cache key with the repairs list page ──────────────────
   const { data: technicians = [] } = useQuery<Technician[]>({
@@ -286,6 +302,14 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
               </span>
             )
           })()}
+          <Button variant="outline" onClick={() => setInvoiceModalOpen(true)} size="sm" className="shrink-0">
+            <Receipt className="h-4 w-4" />
+            <span className="hidden sm:inline">Invoice</span>
+          </Button>
+          <Button variant="outline" onClick={() => setSlipOpen(true)} size="sm" className="shrink-0">
+            <Printer className="h-4 w-4" />
+            <span className="hidden sm:inline">Print Slip</span>
+          </Button>
           <Button onClick={() => setStatusModalOpen(true)} size="sm" className="shrink-0">
             <Edit className="h-4 w-4" />
             <span className="hidden sm:inline">Update Status</span>
@@ -617,6 +641,17 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
           currentStatus={emailPrompt.currentStatus}
           onClose={() => setEmailPrompt(null)}
         />
+      )}
+
+      <RepairInvoiceModal
+        open={invoiceModalOpen}
+        onClose={() => setInvoiceModalOpen(false)}
+        repair={repair}
+        settings={invoiceSettings}
+        branch={activeBranch}
+      />
+      {slipOpen && (
+        <RepairSlipModal repair={repair as any} onClose={() => setSlipOpen(false)} />
       )}
     </div>
   )

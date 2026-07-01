@@ -55,13 +55,7 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
   const thankYou = settings.thank_you_message || 'Thank you for your business!'
 
   const socials = Object.entries(settings.social_links ?? {})
-    .filter(([, v]) => {
-      if (!v) return false
-      // Require at least one path segment after the domain (e.g. facebook.com/page).
-      // Bare hostnames like "example.localhost:3000" have no "/" and are skipped.
-      const stripped = String(v).replace(/^https?:\/\/(www\.)?/, '')
-      return stripped.includes('/')
-    })
+    .filter(([, v]) => !!v)
     .map(([k, v]) => ({
       label: SOCIAL_LABELS[k as keyof SocialLinks],
       val: String(v).replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''),
