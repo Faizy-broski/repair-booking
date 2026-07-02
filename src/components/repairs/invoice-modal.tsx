@@ -1,197 +1,75 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
 import { Printer, FileText, Loader2 } from 'lucide-react'
-import { pdf } from '@react-pdf/renderer'
-import { InvoicePdf } from '@/components/pdf/invoice-pdf'
-import { RepairReceiptHtml } from '@/components/repairs/repair-receipt-html'
-import { printReceipt } from '@/components/repairs/receipt-print'
-import { DEFAULT_INVOICE_SETTINGS, type InvoiceSettings } from '@/types/invoice-settings'
-import { useAuthStore } from '@/store/auth.store'
 
 interface Props {
   open: boolean
   onClose: () => void
   repair: any
-  settings: InvoiceSettings | null | undefined
-  branch: any
 }
 
-
-interface ReceiptData {
-  items: Array<{ description: string; quantity: number; unit_price: number }>
-  invoiceTotal: number
-  amountPaid: number
-  mergedSettings: InvoiceSettings
-  customerName: string
-}
-
-export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: Props) {
-  const [pdfUrl, setPdfUrl]           = useState<string | null>(null)
-  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null)
-  const [loading, setLoading]         = useState(false)
-  const { currency }                  = useAuthStore()
+// The invoice PDF is rendered server-side (/api/repairs/[id]/pdf) with a fixed
+// page size, so the preview and the print are the exact same document. Printing
+// happens through the already-loaded preview iframe — no popup window, no
+// client-side height measurement, no race with logo/font loading.
+export function RepairInvoiceModal({ open, onClose, repair }: Props) {
+  const [pdfUrl, setPdfUrl]   = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError]     = useState(false)
+  const iframeRef             = useRef<HTMLIFrameElement>(null)
 
   useEffect(() => {
     if (!open || !repair) return
-    if (!settings) { setLoading(true); return }
 
     let cancelled = false
+    let objectUrl: string | null = null
 
-    async function generate() {
+    async function load() {
       setLoading(true)
+      setError(false)
       try {
-        const customer = repair.customers
-        const cf = (repair.custom_fields as any) ?? {}
-
-        let repairItems: any[] = []
-        try {
-          const res = await fetch(`/api/repairs/${repair.id}`)
-          if (res.ok) {
-            const full = await res.json()
-            repairItems = Array.isArray(full.repair_items) ? full.repair_items : []
-          }
-        } catch { /* fallback to single item */ }
-
-        const items = repairItems.length > 0
-          ? repairItems.map((item: any) => ({
-              description: item.name,
-              quantity:    item.quantity ?? 1,
-              unit_price:  item.unit_price ?? 0,
-            }))
-          : [{
-              description: `${repair.issue || 'Repair Service'} (${repair.device_type} ${repair.device_brand} ${repair.device_model})`,
-              quantity:    1,
-              unit_price:  repair.estimated_cost ?? 0,
-            }]
-
-        const invoiceTotal = repairItems.length > 0
-          ? items.reduce((s: number, it: any) => s + it.quantity * it.unit_price, 0)
-          : (repair.estimated_cost ?? 0)
-
-        const amountPaid   = repair.deposit_paid ?? 0
-        const customerName = customer
-          ? `${customer.first_name} ${customer.last_name ?? ''}`.trim()
-          : 'Walk-In'
-
-        const mergedSettings: InvoiceSettings = {
-          ...DEFAULT_INVOICE_SETTINGS,
-          ...settings,
-          logo_url:  settings.logo_url  ?? branch?.logo_url ?? null,
-          show_logo: settings.show_logo !== false && !!(settings.logo_url ?? branch?.logo_url),
-        }
-
-        if (!cancelled) {
-          setReceiptData({ items, invoiceTotal, amountPaid, mergedSettings, customerName })
-        }
-
-        // Build PDF for preview
-        const doc = (
-          <InvoicePdf
-            settings={mergedSettings}
-            invoiceNumber={repair.job_number}
-            status={repair.status}
-            issuedAt={repair.created_at}
-            dueAt={cf.due_date}
-            businessName={branch?.name || 'Business'}
-            branchName={branch?.name}
-            branchAddress={branch?.address}
-            branchPhone={branch?.phone}
-            branchEmail={branch?.email}
-            customerName={customerName}
-            customerEmail={customer?.email}
-            customerPhone={customer?.phone}
-            customerAddress={customer?.address}
-            items={items}
-            subtotal={invoiceTotal}
-            discount={0}
-            tax={0}
-            total={invoiceTotal}
-            amountPaid={amountPaid}
-            notes={repair.notes}
-            currency={currency}
-          />
-        )
-        const blob = await pdf(doc).toBlob()
-        if (!cancelled) setPdfUrl(URL.createObjectURL(blob))
+        const res = await fetch(`/api/repairs/${repair.id}/pdf`)
+        if (!res.ok) throw new Error(`PDF generation failed (${res.status})`)
+        const blob = await res.blob()
+        if (cancelled) return
+        objectUrl = URL.createObjectURL(blob)
+        setPdfUrl(objectUrl)
       } catch (err) {
-        if (!cancelled) console.error('Failed to generate invoice:', err)
+        console.error('Failed to load invoice PDF:', err)
+        if (!cancelled) setError(true)
       } finally {
         if (!cancelled) setLoading(false)
       }
     }
 
-    generate()
-    return () => { cancelled = true }
-  }, [open, repair, settings, branch])
+    load()
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [open, repair])
 
   useEffect(() => {
-    if (!open) { setPdfUrl(null); setReceiptData(null); setLoading(false) }
+    if (!open) { setPdfUrl(null); setError(false); setLoading(false) }
   }, [open])
 
   function handlePrint() {
-    if (!receiptData) return
-
-    const paperSize = receiptData.mergedSettings.paper_size ?? 'A4'
-    const isReceipt = paperSize === 'Receipt80' || paperSize === 'Receipt58' || paperSize === 'Custom'
-
-    if (isReceipt) {
-      // ── Popup approach for all receipt/thermal/custom sizes ────────────────
-      // Avoids three bugs in the window.print() approach:
-      //  1) @page inside @media print is silently ignored by browsers
-      //  2) scrollHeight measurement is unreliable inside a hidden Modal parent
-      //  3) window.print() captures the whole page including the modal backdrop
-      // printReceipt() opens a clean isolated HTML popup, measures height there,
-      // and injects @page at the top level — production-proven for EPSON TM-T88V.
-      printReceipt({
-        settings:      receiptData.mergedSettings,
-        invoiceNumber: repair.job_number,
-        status:        repair.status,
-        issuedAt:      repair.created_at,
-        businessName:  branch?.name ?? 'Business',
-        branchName:    branch?.name,
-        branchAddress: branch?.address,
-        branchPhone:   branch?.phone,
-        customerName:  receiptData.customerName,
-        items:         receiptData.items,
-        subtotal:      receiptData.invoiceTotal,
-        total:         receiptData.invoiceTotal,
-        amountPaid:    receiptData.amountPaid,
-        currency,
-      })
-      return
+    const win = iframeRef.current?.contentWindow
+    if (win) {
+      win.focus()
+      win.print()
+    } else if (pdfUrl) {
+      window.open(pdfUrl)
     }
-
-    // ── Standard paper: A4 / A5 / Letter — use window.print() ────────────────
-    // FIX: @page must be a top-level rule, never nested inside @media print.
-    // Browsers silently ignore @page when nested, leaving the page size unchanged.
-    const sizeKeyword = paperSize === 'A5' ? 'A5' : paperSize === 'Letter' ? 'letter' : 'A4'
-    const pageRule    = `@page { size: ${sizeKeyword}; margin: 10mm; }`
-
-    const styleId = 'receipt-page-size-style'
-    document.getElementById(styleId)?.remove()
-    const style = document.createElement('style')
-    style.id = styleId
-    style.textContent = pageRule
-    document.head.appendChild(style)
-
-    window.print()
-
-    window.addEventListener('afterprint', () => {
-      document.getElementById(styleId)?.remove()
-    }, { once: true })
   }
-
-
-
 
   if (!repair) return null
 
   return (
-    <Modal open={open} onClose={onClose} title={`Invoice - ${repair.job_number}`} size="xl" printable>
-      {/* Screen: PDF preview — hidden during print */}
-      <div className="flex flex-col h-[75vh] print:hidden">
+    <Modal open={open} onClose={onClose} title={`Invoice - ${repair.job_number}`} size="xl">
+      <div className="flex flex-col h-[75vh]">
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-500">
             <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
@@ -199,40 +77,18 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
           </div>
         ) : pdfUrl ? (
           <iframe
+            ref={iframeRef}
             src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0`}
             className="flex-1 w-full rounded-lg border border-gray-200"
           />
         ) : (
           <div className="flex-1 flex items-center justify-center text-red-500 text-sm">
-            Failed to load preview.
+            {error ? 'Failed to generate invoice. Please try again.' : 'Failed to load preview.'}
           </div>
         )}
       </div>
 
-      {/* Print: HTML receipt — visible only during print, positioned at page root */}
-      {receiptData && (
-        <div id="receipt-print-el" className="hidden print:block print:w-full print:h-auto print:overflow-visible print:bg-white print:m-0 print:p-0">
-          <RepairReceiptHtml
-            settings={receiptData.mergedSettings}
-            invoiceNumber={repair.job_number}
-            status={repair.status}
-            issuedAt={repair.created_at}
-            businessName={branch?.name ?? 'Business'}
-            branchName={branch?.name}
-            branchAddress={branch?.address}
-            branchPhone={branch?.phone}
-            customerName={receiptData.customerName}
-            items={receiptData.items}
-            subtotal={receiptData.invoiceTotal}
-            total={receiptData.invoiceTotal}
-            amountPaid={receiptData.amountPaid}
-            currency={currency}
-          />
-        </div>
-      )}
-
-      {/* Buttons — hidden during print */}
-      <div className="mt-4 flex justify-between items-center gap-3 border-t border-gray-100 pt-4 print:hidden">
+      <div className="mt-4 flex justify-between items-center gap-3 border-t border-gray-100 pt-4">
         <p className="text-xs text-gray-400">Preview uses your Invoice Design settings</p>
         <div className="flex gap-2">
           <Button variant="outline" onClick={onClose}>Close</Button>
@@ -242,7 +98,7 @@ export function RepairInvoiceModal({ open, onClose, repair, settings, branch }: 
               Open PDF
             </Button>
           )}
-          {receiptData && (
+          {pdfUrl && (
             <Button onClick={handlePrint}>
               <Printer className="h-4 w-4 mr-2" />
               Print

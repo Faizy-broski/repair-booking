@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { RepairService } from '@/backend/services/repair.service'
 import { CommissionService } from '@/backend/services/payroll.service'
@@ -8,6 +8,120 @@ import { ok, created, notFound, serverError } from '@/backend/utils/api-response
 import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
 import { z } from 'zod'
+
+// ── Shared repair PDF generators ────────────────────────────────────────────
+// Server-rendered with a fixed page size so the print output is deterministic —
+// no client-side height measurement, no popup timing races. Same pattern as
+// buildReceiptBuffer in pos.controller.ts.
+
+function pdfResponse(buffer: Buffer | Uint8Array, filename: string) {
+  return new NextResponse(buffer as unknown as BodyInit, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${filename}"`,
+      // Content depends on invoice design settings which can change at any time
+      'Cache-Control': 'no-store',
+    },
+  })
+}
+
+async function buildRepairInvoiceBuffer(repairId: string, branchId: string | null, businessId: string) {
+  const [repair, renderToBuffer, { InvoicePdf }, { InvoiceSettingsService }, { DEFAULT_INVOICE_SETTINGS }, React] = await Promise.all([
+    RepairService.getById(repairId, branchId ?? undefined),
+    import('@react-pdf/renderer').then((m) => m.renderToBuffer),
+    import('@/components/pdf/invoice-pdf'),
+    import('@/backend/services/invoice-settings.service'),
+    import('@/types/invoice-settings'),
+    import('react').then((m) => m.default),
+  ])
+
+  if (!repair) return null
+  const r = repair as any
+
+  const [settings, branchRow, businessRow] = await Promise.all([
+    InvoiceSettingsService.get(businessId, r.branch_id ?? null),
+    adminSupabase.from('branches').select('name, address, phone, email, logo_url').eq('id', r.branch_id).single().then((res) => res.data),
+    adminSupabase.from('businesses').select('currency').eq('id', businessId).single().then((res) => res.data),
+  ])
+
+  const repairItems: any[] = Array.isArray(r.repair_items) ? r.repair_items : []
+  const items = repairItems.length > 0
+    ? repairItems.map((item) => ({
+        description: item.name,
+        quantity:    item.quantity ?? 1,
+        unit_price:  Number(item.unit_price ?? 0),
+      }))
+    : [{
+        description: `${r.issue || 'Repair Service'} (${r.device_type} ${r.device_brand} ${r.device_model})`,
+        quantity:    1,
+        unit_price:  Number(r.estimated_cost ?? 0),
+      }]
+
+  const invoiceTotal = repairItems.length > 0
+    ? items.reduce((s, it) => s + it.quantity * it.unit_price, 0)
+    : Number(r.estimated_cost ?? 0)
+
+  const customer     = r.customers
+  const customerName = customer
+    ? `${customer.first_name} ${customer.last_name ?? ''}`.trim()
+    : 'Walk-In'
+  const cf = (r.custom_fields as Record<string, unknown>) ?? {}
+
+  const mergedSettings = {
+    ...DEFAULT_INVOICE_SETTINGS,
+    ...settings,
+    logo_url:  settings.logo_url  ?? branchRow?.logo_url ?? null,
+    show_logo: settings.show_logo !== false && !!(settings.logo_url ?? branchRow?.logo_url),
+  }
+
+  const doc = React.createElement(InvoicePdf, {
+    settings:        mergedSettings,
+    invoiceNumber:   r.job_number,
+    status:          r.status,
+    issuedAt:        r.created_at,
+    dueAt:           (cf.due_date as string) ?? null,
+    businessName:    branchRow?.name ?? 'Business',
+    branchName:      branchRow?.name,
+    branchAddress:   branchRow?.address,
+    branchPhone:     branchRow?.phone,
+    branchEmail:     branchRow?.email,
+    customerName,
+    customerEmail:   customer?.email,
+    customerPhone:   customer?.phone,
+    customerAddress: customer?.address,
+    items,
+    subtotal:        invoiceTotal,
+    discount:        0,
+    tax:             0,
+    total:           invoiceTotal,
+    amountPaid:      Number(r.deposit_paid ?? 0),
+    notes:           r.notes,
+    currency:        businessRow?.currency ?? undefined,
+  })
+
+  return { buffer: await renderToBuffer(doc as any), jobNumber: r.job_number as string }
+}
+
+async function buildRepairSlipBuffer(repairId: string, branchId: string | null) {
+  const [repair, renderToBuffer, { RepairSlipPdf }, { code128DataUrl }, React] = await Promise.all([
+    RepairService.getById(repairId, branchId ?? undefined),
+    import('@react-pdf/renderer').then((m) => m.renderToBuffer),
+    import('@/components/pdf/repair-slip-pdf'),
+    import('@/backend/utils/barcode'),
+    import('react').then((m) => m.default),
+  ])
+
+  if (!repair) return null
+  const jobNumber = (repair as any).job_number as string
+
+  const doc = React.createElement(RepairSlipPdf, {
+    jobNumber,
+    barcodeDataUrl: await code128DataUrl(jobNumber),
+  })
+
+  return { buffer: await renderToBuffer(doc as any), jobNumber }
+}
 
 const createSchema = z.object({
   branch_id: z.string().uuid(),
@@ -325,6 +439,26 @@ export const RepairController = {
       return ok(history)
     } catch (err) {
       return serverError('Failed to fetch status history', err)
+    }
+  },
+
+  async generateInvoicePdf(_request: NextRequest, ctx: RequestContext, id: string) {
+    try {
+      const result = await buildRepairInvoiceBuffer(id, ctx.auth.branchId ?? null, ctx.businessId)
+      if (!result) return notFound('Repair not found')
+      return pdfResponse(result.buffer, `invoice-${result.jobNumber}.pdf`)
+    } catch (err) {
+      return serverError('Failed to generate invoice PDF', err)
+    }
+  },
+
+  async generateSlipPdf(_request: NextRequest, ctx: RequestContext, id: string) {
+    try {
+      const result = await buildRepairSlipBuffer(id, ctx.auth.branchId ?? null)
+      if (!result) return notFound('Repair not found')
+      return pdfResponse(result.buffer, `slip-${result.jobNumber}.pdf`)
+    } catch (err) {
+      return serverError('Failed to generate slip PDF', err)
     }
   },
 

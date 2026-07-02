@@ -17,7 +17,6 @@ import { formatCurrency, getCurrencySymbol, formatDateTime, formatDate, formatSt
 import { Select } from '@/components/ui/select'
 import type { ColumnDef, VisibilityState } from '@tanstack/react-table'
 import type { Repair } from '@/types/database'
-import type { InvoiceSettings } from '@/types/invoice-settings'
 import { RepairEmailPrompt } from '@/components/repairs/email-prompt-modal'
 import { RepairSlipModal } from '@/components/repairs/slip-modal'
 import { toast } from 'sonner'
@@ -511,18 +510,6 @@ export default function RepairsPage() {
         repairs_profit:    d.repairs_profit  ?? 0,
       }
     },
-  })
-
-  // ── Invoice settings — lazy: only fetched when the invoice modal opens ──
-  const { data: invoiceSettings } = useQuery<InvoiceSettings | null>({
-    queryKey: ['invoice-settings', activeBranch?.id],
-    queryFn: async () => {
-      const res = await fetch(`/api/settings/invoice?branch_id=${activeBranch!.id}`)
-      const json = await res.json()
-      return (json.data as InvoiceSettings) ?? null
-    },
-    enabled: !!activeBranch && invoiceModalOpen,
-    staleTime: 30 * 60_000,
   })
 
   function invalidateStats() {
@@ -1390,8 +1377,6 @@ export default function RepairsPage() {
         open={invoiceModalOpen}
         onClose={() => setInvoiceModalOpen(false)}
         repair={selectedInvoiceRepair}
-        settings={invoiceSettings}
-        branch={activeBranch}
       />
 
       {/* ── List header ── */}

@@ -19,7 +19,6 @@ import { RepairSlipModal } from '@/components/repairs/slip-modal'
 import { CustomFieldRenderer, useCustomFieldDefs } from '@/components/shared/custom-field-renderer'
 import { PatternLock } from '@/components/ui/pattern-lock'
 import { toast } from 'sonner'
-import type { InvoiceSettings } from '@/types/invoice-settings'
 
 
 interface Technician {
@@ -127,17 +126,6 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
     staleTime: Infinity,
   })
   const customStatuses = (metaData?.customStatuses ?? []) as { name: string; color: string }[]
-
-  // ── Invoice design settings — reuses the same cache as the repairs list page ──
-  const { data: invoiceSettings } = useQuery<InvoiceSettings | null>({
-    queryKey: ['invoice-settings', activeBranch?.id],
-    queryFn: async () => {
-      const res = await fetch(`/api/settings/invoice?branch_id=${activeBranch!.id}`)
-      const json = await res.json()
-      return (json.data as InvoiceSettings) ?? null
-    },
-    enabled: !!activeBranch && invoiceModalOpen,
-  })
 
   // ── Employees — shared cache key with the repairs list page ──────────────────
   const { data: technicians = [] } = useQuery<Technician[]>({
@@ -647,8 +635,6 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
         open={invoiceModalOpen}
         onClose={() => setInvoiceModalOpen(false)}
         repair={repair}
-        settings={invoiceSettings}
-        branch={activeBranch}
       />
       {slipOpen && (
         <RepairSlipModal repair={repair as any} onClose={() => setSlipOpen(false)} />

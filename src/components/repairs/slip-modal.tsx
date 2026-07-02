@@ -1,101 +1,96 @@
 'use client'
-// 1. Swap useEffect and useRef for useCallback
-import { useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
-import { Printer } from 'lucide-react'
-import JsBarcode from 'jsbarcode'
+import { Printer, Loader2 } from 'lucide-react'
 
-// ... [Keep your interfaces the same] ...
+interface Props {
+  repair: any
+  onClose: () => void
+}
 
+// The slip (CODE128 barcode + ticket number) is rendered server-side as a PDF
+// with a fixed ~100x60mm page (/api/repairs/[id]/slip), so the preview and the
+// print are the same document — no document.write popup, no print/close races.
 export function RepairSlipModal({ repair, onClose }: Props) {
+  const [pdfUrl, setPdfUrl]   = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError]     = useState(false)
+  const iframeRef             = useRef<HTMLIFrameElement>(null)
 
-  // 2. Use a callback ref. This fires exactly when the element attaches to the DOM.
-  const barcodeRef = useCallback((node: SVGSVGElement | null) => {
-    if (!node || !repair?.job_number) return;
+  useEffect(() => {
+    if (!repair) return
 
-    try {
-      JsBarcode(node, repair.job_number, {
-        format: 'CODE128',
-        width: 2,
-        height: 80,
-        displayValue: false,
-        margin: 0,
-        background: '#ffffff',
-        lineColor: '#000000',
-      })
-    } catch (err) {
-      console.error('Barcode error:', err)
+    let cancelled = false
+    let objectUrl: string | null = null
+
+    async function load() {
+      setLoading(true)
+      setError(false)
+      try {
+        const res = await fetch(`/api/repairs/${repair.id}/slip`)
+        if (!res.ok) throw new Error(`Slip generation failed (${res.status})`)
+        const blob = await res.blob()
+        if (cancelled) return
+        objectUrl = URL.createObjectURL(blob)
+        setPdfUrl(objectUrl)
+      } catch (err) {
+        console.error('Failed to load slip PDF:', err)
+        if (!cancelled) setError(true)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
-  }, [repair?.job_number]); // Only re-run if the job number actually changes
+
+    load()
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+      setPdfUrl(null)
+    }
+  }, [repair])
 
   function handlePrint() {
-    const slip = document.getElementById('repair-slip-content')
-    if (!slip) return
-    const w = window.open('', '_blank', 'width=400,height=300')
-    if (!w) return
-    w.document.write(`
-      <html>
-        <head>
-          <title>Repair Slip – ${repair?.job_number}</title>
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: system-ui, -apple-system, sans-serif; background: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-            @page { size: 100mm 60mm; margin: 4mm; }
-            @media print { body { -webkit-print-color-adjust: exact; } }
-          </style>
-        </head>
-        <body>${slip.innerHTML}</body>
-      </html>
-    `)
-    w.document.close()
-    w.focus()
-    setTimeout(() => { w.print(); w.close() }, 300)
+    const win = iframeRef.current?.contentWindow
+    if (win) {
+      win.focus()
+      win.print()
+    } else if (pdfUrl) {
+      window.open(pdfUrl)
+    }
   }
 
   if (!repair) return null
 
   return (
     <Modal open={!!repair} onClose={onClose} title="Repair Job Sheet Slip" size="md">
-      <div className="flex justify-center p-4">
-        <div
-          id="repair-slip-content"
-          style={{
-            width: '100mm',
-            minHeight: '60mm',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '32px 16px',
-            background: '#fff',
-            border: '1px solid #e5e7eb'
-          }}
-        >
-          <div style={{ textAlign: 'center' }}>
-            {/* 3. Change canvas to svg so it works with innerHTML printing */}
-            <svg ref={barcodeRef} style={{ maxWidth: '100%' }} />
-
-            <div style={{
-              fontSize: '24px',
-              fontWeight: '800',
-              color: '#000',
-              marginTop: '12px',
-              fontFamily: 'system-ui, -apple-system, sans-serif',
-              whiteSpace: 'nowrap'
-            }}>
-              Ticket ID: {repair.job_number}
-            </div>
+      <div className="flex flex-col h-[40vh]">
+        {loading ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-500">
+            <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+            <p className="text-sm font-medium">Generating slip...</p>
           </div>
-        </div>
+        ) : pdfUrl ? (
+          <iframe
+            ref={iframeRef}
+            src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+            className="flex-1 w-full rounded-lg border border-gray-200"
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-red-500 text-sm">
+            {error ? 'Failed to generate slip. Please try again.' : 'Failed to load preview.'}
+          </div>
+        )}
       </div>
 
       <div className="mt-4 flex justify-end gap-3 px-1 pb-1">
         <Button variant="outline" onClick={onClose}>Close</Button>
-        <Button onClick={handlePrint}>
-          <Printer className="h-4 w-4 mr-1.5" />
-          Print Slip
-        </Button>
+        {pdfUrl && (
+          <Button onClick={handlePrint}>
+            <Printer className="h-4 w-4 mr-1.5" />
+            Print Slip
+          </Button>
+        )}
       </div>
     </Modal>
   )

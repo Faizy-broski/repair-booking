@@ -57,7 +57,7 @@ function calcReceiptPageHeight(opts: {
   let h = 20 // page padding top (10) + bottom (10)
 
   // Header
-  if (opts.showLogo)         h += 60  // image 48h + marginBottom 6 + line height
+  if (opts.showLogo)         h += 66  // image 48h + marginBottom 6 + render slack
   if (opts.showBusinessName) h += 18  // fontSize 12 bold + line spacing
   if (opts.showBranchName)   h += 13  // fontSize 8 + marginBottom 1
   if (opts.showAddress)      h += 12  // detail text
@@ -90,20 +90,24 @@ function calcReceiptPageHeight(opts: {
   if (opts.hasBalanceDue) h += 30 // balance-due colored row (padding 6, borderRadius 3, marginTop 4)
 
   h += 14 // fifth divider (before footer)
-  if (opts.hasThankYou) h += 18
-  // Use page width to estimate chars per line at fontSize 7 — accounts for text wrapping
-  const footerCharsPerLine = opts.pageWidth < 200 ? 26 : 36
+  if (opts.hasThankYou) h += 20
+  // Conservative chars-per-line so long footer/policy text never under-counts
+  // its wrapped lines — a slightly taller page just feeds a little extra paper,
+  // but an under-sized page pushes the footer onto a second page that thermal
+  // drivers clip or print blank.
+  const footerCharsPerLine = opts.pageWidth < 200 ? 22 : 30
   for (const line of opts.footerLines) {
     const wrappedLines = Math.max(1, Math.ceil(line.length / footerCharsPerLine))
-    h += wrappedLines * 10 + 3 // 10pt per wrapped line + 1.5 marginTop each side
+    h += wrappedLines * 12 + 3
   }
   h += opts.socialLinkCount * 10
   if (opts.policyText) {
     const policyWrappedLines = Math.max(2, Math.ceil(opts.policyText.length / footerCharsPerLine))
-    h += 15 + policyWrappedLines * 8 // border-top + padding + fontSize 6 text
+    h += 15 + policyWrappedLines * 11 // border-top + padding + fontSize 7 text
   }
 
-  h += 20 // bottom breathing room — reduced to avoid too much blank space
+  // 5% proportional slack + fixed tail so the footer always fits on one page
+  h = Math.ceil(h * 1.05) + 40
   return Math.max(h, 150)
 }
 
