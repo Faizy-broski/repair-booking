@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Segoe Script Custom";
+  src: url("/segoe-script/Segoe Script.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ── Tiptap editor prose reset ──────────────────────────────────── */
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
@@ -63,6 +71,7 @@ body {
      re-derives via color-mix() so the whole primary family stays in sync. */
   --brand-primary:               #008080;
   --primary:                     var(--brand-primary);
+  --primary-light: #18E3CD;
   --primary-dim:                 color-mix(in srgb, var(--brand-primary) 80%, black);
   --primary-fixed:                color-mix(in srgb, var(--brand-primary) 25%, white);
   --primary-fixed-dim:            color-mix(in srgb, var(--brand-primary) 35%, white);
@@ -133,12 +142,13 @@ body {
   --sidebar-bg:         #001F2B;
 
   /* ── Legacy brand aliases (sidebar / existing components) ── */
-  --brand-yellow:       #F8C301;
-  --brand-teal:         var(--primary);   /* now resolves to #008080 */
-  --brand-teal-light:   var(--primary-container);
-  --brand-teal-dark:    var(--primary-dim);
-  --brand-yellow-light: color-mix(in srgb, #F8C301 15%, white);
-  --brand-yellow-dark:  color-mix(in srgb, #F8C301 85%, black);
+  --brand-yellow:         #F8C301;
+  --brand-teal:           var(--primary);   /* now resolves to #008080 */
+  --brand-primary-light:  var(--primary-light);
+  --brand-teal-light:     var(--primary-container);
+  --brand-teal-dark:      var(--primary-dim);
+  --brand-yellow-light:   color-mix(in srgb, #F8C301 15%, white);
+  --brand-yellow-dark:    color-mix(in srgb, #F8C301 85%, black);
 }
 
 @theme inline {
@@ -149,6 +159,7 @@ body {
 
   /* Primary */
   --color-primary:                  var(--primary);
+  --color-primary-light:            var(--brand-primary-light);
   --color-primary-dim:              var(--primary-dim);
   --color-primary-fixed:            var(--primary-fixed);
   --color-primary-fixed-dim:        var(--primary-fixed-dim);
@@ -227,7 +238,14 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
-  
+}
+
+.font-script {
+  font-family: "Pacifico", cursive;
+}
+
+.font-segoe-script {
+  font-family: "Segoe Script Custom", cursive;
 }
 
 /* Force light-mode colours on form elements regardless of OS dark-mode preference */
