@@ -1,0 +1,71 @@
+import { ArrowRight, Check, ShieldCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { FadeIn } from "@/components/landing/motion";
+
+export default function StartTrialSection() {
+  return (
+    <section className="bg-white py-14 sm:py-20 lg:py-28">
+      <div className="mx-auto max-w-[1800px] px-4 sm:px-6 lg:px-8">
+        <FadeIn className="relative overflow-hidden rounded-[28px] bg-[url('/images/ctaBg.svg')] px-6 py-12 text-white bg-no-repeat bg-cover sm:rounded-[48px] sm:px-10 sm:py-20 md:px-20 lg:px-24">
+
+          <div className="relative grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center lg:gap-12">
+            {/* Left */}
+            <div>
+              <Badge className="mb-5 rounded-full border-0 bg-white/20 px-5 py-2 text-xs font-medium uppercase tracking-[0.28em] text-white hover:bg-white/20 sm:mb-8">
+                <span className="mr-2 h-2 w-2 rounded-full bg-white" />
+                Begin
+              </Badge>
+
+              <h2 className="max-w-3xl text-4xl font-light leading-[0.95] tracking-[-0.03em] sm:text-6xl sm:leading-[0.92] sm:tracking-[-0.06em] md:text-7xl">
+                Run your shop
+                <br />
+                <span className="font-segoe-script text-4xl italic text-teal-500 sm:text-7xl md:text-7xl">
+                  like a studio.
+                </span>
+              </h2>
+
+              <p className="mt-6 max-w-md text-sm leading-6 text-white/65 sm:mt-10 sm:text-md">
+                Fourteen days. Every module. No card. We&apos;ll port your data
+                in, and you can keep it whether you stay or not.
+              </p>
+            </div>
+
+            {/* Right */}
+            <div className="flex flex-col items-stretch gap-4 sm:items-start sm:gap-7 lg:items-end lg:justify-end">
+              <Button className="w-full rounded-full bg-white px-7 py-6 text-sm font-medium text-slate-950 shadow-none hover:bg-white/90 sm:w-auto sm:py-7 sm:text-md">
+                Start free trial
+                <ArrowRight className="ml-4 h-5 w-5 sm:h-7 sm:w-7" />
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full rounded-full border-white/25 bg-white/5 px-7 py-6 text-sm font-medium text-white backdrop-blur hover:bg-white/10 hover:text-white sm:w-auto sm:py-7 sm:text-md"
+              >
+                Book a 20-min demo
+                <ArrowRight className="ml-4 h-5 w-5 sm:h-6 sm:w-6" />
+              </Button>
+
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-white/55 sm:mt-6 sm:gap-4">
+                <span className="flex items-center gap-2">
+                  <ShieldCheck className="h-3 w-3 text-white" />
+                  SOC 2 Type II
+                </span>
+
+                <span className="flex items-center gap-2">
+                  <Check className="h-3 w-3 text-white" />
+                  Cancel any time
+                </span>
+
+                <span className="flex items-center gap-2">
+                  <Check className="h-3 w-3 text-white" />
+                  Free migration
+                </span>
+              </div>
+            </div>
+          </div>
+        </FadeIn>
+      </div>
+    </section>
+  );
+}
