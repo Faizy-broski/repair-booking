@@ -52,7 +52,7 @@ const modules = [
 
 export default function ModulesSection() {
   return (
-    <section className="relative overflow-hidden py-16 text-white bg-[url('/images/moduleHero.svg')] bg-cover">
+    <section id="modules" className="relative overflow-hidden py-16 text-white bg-[url('/images/moduleHero.svg')] bg-cover">
       {/* SVG background lines */}
       {/* <div className="pointer-events-none absolute inset-0"> */}
         {/* <svg

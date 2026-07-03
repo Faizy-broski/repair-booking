@@ -16,6 +16,14 @@ import {
   Sparkles,
 } from "lucide-react";
 
+const NAV_LINKS = [
+  { label: "Features", href: "/features" },
+  { label: "Modules", href: "/#modules" },
+  { label: "Industries", href: "/industries" },
+  { label: "Pricing", href: "/#pricing" },
+  { label: "Reviews", href: "/#testimonials" },
+];
+
 export default function Nav() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   return (
@@ -31,36 +39,11 @@ export default function Nav() {
           </Link>
 
           <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-700">
-            <Link
-              href="#features"
-              className="hover:text-primary transition-colors"
-            >
-              Features
-            </Link>
-            <Link
-              href="#modules"
-              className="hover:text-primary transition-colors"
-            >
-              Modules
-            </Link>
-            <Link
-              href="#industries"
-              className="hover:text-primary transition-colors"
-            >
-              Industries
-            </Link>
-            <Link
-              href="#pricing"
-              className="hover:text-primary transition-colors"
-            >
-              Pricing
-            </Link>
-            <Link
-              href="#testimonials"
-              className="hover:text-primary transition-colors"
-            >
-              Reviews
-            </Link>
+            {NAV_LINKS.map(({ label, href }) => (
+              <Link key={label} href={href} className="hover:text-primary transition-colors">
+                {label}
+              </Link>
+            ))}
           </div>
 
           <div className="flex items-center gap-2 my-2 sm:gap-5">
@@ -116,12 +99,7 @@ export default function Nav() {
             </div>
 
             <nav className="flex flex-col gap-1 px-4 py-5">
-              {[
-                { label: "Features", href: "#features" },
-                { label: "Modules", href: "#modules" },
-                { label: "Pricing", href: "#pricing" },
-                { label: "Reviews", href: "#testimonials" },
-              ].map(({ label, href }) => (
+              {NAV_LINKS.map(({ label, href }) => (
                 <Link
                   key={href}
                   href={href}
