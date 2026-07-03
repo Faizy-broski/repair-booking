@@ -28,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" >
       <head>
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=AW-18250909348"
