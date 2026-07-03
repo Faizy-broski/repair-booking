@@ -137,12 +137,18 @@ export async function POST(request: NextRequest) {
       : `${APP_URL}/dashboard?upgraded=1&session_id={CHECKOUT_SESSION_ID}`
 
     // Create Stripe Checkout session for upgrade
+    const vatTaxRateId = process.env.STRIPE_VAT_TAX_RATE_ID
     const session = await stripe.checkout.sessions.create({
       ...customerParam,
       mode: 'subscription',
-      line_items: [{ price: stripePriceId, quantity: 1 }],
+      line_items: [{
+        price: stripePriceId,
+        quantity: 1,
+        ...(vatTaxRateId ? { tax_rates: [vatTaxRateId] } : {}),
+      }],
       subscription_data: {
         metadata: { businessId, planId },
+        ...(vatTaxRateId ? { default_tax_rates: [vatTaxRateId] } : {}),
       },
       metadata: { businessId, planId },
       success_url: successUrl,

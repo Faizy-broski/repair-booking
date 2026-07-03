@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Plus, Search, LayoutGrid, List, Wrench, Banknote, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail, RefreshCw, MoreHorizontal } from 'lucide-react'
+import { Plus, Search, LayoutGrid, List, Wrench, Banknote, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail, Send, RefreshCw, MoreHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
 import { AsyncEmployeeSelect } from '@/components/shared/async-employee-select'
@@ -13,11 +13,12 @@ import { useAuthStore } from '@/store/auth.store'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { formatCurrency, getCurrencySymbol, formatDateTime, formatDate, formatStatus } from '@/lib/utils'
+import { formatCurrency, getCurrencySymbol, formatDateTime, formatDate, formatStatus, cn } from '@/lib/utils'
 import { Select } from '@/components/ui/select'
 import type { ColumnDef, VisibilityState } from '@tanstack/react-table'
 import type { Repair } from '@/types/database'
 import { RepairEmailPrompt } from '@/components/repairs/email-prompt-modal'
+import { EmailComposeModal } from '@/components/repairs/email-compose-modal'
 import { RepairSlipModal } from '@/components/repairs/slip-modal'
 import { toast } from 'sonner'
 import { RepairInvoiceModal } from '@/components/repairs/invoice-modal'
@@ -62,14 +63,17 @@ const EMPTY_JOB = {
   lock_type: '' as '' | 'passcode' | 'pattern',
   passcode: '',
   price_pending: false,
+  payment_method: '' as '' | 'cash' | 'card',
 }
 
-function ActionsMenu({ onEdit, onSlip, onInvoice, onDelete, onMessage }: {
+function ActionsMenu({ onEdit, onSlip, onInvoice, onDelete, onMessage, onEmail, canEmail }: {
   onEdit: () => void
   onSlip: () => void
   onInvoice: () => void
   onDelete: () => void
   onMessage: () => void
+  onEmail: () => void
+  canEmail: boolean
 }) {
   const item = 'flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors'
 
@@ -98,6 +102,12 @@ function ActionsMenu({ onEdit, onSlip, onInvoice, onDelete, onMessage }: {
           </DropdownMenu.Item>
           <DropdownMenu.Item className={item} onSelect={onMessage}>
             <Mail className="h-3.5 w-3.5 text-blue-500" /> Message
+          </DropdownMenu.Item>
+          <DropdownMenu.Item
+            className={cn(item, !canEmail && 'cursor-not-allowed opacity-40 hover:bg-transparent')}
+            onSelect={(e) => { if (!canEmail) { e.preventDefault(); return } onEmail() }}
+          >
+            <Send className="h-3.5 w-3.5 text-teal-500" /> Email
           </DropdownMenu.Item>
           <DropdownMenu.Separator className="h-px bg-gray-100" />
           <DropdownMenu.Item className={`${item} text-red-600 hover:bg-red-50`} onSelect={onDelete}>
@@ -371,6 +381,7 @@ export default function RepairsPage() {
   const [itemAttributes, setItemAttributes] = useState<Record<string, string>>({})
 
   const [emailPrompt, setEmailPrompt] = useState<{ repairId: string; jobNumber: string; currentStatus: string } | null>(null)
+  const [emailCompose, setEmailCompose] = useState<{ repairId: string; jobNumber: string; customerEmail: string; customerName: string } | null>(null)
   const [slipRepair, setSlipRepair] = useState<RepairRow | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, jobNumber: string } | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -917,6 +928,7 @@ export default function RepairsPage() {
           customer_note: jobData.customer_note || null,
           staff_note: jobData.staff_note || null,
           price_pending: jobData.price_pending || undefined,
+          payment_method: jobData.payment_method || null,
           ...(isRetail && Object.keys(itemAttributes).length > 0 ? { item_attributes: itemAttributes } : {}),
         },
         parts: repairParts.map((p) => ({
@@ -1179,6 +1191,13 @@ export default function RepairsPage() {
             onInvoice={() => handleOpenInvoice(r)}
             onDelete={() => deleteRepair(r.id, r.job_number)}
             onMessage={() => setEmailPrompt({ repairId: r.id, jobNumber: r.job_number, currentStatus: r.status ?? 'received' })}
+            canEmail={!!r.customers?.email}
+            onEmail={() => setEmailCompose({
+              repairId: r.id,
+              jobNumber: r.job_number,
+              customerEmail: r.customers?.email ?? '',
+              customerName: `${r.customers?.first_name ?? ''} ${r.customers?.last_name ?? ''}`.trim(),
+            })}
           />
         )
       }
@@ -2312,6 +2331,21 @@ export default function RepairsPage() {
                     )}
                   </div>
                 </div>
+                <div className="mt-2">
+                  <label className={lbl}>Payment Method <span className="font-normal normal-case text-gray-300">(opt)</span></label>
+                  <div className="flex gap-2">
+                    {(['cash', 'card'] as const).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setJobData((p) => ({ ...p, payment_method: p.payment_method === m ? '' : m }))}
+                        className={`rounded-md border px-3 py-1 text-xs font-medium capitalize transition-colors ${jobData.payment_method === m ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               {!isRetail && <div className="h-px bg-gray-100" />}
@@ -2552,6 +2586,16 @@ export default function RepairsPage() {
           currentStatus={emailPrompt.currentStatus}
           modal
           onClose={() => setEmailPrompt(null)}
+        />
+      )}
+
+      {emailCompose && (
+        <EmailComposeModal
+          repairId={emailCompose.repairId}
+          jobNumber={emailCompose.jobNumber}
+          customerEmail={emailCompose.customerEmail}
+          customerName={emailCompose.customerName}
+          onClose={() => setEmailCompose(null)}
         />
       )}
 

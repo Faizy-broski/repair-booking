@@ -112,14 +112,20 @@ export async function POST(request: NextRequest) {
     // 4. Create Stripe Checkout session
     // trial_period_days means Stripe shows £0.00 today, links the card, and
     // only charges after the trial ends. No money is taken at this step.
+    const vatTaxRateId = process.env.STRIPE_VAT_TAX_RATE_ID
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer_email: email,
-      line_items: [{ price: stripePriceId, quantity: 1 }],
+      line_items: [{
+        price: stripePriceId,
+        quantity: 1,
+        ...(vatTaxRateId ? { tax_rates: [vatTaxRateId] } : {}),
+      }],
       subscription_data: {
         trial_period_days: 30,
         trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
         metadata: { pendingId: pending.id },
+        ...(vatTaxRateId ? { default_tax_rates: [vatTaxRateId] } : {}),
       },
       payment_method_collection: 'always',
       custom_text: {

@@ -34,6 +34,7 @@ interface NavItem {
   subItem?: boolean
   retailOnly?: boolean   // only show for retail-store vertical
   hideForRetail?: boolean // hide for retail-store vertical
+  minBranches?: number   // only show when the business has at least this many branches
 }
 
 interface NavGroup {
@@ -79,8 +80,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Employees',      href: '/reports/employees',            icon: UserCheck,  requiredRole: 'branch_manager', module: 'reports', subItem: true },
   { label: 'Inventory',      href: '/reports/inventory',            icon: Package,    requiredRole: 'branch_manager', module: 'reports', subItem: true },
   { label: 'Z-Report',       href: '/reports/z-report',             icon: PieChart,   requiredRole: 'branch_manager', module: 'reports', subItem: true },
-  { label: 'Messages',         href: '/messages',                                icon: MessageSquare, requiredRole: 'cashier',        module: 'messages' },
-  { label: 'Phone',            href: '/phone',                                   icon: Phone,         requiredRole: 'cashier',        module: 'phone' },
+  { label: 'Messages',         href: '/messages',                                icon: MessageSquare, requiredRole: 'cashier',        module: 'messages', minBranches: 2 },
+  { label: 'Phone',            href: '/phone',                                   icon: Phone,         requiredRole: 'cashier',        module: 'phone', minBranches: 2 },
   { label: 'Google Reviews',   href: '/google-reviews',                          icon: Star,          requiredRole: 'branch_manager', module: 'google_reviews' },
   { label: 'Notifications',    href: '/settings/notifications',                  icon: Bell,          requiredRole: 'branch_manager', module: 'notifications' },
   { label: 'Templates',        href: '/settings/notifications',                  icon: Mail,          requiredRole: 'branch_manager', module: 'notifications', subItem: true },
@@ -134,7 +135,7 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
   const searchParams = useSearchParams()
   const searchString = searchParams.size > 0 ? '?' + searchParams.toString() : ''
   const router = useRouter()
-  const { profile, activeBranch, subscriptionStatus, isLoading: authLoading, verticalTemplateSlug } = useAuthStore()
+  const { profile, activeBranch, branches, subscriptionStatus, isLoading: authLoading, verticalTemplateSlug } = useAuthStore()
   const isRetail = verticalTemplateSlug === 'retail-store'
   const { isModuleEnabled, configs, isLoading: configsLoading, invalidate: invalidateConfigs } = useModuleConfigStore()
   const hasSubscriptionAccess = subscriptionStatus === null || subscriptionStatus.hasAccess
@@ -169,6 +170,7 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
     if (!hasAccess(profile?.role ?? 'cashier', item.requiredRole)) return false
     if (item.retailOnly && !isRetail) return false
     if (item.hideForRetail && isRetail) return false
+    if (item.minBranches && branches.length < item.minBranches) return false
     if (item.module == null && item.requiredModules == null) return true
     if (!navReady) return false
     if (item.module != null && !isModuleEnabled(item.module)) return false

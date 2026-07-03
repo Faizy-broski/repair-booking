@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { KeyRound, X } from 'lucide-react'
+import { KeyRound, Pencil, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/store/auth.store'
@@ -10,6 +10,7 @@ import { z } from 'zod'
 
 interface UserRow {
   id: string; full_name: string | null; email: string; role: string; is_active: boolean
+  phone?: string | null; branch_id?: string | null
   branches?: { name: string } | null
 }
 
@@ -18,6 +19,15 @@ const resetPwSchema = z.object({
   confirmPassword: z.string(),
 }).refine((d) => d.password === d.confirmPassword, { message: 'Passwords do not match', path: ['confirmPassword'] })
 type ResetPwForm = z.infer<typeof resetPwSchema>
+
+const editUserSchema = z.object({
+  full_name: z.string().min(1, 'Full name is required'),
+  phone: z.string().optional(),
+  role: z.enum(['cashier', 'staff', 'branch_manager']),
+  branch_id: z.string().uuid().optional().or(z.literal('')),
+  is_active: z.boolean(),
+})
+type EditUserForm = z.infer<typeof editUserSchema>
 
 const userCreateSchema = z.object({
   email: z.string().email(),
@@ -42,9 +52,12 @@ export default function UsersSettingsPage() {
   const [resetTarget, setResetTarget] = useState<UserRow | null>(null)
   const [resetError, setResetError] = useState<string | null>(null)
   const [resetSuccess, setResetSuccess] = useState(false)
+  const [editTarget, setEditTarget] = useState<UserRow | null>(null)
+  const [editError, setEditError] = useState<string | null>(null)
 
   const userForm = useForm<UserCreateFormData>({ resolver: zodResolver(userCreateSchema) })
   const resetPwForm = useForm<ResetPwForm>({ resolver: zodResolver(resetPwSchema) })
+  const editForm = useForm<EditUserForm>({ resolver: zodResolver(editUserSchema) })
 
   useEffect(() => {
     async function fetchUsers() {
@@ -71,6 +84,36 @@ export default function UsersSettingsPage() {
     }
     setResetSuccess(true)
     resetPwForm.reset()
+  }
+
+  function openEditModal(user: UserRow) {
+    setEditTarget(user)
+    setEditError(null)
+    editForm.reset({
+      full_name: user.full_name ?? '',
+      phone: user.phone ?? '',
+      role: user.role as EditUserForm['role'],
+      branch_id: user.branch_id ?? '',
+      is_active: user.is_active,
+    })
+  }
+
+  async function onEditUser(data: EditUserForm) {
+    if (!editTarget) return
+    setEditError(null)
+    const res = await fetch(`/api/users/${editTarget.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...data, branch_id: data.branch_id || null }),
+    })
+    const json = await res.json() as { data?: UserRow; error?: { message?: string } | string }
+    if (!res.ok) {
+      const msg = typeof json.error === 'string' ? json.error : json.error?.message ?? 'Failed to update user'
+      setEditError(msg)
+      return
+    }
+    setUsers((list) => list.map((u) => (u.id === editTarget.id ? { ...u, ...json.data } : u)))
+    setEditTarget(null)
   }
 
   async function onCreateUser(data: UserCreateFormData) {
@@ -106,6 +149,16 @@ export default function UsersSettingsPage() {
                 <p className="text-xs text-gray-400">{user.email} · {ROLE_LABELS[user.role] ?? user.role}</p>
               </div>
               <div className="flex items-center gap-2">
+                {user.role !== 'business_owner' && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    title="Edit profile"
+                    onClick={() => openEditModal(user)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
                 {user.role !== 'business_owner' && (
                   <Button
                     size="sm"
@@ -207,6 +260,68 @@ export default function UsersSettingsPage() {
                   </Button>
                 </form>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+              <div>
+                <h2 className="font-semibold text-gray-900">Edit team member</h2>
+                <p className="mt-0.5 text-xs text-gray-500">{editTarget.full_name ?? editTarget.email}</p>
+              </div>
+              <button
+                onClick={() => { setEditTarget(null); setEditError(null) }}
+                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-5">
+              <form onSubmit={editForm.handleSubmit(onEditUser)} className="space-y-4">
+                {editError && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{editError}</div>
+                )}
+                <Input
+                  label="Full Name"
+                  error={editForm.formState.errors.full_name?.message}
+                  {...editForm.register('full_name')}
+                />
+                <Input
+                  label="Phone"
+                  error={editForm.formState.errors.phone?.message}
+                  {...editForm.register('phone')}
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Role</label>
+                    <select {...editForm.register('role')} className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                      <option value="cashier">Cashier</option>
+                      <option value="staff">Staff</option>
+                      <option value="branch_manager">Branch Manager</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Branch</label>
+                    <select {...editForm.register('branch_id')} className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                      <option value="">Select branch</option>
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input type="checkbox" className="h-4 w-4 rounded border-gray-300" {...editForm.register('is_active')} />
+                  Active
+                </label>
+                <Button type="submit" className="w-full" loading={editForm.formState.isSubmitting}>
+                  Save changes
+                </Button>
+              </form>
             </div>
           </div>
         </div>

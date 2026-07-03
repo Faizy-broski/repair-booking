@@ -5,7 +5,7 @@ export const UserService = {
   async listByBusiness(businessId: string) {
     const { data, error } = await adminSupabase
       .from('profiles')
-      .select('id, full_name, role, phone, is_active, created_at, branches(name)')
+      .select('id, full_name, email, role, phone, branch_id, is_active, created_at, branches(name)')
       .eq('business_id', businessId)
       .order('created_at', { ascending: false })
     if (error) throw error

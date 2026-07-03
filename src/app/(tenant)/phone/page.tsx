@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Phone, PhoneOff, PhoneCall, PhoneMissed, Mic, MicOff, Volume2, VolumeX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -15,7 +16,13 @@ interface OnlineBranch {
 type CallStatus = 'idle' | 'calling' | 'incoming' | 'connected'
 
 export default function PhonePage() {
-  const { activeBranch, branches } = useAuthStore()
+  const { activeBranch, branches, isLoading: authLoading } = useAuthStore()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!authLoading && branches.length < 2) router.replace('/dashboard')
+  }, [authLoading, branches.length, router])
+
   const [onlineBranches, setOnlineBranches] = useState<OnlineBranch[]>([])
   const [callStatus, setCallStatus] = useState<CallStatus>('idle')
   const [callTarget, setCallTarget] = useState<OnlineBranch | null>(null)
@@ -250,6 +257,8 @@ export default function PhonePage() {
     const s = (secs % 60).toString().padStart(2, '0')
     return `${m}:${s}`
   }
+
+  if (authLoading || branches.length < 2) return null
 
   return (
     <div className="space-y-4">

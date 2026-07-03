@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PhoneInput } from '@/components/ui/phone-input'
 import { Card, CardContent } from '@/components/ui/card'
+import { COUNTRIES } from '@/lib/countries'
 import {
   CheckCircle, Building2, User, CreditCard, Check, Zap, Mail,
   ChevronRight, ArrowLeft, Sparkles, Store, Wrench, ShoppingBag,
@@ -713,24 +714,9 @@ export default function RegisterPage() {
                       {...form1.register('country')}
                     >
                       <option value="">Select country</option>
-                      <option value="GB">United Kingdom</option>
-                      <option value="US">United States</option>
-                      <option value="CA">Canada</option>
-                      <option value="AU">Australia</option>
-                      <option value="AE">United Arab Emirates</option>
-                      <option value="SA">Saudi Arabia</option>
-                      <option value="PK">Pakistan</option>
-                      <option value="IN">India</option>
-                      <option value="DE">Germany</option>
-                      <option value="FR">France</option>
-                      <option value="IE">Ireland</option>
-                      <option value="NL">Netherlands</option>
-                      <option value="SG">Singapore</option>
-                      <option value="NZ">New Zealand</option>
-                      <option value="ZA">South Africa</option>
-                      <option value="NG">Nigeria</option>
-                      <option value="GH">Ghana</option>
-                      <option value="KE">Kenya</option>
+                      {COUNTRIES.map((c) => (
+                        <option key={c.code} value={c.code}>{c.name}</option>
+                      ))}
                       <option value="OTHER">Other</option>
                     </select>
                     {form1.formState.errors.country && (

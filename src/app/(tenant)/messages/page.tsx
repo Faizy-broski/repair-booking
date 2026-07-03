@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Send, Plus, MessageSquare, Trash2, Pencil, Check, X, Paperclip, FileText, Download, ImageIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -61,7 +62,13 @@ const composeSchema = z.object({
 type ComposeForm = z.infer<typeof composeSchema>
 
 export default function MessagesPage() {
-  const { activeBranch, branches, profile } = useAuthStore()
+  const { activeBranch, branches, profile, isLoading: authLoading } = useAuthStore()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!authLoading && branches.length < 2) router.replace('/dashboard')
+  }, [authLoading, branches.length, router])
+
   const notify = useNotificationStore((s) => s.add)
   const decrement = useMessageStore((s) => s.decrement)
   const removeUnreadMessage = useMessageStore((s) => s.removeUnreadMessage)
@@ -487,6 +494,8 @@ export default function MessagesPage() {
   const otherBranches = branches.filter((b) => b.id !== activeBranch?.id)
 
   // ── Render ─────────────────────────────────────────────────────────────────
+
+  if (authLoading || branches.length < 2) return null
 
   return (
     <div className="-m-6 flex h-[calc(100vh-3.5rem)] overflow-hidden bg-surface-container-lowest">

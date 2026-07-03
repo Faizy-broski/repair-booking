@@ -465,10 +465,21 @@ export default function BusinessesPage() {
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(20)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [modulesBusiness, setModulesBusiness] = useState<BusinessRow | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [editSubRow, setEditSubRow] = useState<SubscriptionRow | null>(null)
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => {
+      setDebouncedSearch(search)
+      setPage(0)
+    }, 300)
+    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current) }
+  }, [search])
 
   const { data: plansData } = useQuery({
     queryKey: ['superadmin-plans'],
@@ -481,13 +492,13 @@ export default function BusinessesPage() {
   })
   const plans: PlanOption[] = plansData?.data ?? []
 
-  const queryKey = ['superadmin-businesses', page, pageSize, search]
+  const queryKey = ['superadmin-businesses', page, pageSize, debouncedSearch]
 
   const { data, isLoading: loading } = useQuery({
     queryKey,
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page + 1), limit: String(pageSize) })
-      if (search) params.set('search', search)
+      if (debouncedSearch) params.set('search', debouncedSearch)
       const res = await fetch(`/api/businesses?${params}`)
       if (!res.ok) throw new Error('Failed to load businesses')
       return res.json()
@@ -738,12 +749,12 @@ export default function BusinessesPage() {
           type="text"
           placeholder="Search businesses..."
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(0) }}
+          onChange={(e) => setSearch(e.target.value)}
           className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-8 pr-8 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500/30 transition-colors"
         />
         {search && (
           <button
-            onClick={() => { setSearch(''); setPage(0) }}
+            onClick={() => { setSearch(''); setDebouncedSearch(''); setPage(0) }}
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
           >
             <X className="h-3.5 w-3.5" />
