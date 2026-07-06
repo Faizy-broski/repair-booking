@@ -40,7 +40,7 @@ interface Subscription {
 }
 interface Business {
   id: string; name: string; subdomain: string; email: string | null
-  phone: string | null; address: string | null; logo_url: string | null
+  phone: string | null; address: string | null; maps_url: string | null; logo_url: string | null
   currency: string | null; country: string | null; timezone: string | null
   is_active: boolean; is_suspended: boolean; created_at: string
   subscriptions: Subscription[]
@@ -316,6 +316,7 @@ export default function BusinessDetailPage({ params }: { params: Promise<{ id: s
           <InfoRow label="Email"    value={business.email ? <a href={`mailto:${business.email}`} className="text-blue-500 hover:underline inline-flex items-center gap-1"><Mail className="h-3 w-3" />{business.email}</a> : null} />
           <InfoRow label="Phone"    value={business.phone ? <span className="inline-flex items-center gap-1"><Phone className="h-3 w-3 text-gray-400" />{business.phone}</span> : null} />
           <InfoRow label="Address"  value={business.address ? <span className="inline-flex items-start gap-1"><MapPin className="h-3 w-3 text-gray-400 mt-0.5 shrink-0" />{business.address}</span> : null} />
+          <InfoRow label="Maps Link" value={business.maps_url ? <a href={business.maps_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Open in Google Maps</a> : null} />
           <InfoRow label="Country"  value={business.country} />
           <InfoRow label="Currency" value={business.currency} />
           <InfoRow label="Timezone" value={business.timezone} />

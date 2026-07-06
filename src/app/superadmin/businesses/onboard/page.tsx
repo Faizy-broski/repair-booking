@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
@@ -7,13 +7,14 @@ import { z } from 'zod'
 import {
   Building2, User, CreditCard, ClipboardList, CheckCircle,
   ChevronRight, ArrowLeft, Copy, Check, Eye, EyeOff, Sparkles, Plus,
-  RefreshCw, Globe, MapPin,
+  RefreshCw, Globe, MapPin, Link2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PhoneInput } from '@/components/ui/phone-input'
 import { Card, CardContent } from '@/components/ui/card'
 import { COUNTRIES } from '@/lib/countries'
+import { parseGoogleMapsLink } from '@/lib/maps-link'
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,7 @@ const step1Schema = z.object({
   country: z.string().optional(),
   city: z.string().optional(),
   address: z.string().optional(),
+  mapsUrl: z.string().optional(),
 })
 
 const step2Schema = z.object({
@@ -118,6 +120,8 @@ export default function OnboardBusinessPage() {
   const subdomainTimer = useRef<NodeJS.Timeout | null>(null)
 
   const form1 = useForm<Step1Data>({ resolver: zodResolver(step1Schema) })
+  const mapsUrlValue = form1.watch('mapsUrl')
+  const mapsEmbedSrc = useMemo(() => parseGoogleMapsLink(mapsUrlValue ?? ''), [mapsUrlValue]).embedSrc
   const form2 = useForm<Step2Data>({ resolver: zodResolver(step2Schema) })
 
   // Fetch plans when reaching step 3
@@ -502,6 +506,36 @@ export default function OnboardBusinessPage() {
                 </div>
               </div>
 
+              {/* Google Maps Link */}
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-700">Google Maps Link <span className="text-gray-400 font-normal">(optional)</span></label>
+                <div className="relative">
+                  <Link2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="https://maps.google.com/... or https://maps.app.goo.gl/..."
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 pl-9 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                    {...form1.register('mapsUrl')}
+                  />
+                </div>
+                {mapsUrlValue && (
+                  mapsEmbedSrc ? (
+                    <iframe
+                      src={mapsEmbedSrc}
+                      loading="lazy"
+                      className="mt-2 h-48 w-full rounded-lg border border-gray-200"
+                    />
+                  ) : (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Can&apos;t preview shortened links — it&apos;ll still be saved and linked on the business profile.{' '}
+                      <a href={mapsUrlValue} target="_blank" rel="noopener noreferrer" className="text-teal-600 underline">
+                        Open link
+                      </a>
+                    </p>
+                  )
+                )}
+              </div>
+
               <Button type="submit" className="w-full">
                 Continue <ChevronRight className="h-4 w-4" />
               </Button>
@@ -729,6 +763,10 @@ export default function OnboardBusinessPage() {
                   {step1Data.address && (<>
                     <span className="text-gray-500">Address</span>
                     <span className="font-medium text-gray-900">{step1Data.address}</span>
+                  </>)}
+                  {step1Data.mapsUrl && (<>
+                    <span className="text-gray-500">Maps Link</span>
+                    <a href={step1Data.mapsUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-teal-600 underline truncate">{step1Data.mapsUrl}</a>
                   </>)}
                 </div>
               </div>

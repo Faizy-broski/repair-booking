@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
@@ -13,10 +13,11 @@ import { COUNTRIES } from '@/lib/countries'
 import {
   CheckCircle, Building2, User, CreditCard, Check, Zap, Mail,
   ChevronRight, ArrowLeft, Sparkles, Store, Wrench, ShoppingBag,
-  Scissors, Coffee, Monitor, Package, ShieldCheck, RotateCcw, Gift, Globe, MapPin,
+  Scissors, Coffee, Monitor, Package, ShieldCheck, RotateCcw, Gift, Globe, MapPin, Link2,
 } from 'lucide-react'
 
 import validations from '@/components/layout/number-validations.json'
+import { parseGoogleMapsLink } from '@/lib/maps-link'
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
@@ -30,6 +31,7 @@ const step1Schema = z.object({
   country: z.string().min(1, 'Country is required'),
   city: z.string().min(1, 'City is required'),
   address: z.string().min(1, 'Address is required'),
+  mapsUrl: z.string().optional(),
 }).refine((data) => {
   if (!data.phone.startsWith('+')) return true // Basic validation already handled by min(5)
 
@@ -173,6 +175,8 @@ export default function RegisterPage() {
 
   const form1 = useForm<Step1Data>({ resolver: zodResolver(step1Schema) })
   const form2 = useForm<Step2Data>({ resolver: zodResolver(step2Schema) })
+  const mapsUrlValue = form1.watch('mapsUrl')
+  const mapsEmbedSrc = useMemo(() => parseGoogleMapsLink(mapsUrlValue ?? ''), [mapsUrlValue]).embedSrc
 
   // ── Fetch templates (public, cached at edge) ──────────────────────────────
   /*
@@ -747,6 +751,40 @@ export default function RegisterPage() {
                   </div>
                   {form1.formState.errors.address && (
                     <p className="mt-1 text-xs text-error">{form1.formState.errors.address.message}</p>
+                  )}
+                </div>
+
+                {/* Row 6: Google Maps Link */}
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-on-surface">
+                    Google Maps Link <span className="font-normal text-gray-400">(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <Link2 className="h-4 w-4" />
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="https://maps.google.com/... or https://maps.app.goo.gl/..."
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 pl-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      {...form1.register('mapsUrl')}
+                    />
+                  </div>
+                  {mapsUrlValue && (
+                    mapsEmbedSrc ? (
+                      <iframe
+                        src={mapsEmbedSrc}
+                        loading="lazy"
+                        className="mt-2 h-48 w-full rounded-lg border border-gray-200"
+                      />
+                    ) : (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Can&apos;t preview shortened links — it&apos;ll still be saved and linked on your profile.{' '}
+                        <a href={mapsUrlValue} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                          Open link
+                        </a>
+                      </p>
+                    )
                   )}
                 </div>
 
