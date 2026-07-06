@@ -25,6 +25,26 @@ interface Invoice {
   description: string | null
 }
 
+interface StripeSubItem {
+  price_id: string
+  product_name: string | null
+  unit_amount: number | null
+  currency: string
+  interval: string | null
+  quantity: number | null
+}
+
+interface StripeSub {
+  id: string
+  status: string
+  created: number
+  current_period_start: number | null
+  current_period_end: number | null
+  cancel_at_period_end: boolean
+  canceled_at: number | null
+  items: StripeSubItem[]
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function fmtUnix(ts: number) {
@@ -130,6 +150,20 @@ export default function BusinessInvoicesPage({
     },
     staleTime: 2 * 60 * 1000,
   })
+
+  const { data: stripeSubData, isError: stripeSubIsError, error: stripeSubErrorObj } = useQuery({
+    queryKey: ['superadmin-stripe-subs', businessId],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/subscriptions/${businessId}/stripe-subscriptions`)
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to load Stripe subscriptions')
+      return json
+    },
+    staleTime: 60 * 1000,
+  })
+  const stripeSubs: StripeSub[] = stripeSubData?.data ?? []
+  const activeStripeSubs = stripeSubs.filter((s) => s.status === 'active' || s.status === 'trialing')
+  const stripeSubError = stripeSubIsError ? (stripeSubErrorObj as Error)?.message ?? 'Failed to load Stripe subscriptions' : null
 
   const business: SubscriptionRow | null =
     (subData?.data ?? []).find((r: SubscriptionRow) => r.business_id === businessId) ?? null
@@ -308,6 +342,63 @@ export default function BusinessInvoicesPage({
           )}
         </div>
       )}
+
+      {/* Stripe subscriptions — read-only diagnostic, flags duplicates */}
+      <div className={`rounded-xl border p-5 ${activeStripeSubs.length > 1 ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'}`}>
+        <div className="flex items-center gap-2 mb-3">
+          <CreditCard className={`h-4 w-4 ${activeStripeSubs.length > 1 ? 'text-red-600' : 'text-gray-400'}`} />
+          <h3 className={`font-semibold ${activeStripeSubs.length > 1 ? 'text-red-800' : 'text-gray-900'}`}>
+            Stripe Subscriptions {stripeSubs.length > 0 && `(${stripeSubs.length})`}
+          </h3>
+          {activeStripeSubs.length > 1 && (
+            <Badge variant="destructive" className="text-[11px]">
+              {activeStripeSubs.length} active — will all renew and charge separately
+            </Badge>
+          )}
+        </div>
+        {stripeSubError ? (
+          <p className="text-sm text-red-700 font-medium">Error loading Stripe subscriptions: {stripeSubError}</p>
+        ) : stripeSubs.length === 0 ? (
+          <p className="text-sm text-gray-400">No Stripe subscriptions found for this customer.</p>
+        ) : (
+          <div className="space-y-2">
+            {stripeSubs.map((sub) => (
+              <div
+                key={sub.id}
+                className={`rounded-lg border px-4 py-3 text-sm ${
+                  sub.status === 'active' || sub.status === 'trialing'
+                    ? 'border-emerald-200 bg-emerald-50'
+                    : 'border-gray-200 bg-gray-50'
+                }`}
+              >
+                <div className="flex flex-wrap items-center gap-2 justify-between">
+                  <span className="font-mono text-xs text-gray-500">{sub.id}</span>
+                  <Badge
+                    variant={sub.status === 'active' ? 'success' : sub.status === 'trialing' ? 'warning' : 'destructive'}
+                    className="capitalize text-[11px]"
+                  >
+                    {sub.status.replace('_', ' ')}
+                  </Badge>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600">
+                  {sub.items.map((item, i) => (
+                    <span key={i}>
+                      {item.quantity ?? 1}× {item.product_name ?? item.price_id}
+                      {item.unit_amount != null && ` (${fmtMoney(item.unit_amount, item.currency)}/${item.interval ?? '?'})`}
+                    </span>
+                  ))}
+                </div>
+                {sub.current_period_end && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Current period: {fmtUnix(sub.current_period_start!)} → {fmtUnix(sub.current_period_end)}
+                    {sub.cancel_at_period_end && ' (cancels at period end)'}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* KPI cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

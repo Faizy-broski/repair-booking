@@ -45,9 +45,9 @@ export const CustomerService = {
         .eq('customer_id', id)
         .order('created_at', { ascending: false })
         .limit(50),
-      adminSupabase
+      (adminSupabase as any)
         .from('sales')
-        .select('id, total, payment_method, created_at, is_refund')
+        .select('id, sale_number, total, payment_method, payment_status, amount_paid, created_at, is_refund')
         .eq('customer_id', id)
         .eq('is_refund', false)
         .order('created_at', { ascending: false })
@@ -62,7 +62,7 @@ export const CustomerService = {
 
     if (customerRes.error) throw customerRes.error
 
-    const totalSpend = (salesRes.data ?? []).reduce((s, r) => s + (r.total ?? 0), 0)
+    const totalSpend = (salesRes.data ?? []).reduce((s: number, r: { total: number | null }) => s + (r.total ?? 0), 0)
 
     return {
       ...customerRes.data,

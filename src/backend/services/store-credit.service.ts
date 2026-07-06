@@ -25,6 +25,17 @@ export const StoreCreditService = {
     return data ?? []
   },
 
+  /** Business-wide feed of store-credit activity across all customers (not branch-scoped — table has no branch_id). */
+  async listBusinessTransactions(businessId: string, limit = 100) {
+    const { data, error } = await db('store_credit_transactions')
+      .select('*, customers(first_name, last_name)')
+      .eq('business_id', businessId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    if (error) throw error
+    return data ?? []
+  },
+
   /** Add credit to a customer's balance */
   async credit(businessId: string, customerId: string, amount: number, opts: {
     note?: string; referenceId?: string; referenceType?: string; createdBy?: string

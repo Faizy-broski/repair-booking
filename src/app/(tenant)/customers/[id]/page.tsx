@@ -2,7 +2,8 @@
 import { useState, use } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, User, Wrench, ShoppingBag, FileText, Phone, Mail, MapPin, Cpu, CreditCard, Star, Plus, Pencil, Trash2, Coins } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowLeft, User, Wrench, ShoppingBag, FileText, Phone, Mail, MapPin, Cpu, CreditCard, Star, Plus, Pencil, Trash2, Coins, Banknote } from 'lucide-react'
 import { BrandSpinner } from '@/components/ui/brand-spinner'
 import { Button } from '@/components/ui/button'
 import { Badge, REPAIR_STATUS_VARIANTS } from '@/components/ui/badge'
@@ -36,8 +37,11 @@ interface CustomerDetail {
   }[]
   sales: {
     id: string
+    sale_number: string | null
     total: number
     payment_method: string
+    payment_status: string | null
+    amount_paid: number | null
     created_at: string
   }[]
   invoices: {
@@ -135,6 +139,16 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   })
   const loyaltyBalance = loyaltyData?.balance ?? 0
   const loyaltyTxns    = loyaltyData?.transactions ?? []
+
+  // Customer Credit (on-account sales) — a separate system from the prepaid
+  // Store Credits wallet above: this is accounts-receivable for unpaid/partially
+  // paid sales, tracked on the `sales` table and managed on the /credits page.
+  const onAccountSales = (customer?.sales ?? []).filter(
+    (s) => s.payment_method === 'on_account' && s.payment_status !== 'paid'
+  )
+  const onAccountOutstanding = onAccountSales.reduce(
+    (sum, s) => sum + (Number(s.total) - Number(s.amount_paid ?? 0)), 0
+  )
 
   async function saveAsset() {
     setSavingAsset(true)
@@ -463,7 +477,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
       {/* Credits & Points tab */}
       {tab === 'credits' && (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {/* Store Credits */}
           <Card>
             <CardContent className="pt-4 space-y-3">
@@ -512,6 +526,34 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                 ))}
                 {loyaltyTxns.length === 0 && <p className="text-xs text-gray-400 italic">No transactions yet</p>}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Customer Credit (on-account sales) — separate from the prepaid Store Credits wallet above */}
+          <Card>
+            <CardContent className="pt-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Banknote className="h-4 w-4 text-purple-500" />
+                <h3 className="text-sm font-semibold text-gray-700">Customer Credit</h3>
+              </div>
+              <p className={`text-2xl font-bold ${onAccountOutstanding > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                {formatCurrency(onAccountOutstanding)}
+              </p>
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {onAccountSales.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between text-xs text-gray-500">
+                    <span className="font-mono">#{s.sale_number ?? s.id.slice(-8).toUpperCase()}</span>
+                    <span className="font-semibold text-red-600">
+                      {formatCurrency(Number(s.total) - Number(s.amount_paid ?? 0))}
+                    </span>
+                    <span>{new Date(s.created_at).toLocaleDateString()}</span>
+                  </div>
+                ))}
+                {onAccountSales.length === 0 && <p className="text-xs text-gray-400 italic">No outstanding balance</p>}
+              </div>
+              <Link href="/credits" className="inline-block text-xs font-medium text-purple-600 hover:underline">
+                Manage in Customer Credit →
+              </Link>
             </CardContent>
           </Card>
         </div>

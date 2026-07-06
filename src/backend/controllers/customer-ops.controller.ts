@@ -48,6 +48,15 @@ export const StoreCreditController = {
       return serverError('Failed to adjust store credit', err)
     }
   },
+
+  async listBusiness(req: NextRequest, ctx: RequestContext) {
+    try {
+      const transactions = await StoreCreditService.listBusinessTransactions(ctx.businessId)
+      return ok(transactions)
+    } catch (err) {
+      return serverError('Failed to fetch store credit activity', err)
+    }
+  },
 }
 
 // ── Loyalty ──────────────────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { KeyRound, Pencil, X } from 'lucide-react'
+import { KeyRound, Pencil, X, Crown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/store/auth.store'
@@ -29,6 +29,19 @@ const editUserSchema = z.object({
 })
 type EditUserForm = z.infer<typeof editUserSchema>
 
+const ownProfileSchema = z.object({
+  full_name: z.string().min(1, 'Full name is required'),
+  phone: z.string().optional(),
+})
+type OwnProfileForm = z.infer<typeof ownProfileSchema>
+
+const changePwSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(6, 'Min. 6 characters'),
+  confirmNewPassword: z.string(),
+}).refine((d) => d.newPassword === d.confirmNewPassword, { message: 'Passwords do not match', path: ['confirmNewPassword'] })
+type ChangePwForm = z.infer<typeof changePwSchema>
+
 const userCreateSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
@@ -46,7 +59,7 @@ const ROLE_LABELS: Record<string, string> = {
 }
 
 export default function UsersSettingsPage() {
-  const { isOwner, branches } = useAuthStore()
+  const { isOwner, branches, profile } = useAuthStore()
   const [users, setUsers] = useState<UserRow[]>([])
   const [userCreateError, setUserCreateError] = useState<string | null>(null)
   const [resetTarget, setResetTarget] = useState<UserRow | null>(null)
@@ -54,10 +67,15 @@ export default function UsersSettingsPage() {
   const [resetSuccess, setResetSuccess] = useState(false)
   const [editTarget, setEditTarget] = useState<UserRow | null>(null)
   const [editError, setEditError] = useState<string | null>(null)
+  const [changePwTarget, setChangePwTarget] = useState<UserRow | null>(null)
+  const [changePwError, setChangePwError] = useState<string | null>(null)
+  const [changePwSuccess, setChangePwSuccess] = useState(false)
 
   const userForm = useForm<UserCreateFormData>({ resolver: zodResolver(userCreateSchema) })
   const resetPwForm = useForm<ResetPwForm>({ resolver: zodResolver(resetPwSchema) })
   const editForm = useForm<EditUserForm>({ resolver: zodResolver(editUserSchema) })
+  const ownProfileForm = useForm<OwnProfileForm>({ resolver: zodResolver(ownProfileSchema) })
+  const changePwForm = useForm<ChangePwForm>({ resolver: zodResolver(changePwSchema) })
 
   useEffect(() => {
     async function fetchUsers() {
@@ -89,13 +107,17 @@ export default function UsersSettingsPage() {
   function openEditModal(user: UserRow) {
     setEditTarget(user)
     setEditError(null)
-    editForm.reset({
-      full_name: user.full_name ?? '',
-      phone: user.phone ?? '',
-      role: user.role as EditUserForm['role'],
-      branch_id: user.branch_id ?? '',
-      is_active: user.is_active,
-    })
+    if (user.role === 'business_owner') {
+      ownProfileForm.reset({ full_name: user.full_name ?? '', phone: user.phone ?? '' })
+    } else {
+      editForm.reset({
+        full_name: user.full_name ?? '',
+        phone: user.phone ?? '',
+        role: user.role as EditUserForm['role'],
+        branch_id: user.branch_id ?? '',
+        is_active: user.is_active,
+      })
+    }
   }
 
   async function onEditUser(data: EditUserForm) {
@@ -114,6 +136,41 @@ export default function UsersSettingsPage() {
     }
     setUsers((list) => list.map((u) => (u.id === editTarget.id ? { ...u, ...json.data } : u)))
     setEditTarget(null)
+  }
+
+  async function onEditOwnProfile(data: OwnProfileForm) {
+    if (!editTarget) return
+    setEditError(null)
+    const res = await fetch(`/api/users/${editTarget.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    const json = await res.json() as { data?: UserRow; error?: { message?: string } | string }
+    if (!res.ok) {
+      const msg = typeof json.error === 'string' ? json.error : json.error?.message ?? 'Failed to update profile'
+      setEditError(msg)
+      return
+    }
+    setUsers((list) => list.map((u) => (u.id === editTarget.id ? { ...u, ...json.data } : u)))
+    setEditTarget(null)
+  }
+
+  async function onChangeOwnPassword(data: ChangePwForm) {
+    setChangePwError(null)
+    const res = await fetch('/api/account/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword: data.currentPassword, newPassword: data.newPassword }),
+    })
+    const json = await res.json() as { error?: { message?: string } | string }
+    if (!res.ok) {
+      const msg = typeof json.error === 'string' ? json.error : json.error?.message ?? 'Failed to change password'
+      setChangePwError(msg)
+      return
+    }
+    setChangePwSuccess(true)
+    changePwForm.reset()
   }
 
   async function onCreateUser(data: UserCreateFormData) {
@@ -142,39 +199,59 @@ export default function UsersSettingsPage() {
           <h3 className="font-semibold text-gray-900">Team Members</h3>
         </div>
         <div className="divide-y divide-gray-100">
-          {users.map((user) => (
-            <div key={user.id} className="flex items-center justify-between px-4 py-3">
-              <div>
-                <p className="font-medium text-gray-900">{user.full_name ?? user.email}</p>
-                <p className="text-xs text-gray-400">{user.email} · {ROLE_LABELS[user.role] ?? user.role}</p>
+          {users.map((user) => {
+            const isSelf = user.id === profile?.id
+            return (
+              <div
+                key={user.id}
+                className={`flex items-center justify-between px-4 py-3 ${isSelf ? 'bg-amber-50/60 border-l-2 border-amber-400' : ''}`}
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-gray-900">{user.full_name ?? user.email}</p>
+                    {isSelf && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                        <Crown className="h-3 w-3" />
+                        You
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400">{user.email} · {ROLE_LABELS[user.role] ?? user.role}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {(user.role !== 'business_owner' || isSelf) && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title="Edit profile"
+                      onClick={() => openEditModal(user)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {(user.role !== 'business_owner' || isSelf) && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title={isSelf ? 'Change my password' : 'Set password'}
+                      onClick={() => {
+                        if (isSelf) {
+                          setChangePwTarget(user); setChangePwError(null); setChangePwSuccess(false); changePwForm.reset()
+                        } else {
+                          setResetTarget(user); setResetError(null); setResetSuccess(false); resetPwForm.reset()
+                        }
+                      }}
+                    >
+                      <KeyRound className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${user.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                    {user.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                {user.role !== 'business_owner' && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    title="Edit profile"
-                    onClick={() => openEditModal(user)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                )}
-                {user.role !== 'business_owner' && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    title="Set password"
-                    onClick={() => { setResetTarget(user); setResetError(null); setResetSuccess(false); resetPwForm.reset() }}
-                  >
-                    <KeyRound className="h-4 w-4" />
-                  </Button>
-                )}
-                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${user.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                  {user.is_active ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
@@ -265,7 +342,49 @@ export default function UsersSettingsPage() {
         </div>
       )}
 
-      {editTarget && (
+      {editTarget && editTarget.role === 'business_owner' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+              <div className="flex items-center gap-2">
+                <Crown className="h-4 w-4 text-amber-500" />
+                <div>
+                  <h2 className="font-semibold text-gray-900">Edit my details</h2>
+                  <p className="mt-0.5 text-xs text-gray-500">{editTarget.full_name ?? editTarget.email}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setEditTarget(null); setEditError(null) }}
+                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-5">
+              <form onSubmit={ownProfileForm.handleSubmit(onEditOwnProfile)} className="space-y-4">
+                {editError && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{editError}</div>
+                )}
+                <Input
+                  label="Full Name"
+                  error={ownProfileForm.formState.errors.full_name?.message}
+                  {...ownProfileForm.register('full_name')}
+                />
+                <Input
+                  label="Phone"
+                  error={ownProfileForm.formState.errors.phone?.message}
+                  {...ownProfileForm.register('phone')}
+                />
+                <Button type="submit" className="w-full" loading={ownProfileForm.formState.isSubmitting}>
+                  Save changes
+                </Button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editTarget && editTarget.role !== 'business_owner' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm rounded-xl bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
@@ -322,6 +441,71 @@ export default function UsersSettingsPage() {
                   Save changes
                 </Button>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {changePwTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+              <div className="flex items-center gap-2">
+                <Crown className="h-4 w-4 text-amber-500" />
+                <div>
+                  <h2 className="font-semibold text-gray-900">Change my password</h2>
+                  <p className="mt-0.5 text-xs text-gray-500">{changePwTarget.full_name ?? changePwTarget.email}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setChangePwTarget(null); setChangePwError(null); setChangePwSuccess(false) }}
+                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-5">
+              {changePwSuccess ? (
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                    <p className="font-semibold">Password updated</p>
+                    <p className="mt-0.5 text-xs">Use your new password next time you sign in.</p>
+                  </div>
+                  <Button className="w-full" variant="outline" onClick={() => { setChangePwTarget(null); setChangePwSuccess(false) }}>Done</Button>
+                </div>
+              ) : (
+                <form onSubmit={changePwForm.handleSubmit(onChangeOwnPassword)} className="space-y-4">
+                  {changePwError && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{changePwError}</div>
+                  )}
+                  <Input
+                    label="Current password"
+                    type="password"
+                    autoComplete="current-password"
+                    error={changePwForm.formState.errors.currentPassword?.message}
+                    {...changePwForm.register('currentPassword')}
+                  />
+                  <Input
+                    label="New password"
+                    type="password"
+                    placeholder="Min. 6 characters"
+                    autoComplete="new-password"
+                    error={changePwForm.formState.errors.newPassword?.message}
+                    {...changePwForm.register('newPassword')}
+                  />
+                  <Input
+                    label="Confirm new password"
+                    type="password"
+                    placeholder="Repeat password"
+                    autoComplete="new-password"
+                    error={changePwForm.formState.errors.confirmNewPassword?.message}
+                    {...changePwForm.register('confirmNewPassword')}
+                  />
+                  <Button type="submit" className="w-full" loading={changePwForm.formState.isSubmitting}>
+                    Change password
+                  </Button>
+                </form>
+              )}
             </div>
           </div>
         </div>

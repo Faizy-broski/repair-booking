@@ -26,6 +26,11 @@ const resetPasswordSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
 })
 
+const changeOwnPasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(6, 'Password must be at least 6 characters'),
+})
+
 export const UserController = {
   async list(request: NextRequest, ctx: RequestContext) {
     try {
@@ -88,6 +93,21 @@ export const UserController = {
         return badRequest(msg)
       }
       return serverError('Failed to reset password', err)
+    }
+  },
+
+  async changeOwnPassword(request: NextRequest, ctx: RequestContext) {
+    const { data, error } = await validateBody(request, changeOwnPasswordSchema)
+    if (error) return error
+    try {
+      await UserService.changeOwnPassword(ctx.auth.userId, data.currentPassword, data.newPassword)
+      return ok({ success: true })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to change password'
+      if (msg.includes('incorrect') || msg.includes('verify')) {
+        return badRequest(msg)
+      }
+      return serverError('Failed to change password', err)
     }
   },
 }

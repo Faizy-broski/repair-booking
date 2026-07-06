@@ -35,6 +35,7 @@ const schema = z.object({
   country:               z.string().optional().nullable(),
   city:                  z.string().optional().nullable(),
   address:               z.string().optional().nullable(),
+  mapsUrl:               z.string().optional().nullable(),
   fullName:              z.string().min(2),
   password:              z.string().min(8),
   mainBranchName:        z.string().min(2),
