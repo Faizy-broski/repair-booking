@@ -128,12 +128,19 @@ export async function GET() {
       }
     }
 
-    // ── If DB row has no period dates, sync them from Stripe now ─────────────
+    // ── If DB row has no period dates, or the stored period has already ended
+    // (stale status — e.g. a dropped webhook never flipped it to past_due),
+    // sync from Stripe now. Never touch 'suspended' rows — that status is
+    // admin-set (superadmin manual lock) and independent of Stripe, so a Stripe
+    // sync must not silently un-suspend an account.
     const fallbackStripeSubId =
       (sub?.stripe_sub_id as string | null) ??
       (business?.stripe_subscription_id as string | null) ?? null
 
-    if (sub && !sub.current_period_end && fallbackStripeSubId) {
+    const periodEnded = !!sub?.current_period_end && new Date(sub.current_period_end) < new Date()
+    const isAdminManaged = sub?.status === 'suspended'
+
+    if (sub && !isAdminManaged && (!sub.current_period_end || periodEnded) && fallbackStripeSubId) {
       try {
         const stripeSub = await stripe.subscriptions.retrieve(fallbackStripeSubId, { expand: ['items'] })
         const item = stripeSub.items?.data?.[0] as any

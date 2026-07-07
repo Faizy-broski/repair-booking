@@ -480,7 +480,10 @@ function AccountPageInner() {
               <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6">
                 <div className="flex items-start justify-between gap-4 mb-5">
                   <h2 className="text-base font-semibold text-on-surface">Current plan</h2>
-                  {sub && <StatusBadge status={isExpired ? 'canceled' : sub.status} />}
+                  {/* Only substitute 'canceled' for the manual-subscription case where
+                      sub.status is stuck on 'active' despite the period having ended.
+                      past_due/canceled/suspended already carry their own correct status. */}
+                  {sub && <StatusBadge status={isExpired && sub.status === 'active' ? 'canceled' : sub.status} />}
                 </div>
 
                 {sub ? (
@@ -500,8 +503,8 @@ function AccountPageInner() {
                         value={sub.current_period_end ? formatDate(sub.current_period_end) : 'Manual / no expiry'}
                       />
                     )}
-                    {isPastDue && sub.current_period_end && (
-                      <InfoRow label="Next retry by" value={formatDate(sub.current_period_end)} />
+                    {isPastDue && sub.current_period_start && (
+                      <InfoRow label="Due" value={formatDate(sub.current_period_start)} />
                     )}
                     {isCanceled && sub.current_period_end && (
                       <InfoRow label="Expired on" value={formatDate(sub.current_period_end)} />

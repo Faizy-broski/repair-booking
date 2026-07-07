@@ -67,9 +67,11 @@ async function getSessionContext(
     const trialEndsAt = sub?.trial_ends_at ?? null
     const currentPeriodEnd = (sub as any)?.current_period_end ?? null
     const freeTrialExpired = planType === 'free' && trialEndsAt && new Date(trialEndsAt) < new Date()
+    // Mirrors middleware.ts's subscription gate — deliberately does not depend on
+    // plan_type (a mislabeled plans row must never bypass this check).
     const paidSubInactive =
-      planType === 'paid' &&
-      sub?.status &&
+      !!sub?.status &&
+      !trialEndsAt &&
       !['active', 'trialing'].includes(sub.status)
     const manualSubExpired =
       !(sub as any)?.stripe_sub_id &&
