@@ -6,7 +6,7 @@ import { Modal } from '@/components/ui/modal'
 import { CreatableCombobox } from '@/components/ui/creatable-combobox'
 import { toast } from 'sonner'
 
-interface ExpenseCategory { id: string; name: string }
+interface LedgerCategory { id: string; name: string }
 
 interface Props {
   open: boolean
@@ -18,7 +18,7 @@ interface Props {
   cashMovementNotes: string
   setCashMovementNotes: (v: string) => void
   cashMovementSaving: boolean
-  handleCashMovement: (expenseCategoryId: string | null, addToExpense: boolean) => void
+  handleCashMovement: (categoryId: string | null, addToLedger: boolean) => void
   businessId: string | null | undefined
 }
 
@@ -31,10 +31,17 @@ export function CashMovementModal({
 }: Props) {
   const isCashOut = cashMovementType === 'cash_out'
 
-  const [categories, setCategories] = useState<ExpenseCategory[]>([])
+  // Cash Out → optionally record as a real expense
+  const [categories, setCategories] = useState<LedgerCategory[]>([])
   const [categoryId, setCategoryId] = useState('')
   const [catsLoading, setCatsLoading] = useState(false)
   const [addToExpense, setAddToExpense] = useState(false)
+
+  // Cash In → optionally record as real income
+  const [incomeCategories, setIncomeCategories] = useState<LedgerCategory[]>([])
+  const [incomeCategoryId, setIncomeCategoryId] = useState('')
+  const [incomeCatsLoading, setIncomeCatsLoading] = useState(false)
+  const [addToIncome, setAddToIncome] = useState(false)
 
   // Fetch expense categories only when user opts in
   useEffect(() => {
@@ -47,9 +54,22 @@ export function CashMovementModal({
       .finally(() => setCatsLoading(false))
   }, [addToExpense, businessId]) // eslint-disable-line
 
-  // Reset expense opts when switching type
+  // Fetch income categories only when user opts in — fails soft, never
+  // blocks the modal (an empty list just means no categories to pick from).
+  useEffect(() => {
+    if (!addToIncome || !businessId || incomeCategories.length > 0) return
+    setIncomeCatsLoading(true)
+    fetch(`/api/other-income/categories?business_id=${businessId}`)
+      .then(r => r.json())
+      .then(j => setIncomeCategories(j.data ?? []))
+      .catch(() => {})
+      .finally(() => setIncomeCatsLoading(false))
+  }, [addToIncome, businessId]) // eslint-disable-line
+
+  // Reset expense/income opts when switching type
   useEffect(() => {
     if (!isCashOut) { setAddToExpense(false); setCategoryId('') }
+    if (isCashOut)  { setAddToIncome(false); setIncomeCategoryId('') }
   }, [isCashOut])
 
   async function createCategory(name: string) {
@@ -59,15 +79,30 @@ export function CashMovementModal({
       body: JSON.stringify({ name, business_id: businessId }),
     })
     if (!res.ok) { toast.error('Failed to create category'); return }
-    const created: ExpenseCategory = (await res.json()).data
+    const created: LedgerCategory = (await res.json()).data
     setCategories(p => [...p, created])
     setCategoryId(created.id)
+    toast.success(`Category "${created.name}" created`)
+  }
+
+  async function createIncomeCategory(name: string) {
+    if (!businessId) return
+    const res = await fetch('/api/other-income/categories', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, business_id: businessId }),
+    })
+    if (!res.ok) { toast.error('Failed to create category'); return }
+    const created: LedgerCategory = (await res.json()).data
+    setIncomeCategories(p => [...p, created])
+    setIncomeCategoryId(created.id)
     toast.success(`Category "${created.name}" created`)
   }
 
   function handleClose() {
     setCategoryId('')
     setAddToExpense(false)
+    setIncomeCategoryId('')
+    setAddToIncome(false)
     onClose()
   }
 
@@ -75,6 +110,8 @@ export function CashMovementModal({
     setCashMovementType(t)
     setCategoryId('')
     setAddToExpense(false)
+    setIncomeCategoryId('')
+    setAddToIncome(false)
   }
 
   return (
@@ -153,13 +190,51 @@ export function CashMovementModal({
           </div>
         )}
 
+        {/* Optional income recording — cash in only */}
+        {!isCashOut && (
+          <div className="space-y-3">
+            <label className="flex cursor-pointer items-center gap-2.5">
+              <input
+                type="checkbox"
+                checked={addToIncome}
+                onChange={e => { setAddToIncome(e.target.checked); if (!e.target.checked) setIncomeCategoryId('') }}
+                className="h-4 w-4 rounded border-gray-300 accent-brand-teal"
+              />
+              <span className="text-sm text-gray-700">Also record as income</span>
+            </label>
+
+            {addToIncome && (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Income Category <span className="text-xs font-normal text-gray-400">(select or create)</span>
+                </label>
+                {incomeCatsLoading ? (
+                  <div className="h-9 animate-pulse rounded-lg bg-gray-100" />
+                ) : (
+                  <CreatableCombobox
+                    options={incomeCategories.map(c => ({ value: c.id, label: c.name }))}
+                    value={incomeCategoryId}
+                    onChange={v => setIncomeCategoryId(v)}
+                    onCreate={createIncomeCategory}
+                    placeholder="Select or type to create..."
+                    createLabel="Add category"
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex gap-2">
           <Button variant="outline" className="flex-1" onClick={handleClose}>Cancel</Button>
           <Button
             className={`flex-1 ${isCashOut ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}
             loading={cashMovementSaving}
             disabled={!cashMovementAmount || parseFloat(cashMovementAmount) <= 0}
-            onClick={() => handleCashMovement(addToExpense ? categoryId || null : null, addToExpense)}
+            onClick={() => {
+              if (isCashOut) handleCashMovement(addToExpense ? categoryId || null : null, addToExpense)
+              else handleCashMovement(addToIncome ? incomeCategoryId || null : null, addToIncome)
+            }}
           >
             {isCashOut ? 'Record Cash Out' : 'Add Cash'}
           </Button>

@@ -54,8 +54,131 @@ export async function POST(request: NextRequest) {
     const pendingId = session.metadata?.pendingId
     const businessId = session.metadata?.businessId
     const planId     = session.metadata?.planId
+    const isCustom   = session.metadata?.isCustom === 'true'
 
     const supabase = getAdminSupabase()
+
+    // ── Custom Plan upgrade path ─────────────────────────────────────────────
+    // Every custom total is unique (built via price_data, not a shared Price),
+    // so there's no shared plans row to look the numbers up from — they travel
+    // as session/subscription metadata instead.
+    if (businessId && isCustom && !pendingId) {
+      const stripeSubId = typeof session.subscription === 'string'
+        ? session.subscription
+        : (session.subscription as Stripe.Subscription | null)?.id ?? null
+
+      const { data: customPlanRow } = await (supabase as any)
+        .from('plans')
+        .select('id')
+        .eq('plan_type', 'custom')
+        .single()
+      const customPlanId = (customPlanRow as { id: string } | null)?.id
+
+      if (!customPlanId) {
+        console.error('[webhook] custom checkout completed but no custom plan placeholder row exists')
+        return NextResponse.json({ received: true })
+      }
+
+      // Capture any pre-existing (different) subscription BEFORE we overwrite
+      // it below — needed for the upgrade-trap proration/cancel step.
+      const { data: existingSub } = await (supabase as any)
+        .from('subscriptions')
+        .select('stripe_sub_id')
+        .eq('business_id', businessId)
+        .maybeSingle()
+      const oldStripeSubId = (existingSub as { stripe_sub_id: string | null } | null)?.stripe_sub_id ?? null
+
+      await (supabase as any)
+        .from('businesses')
+        .update({
+          is_active:              true,
+          stripe_customer_id:     session.customer ?? null,
+          stripe_subscription_id: stripeSubId,
+          trial_ends_at:          null,
+        })
+        .eq('id', businessId)
+
+      let periodStart: string | null = null
+      let periodEnd: string | null = null
+      if (stripeSubId) {
+        try {
+          const stripeSub = await stripe.subscriptions.retrieve(stripeSubId)
+          const period = subPeriod(stripeSub)
+          periodStart = period.start
+          periodEnd   = period.end
+        } catch { /* non-fatal */ }
+      }
+
+      const inventoryStr = session.metadata?.customInventory
+      const repairStr    = session.metadata?.customRepair
+
+      await SubscriptionSyncService.upsert({
+        businessId,
+        planId: customPlanId,
+        stripeSubId,
+        stripeCustomerId: typeof session.customer === 'string' ? session.customer : null,
+        status: 'active',
+        trialEndsAt: null,
+        currentPeriodStart: periodStart,
+        currentPeriodEnd:   periodEnd,
+        livemode: event.livemode,
+        customOverrides: {
+          maxBranches:  Number(session.metadata?.customBranches ?? 1),
+          maxUsers:     Number(session.metadata?.customStaff ?? 5),
+          maxProducts:  inventoryStr === 'unlimited' ? null : Number(inventoryStr),
+          maxServices:  repairStr === 'unlimited' ? null : Number(repairStr),
+          priceMonthly: Number(session.metadata?.customPricePence ?? 0) / 100,
+        },
+      })
+
+      await invalidateBusinessCache(businessId)
+
+      // ── Upgrade-trap fix ─────────────────────────────────────────────────
+      // Stripe Checkout with price_data always creates a brand-new
+      // subscription — it cannot attach to an existing one. If this business
+      // was already on a different, active paid subscription, credit the
+      // unused time on their Stripe customer balance (applied automatically
+      // to their *next* invoice — the current one is already finalized as
+      // part of this Checkout) before canceling the old subscription, so
+      // they aren't double-billed and don't forfeit unused value.
+      if (oldStripeSubId && oldStripeSubId !== stripeSubId) {
+        try {
+          const oldSub = await stripe.subscriptions.retrieve(oldStripeSubId, { expand: ['items'] })
+          const oldPeriod = subPeriod(oldSub)
+          const oldUnitAmount = oldSub.items?.data?.[0]?.price?.unit_amount ?? 0
+          const customerId = typeof session.customer === 'string'
+            ? session.customer
+            : (typeof oldSub.customer === 'string' ? oldSub.customer : null)
+
+          if (oldPeriod.start && oldPeriod.end && oldUnitAmount > 0 && customerId) {
+            const startMs = new Date(oldPeriod.start).getTime()
+            const endMs   = new Date(oldPeriod.end).getTime()
+            const totalMs = endMs - startMs
+            const unusedFraction = totalMs > 0 ? Math.max(0, Math.min(1, (endMs - Date.now()) / totalMs)) : 0
+            const creditPence = Math.round(oldUnitAmount * unusedFraction)
+
+            if (creditPence > 0) {
+              await stripe.customers.createBalanceTransaction(
+                customerId,
+                {
+                  amount: -creditPence,
+                  currency: oldSub.currency ?? 'gbp',
+                  description: 'Unused time credit from previous plan',
+                },
+                // Idempotent: a retried webhook delivery must not double-credit.
+                { idempotencyKey: `prorate_credit_${oldStripeSubId}_${session.id}` }
+              )
+            }
+          }
+
+          await stripe.subscriptions.cancel(oldStripeSubId)
+        } catch (err) {
+          console.error('[webhook] upgrade-trap proration/cancel failed for', oldStripeSubId, err)
+        }
+      }
+
+      return NextResponse.json({ received: true })
+    }
 
     // ── Upgrade path ─────────────────────────────────────────────────────────
     if (businessId && planId && !pendingId) {
@@ -338,6 +461,23 @@ export async function POST(request: NextRequest) {
       ?? await SubscriptionSyncService.businessIdFromStripeSubId(stripeSub.id)
 
     if (businessId) {
+      // Event-ordering guard: webhook delivery order isn't guaranteed. If this
+      // business has already moved on to a newer subscription (e.g. the
+      // upgrade-trap cancellation above, or any other replacement), a
+      // late-arriving deletion event for the OLD subscription must not
+      // deactivate the newer one it superseded.
+      const supabase = getAdminSupabase() as any
+      const { data: currentSub } = await supabase
+        .from('subscriptions')
+        .select('stripe_sub_id')
+        .eq('business_id', businessId)
+        .maybeSingle()
+
+      if (currentSub?.stripe_sub_id && currentSub.stripe_sub_id !== stripeSub.id) {
+        console.log('[webhook] subscription.deleted for a superseded subscription, ignoring:', stripeSub.id)
+        return NextResponse.json({ received: true })
+      }
+
       await SubscriptionSyncService.deactivate(businessId)
       await invalidateBusinessCache(businessId)
     }

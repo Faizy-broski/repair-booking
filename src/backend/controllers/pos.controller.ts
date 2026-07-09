@@ -98,6 +98,7 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
 
 const saleItemSchema = z.object({
   product_id: z.string().uuid().optional().nullable(),
+  repair_id: z.string().uuid().optional().nullable(),
   variant_id: z.string().uuid().optional().nullable(),
   name: z.string().min(1),
   quantity: z.number().int().positive(),
@@ -120,11 +121,13 @@ const createSaleSchema = z.object({
   discount: z.number().min(0).default(0),
   tax: z.number().min(0).default(0),
   total: z.number().min(0),
-  payment_method: z.enum(['cash', 'card', 'gift_card', 'split', 'on_account', 'ebay', 'deliveroo', 'website']),
+  payment_method: z.enum(['cash', 'card', 'gift_card', 'split', 'on_account', 'ebay', 'deliveroo', 'website', 'store_credit', 'loyalty_points']),
   amount_paid: z.number().min(0).default(0),
   payment_splits: z.array(paymentSplitSchema).optional(),
   gift_card_id: z.string().uuid().optional().nullable(),
   gift_card_amount: z.number().min(0).optional(),
+  store_credit_amount: z.number().min(0).optional(),
+  loyalty_points_used: z.number().int().min(0).optional(),
   notes: z.string().optional().nullable(),
   employee_id: z.string().uuid().optional().nullable(),
   served_by_employee_id: z.string().uuid().optional().nullable(),
@@ -244,7 +247,13 @@ export const PosController = {
     const updateSaleSchema = z.object({
       customer_id: z.string().uuid().optional().nullable(),
       payment_method: z.enum(['cash', 'card', 'gift_card', 'split']).optional(),
-      payment_status: z.enum(['paid', 'partial', 'refunded']).optional(),
+      // 'refunded' is intentionally excluded — it must only be set by the
+      // dedicated refund flow (PosController.processRefund), which creates a
+      // proper negative refund sale record and reverses inventory. Allowing it
+      // here let staff mark a sale "Refunded" without any of that happening,
+      // producing a second, disconnected refund entry when the real refund was
+      // then also processed.
+      payment_status: z.enum(['paid', 'partial']).optional(),
       notes: z.string().optional().nullable(),
       discount: z.number().min(0).optional(),
       tax: z.number().min(0).optional(),

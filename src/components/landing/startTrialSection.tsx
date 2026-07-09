@@ -38,14 +38,7 @@ export default function StartTrialSection() {
                 <ArrowRight className="ml-4 h-5 w-5 sm:h-7 sm:w-7" />
               </Button>
 
-              <Button
-                variant="outline"
-                className="w-full rounded-full border-white/25 bg-white/5 px-7 py-6 text-sm font-medium text-white backdrop-blur hover:bg-white/10 hover:text-white sm:w-auto sm:py-7 sm:text-md"
-              >
-                Book a 20-min demo
-                <ArrowRight className="ml-4 h-5 w-5 sm:h-6 sm:w-6" />
-              </Button>
-
+              
               <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-white/55 sm:mt-6 sm:gap-4">
                 <span className="flex items-center gap-2">
                   <ShieldCheck className="h-3 w-3 text-white" />

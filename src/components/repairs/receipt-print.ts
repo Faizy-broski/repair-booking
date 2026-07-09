@@ -67,15 +67,16 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
   // ── CSS ──────────────────────────────────────────────────────────────────
   // @page size is NOT set here — injected dynamically after render measurement.
   // margin:0 is set here so it applies to the static CSS shipped with the HTML.
+  // portrait: force portrait so Windows thermal drivers never auto-rotate.
   const css = `
-    @page { margin: 0 }
+    @page { margin: 0; size: auto portrait }
     * { box-sizing: border-box; margin: 0; padding: 0 }
     html, body {
       width: ${w};
       /* No min-height / height — let content define the height */
       background: #fff;
       font-family: Arial, Helvetica, sans-serif;
-      font-size: 8px;
+      font-size: 10px;
       color: #000;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
@@ -83,37 +84,37 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
     body { padding: 10px 10px 20px 10px }
     .c  { text-align: center }
     .logo { display: block; margin: 0 auto 6px; width: 48px; height: 48px; object-fit: contain }
-    .bn { font-size: 12px; font-weight: bold; text-align: center; margin-bottom: 1px }
-    .br { font-size: 8px;  color: #555; text-align: center; margin-bottom: 1px }
-    .dt { font-size: 7.5px; color: #555; text-align: center; margin-bottom: 1px }
-    hr  { border: none; border-top: 1px dashed #9ca3af; margin: 6px 0 }
-    .ino { font-size: 9px; font-weight: bold; text-align: center; margin-bottom: 2px }
+    .bn { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 2px }
+    .br { font-size: 10px;  color: #000; text-align: center; margin-bottom: 2px }
+    .dt { font-size: 9.5px; color: #000; text-align: center; margin-bottom: 2px }
+    hr  { border: none; border-top: 1px dashed #000; margin: 6px 0 }
+    .ino { font-size: 11px; font-weight: bold; text-align: center; margin-bottom: 2px }
     .row { display: flex; justify-content: space-between; margin-bottom: 2px }
-    .lbl { font-size: 7.5px; color: #555 }
-    .val { font-size: 7.5px; font-weight: bold }
+    .lbl { font-size: 9.5px; color: #000; font-weight: 600 }
+    .val { font-size: 9.5px; font-weight: bold }
     .ir  { display: flex; align-items: flex-start; margin-bottom: 4px }
-    .id  { flex: 1; padding-right: 4px; font-size: 8px; word-break: break-word }
-    .ia  { font-size: 8px; text-align: right; width: 52px; flex-shrink: 0 }
+    .id  { flex: 1; padding-right: 4px; font-size: 10px; word-break: break-word }
+    .ia  { font-size: 10px; text-align: right; width: 52px; flex-shrink: 0 }
     .tr  { display: flex; justify-content: space-between; margin-bottom: 1.5px }
-    .tl  { font-size: 8px; color: #555 }
-    .tv  { font-size: 8px }
+    .tl  { font-size: 10px; color: #000; font-weight: 600 }
+    .tv  { font-size: 10px; font-weight: bold }
     .gr  { display: flex; justify-content: space-between; margin-top: 3px }
-    .gl  { font-size: 11px; font-weight: bold }
-    .gv  { font-size: 11px; font-weight: bold; color: ${pc} }
+    .gl  { font-size: 13px; font-weight: bold; color: #000 }
+    .gv  { font-size: 13px; font-weight: bold; color: #000 }
     .bar {
       display: flex; justify-content: space-between;
-      background: ${pc}; padding: 6px; border-radius: 3px; margin-top: 4px;
+      background: #000; padding: 6px; border-radius: 3px; margin-top: 4px;
       -webkit-print-color-adjust: exact; print-color-adjust: exact
     }
-    .bl { font-size: 9px; font-weight: bold; color: #fff }
-    .bv { font-size: 9px; font-weight: bold; color: #fff }
+    .bl { font-size: 11px; font-weight: bold; color: #fff }
+    .bv { font-size: 11px; font-weight: bold; color: #fff }
     /* Footer — kept together, never orphaned onto a new page */
     .ft { page-break-inside: avoid; break-inside: avoid; page-break-before: avoid }
-    .ty { font-size: 9px; font-weight: bold; color: #000; text-align: center; margin-top: 6px }
-    .fl { font-size: 7.5px; color: #374151; text-align: center; margin-top: 2px; word-break: break-word }
-    .pl { font-size: 6.5px; color: #374151; text-align: center; margin-top: 5px;
-          border-top: 0.5px solid #e5e7eb; padding-top: 4px }
-    .grn { color: #10b981 }
+    .ty { font-size: 11px; font-weight: bold; color: #000; text-align: center; margin-top: 6px }
+    .fl { font-size: 9.5px; color: #000; text-align: center; margin-top: 2px; word-break: break-word }
+    .pl { font-size: 8.5px; color: #000; text-align: center; margin-top: 5px;
+          border-top: 1px solid #000; padding-top: 4px }
+    .grn { color: #000 }
 
     /* Debug panel — visible on screen, hidden when printing */
     #dbg {
@@ -203,21 +204,103 @@ ${L(bal > 0, `<div class="bar"><span class="bl">Balance Due</span><span class="b
 </body></html>`
 }
 
-// ─── Debug preview (opens receipt in new tab with measurements visible) ───────
-/** Opens receipt HTML in a new tab with on-screen debug panel + console logs.
- *  Use the "Debug HTML" button in the invoice modal to call this.
- *  READ the yellow debug panel to see body.scrollHeight and other measurements.
+// ─── Open receipt in a new tab ──────────────────────────────────────────────
+/** Opens the receipt HTML in a new tab — used by the "Open" button so the user
+ *  can view/save/print the exact same document outside the modal.
+ *  Pass debugMode=true to also show the on-screen measurement panel + console
+ *  logs (body.scrollHeight etc.) for diagnosing thermal-print sizing issues.
  */
-export function previewReceiptHtml(data: ReceiptPrintData): void {
-  const html = buildHtml(data, /* debugMode= */ true)
-  console.log('[Receipt Debug] mergedSettings:', JSON.stringify(data.settings, null, 2))
-  console.log('[Receipt Debug] thank_you_message:', JSON.stringify(data.settings.thank_you_message))
-  console.log('[Receipt Debug] footer_line_1:', data.settings.footer_line_1)
-  console.log('[Receipt Debug] items:', data.items)
-  console.log('[Receipt Debug] amountPaid:', data.amountPaid, '| total:', data.total)
-  console.log('[Receipt Debug] full HTML length:', html.length)
+export function previewReceiptHtml(data: ReceiptPrintData, debugMode = false): void {
+  const html = buildHtml(data, debugMode)
+  if (debugMode) {
+    console.log('[Receipt Debug] mergedSettings:', JSON.stringify(data.settings, null, 2))
+    console.log('[Receipt Debug] thank_you_message:', JSON.stringify(data.settings.thank_you_message))
+    console.log('[Receipt Debug] footer_line_1:', data.settings.footer_line_1)
+    console.log('[Receipt Debug] items:', data.items)
+    console.log('[Receipt Debug] amountPaid:', data.amountPaid, '| total:', data.total)
+    console.log('[Receipt Debug] full HTML length:', html.length)
+  }
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
   window.open(URL.createObjectURL(blob), '_blank')
+}
+
+
+// ─── Auto-print a repair invoice by id ──────────────────────────────────────
+// Fetches invoice data the same way RepairInvoiceModal does, then prints it
+// without requiring the modal to be open — used to auto-print a receipt right
+// after a repair job is created. Fails soft (logs only) so a print/popup
+// issue never blocks the caller's success flow.
+//
+// `preOpenedWin`: pass a window opened synchronously (e.g.
+// `window.open('about:blank', '_blank', ...)`) from inside the click handler,
+// BEFORE any `await` — same requirement as printReceipt()/openPrintWindow()
+// in cart-panel.tsx. Calling this after an await (e.g. once the create-repair
+// fetch resolves) is outside the user-gesture window, so the browser silently
+// blocks any window.open() at that point; passing a pre-opened window sidesteps
+// that entirely, for both the thermal and PDF paths.
+const THERMAL_PAPER_SIZES = ['Receipt80', 'Receipt58', 'Custom']
+
+export async function printRepairInvoiceById(repairId: string, preOpenedWin?: Window | null): Promise<void> {
+  try {
+    const res = await fetch(`/api/repairs/${repairId}/invoice-data`)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      const msg = typeof body.error === 'string' ? body.error : (body.error?.message ?? `HTTP ${res.status}`)
+      throw new Error(`Invoice data failed: ${msg}`)
+    }
+    const json = await res.json()
+    const data = json.data as ReceiptPrintData
+
+    if (THERMAL_PAPER_SIZES.includes(data.settings.paper_size)) {
+      printReceipt(data, preOpenedWin)
+      return
+    }
+
+    const pdfRes = await fetch(`/api/repairs/${repairId}/pdf`)
+    if (!pdfRes.ok) throw new Error(`PDF generation failed (${pdfRes.status})`)
+    const blob = await pdfRes.blob()
+    const blobUrl = URL.createObjectURL(blob)
+
+    if (preOpenedWin && !preOpenedWin.closed) {
+      preOpenedWin.addEventListener('load', () => {
+        preOpenedWin.focus()
+        preOpenedWin.print()
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)
+      }, { once: true })
+      preOpenedWin.location.href = blobUrl
+      return
+    }
+
+    const iframe = document.createElement('iframe')
+    iframe.style.display = 'none'
+    iframe.src = blobUrl
+    document.body.appendChild(iframe)
+    iframe.addEventListener('load', () => {
+      iframe.contentWindow?.focus()
+      iframe.contentWindow?.print()
+      setTimeout(() => {
+        document.body.removeChild(iframe)
+        URL.revokeObjectURL(blobUrl)
+      }, 60_000)
+    }, { once: true })
+  } catch (err) {
+    console.error('Failed to auto-print repair invoice:', err)
+    // Don't close the popup — a window that opens and immediately vanishes
+    // looks like nothing happened at all. Show the actual error instead so
+    // it's visible/debuggable, and leave closing it to the user.
+    if (preOpenedWin && !preOpenedWin.closed) {
+      try {
+        preOpenedWin.document.open()
+        preOpenedWin.document.write(
+          `<html><body style="font-family:sans-serif;padding:24px;color:#7f1d1d">` +
+          `<h3 style="margin:0 0 8px">Couldn't load the invoice</h3>` +
+          `<p style="margin:0;white-space:pre-wrap">${String(err instanceof Error ? err.message : err)}</p>` +
+          `</body></html>`
+        )
+        preOpenedWin.document.close()
+      } catch { /* window may already be unreachable — nothing more we can do */ }
+    }
+  }
 }
 
 // ─── Print receipt ─────────────────────────────────────────────────────────────
@@ -310,14 +393,14 @@ export function printReceipt(data: ReceiptPrintData, preOpenedWin?: Window | nul
     console.log('window.devicePixelRatio        :', win!.devicePixelRatio)
     console.log('paperWidthCss                  :', paperWidthCss)
 
-    // ── Inject @page with exact content height ───────────────────────────────
-    // For Custom paper with a defined height (e.g. 80×210mm) use the fixed mm
-    // dimension so the page is always exactly that size regardless of content.
-    // For thermal rolls (Receipt80/Receipt58/Custom without height) measure the
-    // actual content so the page is exactly as tall as the receipt — no blank tail.
+    // ── Inject @page with exact content height + PORTRAIT orientation ────────
+    // CRITICAL: Without explicit 'portrait', Windows thermal printer drivers
+    // (EPSON TM-T88V, TM-T20III, etc.) auto-rotate 80mm paper to landscape,
+    // printing all text sideways from bottom-to-top.
+    // 'portrait' forces width < height orientation regardless of driver defaults.
     const pageRule = isCustom && customH
-      ? `@page { size: ${paperWidthCss} ${customH}mm; margin: 0; }`
-      : `@page { size: ${paperWidthCss} ${contentHeight}px; margin: 0; }`
+      ? `@page { size: ${paperWidthCss} ${customH}mm portrait; margin: 0; }`
+      : `@page { size: ${paperWidthCss} ${contentHeight}px portrait; margin: 0; }`
     console.log('Injecting @page rule           :', pageRule)
     console.groupEnd()
 
@@ -370,5 +453,175 @@ export function printReceipt(data: ReceiptPrintData, preOpenedWin?: Window | nul
   // Wait for the page to fully load, then 1000ms extra for layout reflow.
   // 1000ms (up from 500ms) covers slow EPSON USB drivers that defer font rendering.
   win.addEventListener('load', () => setTimeout(triggerPrint, 1000), { once: true })
+}
+
+// ─── Full thermal repair slip (customer receipt) ─────────────────────────────
+// Renders a complete receipt slip matching the Laravel blade slip_pdf.blade.php:
+// Business header, Date, Ticket ID, Customer, Device, Faults, Charges, Barcode.
+export interface SlipPrintData {
+  jobNumber: string
+  barcodeDataUrl: string
+  paperSize?: string
+  customWidth?: number | null
+  businessName?: string
+  branchAddress?: string | null
+  branchPhone?: string | null
+  customerName?: string
+  deviceLabel?: string
+  faults?: string[]
+  dueDate?: string | null
+  createdAt?: string
+  totalRepairCharges?: number
+  deposit?: number
+  remaining?: number
+}
+
+function buildSlipHtml(d: SlipPrintData): string {
+  const isCustom  = d.paperSize === 'Custom'
+  const widthMm   = d.paperSize === 'Receipt58' ? 58 : isCustom ? (d.customWidth ?? 80) : 80
+  const w         = `${widthMm}mm`
+
+  // Format date
+  const dateStr = d.dueDate
+    ? new Date(d.dueDate).toLocaleDateString('en-GB')
+    : d.createdAt
+    ? new Date(d.createdAt).toLocaleDateString('en-GB')
+    : new Date().toLocaleDateString('en-GB')
+
+  const faults = d.faults ?? []
+
+  const faultBadges = faults.length > 0
+    ? faults.map(f => `<span style="display:inline-block;padding:3px 6px;margin:2px;
+        background:#1a388d;color:#fff;font-size:10px;border-radius:4px;font-weight:bold;
+        -webkit-print-color-adjust:exact;print-color-adjust:exact">${f}</span>`).join('')
+    : '<span>No faults recorded</span>'
+
+  const css = `
+    @page { margin: 0; size: auto portrait }
+    * { box-sizing: border-box; margin: 0; padding: 0 }
+    html, body {
+      width: ${w};
+      background: #fff;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 12px;
+      color: #000;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    body { padding: 10px 10px 15px 10px }
+    .head  { text-align: center; margin-bottom: 4px }
+    .bname { font-size: 16px; font-weight: bold; margin-bottom: 2px }
+    .addr  { font-size: 10px; color: #000; margin-bottom: 1px }
+    hr { border: none; border-top: 2px solid #000; margin: 8px 0 }
+    .details { text-align: left; font-size: 12px; margin-bottom: 4px }
+    .details div { margin: 3px 0 }
+    .summary { border-top: 2px solid #000; padding-top: 8px; font-size: 12px }
+    .sumrow { display: flex; justify-content: space-between; border-bottom: 1px solid #000;
+              margin: 4px 0; font-weight: 700; padding-bottom: 2px }
+    .footer { margin-top: 10px; text-align: center; font-size: 10px; font-weight: 700; line-height: 1.6 }
+    .barcode { margin-top: 12px; text-align: center }
+    .barcode img { width: 100%; max-width: 220px; height: auto }
+  `
+
+  const esc = (s: string | null | undefined) => {
+    if (!s) return ''
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  }
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>
+<div class="head">
+  <div class="bname">${esc(d.businessName)}</div>
+  ${d.branchAddress ? `<div class="addr">${esc(d.branchAddress)}</div>` : ''}
+  ${d.branchPhone   ? `<div class="addr">Tel: ${esc(d.branchPhone)}</div>` : ''}
+</div>
+<hr>
+<div class="details">
+  <div><strong>Date:</strong> ${dateStr}</div>
+  <div><strong>Ticket ID:</strong> T-${esc(d.jobNumber)}</div>
+  <div><strong>Customer:</strong> ${esc(d.customerName)}</div>
+  <div><strong>Make and Model:</strong> ${esc(d.deviceLabel)}</div>
+  <div><strong>Faults:</strong> ${faultBadges}</div>
+</div>
+<div class="summary">
+  <div class="sumrow"><span>Repair Charges:</span><span>£${(d.totalRepairCharges ?? 0).toFixed(2)}</span></div>
+  <div class="sumrow"><span>Deposit:</span><span>£${(d.deposit ?? 0).toFixed(2)}</span></div>
+  <div class="sumrow"><span>Remaining:</span><span>£${(d.remaining ?? 0).toFixed(2)}</span></div>
+</div>
+<div class="footer">
+  <p>Refund &amp; Exchange within 28 Days<br>and with Proof of Purchase only.</p>
+</div>
+<div class="barcode"><img src="${d.barcodeDataUrl}" alt="Barcode"></div>
+</body></html>`
+}
+
+/** Opens the slip HTML in a new tab for preview/print. */
+export function previewSlipHtml(data: SlipPrintData): void {
+  const html = buildSlipHtml(data)
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  window.open(URL.createObjectURL(blob), '_blank')
+}
+
+export function printSlip(
+  data: SlipPrintData,
+  preOpenedWin?: Window | null
+): void {
+  const isCustom      = data.paperSize === 'Custom'
+  const mmWidth       = data.paperSize === 'Receipt58' ? 58 : isCustom ? (data.customWidth ?? 80) : 80
+  const paperWidthCss = `${mmWidth}mm`
+  const paperWidthPx  = Math.round(mmWidth * 96 / 25.4)
+
+  const html = buildSlipHtml(data)
+
+  let win: Window | null
+  let blobUrl: string | null = null
+
+  if (preOpenedWin && !preOpenedWin.closed) {
+    win = preOpenedWin
+    win.document.open()
+    win.document.write(html)
+    win.document.close()
+  } else {
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+    blobUrl = URL.createObjectURL(blob)
+    win = window.open(
+      blobUrl,
+      '_blank',
+      `width=${paperWidthPx + 4},height=700,toolbar=0,location=0,menubar=0,status=0,scrollbars=1`
+    )
+    if (!win) {
+      alert('Please allow pop-ups for this site to enable printing.')
+      URL.revokeObjectURL(blobUrl)
+      return
+    }
+  }
+
+  const doMeasureAndPrint = () => {
+    const contentHeight = win!.document.body.scrollHeight + 60
+    // CRITICAL: 'portrait' prevents Windows thermal drivers from auto-rotating
+    // 80mm paper to landscape (which prints text sideways bottom-to-top).
+    const pageRule = `@page { size: ${paperWidthCss} ${contentHeight}px portrait; margin: 0; }`
+
+    const sizeStyle = win!.document.createElement('style')
+    sizeStyle.id = 'dynamic-page-size'
+    sizeStyle.textContent = pageRule
+    win!.document.head.appendChild(sizeStyle)
+
+    win!.focus()
+    win!.print()
+
+    win!.addEventListener('afterprint', () => {
+      setTimeout(() => {
+        win!.close()
+        if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = null }
+      }, 8000)
+    }, { once: true })
+
+    setTimeout(() => {
+      if (win && !win.closed) win.close()
+      if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = null }
+    }, 60_000)
+  }
+
+  win.addEventListener('load', () => setTimeout(doMeasureAndPrint, 1000), { once: true })
 }
 

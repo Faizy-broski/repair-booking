@@ -5,6 +5,13 @@ import { CheckCircle, Zap, Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
+import {
+  CustomPlanCard,
+  deriveCustomPlanBaseline,
+  makeDefaultCustomPlanState,
+  toCustomPlanPayload,
+  type CustomPlanState,
+} from '@/components/landing/custom-plan-card'
 
 interface Plan {
   id: string
@@ -13,6 +20,8 @@ interface Plan {
   max_branches: number | null
   max_users: number | null
   features: string[] | null
+  limits?: Record<string, number | boolean | null> | null
+  plan_type?: string
   stripe_price_id_monthly: string | null
 }
 
@@ -35,6 +44,10 @@ export default function UpgradePage() {
   const [loading, setLoading] = useState(true)
   const [upgrading, setUpgrading] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [customPlan, setCustomPlan] = useState<CustomPlanState | null>(null)
+  const [upgradingCustom, setUpgradingCustom] = useState(false)
+  const customPlanBaseline = deriveCustomPlanBaseline(plans)
+  const effectiveCustomPlan = customPlan ?? makeDefaultCustomPlanState(customPlanBaseline)
 
   useEffect(() => {
     async function load() {
@@ -86,6 +99,28 @@ export default function UpgradePage() {
     }
   }
 
+  async function handleUpgradeCustom() {
+    setUpgradingCustom(true)
+    setErrorMsg(null)
+    try {
+      const res = await fetch('/api/stripe/upgrade-custom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(toCustomPlanPayload(effectiveCustomPlan)),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setErrorMsg(json.error?.message ?? 'Something went wrong')
+      } else {
+        router.push(json.data.url)
+      }
+    } catch {
+      setErrorMsg('Network error — please try again')
+    } finally {
+      setUpgradingCustom(false)
+    }
+  }
+
   const trialDays = subscription?.trial_ends_at ? daysLeft(subscription.trial_ends_at) : 0
   const isExpired = subscription?.status === 'trialing' && trialDays <= 0
 
@@ -121,7 +156,7 @@ export default function UpgradePage() {
       {loading ? (
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-5xl">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-6xl">
           {plans.map((plan, index) => {
             const highlighted = plans.length >= 2 && index === Math.floor(plans.length / 2)
             return (
@@ -187,6 +222,14 @@ export default function UpgradePage() {
               </div>
             )
           })}
+          <CustomPlanCard
+            state={effectiveCustomPlan}
+            onChange={setCustomPlan}
+            baseline={customPlanBaseline}
+            ctaLabel={upgradingCustom ? 'Upgrading…' : 'Upgrade now'}
+            onCtaClick={handleUpgradeCustom}
+            disabled={upgradingCustom}
+          />
         </div>
       )}
     </div>

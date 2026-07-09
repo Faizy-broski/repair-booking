@@ -1,146 +1,307 @@
 'use client'
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import {
-  Search, Plus, ArrowRight, MoreHorizontal, Wrench, ShoppingBag,
-  Tag, ClipboardList, Camera, Check,
-} from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Search, Wrench, Lock, Banknote, Wallet, Star, X, StickyNote, User, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/store/auth.store'
 import { usePosStore } from '@/store/pos.store'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, getCurrencySymbol } from '@/lib/utils'
 import { PatternLock } from '@/components/ui/pattern-lock'
+import { CreatableCombobox } from '@/components/ui/creatable-combobox'
+import { MultiComboInput } from '@/components/shared/multi-combo-input'
 import { CustomFieldRenderer, useCustomFieldDefs } from '@/components/shared/custom-field-renderer'
 import { AsyncEmployeeSelect } from '@/components/shared/async-employee-select'
-import { useRouter } from 'next/navigation'
-import type { Product } from '@/types/database'
-import {
-  WARRANTY_OPTIONS, REPAIR_STATUS_OPTIONS, TASK_TYPE_OPTIONS,
-  type ServiceCategory, type ServiceBrand, type ServiceDevice,
-  type ServiceProblem, type RepairDetailsForm,
-  type RepairLevel,
-} from '../_types'
+import { toast } from 'sonner'
+import { printRepairInvoiceById } from '@/components/repairs/receipt-print'
+import { TASK_TYPE_OPTIONS, type RepairDetailsForm, type RepairLineItem } from '../_types'
 
-// ── ChevronRight inline (avoid re-import collision) ───────────────────────────
-import { ChevronRight } from 'lucide-react'
-
-const LEVEL_LABELS: Partial<Record<RepairLevel, string>> = {
-  categories: 'Category', brands: 'Brand', devices: 'Devices',
-  problems: 'Problems', details: 'Details',
+interface RepairCustomStatus { id: string; name: string; color: string }
+interface RepairFault { id: string; name: string }
+interface RepairMeta { customStatuses: RepairCustomStatus[]; faults: RepairFault[] }
+type DeviceData = {
+  types: string[]; brands: string[]; models: string[]
+  raw: { device_type: string | null; device_brand: string | null; device_model: string | null }[]
+  brandIdMap: Record<string, string>; typeIdMap: Record<string, string>; modelIdMap: Record<string, string>
 }
 
+const EMPTY_DETAILS: RepairDetailsForm = {
+  device_type: '', device_brand: '', device_model: '', serial_number: '',
+  faults: [], job_fee: '', estimated_cost: '', deposit_paid: '', price_pending: false,
+  due_date: '', status: '', assigned_to: '',
+  lock_type: '', passcode: '',
+  payment_method: '', credit_apply_input: '', loyalty_apply_input: '',
+  is_rush: false, physical_location: '', task_type: 'In-Store', device_network: '',
+}
+
+const inp = 'h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm focus:border-brand-teal focus:outline-none'
+const sel = inp
+const lbl = 'mb-1 block text-sm font-medium text-gray-700'
+
 export function RepairsTab() {
-  const router = useRouter()
   const { activeBranch } = useAuthStore()
   const pos = usePosStore()
+  const queryClient = useQueryClient()
 
-  // ── Wizard navigation ──────────────────────────────────────────────────────
-  const [repairLevel, setRepairLevel]       = useState<RepairLevel>('categories')
-  const [repairCategory, setRepairCategory] = useState<ServiceCategory | null>(null)
-  const [repairBrand, setRepairBrand]       = useState<ServiceBrand | null>(null)
-  const [repairDevice, setRepairDevice]     = useState<ServiceDevice | null>(null)
-  const [repairSearch, setRepairSearch]     = useState('')
-  const [repairItems, setRepairItems]       = useState<any[]>([])
-  const [repairLoading, setRepairLoading]   = useState(false)
+  const [repairDetails, setRepairDetails] = useState<RepairDetailsForm>(EMPTY_DETAILS)
+  const [repairParts, setRepairParts]     = useState<RepairLineItem[]>([])
+  const [confirmingRepair, setConfirmingRepair] = useState(false)
+  const [success, setSuccess] = useState(false)
+  const [deviceError, setDeviceError]     = useState('')
+  const [chargesError, setChargesError]   = useState('')
+  const [repairCustomFields, setRepairCustomFields] = useState<Record<string, unknown>>({})
+  const { defs: repairCustomFieldDefs } = useCustomFieldDefs('repairs', repairDetails.device_type || undefined)
 
-  // ── Problems & details ─────────────────────────────────────────────────────
-  const [selectedProblems, setSelectedProblems] = useState<ServiceProblem[]>([])
-  const [repairDetails, setRepairDetails]       = useState<RepairDetailsForm>({
-    imei_type: 'Serial', serial_number: '', lock_type: 'passcode', passcode: '',
-    repair_charges: 0, charge_deposit: false, deposit_amount: 0,
-    is_rush: false, assigned_to: '', due_date: '', status: 'waiting_for_inspection',
-    physical_location: '', task_type: 'In-Store', problem_warranties: {},
-  })
-  const [confirmingRepair, setConfirmingRepair]       = useState(false)
-  const [repairDetailsMenuOpen, setRepairDetailsMenuOpen] = useState(false)
-  const [repairCustomFields, setRepairCustomFields]   = useState<Record<string, unknown>>({})
-  const { defs: repairCustomFieldDefs } = useCustomFieldDefs('repairs', repairCategory?.name ?? undefined)
+  // ── Repair parts search ────────────────────────────────────────────────────
+  const [partQuery, setPartQuery]           = useState('')
+  const [partResults, setPartResults]       = useState<Array<{ id: string; name: string; selling_price: number | null; cost_price: number | null }>>([])
+  const [showPartDrop, setShowPartDrop]     = useState(false)
+  const [partSearchLoading, setPartSearchLoading] = useState(false)
+  const partSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const partDropRef   = useRef<HTMLDivElement>(null)
+  const [quickPartPrice, setQuickPartPrice] = useState('')
+  const [quickPartCost, setQuickPartCost]   = useState('')
 
-  // ── Data loading ───────────────────────────────────────────────────────────
-  async function loadLevel(level: RepairLevel, parentId?: string) {
-    setRepairLoading(true); setRepairSearch('')
-    let url = ''
-    switch (level) {
-      case 'categories': url = '/api/services/categories'; break
-      case 'brands':     url = '/api/services/manufacturers'; break
-      case 'devices':    url = `/api/services/devices?manufacturer_id=${parentId}`; break
-      case 'problems':   url = `/api/services/problems?device_id=${parentId}`; break
-      default: setRepairLoading(false); return
+  // ── Store credit / loyalty balances for pos.customer ───────────────────────
+  const [creditBalance, setCreditBalance]   = useState<number | null>(null)
+  const [loyaltyBalance, setLoyaltyBalance] = useState<number | null>(null)
+  const [loyaltyRate, setLoyaltyRate]       = useState(0.01)
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (partDropRef.current && !partDropRef.current.contains(e.target as Node)) setShowPartDrop(false)
     }
-    const res = await fetch(url)
-    const j = await res.json()
-    setRepairItems(j.data ?? [])
-    setRepairLoading(false)
-  }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
-  // Initial categories load — cached, fires once
-  useQuery({
-    queryKey: ['pos-repair-categories'],
+  useEffect(() => {
+    if (!pos.customer) { setCreditBalance(null); setLoyaltyBalance(null); return }
+    const id = pos.customer.id
+    fetch(`/api/customers/${id}/store-credits`).then(r => r.json()).then(j => setCreditBalance(j.data?.balance ?? 0)).catch(() => {})
+    fetch(`/api/customers/${id}/loyalty`).then(r => r.json()).then(j => {
+      setLoyaltyBalance(j.data?.balance ?? 0)
+      setLoyaltyRate(j.data?.redeem_rate ?? 0.01)
+    }).catch(() => {})
+  }, [pos.customer])
+
+  // Auto-populate total charges = job fee + parts total
+  useEffect(() => {
+    setRepairDetails(prev => {
+      const partsTotal = repairParts.reduce((s, p) => s + p.unit_price * p.qty, 0)
+      const fee = parseFloat(prev.job_fee) || 0
+      return { ...prev, estimated_cost: (fee + partsTotal).toFixed(2) }
+    })
+  }, [repairParts])
+
+  // ── Meta: custom statuses + faults (shared cache with the main Repairs module) ──
+  const { data: metaData } = useQuery<RepairMeta>({
+    queryKey: ['repairs-meta', activeBranch?.id],
     queryFn: async () => {
-      const res = await fetch('/api/services/categories')
+      const res = await fetch(`/api/repairs/meta?branch_id=${activeBranch!.id}`)
       const j = await res.json()
-      setRepairItems(j.data ?? [])
-      return j.data ?? []
+      return j.data || { customStatuses: [], faults: [] }
     },
-    staleTime: 5 * 60_000,
+    enabled: !!activeBranch,
+    staleTime: Infinity,
+  })
+  const customStatuses = metaData?.customStatuses ?? []
+  const faults         = metaData?.faults ?? []
+
+  // ── Device catalogue (same source as the main Repairs module) ─────────────
+  const { data: deviceData = { types: [], brands: [], models: [], raw: [], brandIdMap: {}, typeIdMap: {}, modelIdMap: {} } } = useQuery<DeviceData>({
+    queryKey: ['device-data', activeBranch?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/repairs/devices?branch_id=${activeBranch!.id}`)
+      const j = await res.json()
+      return j.data || { types: [], brands: [], models: [], raw: [], brandIdMap: {}, typeIdMap: {}, modelIdMap: {} }
+    },
+    enabled: !!activeBranch,
+    staleTime: Infinity,
   })
 
-  // ── Navigation helpers ─────────────────────────────────────────────────────
-  function resetRepairs() {
-    setRepairLevel('categories')
-    setRepairCategory(null); setRepairBrand(null); setRepairDevice(null)
-    setSelectedProblems([])
-    setRepairDetails(d => ({ ...d, serial_number: '', passcode: '', repair_charges: 0, problem_warranties: {} }))
-    loadLevel('categories')
+  function searchParts(q: string) {
+    if (partSearchRef.current) clearTimeout(partSearchRef.current)
+    if (!q.trim()) { setPartResults([]); setShowPartDrop(false); return }
+    setPartSearchLoading(true)
+    partSearchRef.current = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ branch_id: activeBranch!.id, search: q, limit: '8' })
+        const res = await fetch(`/api/products?${params}`)
+        const json = await res.json()
+        setPartResults(json.data ?? [])
+        setShowPartDrop(true)
+      } finally {
+        setPartSearchLoading(false)
+      }
+    }, 300)
   }
 
-  function selectCategory(cat: ServiceCategory) {
-    setRepairCategory(cat); setRepairLevel('brands'); loadLevel('brands')
-  }
-  function selectBrand(brand: ServiceBrand) {
-    setRepairBrand(brand); setRepairLevel('devices'); loadLevel('devices', brand.id)
-  }
-  function selectDevice(dev: ServiceDevice) {
-    setRepairDevice(dev); setRepairLevel('problems'); setSelectedProblems([]); loadLevel('problems', dev.id)
-  }
-  function toggleProblem(prob: ServiceProblem) {
-    setSelectedProblems(prev => {
-      const exists = prev.find(p => p.id === prob.id)
-      const next = exists ? prev.filter(p => p.id !== prob.id) : [...prev, prob]
-      setRepairDetails(d => ({ ...d, repair_charges: next.reduce((s, p) => s + p.price, 0) }))
-      return next
+  function addPartFromInventory(p: { id: string; name: string; selling_price: number | null; cost_price: number | null }) {
+    setRepairParts(prev => {
+      const existing = prev.find(r => r.product_id === p.id)
+      if (existing) return prev.map(r => r.product_id === p.id ? { ...r, qty: r.qty + 1 } : r)
+      return [...prev, { tempId: Math.random().toString(36).slice(2), product_id: p.id, name: p.name, qty: 1, unit_price: p.selling_price ?? 0, unit_cost: p.cost_price ?? 0 }]
     })
+    setPartQuery(''); setPartResults([]); setShowPartDrop(false)
   }
 
-  async function goToDetailsStep() {
+  function addQuickPart() {
+    const name = partQuery.trim()
+    const price = parseFloat(quickPartPrice) || 0
+    const cost  = parseFloat(quickPartCost)  || 0
+    if (!name) return
+    setRepairParts(prev => [...prev, { tempId: Math.random().toString(36).slice(2), product_id: null, name, qty: 1, unit_price: price, unit_cost: cost }])
+    setPartQuery(''); setQuickPartPrice(''); setQuickPartCost(''); setShowPartDrop(false)
+  }
+
+  // ── Inline device-catalogue creators (same endpoints the main Repairs module hits) ──
+  async function createDeviceType(name: string) {
     if (!activeBranch) return
-    setRepairLevel('details')
-    const warranties: Record<string, string> = {}
-    selectedProblems.forEach(p => { warranties[p.id] = 'No Warranty' })
-    setRepairDetails(d => ({ ...d, problem_warranties: warranties }))
+    setRepairDetails(d => ({ ...d, device_type: name, device_brand: '', device_model: '' }))
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], old => {
+      if (!old || old.types.includes(name)) return old
+      return { ...old, types: [...old.types, name] }
+    })
+    const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+    try {
+      const res = await fetch('/api/services/categories', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, slug, display_order: 0, show_on_pos: true, retail_margin: 0 }),
+      })
+      if (res.ok) {
+        const json = await res.json()
+        const newId = json.data?.id
+        if (newId) {
+          queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], old => old ? { ...old, typeIdMap: { ...old.typeIdMap, [name]: newId } } : old)
+        } else {
+          queryClient.invalidateQueries({ queryKey: ['device-data'] })
+        }
+      }
+    } catch { /* fire-and-forget */ }
+  }
+
+  async function createDeviceBrand(name: string) {
+    if (!activeBranch) return
+    const deviceType = repairDetails.device_type
+    setRepairDetails(d => ({ ...d, device_brand: name, device_model: '' }))
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], old => {
+      if (!old || old.brands.includes(name)) return old
+      const newRaw = deviceType ? [...old.raw, { device_type: deviceType, device_brand: name, device_model: null }] : old.raw
+      return { ...old, brands: [...old.brands, name], raw: newRaw }
+    })
+    const categoryId = deviceType ? (deviceData.typeIdMap ?? {})[deviceType] : undefined
+    try {
+      const res = await fetch('/api/services/manufacturers', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, ...(categoryId ? { category_id: categoryId } : {}) }),
+      })
+      if (res.ok) {
+        const json = await res.json()
+        const newId = json.data?.id
+        if (newId) {
+          queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], old => old ? { ...old, brandIdMap: { ...old.brandIdMap, [name]: newId } } : old)
+        } else {
+          queryClient.invalidateQueries({ queryKey: ['device-data'] })
+        }
+      }
+    } catch { /* fire-and-forget */ }
+  }
+
+  function createDeviceModel(name: string) {
+    if (!activeBranch) return
+    const deviceBrand = repairDetails.device_brand
+    const deviceType  = repairDetails.device_type
+    setRepairDetails(d => ({ ...d, device_model: name }))
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], old => {
+      if (!old || old.models.includes(name)) return old
+      const newRaw = [...old.raw, { device_type: deviceType || null, device_brand: deviceBrand || null, device_model: name }]
+      return { ...old, models: [...old.models, name], raw: newRaw }
+    })
+    if (deviceBrand) {
+      const manufacturerId = (deviceData.brandIdMap ?? {})[deviceBrand]
+      const categoryId     = deviceType ? (deviceData.typeIdMap ?? {})[deviceType] : undefined
+      if (manufacturerId) {
+        fetch('/api/services/devices', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, manufacturer_id: manufacturerId, ...(categoryId ? { category_id: categoryId } : {}) }),
+        }).then(res => { if (res.ok) queryClient.invalidateQueries({ queryKey: ['device-data'] }) }).catch(() => {})
+      }
+    }
+  }
+
+  const filteredBrands = repairDetails.device_type
+    ? [...new Set(deviceData.raw.filter(d => d.device_type === repairDetails.device_type).map(d => d.device_brand).filter(Boolean) as string[])]
+    : deviceData.brands
+
+  const filteredModels = repairDetails.device_brand
+    ? [...new Set(deviceData.raw.filter(d => d.device_brand === repairDetails.device_brand).map(d => d.device_model).filter(Boolean) as string[])]
+    : repairDetails.device_type
+    ? [...new Set(deviceData.raw.filter(d => d.device_type === repairDetails.device_type).map(d => d.device_model).filter(Boolean) as string[])]
+    : deviceData.models
+
+  const pricePending = repairDetails.price_pending
+  const remaining = (parseFloat(repairDetails.estimated_cost) || 0) - (parseFloat(repairDetails.deposit_paid) || 0)
+
+  function resetForm() {
+    setRepairDetails(EMPTY_DETAILS)
+    setRepairParts([])
+    setRepairCustomFields({})
+    setDeviceError('')
+    setChargesError('')
   }
 
   async function confirmRepair() {
     if (!activeBranch) return
+    if (!repairDetails.device_type || !repairDetails.device_brand || !repairDetails.device_model) {
+      setDeviceError('Device Type, Brand and Model are all required.')
+      return
+    }
+    setDeviceError('')
+    if (repairDetails.faults.length === 0) return
+    if (!repairDetails.price_pending) {
+      const totalVal = parseFloat(repairDetails.estimated_cost)
+      if (!repairDetails.estimated_cost.trim() || isNaN(totalVal) || totalVal < 0) {
+        setChargesError('Total Charges is required and must be a valid amount.')
+        return
+      }
+    }
+    setChargesError('')
     setConfirmingRepair(true)
+    // Must open synchronously here, before any `await` below — otherwise the
+    // browser's popup blocker silently swallows the print window once we're
+    // past the user-gesture call stack (see printRepairInvoiceById).
+    const printWin = window.open('about:blank', '_blank', 'width=400,height=900,toolbar=0,location=0,menubar=0,status=0,scrollbars=1')
     try {
+      const total   = parseFloat(repairDetails.estimated_cost) || 0
+      const deposit = parseFloat(repairDetails.deposit_paid) || 0
       const payload = {
         branch_id: activeBranch.id,
         customer_id: pos.customer?.id ?? null,
-        device_type: repairCategory?.name ?? null,
-        device_brand: repairBrand?.name ?? null,
-        device_model: repairDevice?.name ?? null,
+        issue: repairDetails.faults.join(', '),
+        device_type: repairDetails.device_type || null,
+        device_brand: repairDetails.device_brand || null,
+        device_model: repairDetails.device_model || null,
         serial_number: repairDetails.serial_number || null,
-        issue: selectedProblems.map(p => p.name).join(', ') || 'Repair',
-        estimated_cost: repairDetails.repair_charges,
-        deposit_paid: repairDetails.charge_deposit ? repairDetails.deposit_amount : 0,
+        estimated_cost: total || null,
+        deposit_paid: deposit,
+        assigned_to: repairDetails.assigned_to || null,
+        status: repairDetails.status || undefined,
+        lock_type: repairDetails.lock_type || null,
+        passcode: repairDetails.passcode.trim() || null,
         notify_customer: !!pos.customer,
         is_rush: repairDetails.is_rush,
-        assigned_to: repairDetails.assigned_to || null,
-        lock_type: repairDetails.lock_type || null,
-        passcode: repairDetails.passcode || null,
-        custom_fields: repairCustomFields,
-        parts: [],
+        store_credit_applied: repairDetails.payment_method === 'store_credit' ? (parseFloat(repairDetails.credit_apply_input) || 0) : undefined,
+        loyalty_points_applied: repairDetails.payment_method === 'loyalty_points' ? (parseInt(repairDetails.loyalty_apply_input) || 0) : undefined,
+        custom_fields: {
+          due_date: repairDetails.due_date || null,
+          physical_location: repairDetails.physical_location || null,
+          task_type: repairDetails.task_type || null,
+          device_network: repairDetails.device_network || null,
+          price_pending: repairDetails.price_pending || undefined,
+          payment_method: repairDetails.payment_method || null,
+          ...repairCustomFields,
+        },
+        parts: repairParts.map(p => ({ product_id: p.product_id, name: p.name, quantity: p.qty, unit_cost: p.unit_cost, unit_price: p.unit_price })),
       }
       const res = await fetch('/api/repairs', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -149,441 +310,604 @@ export function RepairsTab() {
       if (res.ok) {
         const j = await res.json()
         const repair = j.data
-        const deviceLabel = [repairBrand?.name, repairDevice?.name].filter(Boolean).join(' ')
-        const problemLabel = selectedProblems.map(p => p.name).join(', ')
-        const serviceTotal = selectedProblems.reduce((s, p) => s + p.price, 0)
-        const virtualProduct = {
-          id: repair.id,
-          name: `${deviceLabel} — ${problemLabel}`,
-          selling_price: serviceTotal,
-          cost_price: selectedProblems.reduce((s, p) => s + p.cost, 0),
-          is_service: true, show_on_pos: true,
-          business_id: activeBranch.id,
-          sku: repair.job_number ?? null,
-          barcode: null, image_url: null, brand_id: null, category_id: null,
-          description: null, tax_class: null, track_stock: false, is_serialized: false,
-          valuation_method: 'weighted_average', is_active: true,
-          created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-        } as unknown as Product
-        pos.addToCart(virtualProduct)
-        resetRepairs()
+        // Job creation is a complete transaction on its own (deposit + tender
+        // already captured above) — it never touches the POS cart.
+        printRepairInvoiceById(repair.id, printWin)
+        if (j.data?.credit_apply_warning) toast.error(j.data.credit_apply_warning)
+        setSuccess(true)
+        setTimeout(() => setSuccess(false), 2500)
+        resetForm()
+      } else {
+        printWin?.close()
+        const j = await res.json().catch(() => ({}))
+        const errMsg = typeof j.error === 'string' ? j.error : (j.error?.message ?? 'Failed to create repair. Please try again.')
+        toast.error(errMsg)
       }
+    } catch (err) {
+      printWin?.close()
+      throw err
     } finally {
       setConfirmingRepair(false)
     }
   }
 
-  // ── Filtered items ─────────────────────────────────────────────────────────
-  const filteredRepairItems = repairItems.filter(item =>
-    !repairSearch || item.name.toLowerCase().includes(repairSearch.toLowerCase())
-  )
-
-  // ── Breadcrumb ─────────────────────────────────────────────────────────────
-  function RepairBreadcrumb() {
-    const all: RepairLevel[] = ['categories', 'brands', 'devices', 'problems', 'details']
-    const currentIdx = all.indexOf(repairLevel)
-    return (
-      <div className="flex items-center gap-1 flex-wrap text-xs">
-        {all.map((lvl, i) => {
-          const label = i === 0 ? (repairCategory?.name ?? 'Category')
-            : i === 1 ? (repairBrand?.name ?? 'Brand')
-            : i === 2 ? (repairDevice?.name ?? 'Devices')
-            : LEVEL_LABELS[lvl]!
-          const isCurrent = i === currentIdx
-          const isPast = i < currentIdx
-          return (
-            <span key={lvl} className="flex items-center gap-1">
-              {i > 0 && <ChevronRight className="h-3 w-3 text-gray-400 shrink-0" />}
-              <button
-                onClick={() => {
-                  if (!isPast) return
-                  if (lvl === 'categories') resetRepairs()
-                  else if (lvl === 'brands') { setRepairLevel('brands'); loadLevel('brands') }
-                  else if (lvl === 'devices' && repairBrand) { setRepairLevel('devices'); loadLevel('devices', repairBrand.id) }
-                  else if (lvl === 'problems' && repairDevice) { setRepairLevel('problems'); loadLevel('problems', repairDevice.id) }
-                }}
-                className={`whitespace-nowrap ${isCurrent ? 'font-bold text-brand-teal' : isPast ? 'text-blue-500 hover:underline cursor-pointer' : 'text-gray-300 cursor-default'}`}
-              >
-                {label}
-              </button>
-            </span>
-          )
-        })}
-      </div>
-    )
-  }
-
   return (
     <div className="flex h-full flex-col">
-      {/* Breadcrumb + top controls */}
+      {/* Header */}
       <div className="flex items-center justify-between gap-2 border-b border-gray-200 bg-white px-4 py-2.5">
-        <RepairBreadcrumb />
-        {repairLevel === 'problems' && (
-          <button
-            onClick={goToDetailsStep}
-            disabled={selectedProblems.length === 0}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-teal px-4 py-2 text-sm font-semibold text-white hover:bg-brand-teal-dark disabled:bg-gray-300 disabled:cursor-not-allowed"
-          >
-            Next <ArrowRight className="h-4 w-4" />
-          </button>
-        )}
-        {repairLevel === 'details' && (
-          <div className="flex shrink-0 items-center gap-2">
-            <div className="relative">
-              <button
-                onClick={() => setRepairDetailsMenuOpen(o => !o)}
-                className="flex h-8 w-8 items-center justify-center rounded border border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </button>
-              {repairDetailsMenuOpen && (
-                <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-gray-200 bg-white shadow-lg">
-                  <button
-                    onClick={() => { setRepairDetailsMenuOpen(false); router.push('/repairs/service-catalogue') }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
-                  >
-                    <ClipboardList className="h-3.5 w-3.5" /> Manage Service Catalogue
-                  </button>
+        <div className="flex items-center gap-3">
+          <p className="text-sm font-semibold text-gray-800">New Repair Job</p>
+          <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${pos.customer ? 'bg-teal-50 text-brand-teal' : 'bg-gray-100 text-gray-400'}`}>
+            <User className="h-3 w-3" />
+            {pos.customer ? `${pos.customer.first_name} ${pos.customer.last_name ?? ''}`.trim() : 'No customer selected — walk-in'}
+          </div>
+        </div>
+        <Button className="bg-brand-teal hover:bg-brand-teal-dark text-sm px-4 py-1.5 h-8" loading={confirmingRepair} onClick={confirmRepair}>
+          Confirm
+        </Button>
+      </div>
+
+      {/* Scrollable single-form content */}
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="mx-auto max-w-3xl space-y-4">
+
+          {/* DEVICE */}
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-brand-teal">
+              <Wrench className="h-3 w-3" /> Device
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+              <div>
+                <label className={lbl}>Type <span className="text-red-400">*</span></label>
+                <CreatableCombobox
+                  options={deviceData.types.map(t => ({ value: t, label: t }))}
+                  value={repairDetails.device_type}
+                  onChange={(v) => setRepairDetails(d => ({ ...d, device_type: v, device_brand: '', device_model: '' }))}
+                  onCreate={createDeviceType}
+                  placeholder="Phone…"
+                  createLabel="Add type"
+                />
+              </div>
+              <div>
+                <label className={`${lbl} flex items-center gap-1`}>
+                  Brand <span className="text-red-400">*</span>
+                  {!repairDetails.device_type && <Lock className="h-3 w-3 text-gray-300" />}
+                </label>
+                {repairDetails.device_type ? (
+                  <CreatableCombobox
+                    options={filteredBrands.map(b => ({ value: b, label: b }))}
+                    value={repairDetails.device_brand}
+                    onChange={(v) => setRepairDetails(d => ({ ...d, device_brand: v, device_model: '' }))}
+                    onCreate={createDeviceBrand}
+                    placeholder="Apple…"
+                    createLabel="Add brand"
+                  />
+                ) : (
+                  <div className="flex h-10 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                    <Lock className="h-3.5 w-3.5 shrink-0" /> Select type first
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className={`${lbl} flex items-center gap-1`}>
+                  Model <span className="text-red-400">*</span>
+                  {!repairDetails.device_brand && <Lock className="h-3 w-3 text-gray-300" />}
+                </label>
+                {repairDetails.device_brand ? (
+                  <CreatableCombobox
+                    options={filteredModels.map(m => ({ value: m, label: m }))}
+                    value={repairDetails.device_model}
+                    onChange={(v) => setRepairDetails(d => ({ ...d, device_model: v }))}
+                    onCreate={createDeviceModel}
+                    placeholder="iPhone 15…"
+                    createLabel="Add model"
+                  />
+                ) : (
+                  <div className="flex h-10 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                    <Lock className="h-3.5 w-3.5 shrink-0" /> Select brand first
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className={lbl}>IMEI / Serial</label>
+                <input
+                  value={repairDetails.serial_number}
+                  onChange={(e) => setRepairDetails(d => ({ ...d, serial_number: e.target.value }))}
+                  placeholder="Enter IMEI…"
+                  className={inp}
+                />
+              </div>
+            </div>
+            {deviceError && (
+              <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-500">{deviceError}</p>
+            )}
+          </div>
+
+          {/* REPAIR PARTS */}
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-brand-teal">
+              <Wrench className="h-3 w-3" /> Repair Parts
+            </p>
+            {(!repairDetails.device_type || !repairDetails.device_brand || !repairDetails.device_model) && (
+              <p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-600">
+                Select Device Type, Brand and Model above to add repair parts.
+              </p>
+            )}
+            <div className="relative" ref={partDropRef}>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={partQuery}
+                  onChange={(e) => { setPartQuery(e.target.value); searchParts(e.target.value) }}
+                  onFocus={() => { if (partResults.length > 0 || partQuery.trim()) setShowPartDrop(true) }}
+                  placeholder="Search inventory parts…"
+                  className={`${inp} pl-9`}
+                  disabled={!repairDetails.device_model}
+                />
+                {partSearchLoading && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-transparent" />
+                )}
+              </div>
+
+              {showPartDrop && (
+                <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+                  <ul className="max-h-44 overflow-y-auto py-1">
+                    {partResults.map((p) => (
+                      <li key={p.id}>
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
+                          onMouseDown={(e) => { e.preventDefault(); addPartFromInventory(p) }}
+                        >
+                          <span className="text-gray-700">{p.name}</span>
+                          <span className="text-xs font-semibold text-teal-700">{formatCurrency(p.selling_price ?? 0)}</span>
+                        </button>
+                      </li>
+                    ))}
+                    {partQuery.trim() && (
+                      <li className="border-t border-gray-100">
+                        <div className="flex flex-col gap-1.5 px-3 py-2">
+                          <span className="text-xs italic text-gray-500">Add &quot;{partQuery.trim()}&quot;</span>
+                          <div className="flex items-center gap-2">
+                            <div className="flex flex-1 flex-col gap-0.5">
+                              <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Cost {getCurrencySymbol()}</span>
+                              <input
+                                type="number" step="0.01" min="0"
+                                value={quickPartCost}
+                                onChange={(e) => setQuickPartCost(e.target.value)}
+                                placeholder="0.00"
+                                className="h-7 w-full rounded border border-gray-200 bg-gray-50 px-2 text-xs text-gray-900"
+                                onMouseDown={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            <div className="flex flex-1 flex-col gap-0.5">
+                              <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Price {getCurrencySymbol()}</span>
+                              <input
+                                type="number" step="0.01" min="0"
+                                value={quickPartPrice}
+                                onChange={(e) => setQuickPartPrice(e.target.value)}
+                                placeholder="0.00"
+                                className="h-7 w-full rounded border border-gray-300 px-2 text-xs text-gray-900"
+                                onMouseDown={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              className="mt-4 shrink-0 rounded bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-700 transition-colors"
+                              onMouseDown={(e) => { e.preventDefault(); addQuickPart() }}
+                            >
+                              Add
+                            </button>
+                          </div>
+                        </div>
+                      </li>
+                    )}
+                    {partResults.length === 0 && !partSearchLoading && (
+                      <li className="px-3 py-2 text-xs italic text-gray-400">
+                        {partQuery.trim() ? 'No inventory parts found — use quick-add above.' : 'Type to search parts…'}
+                      </li>
+                    )}
+                  </ul>
                 </div>
               )}
             </div>
-            <Button className="bg-brand-teal hover:bg-brand-teal-dark text-sm px-4 py-1.5 h-8" loading={confirmingRepair} onClick={confirmRepair}>
-              Confirm
-            </Button>
-          </div>
-        )}
-      </div>
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto p-4">
-
-        {/* CATEGORIES / BRANDS / DEVICES grid */}
-        {(repairLevel === 'categories' || repairLevel === 'brands' || repairLevel === 'devices') && (
-          <div className="space-y-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder={`Search ${repairLevel === 'categories' ? 'category' : repairLevel === 'brands' ? 'brand' : 'device'}...`}
-                value={repairSearch} onChange={e => setRepairSearch(e.target.value)}
-                className="h-10 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-base focus:border-brand-teal focus:outline-none"
-              />
-            </div>
-            {repairLoading ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                <button
-                  onClick={() => router.push('/repairs/service-catalogue')}
-                  className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-brand-teal-light bg-brand-teal p-4 text-white hover:bg-brand-teal-dark transition-colors min-h-[100px]"
-                >
-                  <Plus className="h-7 w-7" />
-                  <span className="text-sm font-medium">
-                    Add {repairLevel === 'categories' ? 'Category' : repairLevel === 'brands' ? 'Brand' : 'Devices'}
-                  </span>
-                </button>
-                {filteredRepairItems.map((item: any) => (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      if (repairLevel === 'categories') selectCategory(item)
-                      else if (repairLevel === 'brands') selectBrand(item)
-                      else selectDevice(item)
-                    }}
-                    className="flex flex-col items-center gap-2 rounded-xl border border-gray-200 bg-white p-4 text-center hover:border-brand-teal hover:shadow-sm transition-all min-h-[100px]"
-                  >
-                    {(item.image_url ?? item.logo_url) ? (
-                      <img src={item.image_url ?? item.logo_url} alt={item.name} className="h-11 w-11 object-contain" />
-                    ) : (
-                      <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-100">
-                        {repairLevel === 'categories' && <Wrench className="h-6 w-6 text-gray-400" />}
-                        {repairLevel === 'brands'     && <Tag    className="h-6 w-6 text-gray-400" />}
-                        {repairLevel === 'devices'    && <ShoppingBag className="h-6 w-6 text-gray-400" />}
-                      </div>
-                    )}
-                    <span className="text-sm font-medium text-gray-800 line-clamp-2 leading-tight">{item.name}</span>
-                  </button>
-                ))}
+            {repairParts.length > 0 && (
+              <div className="mt-2 overflow-hidden rounded-lg border border-gray-200">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 font-semibold text-gray-500">
+                      <th className="px-3 py-1.5 text-left">Part</th>
+                      <th className="w-16 px-2 py-1.5 text-center">Qty</th>
+                      <th className="w-20 px-2 py-1.5 text-right text-gray-400">Cost {getCurrencySymbol()}</th>
+                      <th className="w-20 px-2 py-1.5 text-right">Price {getCurrencySymbol()}</th>
+                      <th className="w-20 px-2 py-1.5 text-right">Total</th>
+                      <th className="w-8" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {repairParts.map((p) => (
+                      <tr key={p.tempId} className="border-t border-gray-100">
+                        <td className="px-3 py-1.5 text-gray-700">{p.name}</td>
+                        <td className="px-2 py-1.5 text-center">
+                          <input
+                            type="number" min="1" value={p.qty}
+                            onChange={(e) => setRepairParts(prev => prev.map(r => r.tempId === p.tempId ? { ...r, qty: Math.max(1, parseInt(e.target.value) || 1) } : r))}
+                            className="h-6 w-12 rounded border border-gray-200 px-1 text-center text-xs"
+                          />
+                        </td>
+                        <td className="px-2 py-1.5 text-right">
+                          <input
+                            type="number" step="0.01" min="0" value={p.unit_cost}
+                            onChange={(e) => setRepairParts(prev => prev.map(r => r.tempId === p.tempId ? { ...r, unit_cost: parseFloat(e.target.value) || 0 } : r))}
+                            className="h-6 w-16 rounded border border-gray-100 bg-gray-50 px-1 text-right text-xs text-gray-500"
+                          />
+                        </td>
+                        <td className="px-2 py-1.5 text-right">
+                          <input
+                            type="number" step="0.01" min="0" value={p.unit_price}
+                            onChange={(e) => setRepairParts(prev => prev.map(r => r.tempId === p.tempId ? { ...r, unit_price: parseFloat(e.target.value) || 0 } : r))}
+                            className="h-6 w-16 rounded border border-gray-200 px-1 text-right text-xs"
+                          />
+                        </td>
+                        <td className="px-2 py-1.5 text-right font-semibold text-gray-700">{formatCurrency(p.unit_price * p.qty)}</td>
+                        <td className="px-1 py-1.5 text-center">
+                          <button type="button" onClick={() => setRepairParts(prev => prev.filter(r => r.tempId !== p.tempId))} className="text-red-400 hover:text-red-600 transition-colors">
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t border-gray-200 bg-gray-50">
+                      <td colSpan={4} className="px-3 py-1.5 text-right text-xs font-bold text-gray-600">Parts Total:</td>
+                      <td className="px-2 py-1.5 text-right text-xs font-bold text-gray-900">{formatCurrency(repairParts.reduce((s, p) => s + p.unit_price * p.qty, 0))}</td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             )}
           </div>
-        )}
 
-        {/* PROBLEMS step */}
-        {repairLevel === 'problems' && (
-          <div className="space-y-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text" placeholder="Search device problem"
-                value={repairSearch} onChange={e => setRepairSearch(e.target.value)}
-                className="h-10 w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 text-base focus:border-brand-teal focus:outline-none"
-              />
-            </div>
-            {repairLoading ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}
+          {/* FAULT & ASSIGNMENT */}
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-brand-teal">
+              <Wrench className="h-3 w-3" /> Fault &amp; Assignment
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+              <div className="sm:col-span-2">
+                <label className={lbl}>Fault <span className="text-red-400">*</span></label>
+                <MultiComboInput
+                  values={repairDetails.faults}
+                  onAdd={(v) => {
+                    setRepairDetails(p => ({ ...p, faults: [...p.faults, v] }))
+                    const isNew = !faults.some(f => f.name.toLowerCase() === v.toLowerCase())
+                    if (isNew) {
+                      queryClient.setQueryData<RepairMeta>(['repairs-meta', activeBranch?.id], old => {
+                        if (!old) return old
+                        return { ...old, faults: [...old.faults, { id: `temp-${Date.now()}`, name: v }] }
+                      })
+                      fetch('/api/repairs/faults', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: v }),
+                      }).then(r => { if (r.ok) queryClient.invalidateQueries({ queryKey: ['repairs-meta', activeBranch?.id] }) }).catch(() => {})
+                    }
+                  }}
+                  onRemove={(v) => setRepairDetails(p => ({ ...p, faults: p.faults.filter(f => f !== v) }))}
+                  options={faults.map(f => f.name)}
+                  placeholder="Select or type fault…"
+                />
               </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                <button
-                  onClick={() => router.push('/repairs/service-catalogue')}
-                  className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-brand-teal-light bg-brand-teal p-4 text-white hover:bg-brand-teal-dark transition-colors min-h-[130px]"
-                >
-                  <Plus className="h-7 w-7" />
-                  <span className="text-sm font-medium">Add Service</span>
-                </button>
-                {filteredRepairItems.map((prob: ServiceProblem) => {
-                  const isSelected = selectedProblems.some(p => p.id === prob.id)
+              <div>
+                <label className={lbl}>Due Date</label>
+                <input
+                  type="date"
+                  min={new Date().toISOString().split('T')[0]}
+                  value={repairDetails.due_date}
+                  onChange={(e) => setRepairDetails(d => ({ ...d, due_date: e.target.value }))}
+                  className={inp}
+                />
+              </div>
+              <div>
+                <label className={lbl}>Status</label>
+                <select value={repairDetails.status} onChange={(e) => setRepairDetails(d => ({ ...d, status: e.target.value }))} className={sel}>
+                  <option value="">— Status —</option>
+                  {customStatuses.map(cs => <option key={cs.id} value={cs.name}>{cs.name}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* FINANCIALS & ASSIGNMENT */}
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-brand-teal">
+              <Banknote className="h-3 w-3" /> Financials &amp; Assignment
+            </p>
+            <label className="mb-3 flex w-fit cursor-pointer items-center gap-2.5">
+              <div
+                onClick={() => setRepairDetails(p => ({ ...p, price_pending: !p.price_pending, estimated_cost: !p.price_pending ? '' : p.estimated_cost, deposit_paid: !p.price_pending ? '' : p.deposit_paid }))}
+                className={`relative flex h-5 w-9 items-center rounded-full transition-colors ${pricePending ? 'bg-amber-500' : 'bg-gray-300'}`}
+              >
+                <span className={`absolute inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${pricePending ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+              </div>
+              <span className="text-xs font-semibold text-gray-600">
+                {pricePending ? (
+                  <span className="flex items-center gap-1 text-amber-600"><span>⚠</span> Issue Not Found — Price TBD</span>
+                ) : 'No fault found / Price TBD'}
+              </span>
+            </label>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+              <div>
+                <label className={lbl}>Job Fee (Labour)</label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">{getCurrencySymbol()}</span>
+                  <input
+                    type="number" step="0.01" min="0" disabled={pricePending}
+                    value={repairDetails.job_fee}
+                    onChange={(e) => {
+                      const fee = e.target.value
+                      const partsTotal = repairParts.reduce((s, p) => s + p.unit_price * p.qty, 0)
+                      const total = (parseFloat(fee) || 0) + partsTotal
+                      setRepairDetails(p => ({ ...p, job_fee: fee, estimated_cost: total.toFixed(2) }))
+                    }}
+                    placeholder="0.00"
+                    className={`${inp} pl-7 ${pricePending ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className={lbl}>Total Charges {!pricePending && <span className="text-red-400">*</span>}</label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">{getCurrencySymbol()}</span>
+                  <input
+                    type="number" step="0.01" min="0" disabled={pricePending}
+                    value={repairDetails.estimated_cost}
+                    onChange={(e) => {
+                      setRepairDetails(p => ({ ...p, estimated_cost: e.target.value }))
+                      if (chargesError) {
+                        const v = parseFloat(e.target.value)
+                        setChargesError(!e.target.value.trim() || isNaN(v) || v < 0 ? 'Total Charges is required and must be a valid amount.' : '')
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (!pricePending) {
+                        const v = parseFloat(e.target.value)
+                        setChargesError(!e.target.value.trim() || isNaN(v) || v < 0 ? 'Total Charges is required and must be a valid amount.' : '')
+                      }
+                    }}
+                    placeholder={pricePending ? 'TBD' : '0.00'}
+                    className={`${inp} pl-7 ${pricePending ? 'opacity-40 cursor-not-allowed' : ''} ${chargesError ? 'border-red-400 focus:border-red-400' : ''}`}
+                  />
+                </div>
+                {chargesError && <p className="mt-1 text-xs text-red-500">{chargesError}</p>}
+              </div>
+              <div>
+                <label className={lbl}>Deposit</label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">{getCurrencySymbol()}</span>
+                  <input
+                    type="number" step="0.01" min="0" disabled={pricePending}
+                    value={repairDetails.deposit_paid}
+                    onChange={(e) => setRepairDetails(p => ({ ...p, deposit_paid: e.target.value }))}
+                    placeholder={pricePending ? 'TBD' : '0.00'}
+                    className={`${inp} pl-7 ${pricePending ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className={lbl}>Remaining</label>
+                <div className={`flex h-10 items-center rounded-lg border px-3 text-sm font-semibold ${
+                  pricePending ? 'border-amber-200 bg-amber-50 text-amber-600'
+                    : remaining > 0 ? 'border-orange-200 bg-orange-50 text-orange-600' : 'border-green-200 bg-green-50 text-green-600'
+                }`}>
+                  {pricePending ? 'TBD' : `${getCurrencySymbol()}${remaining.toFixed(2)}`}
+                </div>
+              </div>
+              <div>
+                <label className={lbl}>Assigned To</label>
+                {activeBranch && (
+                  <AsyncEmployeeSelect
+                    branchId={activeBranch.id}
+                    value={repairDetails.assigned_to}
+                    onChange={(id) => setRepairDetails(d => ({ ...d, assigned_to: id }))}
+                    label=""
+                    placeholder="Search employee..."
+                  />
+                )}
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <label className={lbl}>Payment Method <span className="font-normal normal-case text-gray-300">(opt)</span></label>
+              <div className="flex flex-wrap gap-2">
+                {(['cash', 'card', 'store_credit', 'loyalty_points'] as const).map(m => {
+                  const disabled = (m === 'store_credit' || m === 'loyalty_points') && !pos.customer
                   return (
                     <button
-                      key={prob.id}
-                      onClick={() => toggleProblem(prob)}
-                      className={`relative flex flex-col items-center gap-2 rounded-xl border-2 bg-white p-3 text-center transition-all min-h-[100px] ${
-                        isSelected ? 'border-brand-teal bg-brand-teal-light' : 'border-gray-200 hover:border-brand-teal-light'
+                      key={m}
+                      type="button"
+                      disabled={disabled}
+                      title={disabled ? 'Select a customer first' : undefined}
+                      onClick={() => !disabled && setRepairDetails(p => ({ ...p, payment_method: p.payment_method === m ? '' : m }))}
+                      className={`flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
+                        repairDetails.payment_method === m
+                          ? 'border-gray-900 bg-gray-900 text-white'
+                          : disabled
+                            ? 'border-gray-100 text-gray-300 cursor-not-allowed'
+                            : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
                       }`}
                     >
-                      <div className={`absolute left-2 top-2 flex h-4 w-4 items-center justify-center rounded border ${isSelected ? 'border-brand-teal bg-brand-teal' : 'border-gray-300 bg-white'}`}>
-                        {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
-                      </div>
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 mt-2">
-                        <Wrench className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <span className="text-sm font-medium text-gray-800 line-clamp-2 leading-tight">{prob.name}</span>
-                      <span className="text-sm font-bold text-brand-teal">{formatCurrency(prob.price)}</span>
+                      {m === 'store_credit' && <Wallet className="h-3 w-3" />}
+                      {m === 'loyalty_points' && <Star className="h-3 w-3" />}
+                      {m.replace('_', ' ')}
                     </button>
                   )
                 })}
               </div>
-            )}
-            {selectedProblems.length > 0 && (
-              <div className="rounded-lg bg-brand-teal-light border border-brand-teal-light px-4 py-2.5 text-sm font-medium text-brand-teal">
-                {selectedProblems.length} service(s) selected · Total: <strong>{formatCurrency(selectedProblems.reduce((s, p) => s + p.price, 0))}</strong>
-              </div>
-            )}
-          </div>
-        )}
 
-        {/* DETAILS step */}
-        {repairLevel === 'details' && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5">
-            {/* Left column */}
-            <div className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                <button className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                  <ClipboardList className="h-4 w-4" /> Pre-Repair Checklist
-                </button>
-                <button className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                  <Camera className="h-4 w-4" /> Pre-Repair Condition Images
-                </button>
-              </div>
-
-              {/* IMEI / Serial */}
-              <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <select
-                    value={repairDetails.imei_type}
-                    onChange={e => setRepairDetails(d => ({ ...d, imei_type: e.target.value as 'Serial' | 'IMEI' }))}
-                    className="h-10 rounded border border-gray-200 bg-white px-2 text-sm focus:border-brand-teal focus:outline-none"
-                  >
-                    <option>Serial</option>
-                    <option>IMEI</option>
-                  </select>
-                  <input
-                    type="text" placeholder={`Enter ${repairDetails.imei_type} number`}
-                    value={repairDetails.serial_number}
-                    onChange={e => setRepairDetails(d => ({ ...d, serial_number: e.target.value }))}
-                    className="h-10 flex-1 rounded border border-gray-200 bg-white px-3 text-sm focus:border-brand-teal focus:outline-none"
-                  />
-                </div>
-                {/* Passcode / Pattern toggle */}
-                <div className="space-y-2">
-                  <div className="flex overflow-hidden rounded-lg border border-gray-200">
-                    <button
-                      type="button"
-                      onClick={() => setRepairDetails(d => ({ ...d, lock_type: 'passcode', passcode: '' }))}
-                      className={`flex-1 py-2 text-sm font-medium transition-colors ${repairDetails.lock_type === 'passcode' ? 'bg-brand-teal text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
-                    >Passcode</button>
-                    <button
-                      type="button"
-                      onClick={() => setRepairDetails(d => ({ ...d, lock_type: 'pattern', passcode: '' }))}
-                      className={`flex-1 py-2 text-sm font-medium border-l border-gray-200 transition-colors ${repairDetails.lock_type === 'pattern' ? 'bg-brand-teal text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
-                    >Pattern Lock</button>
-                  </div>
-                  {repairDetails.lock_type === 'passcode' && (
+              {repairDetails.payment_method === 'store_credit' && (
+                <div className="mt-2 space-y-1.5">
+                  {creditBalance !== null && (
+                    <p className="text-xs text-gray-500">Available balance: <span className="font-semibold text-gray-800">{formatCurrency(creditBalance)}</span></p>
+                  )}
+                  <div className="flex gap-2">
                     <input
-                      type="text" placeholder="Enter device passcode"
-                      value={repairDetails.passcode}
-                      onChange={e => setRepairDetails(d => ({ ...d, passcode: e.target.value }))}
-                      className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm focus:border-brand-teal focus:outline-none"
+                      type="number" min="0" step="0.01" placeholder="Amount to use"
+                      value={repairDetails.credit_apply_input}
+                      onChange={(e) => setRepairDetails(p => ({ ...p, credit_apply_input: e.target.value }))}
+                      className={`${inp} flex-1`}
                     />
-                  )}
-                  {repairDetails.lock_type === 'pattern' && (
-                    <PatternLock
-                      size={200}
-                      value={repairDetails.passcode}
-                      onChange={pattern => setRepairDetails(d => ({ ...d, passcode: pattern }))}
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* Warranty per problem */}
-              {selectedProblems.length > 0 && (
-                <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-                  <p className="text-sm font-semibold text-gray-700">Warranty Applicable</p>
-                  {selectedProblems.map(prob => (
-                    <div key={prob.id}>
-                      <p className="text-sm font-medium text-brand-teal mb-1">{prob.name}</p>
-                      <select
-                        value={repairDetails.problem_warranties[prob.id] ?? 'No Warranty'}
-                        onChange={e => setRepairDetails(d => ({ ...d, problem_warranties: { ...d.problem_warranties, [prob.id]: e.target.value } }))}
-                        className="h-10 w-full rounded border border-gray-200 bg-white px-2 text-sm focus:border-brand-teal focus:outline-none"
-                      >
-                        {WARRANTY_OPTIONS.map(w => <option key={w}>{w}</option>)}
-                      </select>
-                    </div>
-                  ))}
+                    <Button variant="outline" size="sm" onClick={() => {
+                      const due = parseFloat(repairDetails.deposit_paid) || 0
+                      const amount = Math.min(parseFloat(repairDetails.credit_apply_input) || 0, creditBalance ?? 0, due)
+                      setRepairDetails(p => ({ ...p, credit_apply_input: String(amount) }))
+                    }}>Apply</Button>
+                  </div>
                 </div>
               )}
 
-              {/* Assigned to + Due date */}
-              <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Assigned to</label>
-                  {activeBranch && (
-                    <AsyncEmployeeSelect
-                      branchId={activeBranch.id}
-                      value={repairDetails.assigned_to}
-                      onChange={(id) => setRepairDetails(d => ({ ...d, assigned_to: id }))}
-                      label=""
-                      placeholder="Search employee..."
-                    />
+              {repairDetails.payment_method === 'loyalty_points' && (
+                <div className="mt-2 space-y-1.5">
+                  {loyaltyBalance !== null && (
+                    <p className="text-xs text-gray-500">
+                      Points balance: <span className="font-semibold text-gray-800">{loyaltyBalance} pts</span> (≈ {formatCurrency(loyaltyBalance * loyaltyRate)})
+                    </p>
                   )}
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Task Due Date &amp; Time</label>
-                  <input
-                    type="datetime-local"
-                    value={repairDetails.due_date}
-                    onChange={e => setRepairDetails(d => ({ ...d, due_date: e.target.value }))}
-                    className="h-10 w-full rounded border border-gray-200 bg-white px-2 text-sm focus:border-brand-teal focus:outline-none"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Right column */}
-            <div className="space-y-4">
-              {/* Repair charges */}
-              <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-gray-700">Repair Charges</span>
-                  <input
-                    type="number" min="0" step="0.01"
-                    value={repairDetails.repair_charges}
-                    onChange={e => setRepairDetails(d => ({ ...d, repair_charges: parseFloat(e.target.value) || 0 }))}
-                    className="h-10 w-28 rounded border border-gray-200 px-2 text-right text-base font-bold focus:border-brand-teal focus:outline-none"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox" id="charge_deposit"
-                    checked={repairDetails.charge_deposit}
-                    onChange={e => {
-                      const checked = e.target.checked
-                      setRepairDetails(d => ({ ...d, charge_deposit: checked, deposit_amount: checked ? Math.round(d.repair_charges * 0.2 * 100) / 100 : 0 }))
-                    }}
-                    className="h-4 w-4 rounded border-gray-300 text-brand-teal"
-                  />
-                  <label htmlFor="charge_deposit" className="text-sm font-medium text-gray-700">Charge Deposit</label>
-                </div>
-                {repairDetails.charge_deposit && (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-500">Deposit</span>
-                      <input
-                        type="number" min="0" step="0.01"
-                        value={repairDetails.deposit_amount}
-                        onChange={e => setRepairDetails(d => ({ ...d, deposit_amount: parseFloat(e.target.value) || 0 }))}
-                        className="h-7 w-24 rounded border border-gray-200 px-2 text-right text-sm focus:border-brand-teal focus:outline-none"
-                      />
-                    </div>
-                    <p className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-700">20% of Repair Charges</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="number" min="0" step="1" placeholder="Points to redeem"
+                      value={repairDetails.loyalty_apply_input}
+                      onChange={(e) => setRepairDetails(p => ({ ...p, loyalty_apply_input: e.target.value }))}
+                      className={`${inp} flex-1`}
+                    />
+                    <Button variant="outline" size="sm" onClick={() => {
+                      const due = parseFloat(repairDetails.deposit_paid) || 0
+                      const pts = Math.min(parseInt(repairDetails.loyalty_apply_input) || 0, loyaltyBalance ?? 0)
+                      const capped = Math.min(pts * loyaltyRate, due)
+                      setRepairDetails(p => ({ ...p, loyalty_apply_input: String(Math.round(capped / loyaltyRate)) }))
+                    }}>Apply</Button>
                   </div>
-                )}
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox" id="rush_job"
-                    checked={repairDetails.is_rush}
-                    onChange={e => setRepairDetails(d => ({ ...d, is_rush: e.target.checked }))}
-                    className="h-4 w-4 rounded border-gray-300 text-brand-teal"
-                  />
-                  <label htmlFor="rush_job" className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
-                    Mark as Rush Job
-                    <span className="rounded bg-brand-teal-light px-1.5 py-0.5 text-xs font-semibold text-brand-teal">New</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Status + location + type */}
-              <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Repair Task Status</label>
-                  <select
-                    value={repairDetails.status}
-                    onChange={e => setRepairDetails(d => ({ ...d, status: e.target.value }))}
-                    className="h-10 w-full rounded border border-gray-200 bg-blue-600 px-2 text-sm text-white focus:outline-none"
-                  >
-                    {REPAIR_STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Device Physical Location</label>
-                  <input
-                    type="text" placeholder="Select Physical Location"
-                    value={repairDetails.physical_location}
-                    onChange={e => setRepairDetails(d => ({ ...d, physical_location: e.target.value }))}
-                    className="h-10 w-full rounded border border-gray-200 px-2 text-sm focus:border-brand-teal focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Repair Task Type</label>
-                  <select
-                    value={repairDetails.task_type}
-                    onChange={e => setRepairDetails(d => ({ ...d, task_type: e.target.value }))}
-                    className="h-10 w-full rounded border border-gray-200 bg-white px-2 text-sm focus:border-brand-teal focus:outline-none"
-                  >
-                    {TASK_TYPE_OPTIONS.map(t => <option key={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Device Network</label>
-                  <input
-                    type="text" placeholder="Select Network"
-                    className="h-10 w-full rounded border border-gray-200 px-2 text-sm focus:border-brand-teal focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Custom Fields */}
-              {repairCustomFieldDefs.length > 0 && (
-                <div className="rounded-xl border border-brand-teal-light bg-brand-teal-light p-4 space-y-3">
-                  <p className="text-xs font-semibold text-brand-teal-dark">Additional Fields</p>
-                  <CustomFieldRenderer
-                    values={repairCustomFields}
-                    definitions={repairCustomFieldDefs}
-                    onSave={async v => setRepairCustomFields(v)}
-                    showSave={false}
-                  />
                 </div>
               )}
             </div>
           </div>
-        )}
+
+          {/* DEVICE LOCK */}
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-brand-teal">
+              <Lock className="h-3 w-3" /> Device Lock
+            </p>
+            <div className="mb-2 flex items-center gap-2">
+              {(['', 'passcode', 'pattern'] as const).map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setRepairDetails(p => ({ ...p, lock_type: t, passcode: '' }))}
+                  className={`rounded-md border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${repairDetails.lock_type === t ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
+                >
+                  {t === '' ? 'None' : t}
+                </button>
+              ))}
+            </div>
+            {repairDetails.lock_type === 'passcode' && (
+              <div className="max-w-[200px]">
+                <label className={lbl}>Passcode / PIN</label>
+                <input
+                  type="text" value={repairDetails.passcode}
+                  onChange={(e) => setRepairDetails(d => ({ ...d, passcode: e.target.value }))}
+                  placeholder="Enter passcode…"
+                  className={inp}
+                />
+              </div>
+            )}
+            {repairDetails.lock_type === 'pattern' && (
+              <div className="flex flex-col items-start gap-1">
+                <label className={lbl}>Draw Pattern</label>
+                <PatternLock
+                  value={repairDetails.passcode}
+                  onChange={(v) => setRepairDetails(d => ({ ...d, passcode: v }))}
+                  size={180}
+                />
+                {repairDetails.passcode && (
+                  <button type="button" onClick={() => setRepairDetails(d => ({ ...d, passcode: '' }))} className="mt-1 text-xs text-gray-400 hover:text-red-500 transition-colors">
+                    Clear pattern
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* POS EXTRAS */}
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-brand-teal">
+              <StickyNote className="h-3 w-3" /> Additional Details
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <label className={lbl}>Device Physical Location</label>
+                <input
+                  type="text" placeholder="Select Physical Location"
+                  value={repairDetails.physical_location}
+                  onChange={(e) => setRepairDetails(d => ({ ...d, physical_location: e.target.value }))}
+                  className={inp}
+                />
+              </div>
+              <div>
+                <label className={lbl}>Repair Task Type</label>
+                <select value={repairDetails.task_type} onChange={(e) => setRepairDetails(d => ({ ...d, task_type: e.target.value }))} className={sel}>
+                  {TASK_TYPE_OPTIONS.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={lbl}>Device Network</label>
+                <input
+                  type="text" placeholder="Select Network"
+                  value={repairDetails.device_network}
+                  onChange={(e) => setRepairDetails(d => ({ ...d, device_network: e.target.value }))}
+                  className={inp}
+                />
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                type="checkbox" id="rush_job"
+                checked={repairDetails.is_rush}
+                onChange={(e) => setRepairDetails(d => ({ ...d, is_rush: e.target.checked }))}
+                className="h-4 w-4 rounded border-gray-300 text-brand-teal"
+              />
+              <label htmlFor="rush_job" className="text-sm font-medium text-gray-700">Mark as Rush Job</label>
+            </div>
+          </div>
+
+          {/* Custom Fields */}
+          {repairCustomFieldDefs.length > 0 && (
+            <div className="rounded-xl border border-brand-teal-light bg-brand-teal-light p-4">
+              <p className="mb-2 text-xs font-semibold text-brand-teal-dark">Additional Fields</p>
+              <CustomFieldRenderer
+                values={repairCustomFields}
+                definitions={repairCustomFieldDefs}
+                onSave={async v => setRepairCustomFields(v)}
+                showSave={false}
+              />
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Repair Job Created Success Overlay */}
+      {success && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="rounded-2xl bg-white px-16 py-14 text-center shadow-2xl">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+              <CheckCircle2 className="h-9 w-9 text-green-600" />
+            </div>
+            <p className="text-xl font-bold text-green-700">Repair Job Created!</p>
+            <p className="mt-1 text-sm text-gray-500">Invoice has been sent to print.</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

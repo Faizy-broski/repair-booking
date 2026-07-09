@@ -6,7 +6,7 @@ import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Min
 import { EditSubscriptionModal } from '@/components/superadmin/edit-subscription-modal'
 import type { PlanOption } from '@/components/superadmin/edit-subscription-modal'
 import type { SubscriptionRow } from '@/app/api/admin/subscriptions/route'
-import { Badge } from '@/components/ui/badge'
+import { Badge, SUBSCRIPTION_STATUS_VARIANTS } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/data-table'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
 import { formatDate } from '@/lib/utils'
@@ -604,20 +604,22 @@ export default function BusinessesPage() {
       cell: ({ getValue }) => {
         const subs = getValue() as BusinessRow['subscriptions']
         const sub = subs?.[0]
-        return sub ? (
+        if (!sub) return <span className="text-gray-400 text-sm">—</span>
+
+        const expiryDate = sub.current_period_end ?? sub.trial_ends_at
+        const isExpired = !!expiryDate && new Date(expiryDate) < new Date()
+        const effectiveStatus = isExpired && (sub.status === 'active' || sub.status === 'trialing')
+          ? 'expired'
+          : sub.status
+
+        return (
           <div>
             <p className="text-sm text-gray-700">{sub.plans?.name ?? '—'}</p>
-            <Badge
-              variant={
-                sub.status === 'active' ? 'success' :
-                sub.status === 'trialing' ? 'warning' : 'destructive'
-              }
-              className="text-[10px]"
-            >
-              {sub.status}
+            <Badge variant={SUBSCRIPTION_STATUS_VARIANTS[effectiveStatus] ?? 'destructive'} className="text-[10px]">
+              {effectiveStatus}
             </Badge>
           </div>
-        ) : <span className="text-gray-400 text-sm">—</span>
+        )
       },
     },
     {

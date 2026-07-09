@@ -5,6 +5,14 @@ import { CheckCircle2, Loader2, Zap, ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/store/auth.store'
+import { createClient } from '@/lib/supabase/client'
+import {
+  CustomPlanCard,
+  deriveCustomPlanBaseline,
+  makeDefaultCustomPlanState,
+  toCustomPlanPayload,
+  type CustomPlanState,
+} from '@/components/landing/custom-plan-card'
 
 interface Plan {
   id: string
@@ -15,6 +23,7 @@ interface Plan {
   features: string[] | null
   max_branches: number | null
   max_users: number | null
+  limits?: Record<string, number | boolean | null> | null
 }
 
 function parseFeatures(features: string[] | null): string[] {
@@ -31,6 +40,13 @@ export default function PlansPage() {
   const [upgrading, setUpgrading] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
+  const [customPlan, setCustomPlan] = useState<CustomPlanState | null>(null)
+  const [customEditable, setCustomEditable] = useState(false) // trialing, is_custom, no stripe_sub_id yet
+  const [savingCustom, setSavingCustom] = useState(false)
+  const [upgradingCustom, setUpgradingCustom] = useState(false)
+  const { profile } = useAuthStore()
+  const customPlanBaseline = deriveCustomPlanBaseline(plans)
+  const effectiveCustomPlan = customPlan ?? makeDefaultCustomPlanState(customPlanBaseline)
 
   useEffect(() => {
     fetch('/api/plans')
@@ -41,6 +57,80 @@ export default function PlansPage() {
       })
       .finally(() => setLoading(false))
   }, [])
+
+  // Check whether this business is already on a trial-time-editable custom plan.
+  useEffect(() => {
+    if (!profile?.business_id) return
+    const supabase = createClient()
+    // Cast: is_custom/custom_* columns exist post-migration-111 but aren't in the
+    // generated database types yet — regenerate types after applying that migration
+    // to remove this cast.
+    ;(supabase as any)
+      .from('subscriptions')
+      .select('is_custom, status, stripe_sub_id, custom_max_branches, custom_max_users, custom_max_products, custom_max_services')
+      .eq('business_id', profile.business_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }: { data: {
+        is_custom: boolean
+        status: string
+        stripe_sub_id: string | null
+        custom_max_branches: number | null
+        custom_max_users: number | null
+        custom_max_products: number | null
+        custom_max_services: number | null
+      } | null }) => {
+        if (data?.is_custom && data.status === 'trialing' && !data.stripe_sub_id) {
+          setCustomEditable(true)
+          setCustomPlan({
+            branches: data.custom_max_branches ?? customPlanBaseline.baseBranches,
+            staff: data.custom_max_users ?? customPlanBaseline.baseStaff,
+            inventoryLimit: data.custom_max_products ?? customPlanBaseline.baseInventory,
+            inventoryUnlimited: data.custom_max_products === null,
+            repairLimit: data.custom_max_services ?? customPlanBaseline.baseRepair,
+            repairUnlimited: data.custom_max_services === null,
+          })
+        }
+      })
+  }, [profile?.business_id])
+
+  async function handleSaveCustomTrial() {
+    setSavingCustom(true)
+    setErrorMsg(null)
+    try {
+      const res = await fetch('/api/account/custom-plan', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(toCustomPlanPayload(effectiveCustomPlan)),
+      })
+      const json = await res.json()
+      if (!res.ok) setErrorMsg(json.error ?? 'Something went wrong')
+    } catch {
+      setErrorMsg('Network error — please try again')
+    } finally {
+      setSavingCustom(false)
+    }
+  }
+
+  async function handleUpgradeCustom() {
+    setUpgradingCustom(true)
+    setErrorMsg(null)
+    try {
+      const res = await fetch('/api/stripe/upgrade-custom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(toCustomPlanPayload(effectiveCustomPlan)),
+      })
+      const json = await res.json()
+      if (!res.ok) setErrorMsg(json.error?.message ?? 'Something went wrong')
+      else router.push(json.data.url)
+    } catch {
+      setErrorMsg('Network error — please try again')
+    } finally {
+      setUpgradingCustom(false)
+    }
+  }
 
   async function handleSelect(planId: string) {
     setUpgrading(planId)
@@ -131,7 +221,7 @@ export default function PlansPage() {
             <Loader2 className="h-8 w-8 animate-spin text-brand-teal" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {plans.map((p, i) => {
               const highlighted = i === midIndex
               const showYearly = billingCycle === 'yearly' && !!p.price_yearly
@@ -209,7 +299,24 @@ export default function PlansPage() {
                 </div>
               )
             })}
+            <CustomPlanCard
+              state={effectiveCustomPlan}
+              onChange={setCustomPlan}
+              baseline={customPlanBaseline}
+              ctaLabel={
+                customEditable
+                  ? (savingCustom ? 'Saving…' : 'Save changes')
+                  : (upgradingCustom ? 'Upgrading…' : 'Get started')
+              }
+              onCtaClick={customEditable ? handleSaveCustomTrial : handleUpgradeCustom}
+              disabled={customEditable ? savingCustom : upgradingCustom}
+            />
           </div>
+        )}
+        {customEditable && (
+          <p className="mt-4 text-center text-xs text-on-surface-variant">
+            You're on a trial Custom Plan — adjust it freely until your trial ends.
+          </p>
         )}
 
         <p className="mt-8 text-center text-xs text-on-surface-variant">

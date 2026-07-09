@@ -45,15 +45,18 @@ export const ReportService = {
     })
     if (error) {
       // Fallback to JS aggregation if function not migrated yet
-      const [salesRes, expensesRes, salariesRes] = await Promise.all([
+      const [salesRes, expensesRes, salariesRes, otherIncomeRes] = await Promise.all([
         db('sales').select('total, discount, tax').eq('branch_id', branchId).gte('created_at', from).lte('created_at', to),
         db('expenses').select('amount').eq('branch_id', branchId).gte('expense_date', from).lte('expense_date', to),
         db('salaries').select('amount').eq('branch_id', branchId).gte('pay_date', from).lte('pay_date', to),
+        db('other_income').select('amount').eq('branch_id', branchId).gte('income_date', from).lte('income_date', to),
       ])
       const revenue = ((salesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.total, 0)
       const expenses = ((expensesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.amount, 0)
       const salaries = ((salariesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.amount, 0)
-      return { revenue, repair_revenue: 0, total_revenue: revenue, cogs: 0, expenses, salaries, total_costs: expenses + salaries, gross_profit: revenue, net_profit: revenue - expenses - salaries }
+      const otherIncome = ((otherIncomeRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.amount, 0)
+      const totalRevenue = revenue + otherIncome
+      return { revenue, repair_revenue: 0, other_income: otherIncome, total_revenue: totalRevenue, cogs: 0, expenses, salaries, total_costs: expenses + salaries, gross_profit: totalRevenue, net_profit: totalRevenue - expenses - salaries }
     }
     return data
   },

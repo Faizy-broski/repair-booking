@@ -348,7 +348,9 @@ export function CartPanel({ mobileView }: Props) {
       commission_amount: servedByEmployeeId && commissionAmount ? parseFloat(commissionAmount) : null,
       commission_type: servedByEmployeeId && commissionAmount ? commissionType : null,
       items: pos.cart.map(item => ({
-        product_id: item.product.id, variant_id: item.variant?.id ?? null,
+        product_id: (item.product as any).repair_id ? null : item.product.id,
+        repair_id: (item.product as any).repair_id ?? null,
+        variant_id: item.variant?.id ?? null,
         name: item.variant ? `${item.product.name} – ${item.variant.name}` : item.product.name,
         quantity: item.quantity, unit_price: item.unitPrice,
         discount: item.discount, total: (item.unitPrice - item.discount) * item.quantity,
@@ -400,7 +402,9 @@ export function CartPanel({ mobileView }: Props) {
 
     const cartSnapshot = [...pos.cart]
     const itemsPayload = pos.cart.map(item => ({
-      product_id: item.product.id, variant_id: item.variant?.id ?? null,
+      product_id: (item.product as any).repair_id ? null : item.product.id,
+      repair_id: (item.product as any).repair_id ?? null,
+      variant_id: item.variant?.id ?? null,
       name: item.product.name, quantity: item.quantity, unit_price: item.unitPrice,
       discount: item.discount, total: (item.unitPrice - item.discount) * item.quantity,
       is_service: item.product.is_service,
@@ -485,7 +489,9 @@ export function CartPanel({ mobileView }: Props) {
 
     const cartSnapshot = [...pos.cart]
     const itemsPayload = pos.cart.map(item => ({
-      product_id: item.product.id, variant_id: item.variant?.id ?? null,
+      product_id: (item.product as any).repair_id ? null : item.product.id,
+      repair_id: (item.product as any).repair_id ?? null,
+      variant_id: item.variant?.id ?? null,
       name: item.variant ? `${item.product.name} – ${item.variant.name}` : item.product.name,
       quantity: item.quantity, unit_price: item.unitPrice,
       discount: item.discount, total: (item.unitPrice - item.discount) * item.quantity,

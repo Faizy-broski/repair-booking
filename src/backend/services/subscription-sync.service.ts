@@ -8,6 +8,14 @@
 import Stripe from 'stripe'
 import { getAdminSupabase } from '@/backend/config/supabase'
 
+interface CustomPlanOverrides {
+  maxBranches: number
+  maxUsers: number
+  maxProducts: number | null
+  maxServices: number | null
+  priceMonthly: number
+}
+
 interface SubscriptionPayload {
   businessId: string
   planId: string
@@ -20,6 +28,8 @@ interface SubscriptionPayload {
   currentPeriodEnd?: string | null
   /** Set from Stripe event.livemode. False = test-mode data that should be excluded from real stats. */
   livemode?: boolean
+  /** Present only when this subscription is a customer-built Custom Plan. */
+  customOverrides?: CustomPlanOverrides
 }
 
 export const SubscriptionSyncService = {
@@ -45,6 +55,12 @@ export const SubscriptionSyncService = {
           current_period_start:  payload.currentPeriodStart ?? null,
           current_period_end:    payload.currentPeriodEnd ?? null,
           livemode:              payload.livemode ?? false,
+          is_custom:             !!payload.customOverrides,
+          custom_max_branches:   payload.customOverrides?.maxBranches ?? null,
+          custom_max_users:      payload.customOverrides?.maxUsers ?? null,
+          custom_max_products:   payload.customOverrides?.maxProducts ?? null,
+          custom_max_services:   payload.customOverrides?.maxServices ?? null,
+          custom_price_monthly:  payload.customOverrides?.priceMonthly ?? null,
         },
         { onConflict: 'business_id' }
       )

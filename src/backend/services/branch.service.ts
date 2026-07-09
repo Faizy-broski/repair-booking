@@ -5,7 +5,7 @@ export const BranchService = {
   async listByBusiness(businessId: string) {
     const { data, error } = await adminSupabase
       .from('branches')
-      .select('*')
+      .select('*, profiles(id, full_name, email, role, avatar_url, is_active)')
       .eq('business_id', businessId)
       .order('is_main', { ascending: false })
       .order('name')
@@ -42,5 +42,12 @@ export const BranchService = {
       .single()
     if (error) throw error
     return data
+  },
+
+  /** Hard delete — only used to roll back a branch created moments earlier in the
+   * same request when the follow-up step (e.g. creating its user) fails. */
+  async remove(id: string) {
+    const { error } = await adminSupabase.from('branches').delete().eq('id', id)
+    if (error) throw error
   },
 }

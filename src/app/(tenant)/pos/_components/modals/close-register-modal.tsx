@@ -1,14 +1,15 @@
 'use client'
 import { AlertTriangle, Plus, Minus } from 'lucide-react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
 import { formatCurrency } from '@/lib/utils'
-import { DENOMINATIONS, denomTotal } from '../../_types'
+import { DENOMINATIONS, denomTotal, type ZReport } from '../../_types'
 
 interface Props {
   open: boolean
   onClose: () => void
-  zReport: Record<string, unknown> | null
+  zReport: ZReport | null
   sessionProcessing: boolean
   closingDenoms: Record<string, number>
   setClosingDenoms: React.Dispatch<React.SetStateAction<Record<string, number>>>
@@ -22,41 +23,120 @@ export function CloseRegisterModal({
   closingDenoms, setClosingDenoms, closingNote, setClosingNote, handleCloseRegister,
 }: Props) {
   return (
-    <Modal open={open} onClose={onClose} title="End Shift" size="sm">
+    <Modal open={open} onClose={onClose} title="End Shift" size={zReport ? 'xl' : 'sm'}>
       {zReport ? (
-        <div className="space-y-4">
-          <div className="rounded-xl bg-gray-50 p-4 space-y-2 text-sm">
-            <h3 className="font-semibold text-gray-900 mb-3">Z-Report</h3>
-            {([
-              ['Total Sales',  zReport.total_sales  as number],
-              ['Cash Sales',   zReport.cash_sales   as number],
-              ['Card Sales',   zReport.card_sales   as number],
-              ['Other',        zReport.other_sales  as number],
-            ] as [string, number][]).map(([l, v]) => (
-              <div key={l} className="flex justify-between"><span className="text-gray-500">{l}</span><span>{formatCurrency(v ?? 0)}</span></div>
-            ))}
-            <div className="flex justify-between text-red-600"><span>Refunds</span><span>-{formatCurrency((zReport.total_refunds as number) ?? 0)}</span></div>
-            {((zReport.cash_in as number) ?? 0) > 0 && (
-              <div className="flex justify-between text-green-600"><span>Cash In</span><span>+{formatCurrency((zReport.cash_in as number) ?? 0)}</span></div>
-            )}
-            {((zReport.cash_out as number) ?? 0) > 0 && (
-              <div className="flex justify-between text-orange-600"><span>Cash Out</span><span>-{formatCurrency((zReport.cash_out as number) ?? 0)}</span></div>
-            )}
-            <div className="border-t border-gray-200 pt-2 space-y-1">
-              {([
-                ['Opening Float', zReport.opening_float as number],
-                ['Expected Cash', zReport.expected_cash as number],
-                ['Closing Cash',  zReport.closing_cash  as number],
-              ] as [string, number][]).map(([l, v]) => (
-                <div key={l} className="flex justify-between"><span className="text-gray-500">{l}</span><span>{formatCurrency(v ?? 0)}</span></div>
-              ))}
-              <div className={`flex justify-between font-semibold ${((zReport.variance as number) ?? 0) < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                <span>Difference (Over/Short)</span><span>{formatCurrency((zReport.variance as number) ?? 0)}</span>
+        <div className="space-y-5">
+          <p className="-mt-2 text-sm text-gray-500">Register closed successfully. Here&apos;s the summary for this shift.</p>
+
+          {/* Sales breakdown: product vs repair */}
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Sales Breakdown</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-gray-200 bg-white p-4">
+                <p className="text-xs font-medium text-gray-500">Product Sales</p>
+                <p className="mt-1 text-xl font-semibold text-gray-900">{formatCurrency(zReport.total_sales ?? 0)}</p>
+              </div>
+              <div className="rounded-xl border border-gray-200 bg-white p-4">
+                <p className="text-xs font-medium text-gray-500">Repair Sales</p>
+                <p className="mt-1 text-xl font-semibold text-gray-900">{formatCurrency(zReport.repair_sales ?? 0)}</p>
+                {(zReport.repair_refunds ?? 0) > 0 && (
+                  <p className="mt-0.5 text-xs text-red-600">-{formatCurrency(zReport.repair_refunds ?? 0)} refunded</p>
+                )}
+              </div>
+              <div className="rounded-xl border border-brand-teal/30 bg-brand-teal/5 p-4">
+                <p className="text-xs font-medium text-brand-teal">Total</p>
+                <p className="mt-1 text-xl font-semibold text-brand-teal">
+                  {formatCurrency(zReport.grand_total ?? (zReport.total_sales ?? 0) + (zReport.repair_sales ?? 0) - (zReport.repair_refunds ?? 0))}
+                </p>
               </div>
             </div>
-            <div className="flex justify-between text-xs text-gray-400 pt-1"><span>Transactions</span><span>{(zReport.transaction_count as number) ?? 0}</span></div>
           </div>
-          <Button className="w-full" onClick={onClose}>Done</Button>
+
+          {/* Cash flow for the shift */}
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Cash Flow</p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {([
+                ['Cash Sales', zReport.cash_sales ?? 0],
+                ['Card Sales', zReport.card_sales ?? 0],
+                ['Other',      zReport.other_sales ?? 0],
+                ['Refunds',    -(zReport.total_refunds ?? 0)],
+              ] as [string, number][]).map(([l, v]) => (
+                <div key={l} className="rounded-xl border border-gray-200 bg-white p-3">
+                  <p className="text-xs text-gray-500">{l}</p>
+                  <p className={`mt-0.5 font-semibold ${l === 'Refunds' && v < 0 ? 'text-red-600' : 'text-gray-900'}`}>{formatCurrency(v)}</p>
+                </div>
+              ))}
+              {(zReport.cash_in ?? 0) > 0 && (
+                <div className="rounded-xl border border-green-200 bg-green-50 p-3">
+                  <p className="text-xs text-green-700">Cash In</p>
+                  <p className="mt-0.5 font-semibold text-green-700">+{formatCurrency(zReport.cash_in ?? 0)}</p>
+                </div>
+              )}
+              {(zReport.cash_out ?? 0) > 0 && (
+                <div className="rounded-xl border border-orange-200 bg-orange-50 p-3">
+                  <p className="text-xs text-orange-700">Cash Out</p>
+                  <p className="mt-0.5 font-semibold text-orange-700">-{formatCurrency(zReport.cash_out ?? 0)}</p>
+                </div>
+              )}
+            </div>
+            {((zReport.cash_in ?? 0) > 0 || (zReport.cash_out ?? 0) > 0) && (
+              <p className="mt-2 text-xs text-gray-400 italic">Cash In/Out are manual drawer adjustments for the whole shift — not tied to product or repair sales specifically.</p>
+            )}
+          </div>
+
+          {/* Repair sales tender breakdown */}
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Repair Sales Detail</p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {([
+                ['Cash Sales',         zReport.repair_cash_sales ?? 0],
+                ['Card Sales',         zReport.repair_card_sales ?? 0],
+                ['Other (pickup etc)', zReport.repair_other_sales ?? 0],
+                ['Refunds',            -(zReport.repair_refunds ?? 0)],
+              ] as [string, number][]).map(([l, v]) => (
+                <div key={l} className="rounded-xl border border-gray-200 bg-white p-3">
+                  <p className="text-xs text-gray-500">{l}</p>
+                  <p className={`mt-0.5 font-semibold ${l === 'Refunds' && v < 0 ? 'text-red-600' : 'text-gray-900'}`}>{formatCurrency(v)}</p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-gray-400 italic">Cash/Card reflects deposits only — pickup payments have no recorded tender yet.</p>
+          </div>
+
+          {/* Cash drawer reconciliation */}
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Cash Reconciliation</p>
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                {([
+                  ['Opening Float', zReport.opening_float],
+                  ['Expected Cash', zReport.expected_cash],
+                  ['Closing Cash',  zReport.closing_cash],
+                ] as [string, number | undefined][]).map(([l, v]) => (
+                  <div key={l}>
+                    <p className="text-xs text-gray-500">{l}</p>
+                    <p className="mt-0.5 font-semibold text-gray-900">{formatCurrency(v ?? 0)}</p>
+                  </div>
+                ))}
+              </div>
+              <div className={`mt-4 flex items-center justify-between rounded-lg px-4 py-3 ${(zReport.variance ?? 0) < 0 ? 'bg-red-50' : 'bg-green-50'}`}>
+                <span className={`text-sm font-medium ${(zReport.variance ?? 0) < 0 ? 'text-red-700' : 'text-green-700'}`}>Difference (Over/Short)</span>
+                <span className={`text-lg font-bold ${(zReport.variance ?? 0) < 0 ? 'text-red-700' : 'text-green-700'}`}>{formatCurrency(zReport.variance ?? 0)}</span>
+              </div>
+              <p className="mt-2 text-xs text-gray-400 italic">Reflects cash-drawer (product, cash-paid) transactions only — repair sales are shown above for information and aren&apos;t included in this reconciliation.</p>
+              <p className="mt-2 text-xs text-gray-400">Transactions: {zReport.transaction_count ?? 0}</p>
+            </div>
+          </div>
+
+          <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row">
+            {zReport.session_id && (
+              <Link href={`/reports/z-report?session=${zReport.session_id}`} className="sm:flex-1">
+                <Button variant="outline" className="w-full">View Full Z-Report</Button>
+              </Link>
+            )}
+            <Button className="sm:flex-1" onClick={onClose}>Done</Button>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">

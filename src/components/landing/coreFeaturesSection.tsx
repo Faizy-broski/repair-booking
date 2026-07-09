@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import {
   ArrowRight,
   BarChart3,
@@ -73,9 +74,11 @@ export default function CoreFeaturesSection() {
             handles every part of your daily operation.
           </p>
 
-          <Button className="mt-6 rounded-full bg-[linear-gradient(90deg,_#008080_0%,_#008080_37%,_#18E3CD_100%)] px-6 py-6 text-sm font-bold text-white hover:bg-teal-700 sm:mt-8">
-            See pricing
-            <ArrowRight className="ml-2 h-4 w-4" />
+          <Button asChild className="mt-6 rounded-full bg-[linear-gradient(90deg,_#008080_0%,_#008080_37%,_#18E3CD_100%)] px-6 py-6 text-sm font-bold text-white hover:bg-teal-700 sm:mt-8">
+            <Link href="#pricing">
+              See pricing
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
           </Button>
 
           <div className="relative mt-12 hidden max-w-lg lg:mt-20 lg:block">

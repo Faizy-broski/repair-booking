@@ -10,7 +10,7 @@ import {
   CreditCard, AlertCircle, Smartphone, BookOpen, TrendingUp, PieChart,
   ChevronDown, Bell, Server, Clock, Activity, Mail, Users2,
   Store, GitBranch, Sliders, Layers, Settings2, PackagePlus, Cpu, Tag,
-  CalendarDays, LogIn, Palette, LifeBuoy,
+  CalendarDays, LogIn, Palette, LifeBuoy, Coins,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
@@ -64,6 +64,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Invoices',       href: '/invoices',        icon: FileText,        requiredRole: 'staff',          module: 'invoices' },
   { label: 'Gift Cards',     href: '/gift-cards',      icon: Gift,            requiredRole: 'staff',          module: 'gift_cards' },
   { label: 'Expenses',       href: '/expenses',        icon: DollarSign,      requiredRole: 'branch_manager', module: 'expenses' },
+  { label: 'Income',   href: '/other-income',    icon: Coins,           requiredRole: 'branch_manager', module: 'expenses' },
   { label: 'Employees',        href: '/employees',                        icon: UserCheck,     requiredRole: 'branch_manager', module: 'employees' },
   { label: 'Employees List',   href: '/employees?tab=employees',          icon: Users,         requiredRole: 'branch_manager', module: 'employees', subItem: true },
   { label: 'Clock In/Out',     href: '/employees?tab=clock',              icon: LogIn,         requiredRole: 'branch_manager', module: 'employees', subItem: true },

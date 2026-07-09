@@ -5,7 +5,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { usePosStore } from '@/store/pos.store'
 import { formatCurrency } from '@/lib/utils'
 import { usePinPrompt } from '@/components/ui/pin-prompt'
-import type { RegisterSession } from './_types'
+import type { RegisterSession, ZReport } from './_types'
 
 import { Button } from '@/components/ui/button'
 import { RegisterGate } from './_components/register-gate'
@@ -61,7 +61,7 @@ export default function PosPage() {
   const [closeRegisterModal, setCloseRegisterModal] = useState(false)
   const [closingDenoms, setClosingDenoms] = useState<Record<string, number>>({})
   const [closingNote, setClosingNote] = useState('')
-  const [zReport, setZReport] = useState<Record<string, unknown> | null>(null)
+  const [zReport, setZReport] = useState<ZReport | null>(null)
 
   // ── Cash In/Out modal ─────────────────────────────────────────────────────────
   const [cashMovementOpen, setCashMovementOpen] = useState(false)
@@ -212,7 +212,7 @@ export default function PosPage() {
     setSessionProcessing(false)
   }
 
-  async function handleCashMovement(expenseCategoryId: string | null, addToExpense: boolean) {
+  async function handleCashMovement(categoryId: string | null, addToLedger: boolean) {
     if (!pos.session || !cashMovementAmount) return
     setCashMovementSaving(true)
     const amount = parseFloat(cashMovementAmount)
@@ -229,19 +229,37 @@ export default function PosPage() {
     })
 
     if (res.ok) {
-      if (cashMovementType === 'cash_out' && addToExpense && activeBranch?.id) {
-        await fetch('/api/expenses', {
+      // The cash_movements record above is the source of truth and has
+      // already been saved — if the expense/income POST below fails, we
+      // still report the movement as recorded rather than rolling back.
+      if (cashMovementType === 'cash_out' && addToLedger && activeBranch?.id) {
+        const expRes = await fetch('/api/expenses', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             branch_id: activeBranch.id,
-            category_id: expenseCategoryId || null,
+            category_id: categoryId || null,
             title: cashMovementNotes?.trim() || 'POS Cash Out',
             amount,
             expense_date: new Date().toISOString().split('T')[0],
             notes: cashMovementNotes?.trim() || null,
           }),
         })
-        toast.success(`Cash out of ${formatCurrency(amount)} recorded as expense`)
+        if (expRes.ok) toast.success(`Cash out of ${formatCurrency(amount)} recorded as expense`)
+        else toast.error(`Cash out recorded, but failed to log the expense`)
+      } else if (cashMovementType === 'cash_in' && addToLedger && activeBranch?.id) {
+        const incRes = await fetch('/api/other-income', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            branch_id: activeBranch.id,
+            category_id: categoryId || null,
+            title: cashMovementNotes?.trim() || 'POS Cash In',
+            amount,
+            income_date: new Date().toISOString().split('T')[0],
+            notes: cashMovementNotes?.trim() || null,
+          }),
+        })
+        if (incRes.ok) toast.success(`Cash in of ${formatCurrency(amount)} recorded as income`)
+        else toast.error(`Cash in recorded, but failed to log the income`)
       } else if (cashMovementType === 'cash_out') {
         toast.success(`Cash out of ${formatCurrency(amount)} recorded`)
       } else {
@@ -268,22 +286,38 @@ export default function PosPage() {
 
   if (!pos.session && shiftRequired) {
     return (
-      <RegisterGate
-        activeBranchName={activeBranch?.name}
-        existingSession={pos.existingSession}
-        sessionProcessing={sessionProcessing}
-        prevClosingBalance={prevClosingBalance}
-        openingDenoms={openingDenoms}
-        setOpeningDenoms={setOpeningDenoms}
-        openingFloat={openingFloat}
-        setOpeningFloat={setOpeningFloat}
-        openingNote={openingNote}
-        setOpeningNote={setOpeningNote}
-        joinShiftOpen={joinShiftOpen}
-        setJoinShiftOpen={setJoinShiftOpen}
-        handleOpenRegister={handleOpenRegister}
-        handleJoinShift={handleJoinShift}
-      />
+      <>
+        <RegisterGate
+          activeBranchName={activeBranch?.name}
+          existingSession={pos.existingSession}
+          sessionProcessing={sessionProcessing}
+          prevClosingBalance={prevClosingBalance}
+          openingDenoms={openingDenoms}
+          setOpeningDenoms={setOpeningDenoms}
+          openingFloat={openingFloat}
+          setOpeningFloat={setOpeningFloat}
+          openingNote={openingNote}
+          setOpeningNote={setOpeningNote}
+          joinShiftOpen={joinShiftOpen}
+          setJoinShiftOpen={setJoinShiftOpen}
+          handleOpenRegister={handleOpenRegister}
+          handleJoinShift={handleJoinShift}
+        />
+        {/* Kept alive here too: closing the register nulls pos.session, which
+            triggers this early return — without this, the Z-Report summary
+            modal would unmount before the cashier ever saw it. */}
+        <CloseRegisterModal
+          open={closeRegisterModal}
+          onClose={() => { setCloseRegisterModal(false); setZReport(null) }}
+          zReport={zReport}
+          sessionProcessing={sessionProcessing}
+          closingDenoms={closingDenoms}
+          setClosingDenoms={setClosingDenoms}
+          closingNote={closingNote}
+          setClosingNote={setClosingNote}
+          handleCloseRegister={handleCloseRegister}
+        />
+      </>
     )
   }
 

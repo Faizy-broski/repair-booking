@@ -2,13 +2,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Plus, Search, LayoutGrid, List, Wrench, Banknote, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail, Send, RefreshCw, MoreHorizontal } from 'lucide-react'
+import { Plus, Search, LayoutGrid, List, Wrench, Banknote, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail, Send, RefreshCw, MoreHorizontal, Wallet, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
 import { AsyncEmployeeSelect } from '@/components/shared/async-employee-select'
 import { Modal } from '@/components/ui/modal'
 import { KanbanBoard } from '@/components/repairs/kanban-board'
 import { CreatableCombobox } from '@/components/ui/creatable-combobox'
+import { MultiComboInput } from '@/components/shared/multi-combo-input'
 import { useAuthStore } from '@/store/auth.store'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -22,6 +23,7 @@ import { EmailComposeModal } from '@/components/repairs/email-compose-modal'
 import { RepairSlipModal } from '@/components/repairs/slip-modal'
 import { toast } from 'sonner'
 import { RepairInvoiceModal } from '@/components/repairs/invoice-modal'
+import { printRepairInvoiceById } from '@/components/repairs/receipt-print'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { PatternLock } from '@/components/ui/pattern-lock'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
@@ -63,7 +65,9 @@ const EMPTY_JOB = {
   lock_type: '' as '' | 'passcode' | 'pattern',
   passcode: '',
   price_pending: false,
-  payment_method: '' as '' | 'cash' | 'card',
+  payment_method: '' as '' | 'cash' | 'card' | 'store_credit' | 'loyalty_points',
+  credit_apply_input: '',
+  loyalty_apply_input: '',
 }
 
 function ActionsMenu({ onEdit, onSlip, onInvoice, onDelete, onMessage, onEmail, canEmail }: {
@@ -184,84 +188,6 @@ function ComboInput({ value, onChange, options, placeholder }: {
   )
 }
 
-function MultiComboInput({ values, onAdd, onRemove, options, placeholder }: {
-  values: string[]
-  onAdd: (v: string) => void
-  onRemove: (v: string) => void
-  options: string[]
-  placeholder?: string
-}) {
-  const [value, setValue] = useState('')
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  const filtered = options.filter((o) => o.toLowerCase().includes(value.toLowerCase()) && !values.includes(o))
-
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  return (
-    <div ref={ref} className="relative">
-      <div className="mb-1.5 flex flex-wrap gap-1.5">
-        {values.map((v) => (
-          <span key={v} className="inline-flex items-center gap-1 rounded bg-brand-teal/10 px-2 py-0.5 text-xs font-semibold text-brand-teal">
-            {v}
-            <button type="button" onClick={() => onRemove(v)} className="hover:text-brand-teal-dark transition-colors">
-              <X className="h-3 w-3" />
-            </button>
-          </span>
-        ))}
-      </div>
-      <div className="relative">
-        <input
-          value={value}
-          onChange={(e) => { setValue(e.target.value); setOpen(true) }}
-          onFocus={() => setOpen(true)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && value.trim()) {
-              e.preventDefault()
-              if (!values.includes(value.trim())) onAdd(value.trim())
-              setValue('')
-            }
-          }}
-          placeholder={placeholder}
-          className="h-8 w-full rounded-md border border-gray-200 bg-white px-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
-        />
-        {open && (value || filtered.length > 0) && (
-          <ul className="absolute z-50 mt-1 max-h-44 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-            {filtered.map((o) => (
-              <li key={o}>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
-                  onMouseDown={(e) => { e.preventDefault(); onAdd(o); setValue(''); setOpen(false) }}
-                >
-                  <span className="text-gray-700">{o}</span>
-                </button>
-              </li>
-            ))}
-            {value.trim() && !options.some(o => o.toLowerCase() === value.trim().toLowerCase()) && (
-              <li>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 border-t border-gray-100 transition-colors"
-                  onMouseDown={(e) => { e.preventDefault(); onAdd(value.trim()); setValue(''); setOpen(false) }}
-                >
-                  <span className="text-gray-500 italic">Add "{value.trim()}"...</span>
-                </button>
-              </li>
-            )}
-          </ul>
-        )}
-      </div>
-    </div>
-  )
-}
-
 const EXPORTABLE_COLUMNS = ['Job #', 'Customer', 'Phone', 'Email', 'Type', 'Brand', 'Model', 'Fault', 'Status', 'Due Date', 'Cost', 'Created']
 
 function buildExportRow(r: RepairRow): (string | number)[] {
@@ -354,6 +280,10 @@ export default function RepairsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [step1Error, setStep1Error] = useState('')
   const [chargesError, setChargesError] = useState('')
+  // Store credit / loyalty balances for the attached customer (job creation)
+  const [creditBalance, setCreditBalance] = useState<number | null>(null)
+  const [loyaltyBalance, setLoyaltyBalance] = useState<number | null>(null)
+  const [loyaltyRate, setLoyaltyRate] = useState(0.01)
   // Customer autocomplete
   const [custSuggestions, setCustSuggestions] = useState<SelectedCustomer[]>([])
   const [showSuggestions, setShowSuggestions] = useState<'name' | 'phone' | 'email' | null>(null)
@@ -392,9 +322,13 @@ export default function RepairsPage() {
   // Edit Job Sheet modal
   const [editOpen, setEditOpen] = useState(false)
   const [editRepair, setEditRepair] = useState<RepairRow | null>(null)
-  const [editData, setEditData] = useState({ due_date: '', estimated_cost: '', deposit_paid: '', payment_method: '' as '' | 'cash' | 'card', status: '' })
+  const [editData, setEditData] = useState({ due_date: '', estimated_cost: '', deposit_paid: '', payment_method: '' as '' | 'cash' | 'card' | 'store_credit' | 'loyalty_points', status: '', credit_apply_input: '', loyalty_apply_input: '' })
   const [editSaving, setEditSaving] = useState(false)
   const [editErrors, setEditErrors] = useState<{ due_date?: string; estimated_cost?: string; deposit_paid?: string }>({})
+  // Store credit / loyalty balances for the repair's customer (editing)
+  const [editCreditBalance, setEditCreditBalance] = useState<number | null>(null)
+  const [editLoyaltyBalance, setEditLoyaltyBalance] = useState<number | null>(null)
+  const [editLoyaltyRate, setEditLoyaltyRate] = useState(0.01)
 
   // Declare before the lazy queries that use them as enabled guards
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false)
@@ -439,6 +373,36 @@ export default function RepairsPage() {
         setItemAttributes({})
       })
   }, [isRetail, retailCategoryId])
+
+  // Fetch store credit / loyalty balance for the customer attached to a new job
+  useEffect(() => {
+    if (!modalOpen || !selectedCustomer) {
+      setCreditBalance(null)
+      setLoyaltyBalance(null)
+      return
+    }
+    const id = selectedCustomer.id
+    fetch(`/api/customers/${id}/store-credits`).then(r => r.json()).then(j => setCreditBalance(j.data?.balance ?? 0)).catch(() => {})
+    fetch(`/api/customers/${id}/loyalty`).then(r => r.json()).then(j => {
+      setLoyaltyBalance(j.data?.balance ?? 0)
+      setLoyaltyRate(j.data?.redeem_rate ?? 0.01)
+    }).catch(() => {})
+  }, [modalOpen, selectedCustomer])
+
+  // Fetch store credit / loyalty balance for the repair's customer when editing
+  useEffect(() => {
+    if (!editOpen || !editRepair?.customer_id) {
+      setEditCreditBalance(null)
+      setEditLoyaltyBalance(null)
+      return
+    }
+    const id = editRepair.customer_id
+    fetch(`/api/customers/${id}/store-credits`).then(r => r.json()).then(j => setEditCreditBalance(j.data?.balance ?? 0)).catch(() => {})
+    fetch(`/api/customers/${id}/loyalty`).then(r => r.json()).then(j => {
+      setEditLoyaltyBalance(j.data?.balance ?? 0)
+      setEditLoyaltyRate(j.data?.redeem_rate ?? 0.01)
+    }).catch(() => {})
+  }, [editOpen, editRepair])
 
   const queryClient = useQueryClient()
   const repairsQueryKey     = ['repairs', activeBranch?.id, page, pageSize, search, statusFilter, view] as const
@@ -625,8 +589,10 @@ export default function RepairsPage() {
       due_date: cf.due_date ?? '',
       estimated_cost: r.estimated_cost != null ? String(r.estimated_cost) : '',
       deposit_paid: r.deposit_paid != null ? String(r.deposit_paid) : '',
-      payment_method: (cf.payment_method as '' | 'cash' | 'card') ?? '',
+      payment_method: (cf.payment_method as '' | 'cash' | 'card' | 'store_credit' | 'loyalty_points') ?? '',
       status: r.status ?? '',
+      credit_apply_input: '',
+      loyalty_apply_input: '',
     })
     setEditErrors({})
     setEditOpen(true)
@@ -656,11 +622,13 @@ export default function RepairsPage() {
           estimated_cost: editData.estimated_cost === '' ? null : parseFloat(editData.estimated_cost),
           deposit_paid: editData.deposit_paid === '' ? 0 : parseFloat(editData.deposit_paid),
           status: editData.status || undefined,
-          custom_fields: { 
-            ...cf, 
-            due_date: editData.due_date || null, 
-            payment_method: editData.payment_method || null 
+          custom_fields: {
+            ...cf,
+            due_date: editData.due_date || null,
+            payment_method: editData.payment_method || null
           },
+          store_credit_applied: editData.payment_method === 'store_credit' ? (parseFloat(editData.credit_apply_input) || 0) : undefined,
+          loyalty_points_applied: editData.payment_method === 'loyalty_points' ? (parseInt(editData.loyalty_apply_input) || 0) : undefined,
         }),
       })
       
@@ -669,7 +637,9 @@ export default function RepairsPage() {
         throw new Error(errorData.error?.message || 'Failed to update repair')
       }
 
+      const j = await res.json().catch(() => ({}))
       toast.success('Repair job updated successfully.')
+      if (j.data?.credit_apply_warning) toast.error(j.data.credit_apply_warning)
       setEditOpen(false)
       fetchRepairs()
       invalidateStats()
@@ -873,6 +843,10 @@ export default function RepairsPage() {
     }
     setChargesError('')
     setSubmitting(true)
+    // Must open synchronously here, before any `await` below — otherwise the
+    // browser's popup blocker silently swallows the print window once we're
+    // past the user-gesture call stack (see printRepairInvoiceById).
+    const printWin = window.open('about:blank', '_blank', 'width=400,height=900,toolbar=0,location=0,menubar=0,status=0,scrollbars=1')
 
     let customerId = selectedCustomer?.id ?? null
 
@@ -893,6 +867,7 @@ export default function RepairsPage() {
       })
       const custJson = await custRes.json()
       if (!custRes.ok || !custJson.data?.id) {
+        printWin?.close()
         const errMsg = typeof custJson.error === 'string' ? custJson.error : (custJson.error?.message ?? 'Failed to create customer. Please try again.')
         toast.error(errMsg)
         setSubmitting(false)
@@ -922,6 +897,8 @@ export default function RepairsPage() {
         status: jobData.status || undefined,
         lock_type: jobData.lock_type || null,
         passcode: jobData.passcode.trim() || null,
+        store_credit_applied: jobData.payment_method === 'store_credit' ? (parseFloat(jobData.credit_apply_input) || 0) : undefined,
+        loyalty_points_applied: jobData.payment_method === 'loyalty_points' ? (parseInt(jobData.loyalty_apply_input) || 0) : undefined,
         custom_fields: {
           imei: jobData.imei || null,
           due_date: jobData.due_date || null,
@@ -942,11 +919,16 @@ export default function RepairsPage() {
     })
 
     if (res.ok) {
+      const j = await res.json().catch(() => ({}))
       setModalOpen(false)
       fetchRepairs()
       invalidateStats()
       toast.success('Repair job created.')
+      if (j.data?.credit_apply_warning) toast.error(j.data.credit_apply_warning)
+      if (j.data?.id) printRepairInvoiceById(j.data.id, printWin)
+      else printWin?.close()
     } else {
+      printWin?.close()
       const j = await res.json().catch(() => ({}))
       const errMsg = typeof j.error === 'string' ? j.error : (j.error?.message ?? 'Failed to create repair. Please try again.')
       toast.error(errMsg)
@@ -2334,17 +2316,75 @@ export default function RepairsPage() {
                 <div className="mt-2">
                   <label className={lbl}>Payment Method <span className="font-normal normal-case text-gray-300">(opt)</span></label>
                   <div className="flex gap-2">
-                    {(['cash', 'card'] as const).map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => setJobData((p) => ({ ...p, payment_method: p.payment_method === m ? '' : m }))}
-                        className={`rounded-md border px-3 py-1 text-xs font-medium capitalize transition-colors ${jobData.payment_method === m ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
-                      >
-                        {m}
-                      </button>
-                    ))}
+                    {(['cash', 'card', 'store_credit', 'loyalty_points'] as const).map((m) => {
+                      const disabled = (m === 'store_credit' || m === 'loyalty_points') && !selectedCustomer
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          disabled={disabled}
+                          title={disabled ? 'Select an existing customer first' : undefined}
+                          onClick={() => !disabled && setJobData((p) => ({ ...p, payment_method: p.payment_method === m ? '' : m }))}
+                          className={`flex items-center gap-1 rounded-md border px-3 py-1 text-xs font-medium capitalize transition-colors ${
+                            jobData.payment_method === m
+                              ? 'border-gray-900 bg-gray-900 text-white'
+                              : disabled
+                                ? 'border-gray-100 text-gray-300 cursor-not-allowed'
+                                : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          {m === 'store_credit' && <Wallet className="h-3 w-3" />}
+                          {m === 'loyalty_points' && <Star className="h-3 w-3" />}
+                          {m.replace('_', ' ')}
+                        </button>
+                      )
+                    })}
                   </div>
+
+                  {jobData.payment_method === 'store_credit' && (
+                    <div className="mt-2 space-y-1.5">
+                      {creditBalance !== null && (
+                        <p className="text-xs text-gray-500">Available balance: <span className="font-semibold text-gray-800">£{creditBalance.toFixed(2)}</span></p>
+                      )}
+                      <div className="flex gap-2">
+                        <input
+                          type="number" min="0" step="0.01" placeholder="Amount to use"
+                          value={jobData.credit_apply_input}
+                          onChange={(e) => setJobData((p) => ({ ...p, credit_apply_input: e.target.value }))}
+                          className={`${inp} flex-1`}
+                        />
+                        <Button variant="outline" size="sm" onClick={() => {
+                          const due = parseFloat(jobData.deposit_paid) || 0
+                          const amount = Math.min(parseFloat(jobData.credit_apply_input) || 0, creditBalance ?? 0, due)
+                          setJobData((p) => ({ ...p, credit_apply_input: String(amount) }))
+                        }}>Apply</Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {jobData.payment_method === 'loyalty_points' && (
+                    <div className="mt-2 space-y-1.5">
+                      {loyaltyBalance !== null && (
+                        <p className="text-xs text-gray-500">
+                          Points balance: <span className="font-semibold text-gray-800">{loyaltyBalance} pts</span> (≈ £{(loyaltyBalance * loyaltyRate).toFixed(2)})
+                        </p>
+                      )}
+                      <div className="flex gap-2">
+                        <input
+                          type="number" min="0" step="1" placeholder="Points to redeem"
+                          value={jobData.loyalty_apply_input}
+                          onChange={(e) => setJobData((p) => ({ ...p, loyalty_apply_input: e.target.value }))}
+                          className={`${inp} flex-1`}
+                        />
+                        <Button variant="outline" size="sm" onClick={() => {
+                          const due = parseFloat(jobData.deposit_paid) || 0
+                          const pts = Math.min(parseInt(jobData.loyalty_apply_input) || 0, loyaltyBalance ?? 0)
+                          const capped = Math.min(pts * loyaltyRate, due)
+                          setJobData((p) => ({ ...p, loyalty_apply_input: String(Math.round(capped / loyaltyRate)) }))
+                        }}>Apply</Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2542,17 +2582,80 @@ export default function RepairsPage() {
               <div>
                 <label className={lbl}>Payment Method :</label>
                 <div className="flex gap-2">
-                  {(['cash', 'card'] as const).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setEditData((p) => ({ ...p, payment_method: p.payment_method === m ? '' : m }))}
-                      className={`rounded-lg border px-6 py-2 text-sm font-medium capitalize transition-colors ${editData.payment_method === m ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}
-                    >
-                      {m.charAt(0).toUpperCase() + m.slice(1)}
-                    </button>
-                  ))}
+                  {(['cash', 'card', 'store_credit', 'loyalty_points'] as const).map((m) => {
+                    const disabled = (m === 'store_credit' || m === 'loyalty_points') && !editRepair?.customer_id
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        disabled={disabled}
+                        title={disabled ? 'This repair has no customer attached' : undefined}
+                        onClick={() => !disabled && setEditData((p) => ({ ...p, payment_method: p.payment_method === m ? '' : m }))}
+                        className={`flex items-center gap-1.5 rounded-lg border px-6 py-2 text-sm font-medium capitalize transition-colors ${
+                          editData.payment_method === m
+                            ? 'border-gray-900 bg-gray-900 text-white'
+                            : disabled
+                              ? 'border-gray-100 text-gray-300 cursor-not-allowed'
+                              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        {m === 'store_credit' && <Wallet className="h-3.5 w-3.5" />}
+                        {m === 'loyalty_points' && <Star className="h-3.5 w-3.5" />}
+                        {m.replace('_', ' ')}
+                      </button>
+                    )
+                  })}
                 </div>
+
+                {(() => {
+                  const editDelta = Math.max(0, (parseFloat(editData.deposit_paid) || 0) - (editRepair?.deposit_paid ?? 0))
+                  return (
+                    <>
+                      {editData.payment_method === 'store_credit' && (
+                        <div className="mt-2 space-y-1.5">
+                          {editCreditBalance !== null && (
+                            <p className="text-xs text-gray-500">Available balance: <span className="font-semibold text-gray-800">£{editCreditBalance.toFixed(2)}</span> · applying to new payment of £{editDelta.toFixed(2)}</p>
+                          )}
+                          <div className="flex gap-2">
+                            <input
+                              type="number" min="0" step="0.01" placeholder="Amount to use"
+                              value={editData.credit_apply_input}
+                              onChange={(e) => setEditData((p) => ({ ...p, credit_apply_input: e.target.value }))}
+                              className={`${inp} flex-1`}
+                            />
+                            <Button variant="outline" size="sm" onClick={() => {
+                              const amount = Math.min(parseFloat(editData.credit_apply_input) || 0, editCreditBalance ?? 0, editDelta)
+                              setEditData((p) => ({ ...p, credit_apply_input: String(amount) }))
+                            }}>Apply</Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {editData.payment_method === 'loyalty_points' && (
+                        <div className="mt-2 space-y-1.5">
+                          {editLoyaltyBalance !== null && (
+                            <p className="text-xs text-gray-500">
+                              Points balance: <span className="font-semibold text-gray-800">{editLoyaltyBalance} pts</span> (≈ £{(editLoyaltyBalance * editLoyaltyRate).toFixed(2)}) · applying to new payment of £{editDelta.toFixed(2)}
+                            </p>
+                          )}
+                          <div className="flex gap-2">
+                            <input
+                              type="number" min="0" step="1" placeholder="Points to redeem"
+                              value={editData.loyalty_apply_input}
+                              onChange={(e) => setEditData((p) => ({ ...p, loyalty_apply_input: e.target.value }))}
+                              className={`${inp} flex-1`}
+                            />
+                            <Button variant="outline" size="sm" onClick={() => {
+                              const pts = Math.min(parseInt(editData.loyalty_apply_input) || 0, editLoyaltyBalance ?? 0)
+                              const capped = Math.min(pts * editLoyaltyRate, editDelta)
+                              setEditData((p) => ({ ...p, loyalty_apply_input: String(Math.round(capped / editLoyaltyRate)) }))
+                            }}>Apply</Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
 
               {/* Repairing Status */}

@@ -13,6 +13,12 @@ import { z } from 'zod'
 
 const creditSchema  = z.object({ amount: z.number().positive(), note: z.string().optional() })
 const adjustSchema  = z.object({ balance: z.number().min(0), note: z.string().min(1) })
+const debitSchema   = z.object({
+  amount: z.number().positive(),
+  note: z.string().optional(),
+  reference_id: z.string().uuid().optional(),
+  reference_type: z.string().optional(),
+})
 
 export const StoreCreditController = {
   async getBalance(req: NextRequest, ctx: RequestContext, customerId: string) {
@@ -35,6 +41,22 @@ export const StoreCreditController = {
       return ok({ balance })
     } catch (err) {
       return serverError('Failed to add store credit', err)
+    }
+  },
+
+  async debit(req: NextRequest, ctx: RequestContext, customerId: string) {
+    const { data, error } = await validateBody(req, debitSchema)
+    if (error) return error
+    try {
+      const balance = await StoreCreditService.debit(ctx.businessId, customerId, data.amount, {
+        note: data.note,
+        referenceId: data.reference_id,
+        referenceType: data.reference_type,
+        createdBy: ctx.auth.userId,
+      })
+      return ok({ balance })
+    } catch (err) {
+      return serverError('Failed to debit store credit', err)
     }
   },
 
@@ -68,7 +90,11 @@ const loyaltySettingsSchema = z.object({
   is_enabled:         z.boolean(),
 })
 
-const redeemSchema = z.object({ points: z.number().int().positive() })
+const redeemSchema = z.object({
+  points: z.number().int().positive(),
+  reference_id: z.string().uuid().optional(),
+  reference_type: z.string().optional(),
+})
 
 export const LoyaltyController = {
   async getSettings(_req: NextRequest, ctx: RequestContext) {
@@ -114,7 +140,10 @@ export const LoyaltyController = {
     const { data, error } = await validateBody(req, redeemSchema)
     if (error) return error
     try {
-      const balance = await LoyaltyService.redeemPoints(ctx.businessId, customerId, data.points)
+      const balance = await LoyaltyService.redeemPoints(ctx.businessId, customerId, data.points, {
+        referenceId: data.reference_id,
+        referenceType: data.reference_type,
+      })
       return ok({ balance })
     } catch (err) {
       return serverError('Failed to redeem loyalty points', err)

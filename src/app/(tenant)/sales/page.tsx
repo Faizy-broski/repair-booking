@@ -1431,7 +1431,8 @@ export default function SalesPage() {
                   onChange={e => setEditForm(f => f ? { ...f, payment_status: e.target.value } : f)}
                 >
                   <option value="paid">Paid</option>
-                  <option value="refunded">Refunded</option>
+                  {/* Refunded is intentionally not selectable here — use the Refund action
+                      so a proper refund record is created instead of just relabeling this sale. */}
                   {/* on_account / partial are computed by the system — not manually settable */}
                   {(editForm.payment_status === 'partial' || editForm.payment_status === 'on_account') && (
                     <option value={editForm.payment_status} disabled>

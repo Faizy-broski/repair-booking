@@ -49,9 +49,12 @@ export interface SalePayload {
   payment_splits?: PaymentSplit[]
   gift_card_id?: string | null
   gift_card_amount?: number
+  store_credit_amount?: number
+  loyalty_points_used?: number
   notes?: string | null
   items: {
     product_id?: string | null
+    repair_id?: string | null
     variant_id?: string | null
     name: string
     quantity: number

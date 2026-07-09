@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef, useEffect, KeyboardEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Plus, X, Pencil, Trash2, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -43,8 +44,10 @@ export function CreatableCombobox({
   const [deleteBusy, setDeleteBusy] = useState(false)
 
   const wrapRef      = useRef<HTMLDivElement>(null)
+  const triggerRef   = useRef<HTMLButtonElement>(null)
   const searchRef    = useRef<HTMLInputElement>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
+  const [dropdownRect, setDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null)
 
   const selectedLabel = options.find(o => o.value === value)?.label ?? ''
   const filtered = query
@@ -55,11 +58,14 @@ export function CreatableCombobox({
   const showCreate   = !!queryTrimmed && !exactMatch && !!onCreate
   const hasManage    = !!(onEdit || onDelete)
 
+  const dropdownRef  = useRef<HTMLDivElement | null>(null)
+
   useEffect(() => {
     function onOutside(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        close()
-      }
+      const target = e.target as Node
+      const insideTrigger = wrapRef.current?.contains(target)
+      const insideDropdown = dropdownRef.current?.contains(target)
+      if (!insideTrigger && !insideDropdown) close()
     }
     document.addEventListener('mousedown', onOutside)
     return () => document.removeEventListener('mousedown', onOutside)
@@ -78,6 +84,10 @@ export function CreatableCombobox({
 
   function openDropdown() {
     if (disabled) return
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setDropdownRect({ top: rect.bottom + 4, left: rect.left, width: rect.width })
+    }
     setOpen(true)
     setQuery('')
     setEditId(null)
@@ -162,6 +172,7 @@ export function CreatableCombobox({
 
       {/* Trigger */}
       <button
+        ref={triggerRef}
         type="button"
         onClick={openDropdown}
         disabled={disabled}
@@ -195,9 +206,15 @@ export function CreatableCombobox({
         </span>
       </button>
 
-      {/* Dropdown panel */}
-      {open && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1 rounded-lg border border-gray-200 bg-white shadow-xl">
+      {/* Dropdown panel — rendered via portal so it escapes modal overflow/clipping */}
+      {open && dropdownRect && createPortal(
+        <div
+          ref={dropdownRef}
+          data-combobox-dropdown="true"
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{ position: 'fixed', top: dropdownRect.top, left: dropdownRect.left, width: dropdownRect.width, zIndex: 9999, pointerEvents: 'auto' }}
+          className="rounded-lg border border-gray-200 bg-white shadow-xl"
+        >
 
           {/* Search input */}
           <div className="border-b border-gray-100 p-2">
@@ -334,7 +351,8 @@ export function CreatableCombobox({
             )}
 
           </ul>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

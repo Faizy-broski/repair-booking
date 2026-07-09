@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { BranchService } from '@/backend/services/branch.service'
-import { ok, created, notFound, forbidden, serverError } from '@/backend/utils/api-response'
+import { UserService } from '@/backend/services/user.service'
+import { ok, created, notFound, forbidden, badRequest, serverError } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 import { PlanLimitService } from '@/backend/services/plan-limit.service'
 import { z } from 'zod'
@@ -12,6 +13,10 @@ const createSchema = z.object({
   phone: z.string().optional().nullable(),
   email: z.string().email().optional().nullable().or(z.literal('')),
   logo_url: z.string().url().optional().nullable().or(z.literal('')),
+  manager_full_name: z.string().min(1),
+  manager_email: z.string().email(),
+  manager_password: z.string().min(6),
+  manager_role: z.enum(['cashier', 'staff', 'branch_manager']),
 })
 
 const updateSchema = createSchema.partial().extend({
@@ -32,21 +37,46 @@ export const BranchController = {
     const { data, error } = await validateBody(request, createSchema)
     if (error) return error
     try {
-      const limitCheck = await PlanLimitService.checkLimit(ctx.businessId, 'max_branches')
-      if (!limitCheck.allowed) {
-        const limitMsg = limitCheck.limit != null
-          ? `Your plan allows ${limitCheck.limit} branch${limitCheck.limit === 1 ? '' : 'es'}.`
-          : (limitCheck.reason ?? 'Upgrade your plan to add more branches.')
+      const branchLimitCheck = await PlanLimitService.checkLimit(ctx.businessId, 'max_branches')
+      if (!branchLimitCheck.allowed) {
+        const limitMsg = branchLimitCheck.limit != null
+          ? `Your plan allows ${branchLimitCheck.limit} branch${branchLimitCheck.limit === 1 ? '' : 'es'}.`
+          : (branchLimitCheck.reason ?? 'Upgrade your plan to add more branches.')
         return forbidden(`Branch limit reached. ${limitMsg}`)
       }
 
+      const userLimitCheck = await PlanLimitService.checkLimit(ctx.businessId, 'max_users')
+      if (!userLimitCheck.allowed) {
+        return forbidden(`User limit reached. Your plan allows ${userLimitCheck.limit} user${userLimitCheck.limit === 1 ? '' : 's'}.`)
+      }
+
+      const { manager_full_name, manager_email, manager_password, manager_role, ...branchData } = data
       const branch = await BranchService.create({
-        ...data,
-        email: data.email || null,
-        logo_url: data.logo_url || null,
+        ...branchData,
+        email: branchData.email || null,
+        logo_url: branchData.logo_url || null,
         business_id: ctx.businessId,
       })
-      return created(branch)
+
+      try {
+        const user = await UserService.create({
+          email: manager_email,
+          password: manager_password,
+          full_name: manager_full_name,
+          role: manager_role,
+          branch_id: branch.id,
+          business_id: ctx.businessId,
+        })
+        return created({ branch, user })
+      } catch (userErr) {
+        await BranchService.remove(branch.id).catch(() => {})
+        const code = (userErr as any)?.code ?? ''
+        const msg  = (userErr instanceof Error ? userErr.message : String(userErr)).toLowerCase()
+        if (code === 'email_exists' || msg.includes('already been registered') || msg.includes('already registered') || msg.includes('already exists')) {
+          return badRequest('An account with this email address is already registered.')
+        }
+        return serverError('Failed to create branch user', userErr)
+      }
     } catch (err) {
       return serverError('Failed to create branch', err)
     }

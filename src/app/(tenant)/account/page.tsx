@@ -480,10 +480,17 @@ function AccountPageInner() {
               <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6">
                 <div className="flex items-start justify-between gap-4 mb-5">
                   <h2 className="text-base font-semibold text-on-surface">Current plan</h2>
-                  {/* Only substitute 'canceled' for the manual-subscription case where
-                      sub.status is stuck on 'active' despite the period having ended.
-                      past_due/canceled/suspended already carry their own correct status. */}
-                  {sub && <StatusBadge status={isExpired && sub.status === 'active' ? 'canceled' : sub.status} />}
+                  {/* Substitute 'canceled' only when sub.status is stale and would otherwise
+                      mislabel a lost-access account as fine — e.g. a manual subscription stuck
+                      on 'active' after its period ended, or a no-card free trial stuck on
+                      'trialing' after expiry (nothing ever updates it, since no Stripe
+                      subscription exists to drive a webhook). past_due/canceled/suspended
+                      already carry their own correct, specific status — leave those alone. */}
+                  {sub && (
+                    <StatusBadge
+                      status={isExpired && !['past_due', 'canceled', 'suspended'].includes(sub.status) ? 'canceled' : sub.status}
+                    />
+                  )}
                 </div>
 
                 {sub ? (

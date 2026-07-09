@@ -113,6 +113,27 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repair?.id])
 
+  // ── Store credit / loyalty applied to this repair's deposit/payments ─────────
+  const { data: creditLoyaltyApplied } = useQuery({
+    queryKey: ['repair-credit-loyalty', repair?.customer_id, id],
+    queryFn: async () => {
+      const customerId = repair!.customer_id!
+      const [creditRes, loyaltyRes] = await Promise.all([
+        fetch(`/api/customers/${customerId}/store-credits`).then((r) => r.json()),
+        fetch(`/api/customers/${customerId}/loyalty`).then((r) => r.json()),
+      ])
+      type Txn = { reference_type?: string; reference_id?: string; amount?: number; points?: number }
+      const creditAmount = ((creditRes.data?.transactions ?? []) as Txn[])
+        .filter((t) => t.reference_type === 'repair' && t.reference_id === id)
+        .reduce((sum, t) => sum + Math.abs(t.amount ?? 0), 0)
+      const loyaltyPoints = ((loyaltyRes.data?.transactions ?? []) as Txn[])
+        .filter((t) => t.reference_type === 'repair' && t.reference_id === id)
+        .reduce((sum, t) => sum + Math.abs(t.points ?? 0), 0)
+      return { creditAmount, loyaltyPoints }
+    },
+    enabled: !!repair?.customer_id,
+  })
+
   // ── Custom statuses — reuses the same cache as the repairs list page ──────────
   // If the user navigated here from the list, this is already populated (0 requests).
   const { data: metaData } = useQuery({
@@ -367,6 +388,12 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
             <InfoRow label="Estimated" value={repair.estimated_cost ? formatCurrency(repair.estimated_cost) : null} />
             <InfoRow label="Actual cost" value={repair.actual_cost ? formatCurrency(repair.actual_cost) : null} />
             <InfoRow label="Deposit paid" value={formatCurrency(repair.deposit_paid)} />
+            {!!creditLoyaltyApplied?.creditAmount && (
+              <InfoRow label="Store credit used" value={formatCurrency(creditLoyaltyApplied.creditAmount)} />
+            )}
+            {!!creditLoyaltyApplied?.loyaltyPoints && (
+              <InfoRow label="Loyalty points used" value={`${creditLoyaltyApplied.loyaltyPoints} pts`} />
+            )}
             <InfoRow label="Due Date" value={repair.custom_fields?.due_date ? formatDate(repair.custom_fields.due_date) : null} />
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 py-0.5">
               <span className="w-24 shrink-0 text-gray-400">Assigned</span>
