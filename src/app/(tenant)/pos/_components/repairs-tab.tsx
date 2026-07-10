@@ -47,6 +47,7 @@ export function RepairsTab() {
   const [confirmingRepair, setConfirmingRepair] = useState(false)
   const [success, setSuccess] = useState(false)
   const [deviceError, setDeviceError]     = useState('')
+  const [faultError, setFaultError]       = useState('')
   const [chargesError, setChargesError]   = useState('')
   const [repairCustomFields, setRepairCustomFields] = useState<Record<string, unknown>>({})
   const { defs: repairCustomFieldDefs } = useCustomFieldDefs('repairs', repairDetails.device_type || undefined)
@@ -229,6 +230,109 @@ export function RepairsTab() {
     }
   }
 
+  // ── Rename/Delete for Device Catalogue (Type/Brand/Model) ──────────────────
+  async function renameDeviceType(oldName: string, newName: string) {
+    if (!activeBranch) return
+    const id = (deviceData.typeIdMap ?? {})[oldName]
+    if (!id) { toast.error('Could not find this type to rename.'); return }
+    const res = await fetch(`/api/services/categories/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName }),
+    })
+    if (!res.ok) { toast.error('Failed to rename type. Please try again.'); return }
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], old => {
+      if (!old) return old
+      return {
+        ...old,
+        types: old.types.map(v => v === oldName ? newName : v),
+        raw: old.raw.map(r => r.device_type === oldName ? { ...r, device_type: newName } : r),
+      }
+    })
+    if (repairDetails.device_type === oldName) setRepairDetails(d => ({ ...d, device_type: newName }))
+    toast.success('Type renamed.')
+  }
+
+  async function deleteDeviceType(name: string) {
+    if (!activeBranch) return
+    const id = (deviceData.typeIdMap ?? {})[name]
+    if (!id) { toast.error('Could not find this type to delete.'); return }
+    const res = await fetch(`/api/services/categories/${id}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Failed to delete type. It may still be in use.'); return }
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], old => {
+      if (!old) return old
+      return { ...old, types: old.types.filter(v => v !== name) }
+    })
+    if (repairDetails.device_type === name) setRepairDetails(d => ({ ...d, device_type: '', device_brand: '', device_model: '' }))
+    toast.success('Type deleted.')
+  }
+
+  async function renameDeviceBrand(oldName: string, newName: string) {
+    if (!activeBranch) return
+    const id = (deviceData.brandIdMap ?? {})[oldName]
+    if (!id) { toast.error('Could not find this brand to rename.'); return }
+    const res = await fetch(`/api/services/manufacturers/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName }),
+    })
+    if (!res.ok) { toast.error('Failed to rename brand. Please try again.'); return }
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], old => {
+      if (!old) return old
+      return {
+        ...old,
+        brands: old.brands.map(v => v === oldName ? newName : v),
+        raw: old.raw.map(r => r.device_brand === oldName ? { ...r, device_brand: newName } : r),
+      }
+    })
+    if (repairDetails.device_brand === oldName) setRepairDetails(d => ({ ...d, device_brand: newName }))
+    toast.success('Brand renamed.')
+  }
+
+  async function deleteDeviceBrand(name: string) {
+    if (!activeBranch) return
+    const id = (deviceData.brandIdMap ?? {})[name]
+    if (!id) { toast.error('Could not find this brand to delete.'); return }
+    const res = await fetch(`/api/services/manufacturers/${id}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Failed to delete brand. It may still be in use.'); return }
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], old => {
+      if (!old) return old
+      return { ...old, brands: old.brands.filter(v => v !== name) }
+    })
+    if (repairDetails.device_brand === name) setRepairDetails(d => ({ ...d, device_brand: '', device_model: '' }))
+    toast.success('Brand deleted.')
+  }
+
+  async function renameDeviceModel(oldName: string, newName: string) {
+    if (!activeBranch) return
+    const id = (deviceData.modelIdMap ?? {})[oldName]
+    if (!id) { toast.error('Could not find this model to rename.'); return }
+    const res = await fetch(`/api/services/devices/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName }),
+    })
+    if (!res.ok) { toast.error('Failed to rename model. Please try again.'); return }
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], old => {
+      if (!old) return old
+      return {
+        ...old,
+        models: old.models.map(v => v === oldName ? newName : v),
+        raw: old.raw.map(r => r.device_model === oldName ? { ...r, device_model: newName } : r),
+      }
+    })
+    if (repairDetails.device_model === oldName) setRepairDetails(d => ({ ...d, device_model: newName }))
+    toast.success('Model renamed.')
+  }
+
+  async function deleteDeviceModel(name: string) {
+    if (!activeBranch) return
+    const id = (deviceData.modelIdMap ?? {})[name]
+    if (!id) { toast.error('Could not find this model to delete.'); return }
+    const res = await fetch(`/api/services/devices/${id}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Failed to delete model. It may still be in use.'); return }
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], old => {
+      if (!old) return old
+      return { ...old, models: old.models.filter(v => v !== name) }
+    })
+    if (repairDetails.device_model === name) setRepairDetails(d => ({ ...d, device_model: '' }))
+    toast.success('Model deleted.')
+  }
+
   const filteredBrands = repairDetails.device_type
     ? [...new Set(deviceData.raw.filter(d => d.device_type === repairDetails.device_type).map(d => d.device_brand).filter(Boolean) as string[])]
     : deviceData.brands
@@ -247,6 +351,7 @@ export function RepairsTab() {
     setRepairParts([])
     setRepairCustomFields({})
     setDeviceError('')
+    setFaultError('')
     setChargesError('')
   }
 
@@ -257,7 +362,11 @@ export function RepairsTab() {
       return
     }
     setDeviceError('')
-    if (repairDetails.faults.length === 0) return
+    if (repairDetails.faults.length === 0) {
+      setFaultError('At least one fault is required.')
+      return
+    }
+    setFaultError('')
     if (!repairDetails.price_pending) {
       const totalVal = parseFloat(repairDetails.estimated_cost)
       if (!repairDetails.estimated_cost.trim() || isNaN(totalVal) || totalVal < 0) {
@@ -364,6 +473,8 @@ export function RepairsTab() {
                   value={repairDetails.device_type}
                   onChange={(v) => setRepairDetails(d => ({ ...d, device_type: v, device_brand: '', device_model: '' }))}
                   onCreate={createDeviceType}
+                  onEdit={renameDeviceType}
+                  onDelete={deleteDeviceType}
                   placeholder="Phone…"
                   createLabel="Add type"
                 />
@@ -379,6 +490,8 @@ export function RepairsTab() {
                     value={repairDetails.device_brand}
                     onChange={(v) => setRepairDetails(d => ({ ...d, device_brand: v, device_model: '' }))}
                     onCreate={createDeviceBrand}
+                    onEdit={renameDeviceBrand}
+                    onDelete={deleteDeviceBrand}
                     placeholder="Apple…"
                     createLabel="Add brand"
                   />
@@ -399,6 +512,8 @@ export function RepairsTab() {
                     value={repairDetails.device_model}
                     onChange={(v) => setRepairDetails(d => ({ ...d, device_model: v }))}
                     onCreate={createDeviceModel}
+                    onEdit={renameDeviceModel}
+                    onDelete={deleteDeviceModel}
                     placeholder="iPhone 15…"
                     createLabel="Add model"
                   />
@@ -599,6 +714,7 @@ export function RepairsTab() {
                   options={faults.map(f => f.name)}
                   placeholder="Select or type fault…"
                 />
+                {faultError && <p className="mt-1 text-xs text-red-500">{faultError}</p>}
               </div>
               <div>
                 <label className={lbl}>Due Date</label>

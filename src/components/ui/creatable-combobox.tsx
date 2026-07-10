@@ -306,28 +306,30 @@ export function CreatableCombobox({
                     <span className="truncate">{opt.label}</span>
                   </button>
 
-                  <span className="flex shrink-0 items-center gap-1 pr-1.5">
-                    <button
-                      type="button"
-                      title="Rename"
-                      onClick={e => {
-                        if (onEdit) beginEdit(e, opt)
-                      }}
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-500 transition-colors hover:bg-blue-100 hover:text-blue-700"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      title="Delete"
-                      onClick={e => {
-                        if (onDelete) beginDelete(e, opt)
-                      }}
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-red-50 text-red-500 transition-colors hover:bg-red-100 hover:text-red-700"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </span>
+                  {hasManage && (
+                    <span className="flex shrink-0 items-center gap-1 pr-1.5">
+                      {onEdit && (
+                        <button
+                          type="button"
+                          title="Rename"
+                          onClick={e => beginEdit(e, opt)}
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-500 transition-colors hover:bg-blue-100 hover:text-blue-700"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {onDelete && (
+                        <button
+                          type="button"
+                          title="Delete"
+                          onClick={e => beginDelete(e, opt)}
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-red-50 text-red-500 transition-colors hover:bg-red-100 hover:text-red-700"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </span>
+                  )}
                 </li>
               )
             })}

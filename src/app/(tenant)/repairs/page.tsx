@@ -23,7 +23,6 @@ import { EmailComposeModal } from '@/components/repairs/email-compose-modal'
 import { RepairSlipModal } from '@/components/repairs/slip-modal'
 import { toast } from 'sonner'
 import { RepairInvoiceModal } from '@/components/repairs/invoice-modal'
-import { printRepairInvoiceById } from '@/components/repairs/receipt-print'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { PatternLock } from '@/components/ui/pattern-lock'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
@@ -843,10 +842,6 @@ export default function RepairsPage() {
     }
     setChargesError('')
     setSubmitting(true)
-    // Must open synchronously here, before any `await` below — otherwise the
-    // browser's popup blocker silently swallows the print window once we're
-    // past the user-gesture call stack (see printRepairInvoiceById).
-    const printWin = window.open('about:blank', '_blank', 'width=400,height=900,toolbar=0,location=0,menubar=0,status=0,scrollbars=1')
 
     let customerId = selectedCustomer?.id ?? null
 
@@ -867,7 +862,6 @@ export default function RepairsPage() {
       })
       const custJson = await custRes.json()
       if (!custRes.ok || !custJson.data?.id) {
-        printWin?.close()
         const errMsg = typeof custJson.error === 'string' ? custJson.error : (custJson.error?.message ?? 'Failed to create customer. Please try again.')
         toast.error(errMsg)
         setSubmitting(false)
@@ -921,14 +915,12 @@ export default function RepairsPage() {
     if (res.ok) {
       const j = await res.json().catch(() => ({}))
       setModalOpen(false)
-      fetchRepairs()
+      setPage(0)
+      queryClient.invalidateQueries({ queryKey: repairsBaseKey })
       invalidateStats()
       toast.success('Repair job created.')
       if (j.data?.credit_apply_warning) toast.error(j.data.credit_apply_warning)
-      if (j.data?.id) printRepairInvoiceById(j.data.id, printWin)
-      else printWin?.close()
     } else {
-      printWin?.close()
       const j = await res.json().catch(() => ({}))
       const errMsg = typeof j.error === 'string' ? j.error : (j.error?.message ?? 'Failed to create repair. Please try again.')
       toast.error(errMsg)
@@ -1032,6 +1024,115 @@ export default function RepairsPage() {
         }).catch(() => {})
       }
     }
+  }
+
+  // ── Rename/Delete for Device Catalogue (Type/Brand/Model) ──────────────────
+  async function renameDeviceType(oldName: string, newName: string) {
+    if (!activeBranch) return
+    const id = (deviceData.typeIdMap ?? {})[oldName]
+    if (!id) { toast.error('Could not find this type to rename.'); return }
+    const res = await fetch(`/api/services/categories/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName }),
+    })
+    if (!res.ok) { toast.error('Failed to rename type. Please try again.'); return }
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
+      if (!old) return old
+      return {
+        ...old,
+        types: old.types.map(v => v === oldName ? newName : v),
+        raw: old.raw.map(r => r.device_type === oldName ? { ...r, device_type: newName } : r),
+      }
+    })
+    if (jobData.device_type === oldName) setJobData((p) => ({ ...p, device_type: newName }))
+    toast.success('Type renamed.')
+  }
+
+  async function deleteDeviceType(name: string) {
+    if (!activeBranch) return
+    const id = (deviceData.typeIdMap ?? {})[name]
+    if (!id) { toast.error('Could not find this type to delete.'); return }
+    const res = await fetch(`/api/services/categories/${id}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Failed to delete type. It may still be in use.'); return }
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
+      if (!old) return old
+      return { ...old, types: old.types.filter(v => v !== name) }
+    })
+    if (jobData.device_type === name) setJobData((p) => ({ ...p, device_type: '', device_brand: '', device_model: '' }))
+    toast.success('Type deleted.')
+  }
+
+  async function renameDeviceBrand(oldName: string, newName: string) {
+    if (!activeBranch) return
+    const id = (deviceData.brandIdMap ?? {})[oldName]
+    if (!id) { toast.error('Could not find this brand to rename.'); return }
+    const res = await fetch(`/api/services/manufacturers/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName }),
+    })
+    if (!res.ok) { toast.error('Failed to rename brand. Please try again.'); return }
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
+      if (!old) return old
+      return {
+        ...old,
+        brands: old.brands.map(v => v === oldName ? newName : v),
+        raw: old.raw.map(r => r.device_brand === oldName ? { ...r, device_brand: newName } : r),
+      }
+    })
+    if (jobData.device_brand === oldName) setJobData((p) => ({ ...p, device_brand: newName }))
+    toast.success('Brand renamed.')
+  }
+
+  async function deleteDeviceBrand(name: string) {
+    if (!activeBranch) return
+    const id = (deviceData.brandIdMap ?? {})[name]
+    if (!id) { toast.error('Could not find this brand to delete.'); return }
+    const res = await fetch(`/api/services/manufacturers/${id}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Failed to delete brand. It may still be in use.'); return }
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
+      if (!old) return old
+      return { ...old, brands: old.brands.filter(v => v !== name) }
+    })
+    if (jobData.device_brand === name) setJobData((p) => ({ ...p, device_brand: '', device_model: '' }))
+    toast.success('Brand deleted.')
+  }
+
+  async function renameDeviceModel(oldName: string, newName: string) {
+    if (!activeBranch) return
+    const id = (deviceData.modelIdMap ?? {})[oldName]
+    if (!id) { toast.error('Could not find this model to rename.'); return }
+    const res = await fetch(`/api/services/devices/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName }),
+    })
+    if (!res.ok) { toast.error('Failed to rename model. Please try again.'); return }
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
+      if (!old) return old
+      return {
+        ...old,
+        models: old.models.map(v => v === oldName ? newName : v),
+        raw: old.raw.map(r => r.device_model === oldName ? { ...r, device_model: newName } : r),
+      }
+    })
+    if (jobData.device_model === oldName) setJobData((p) => ({ ...p, device_model: newName }))
+    toast.success('Model renamed.')
+  }
+
+  async function deleteDeviceModel(name: string) {
+    if (!activeBranch) return
+    const id = (deviceData.modelIdMap ?? {})[name]
+    if (!id) { toast.error('Could not find this model to delete.'); return }
+    const res = await fetch(`/api/services/devices/${id}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Failed to delete model. It may still be in use.'); return }
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
+      if (!old) return old
+      return { ...old, models: old.models.filter(v => v !== name) }
+    })
+    if (jobData.device_model === name) setJobData((p) => ({ ...p, device_model: '' }))
+    toast.success('Model deleted.')
   }
 
   // All statuses come from DB — no hardcoded fallbacks
@@ -1906,7 +2007,7 @@ export default function RepairsPage() {
                   </div>
                 ) : (
                   /* ── Repair shop: Type → Brand → Model → IMEI ── */
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {/* TYPE */}
                     <div>
                       <label className={lbl}>Type <span className="text-red-400">*</span></label>
@@ -1915,6 +2016,8 @@ export default function RepairsPage() {
                         value={jobData.device_type}
                         onChange={(v) => setJobData((p) => ({ ...p, device_type: v, device_brand: '', device_model: '' }))}
                         onCreate={createDeviceType}
+                        onEdit={renameDeviceType}
+                        onDelete={deleteDeviceType}
                         placeholder="Phone…"
                         createLabel="Add type"
                       />
@@ -1932,6 +2035,8 @@ export default function RepairsPage() {
                           value={jobData.device_brand}
                           onChange={(v) => setJobData((p) => ({ ...p, device_brand: v, device_model: '' }))}
                           onCreate={createDeviceBrand}
+                          onEdit={renameDeviceBrand}
+                          onDelete={deleteDeviceBrand}
                           placeholder="Apple…"
                           createLabel="Add brand"
                         />
@@ -1955,6 +2060,8 @@ export default function RepairsPage() {
                           value={jobData.device_model}
                           onChange={(v) => setJobData((p) => ({ ...p, device_model: v }))}
                           onCreate={createDeviceModel}
+                          onEdit={renameDeviceModel}
+                          onDelete={deleteDeviceModel}
                           placeholder="iPhone 15…"
                           createLabel="Add model"
                         />
@@ -2160,7 +2267,7 @@ export default function RepairsPage() {
                 <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
                   <Wrench className="h-2.5 w-2.5" /> Fault & Assignment
                 </p>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <div className="col-span-2">
                     <label className={lbl}>Fault <span className="text-red-400">*</span></label>
                     <MultiComboInput
@@ -2228,7 +2335,7 @@ export default function RepairsPage() {
                     ) : 'No fault found / Price TBD'}
                   </span>
                 </label>
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                   {/* Job Fee (labour) */}
                   <div>
                     <label className={lbl}>Job Fee (Labour)</label>
@@ -2315,7 +2422,7 @@ export default function RepairsPage() {
                 </div>
                 <div className="mt-2">
                   <label className={lbl}>Payment Method <span className="font-normal normal-case text-gray-300">(opt)</span></label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {(['cash', 'card', 'store_credit', 'loyalty_points'] as const).map((m) => {
                       const disabled = (m === 'store_credit' || m === 'loyalty_points') && !selectedCustomer
                       return (
