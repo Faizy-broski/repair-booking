@@ -13,8 +13,9 @@ import { CartPanel } from './_components/cart-panel'
 import { RepairsTab } from './_components/repairs-tab'
 import { ProductsTab } from './_components/products-tab'
 import { CloseRegisterModal } from './_components/modals/close-register-modal'
-import { CashMovementModal } from './_components/modals/cash-movement-modal'
+import { CashMovementModal, type BuybackPayload } from './_components/modals/cash-movement-modal'
 import { useHidScanner } from '@/hooks/use-hid-scanner'
+import { useRealtime } from '@/hooks/use-realtime'
 
 import { toast } from 'sonner'
 import type { Product } from '@/types/database'
@@ -62,6 +63,41 @@ export default function PosPage() {
   const [closingDenoms, setClosingDenoms] = useState<Record<string, number>>({})
   const [closingNote, setClosingNote] = useState('')
   const [zReport, setZReport] = useState<ZReport | null>(null)
+  const [expectedCash, setExpectedCash] = useState<number | null>(null)
+  const [expectedCashLoading, setExpectedCashLoading] = useState(false)
+
+  // ── Live session stats (net sales / repair / product / credit / cash in-out) ──
+  const [sessionStats, setSessionStats] = useState<{
+    total_sales: number; repair_sales: number; total_refunds: number; repair_refunds: number
+    store_credit_sales: number; loyalty_points_sales: number; on_account_sales: number
+    repair_store_credit_sales: number; repair_loyalty_points_sales: number
+    cash_in: number; cash_out: number
+    expected_cash: number; opening_float: number
+  } | null>(null)
+
+  const fetchSessionStats = useCallback(async (sessionId: string) => {
+    try {
+      const res = await fetch(`/api/pos/session/${sessionId}/expected-cash`)
+      if (!res.ok) return
+      const j = await res.json()
+      if (j.data) setSessionStats(j.data)
+    } catch { /* best-effort — live stats aren't critical path */ }
+  }, [])
+
+  useEffect(() => {
+    if (!pos.session) { setSessionStats(null); return }
+    fetchSessionStats(pos.session.id)
+    const interval = setInterval(() => fetchSessionStats(pos.session!.id), 30000)
+    return () => clearInterval(interval)
+  }, [pos.session, fetchSessionStats])
+
+  const refreshSessionStats = useCallback(() => {
+    if (pos.session) fetchSessionStats(pos.session.id)
+  }, [pos.session, fetchSessionStats])
+
+  useRealtime({ table: 'sales', filterColumn: 'branch_id', filterValue: activeBranch?.id, onInsert: refreshSessionStats, onUpdate: refreshSessionStats })
+  useRealtime({ table: 'repairs', filterColumn: 'branch_id', filterValue: activeBranch?.id, onInsert: refreshSessionStats, onUpdate: refreshSessionStats })
+  useRealtime({ table: 'cash_movements', filterColumn: 'branch_id', filterValue: activeBranch?.id, onInsert: refreshSessionStats })
 
   // ── Cash In/Out modal ─────────────────────────────────────────────────────────
   const [cashMovementOpen, setCashMovementOpen] = useState(false)
@@ -177,15 +213,31 @@ export default function PosPage() {
     setSessionProcessing(false)
   }
 
+  async function openCloseRegisterModal() {
+    setCloseRegisterModal(true)
+    if (!pos.session) return
+    setExpectedCashLoading(true)
+    try {
+      const res = await fetch(`/api/pos/session/${pos.session.id}/expected-cash`)
+      const j = await res.json()
+      setExpectedCash(res.ok ? (j.data?.expected_cash ?? null) : null)
+    } catch {
+      setExpectedCash(null)
+    }
+    setExpectedCashLoading(false)
+  }
+
   async function handleCloseRegister() {
     if (!pos.session) return
-    setSessionProcessing(true)
     const DENOMINATIONS = [
       { value: 50 }, { value: 20 }, { value: 10 }, { value: 5 },
       { value: 2 }, { value: 1 }, { value: 0.50 }, { value: 0.20 },
       { value: 0.10 }, { value: 0.05 }, { value: 0.02 }, { value: 0.01 },
     ]
     const total = DENOMINATIONS.reduce((sum, d) => sum + (closingDenoms[String(d.value)] ?? 0) * d.value, 0)
+    const hasDiscrepancy = expectedCash !== null && Math.abs(total - expectedCash) > 0.01
+    if (hasDiscrepancy && !closingNote.trim()) return
+    setSessionProcessing(true)
     const res = await fetch('/api/pos/session/close', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -201,18 +253,20 @@ export default function PosPage() {
       pos.setSessionLoaded(false)
       setClosingDenoms({})
       setClosingNote('')
+      setExpectedCash(null)
     } else if (j?.error?.message?.includes('Session already closed')) {
       // Session was already closed externally — sync local state
       pos.setSession(null)
       pos.setSessionLoaded(false)
       setClosingDenoms({})
       setClosingNote('')
+      setExpectedCash(null)
       await fetchSession()
     }
     setSessionProcessing(false)
   }
 
-  async function handleCashMovement(categoryId: string | null, addToLedger: boolean) {
+  async function handleCashMovement(categoryId: string | null, addToLedger: boolean, buyback?: BuybackPayload | null) {
     if (!pos.session || !cashMovementAmount) return
     setCashMovementSaving(true)
     const amount = parseFloat(cashMovementAmount)
@@ -229,9 +283,11 @@ export default function PosPage() {
     })
 
     if (res.ok) {
-      // The cash_movements record above is the source of truth and has
-      // already been saved — if the expense/income POST below fails, we
-      // still report the movement as recorded rather than rolling back.
+      // Cash In always counts directly as Sales revenue, Cash Out always
+      // subtracts — no opt-in needed. "Record as expense"/"Buyback" are
+      // optional bookkeeping entries on top of that; the cash_movements
+      // record above is the source of truth, so if either fails we still
+      // report the movement as recorded rather than rolling back.
       if (cashMovementType === 'cash_out' && addToLedger && activeBranch?.id) {
         const expRes = await fetch('/api/expenses', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -246,20 +302,17 @@ export default function PosPage() {
         })
         if (expRes.ok) toast.success(`Cash out of ${formatCurrency(amount)} recorded as expense`)
         else toast.error(`Cash out recorded, but failed to log the expense`)
-      } else if (cashMovementType === 'cash_in' && addToLedger && activeBranch?.id) {
-        const incRes = await fetch('/api/other-income', {
+      } else if (cashMovementType === 'cash_out' && buyback && activeBranch?.id) {
+        const bbRes = await fetch('/api/inventory/buyback', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             branch_id: activeBranch.id,
-            category_id: categoryId || null,
-            title: cashMovementNotes?.trim() || 'POS Cash In',
             amount,
-            income_date: new Date().toISOString().split('T')[0],
-            notes: cashMovementNotes?.trim() || null,
+            ...buyback,
           }),
         })
-        if (incRes.ok) toast.success(`Cash in of ${formatCurrency(amount)} recorded as income`)
-        else toast.error(`Cash in recorded, but failed to log the income`)
+        if (bbRes.ok) toast.success(`Cash out of ${formatCurrency(amount)} recorded as buyback — 1 unit added to stock`)
+        else toast.error(`Cash out recorded, but failed to log the buyback`)
       } else if (cashMovementType === 'cash_out') {
         toast.success(`Cash out of ${formatCurrency(amount)} recorded`)
       } else {
@@ -308,7 +361,7 @@ export default function PosPage() {
             modal would unmount before the cashier ever saw it. */}
         <CloseRegisterModal
           open={closeRegisterModal}
-          onClose={() => { setCloseRegisterModal(false); setZReport(null) }}
+          onClose={() => { setCloseRegisterModal(false); setZReport(null); setExpectedCash(null) }}
           zReport={zReport}
           sessionProcessing={sessionProcessing}
           closingDenoms={closingDenoms}
@@ -316,6 +369,8 @@ export default function PosPage() {
           closingNote={closingNote}
           setClosingNote={setClosingNote}
           handleCloseRegister={handleCloseRegister}
+          expectedCash={expectedCash}
+          expectedCashLoading={expectedCashLoading}
         />
       </>
     )
@@ -353,7 +408,7 @@ export default function PosPage() {
             <Button 
               variant="secondary"
               size="sm"
-              onClick={() => setCloseRegisterModal(true)}
+              onClick={openCloseRegisterModal}
               className="text-red-600 hover:text-red-700 font-bold"
             >
               Close Register
@@ -361,6 +416,39 @@ export default function PosPage() {
           </div>
         </div>
       )}
+
+      {/* Live session stats: net/repair/product/credit sales + cash in/out, updates in realtime */}
+      {pos.session && sessionStats && (() => {
+        const productSales = sessionStats.total_sales
+        const repairSales = sessionStats.repair_sales
+        // "Credit Sales" = on-account (accounts-receivable) sales — money owed,
+        // not yet collected. Store credit / loyalty are prepaid tenders (the
+        // customer already paid in advance), so they're excluded here.
+        const creditSales = sessionStats.on_account_sales
+        // Cash In adds to Sales revenue, Cash Out subtracts — folded into
+        // Net Sales alongside product/repair sales.
+        const netSales = (sessionStats.total_sales - sessionStats.total_refunds)
+          + (sessionStats.repair_sales - sessionStats.repair_refunds)
+          + sessionStats.cash_in - sessionStats.cash_out
+        return (
+          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-3 py-2 sm:px-5">
+            {([
+              ['Net Sales',      netSales,                     'bg-brand-teal-light text-brand-teal-dark'],
+              ['Product Sales',  productSales,                 'bg-blue-50 text-blue-700'],
+              ['Repair Sales',   repairSales,                  'bg-indigo-50 text-indigo-700'],
+              ['Credit Sales',   creditSales,                  'bg-purple-50 text-purple-700'],
+              ['Cash In',        sessionStats.cash_in,         'bg-green-50 text-green-700'],
+              ['Cash Out',       sessionStats.cash_out,        'bg-orange-50 text-orange-700'],
+              ['Expected Cash',  sessionStats.expected_cash,   'bg-amber-50 text-amber-700'],
+            ] as [string, number, string][]).map(([label, value, cls]) => (
+              <div key={label} className={`flex flex-col gap-0.5 rounded-lg px-3 py-1.5 ${cls}`}>
+                <span className="text-[10px] font-semibold uppercase tracking-wide opacity-70">{label}</span>
+                <span className="text-sm font-extrabold leading-none">{formatCurrency(value)}</span>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
 
       <div className="flex flex-1 overflow-hidden">
 
@@ -423,7 +511,7 @@ export default function PosPage() {
       {/* ── Modals ── */}
       <CloseRegisterModal
         open={closeRegisterModal}
-        onClose={() => { setCloseRegisterModal(false); setZReport(null) }}
+        onClose={() => { setCloseRegisterModal(false); setZReport(null); setExpectedCash(null) }}
         zReport={zReport}
         sessionProcessing={sessionProcessing}
         closingDenoms={closingDenoms}
@@ -431,6 +519,8 @@ export default function PosPage() {
         closingNote={closingNote}
         setClosingNote={setClosingNote}
         handleCloseRegister={handleCloseRegister}
+        expectedCash={expectedCash}
+        expectedCashLoading={expectedCashLoading}
       />
 
       <CashMovementModal

@@ -17,6 +17,17 @@ export const SupplierService = {
     return data ?? []
   },
 
+  async getById(id: string, businessId: string) {
+    const { data, error } = await adminSupabase
+      .from('suppliers')
+      .select('*')
+      .eq('id', id)
+      .eq('business_id', businessId)
+      .single()
+    if (error) throw error
+    return data
+  },
+
   async create(payload: InsertTables<'suppliers'>) {
     const { data, error } = await db('suppliers').insert(payload).select().single()
     if (error) throw error
@@ -33,13 +44,62 @@ export const SupplierService = {
     const { error } = await adminSupabase.from('suppliers').delete().eq('id', id).eq('business_id', businessId)
     if (error) throw error
   },
+
+  async getPaymentHistory(supplierId: string, params: { from?: string; to?: string } = {}) {
+    let posQ = adminSupabase
+      .from('purchase_orders')
+      .select('id, po_number, total, amount_paid, payment_status, status, created_at')
+      .eq('supplier_id', supplierId)
+      .eq('status', 'received')
+      .order('created_at', { ascending: false })
+    if (params.from) posQ = posQ.gte('created_at', params.from)
+    if (params.to) posQ = posQ.lte('created_at', params.to)
+
+    const { data: pos, error: posErr } = await posQ
+    if (posErr) throw posErr
+
+    const poIds = (pos ?? []).map((p: any) => p.id)
+    let payments: any[] = []
+    if (poIds.length > 0) {
+      const { data, error } = await db('supplier_payments')
+        .select('id, purchase_order_id, amount, method, created_at')
+        .in('purchase_order_id', poIds)
+        .order('created_at', { ascending: true })
+      if (error) throw error
+      payments = data ?? []
+    }
+
+    return (pos ?? []).map((p: any) => ({
+      ...p,
+      payments: payments.filter((pay) => pay.purchase_order_id === p.id),
+    }))
+  },
+
+  async getReceiptData(poId: string, businessId: string) {
+    const { data: po, error: poErr } = await adminSupabase
+      .from('purchase_orders')
+      .select('id, po_number, total, amount_paid, payment_status, status, created_at, supplier_id, suppliers(name)')
+      .eq('id', poId)
+      .eq('business_id', businessId)
+      .single()
+    if (poErr) throw poErr
+    if (!po) return null
+
+    const { data: payments, error: payErr } = await db('supplier_payments')
+      .select('id, amount, method, created_at')
+      .eq('purchase_order_id', poId)
+      .order('created_at', { ascending: true })
+    if (payErr) throw payErr
+
+    return { ...po, payments: payments ?? [] }
+  },
 }
 
 // ── Purchase Orders ──────────────────────────────────────────────────────────
 
 export const PurchaseOrderService = {
-  async list(businessId: string, branchId: string, params: { status?: string; page?: number; limit?: number }) {
-    const { page = 1, limit = 20, status } = params
+  async list(businessId: string, branchId: string, params: { status?: string; page?: number; limit?: number; outstandingOnly?: boolean; supplierId?: string }) {
+    const { page = 1, limit = 20, status, outstandingOnly, supplierId } = params
     let q = adminSupabase
       .from('purchase_orders')
       .select('*, suppliers(name), purchase_order_items(id)', { count: 'exact' })
@@ -49,10 +109,24 @@ export const PurchaseOrderService = {
       .range((page - 1) * limit, page * limit - 1)
 
     if (status) q = q.eq('status', status)
+    if (outstandingOnly) q = q.eq('status', 'received').neq('payment_status', 'paid')
+    if (supplierId) q = q.eq('supplier_id', supplierId)
 
     const { data, error, count } = await q
     if (error) throw error
     return { data, count }
+  },
+
+  async recordPayment(poId: string, amount: number, method: string, note: string | undefined, businessId: string, createdBy: string): Promise<void> {
+    const { error } = await (adminSupabase.rpc as any)('record_supplier_payment', {
+      p_po_id: poId,
+      p_amount: amount,
+      p_method: method,
+      p_note: note ?? null,
+      p_business_id: businessId,
+      p_created_by: createdBy,
+    })
+    if (error) throw error
   },
 
   async getById(id: string, businessId: string) {
@@ -114,10 +188,44 @@ export const PurchaseOrderService = {
     return this.updateStatus(id, businessId, 'cancelled')
   },
 
+  async remove(id: string, businessId: string) {
+    const { data: po, error: fetchErr } = await adminSupabase
+      .from('purchase_orders')
+      .select('id, status')
+      .eq('id', id)
+      .eq('business_id', businessId)
+      .single()
+    if (fetchErr) throw fetchErr
+    if (!po) throw new Error('Purchase order not found')
+
+    // Once any stock has been received (in_progress/received), the PO has
+    // real inventory/stock_movements/supplier_payments history tied to it —
+    // deleting it would corrupt that trail, so only draft/pending/cancelled
+    // orders (nothing received yet) can be deleted.
+    if (!['draft', 'pending', 'cancelled'].includes((po as any).status)) {
+      throw new Error('Only draft, pending, or cancelled purchase orders can be deleted — this order has already received stock')
+    }
+
+    const { error } = await adminSupabase.from('purchase_orders').delete().eq('id', id).eq('business_id', businessId)
+    if (error) throw error
+  },
+
   async update(id: string, businessId: string, payload: {
     supplier_id?: string; notes?: string | null; expected_delivery_date?: string | null
     items?: Array<{ product_id?: string; name: string; sku?: string; quantity_ordered: number; unit_cost: number }>
   }) {
+    // Line items can only be replaced while nothing has been received yet —
+    // once GRN/receiving has happened, quantity_received and the total tied
+    // to any supplier_payments would desync from a silent item rewrite.
+    if (payload.items) {
+      const { data: existing, error: fetchErr } = await adminSupabase
+        .from('purchase_orders').select('status').eq('id', id).eq('business_id', businessId).single()
+      if (fetchErr) throw fetchErr
+      if ((existing as any)?.status !== 'draft') {
+        throw new Error('Only draft purchase orders can have their line items edited')
+      }
+    }
+
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
     if (payload.supplier_id !== undefined) updates.supplier_id = payload.supplier_id
     if (payload.notes !== undefined) updates.notes = payload.notes

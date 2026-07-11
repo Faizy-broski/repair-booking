@@ -39,6 +39,12 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
               e.preventDefault();
             }
           }}
+          onFocusOutside={(e) => {
+            const target = e.target as Element;
+            if (target?.closest('[data-combobox-dropdown="true"]')) {
+              e.preventDefault();
+            }
+          }}
           className={cn(
             size === 'full'
               ? 'fixed left-0 top-0 z-50 w-screen h-screen -translate-x-0 -translate-y-0 rounded-none'

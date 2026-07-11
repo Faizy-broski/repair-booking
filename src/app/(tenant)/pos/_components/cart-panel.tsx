@@ -98,6 +98,9 @@ export function CartPanel({ mobileView }: Props) {
   const [newCustomerOpen, setNewCustomerOpen]       = useState(false)
   const [newCustomerSaving, setNewCustomerSaving]   = useState(false)
   const [newCustomerForm, setNewCustomerForm]       = useState({ first_name: '', last_name: '', email: '', phone: '' })
+  const [newEmployeeOpen, setNewEmployeeOpen]       = useState(false)
+  const [newEmployeeSaving, setNewEmployeeSaving]   = useState(false)
+  const [newEmployeeForm, setNewEmployeeForm]       = useState({ first_name: '', last_name: '', email: '', phone: '' })
   const [outstandingBalance, setOutstandingBalance] = useState(0)
   const [outstandingOpen, setOutstandingOpen]       = useState(false)
 
@@ -197,6 +200,23 @@ export function CartPanel({ mobileView }: Props) {
       setNewCustomerForm({ first_name: '', last_name: '', email: '', phone: '' })
     }
     setNewCustomerSaving(false)
+  }
+
+  async function saveNewEmployee() {
+    if (!newEmployeeForm.first_name.trim() || !activeBranch) return
+    setNewEmployeeSaving(true)
+    const res = await fetch('/api/employees', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...newEmployeeForm, branch_id: activeBranch.id }),
+    })
+    if (res.ok) {
+      const j = await res.json()
+      setCreditEmployeeId(j.data.id)
+      setCreditEmployeeName(`${j.data.first_name} ${j.data.last_name ?? ''}`.trim())
+      setNewEmployeeOpen(false)
+      setNewEmployeeForm({ first_name: '', last_name: '', email: '', phone: '' })
+    }
+    setNewEmployeeSaving(false)
   }
 
   // ── Gift card ──────────────────────────────────────────────────────────────
@@ -932,13 +952,26 @@ export function CartPanel({ mobileView }: Props) {
           {creditIsEmployee ? (
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-600">Employee</label>
-              <AsyncEmployeeSelect
-                value={creditEmployeeId}
-                onChange={id => setCreditEmployeeId(id)}
-                onEmployeeChange={emp => setCreditEmployeeName(emp ? `${emp.first_name} ${emp.last_name ?? ''}`.trim() : '')}
-                branchId={activeBranch?.id ?? ''}
-                placeholder="Search employee…"
-              />
+              <div className="flex items-end gap-1.5">
+                <div className="flex-1">
+                  <AsyncEmployeeSelect
+                    value={creditEmployeeId}
+                    onChange={id => setCreditEmployeeId(id)}
+                    onEmployeeChange={emp => setCreditEmployeeName(emp ? `${emp.first_name} ${emp.last_name ?? ''}`.trim() : '')}
+                    branchId={activeBranch?.id ?? ''}
+                    placeholder="Search employee…"
+                    label=""
+                  />
+                </div>
+                <button
+                  type="button"
+                  title="Add new employee"
+                  onClick={() => setNewEmployeeOpen(true)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors"
+                >
+                  <UserPlus className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           ) : pos.customer ? (
             <div className="flex items-center justify-between rounded-lg bg-purple-50 px-4 py-3 text-sm">
@@ -952,19 +985,29 @@ export function CartPanel({ mobileView }: Props) {
           ) : (
             <div className="relative">
               <label className="mb-1 block text-xs font-medium text-gray-600">Customer</label>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search customer by name…"
-                  className="w-full rounded-lg border py-2 pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
-                  value={creditCustomerSearch}
-                  onChange={e => setCreditCustomerSearch(e.target.value)}
-                  autoFocus
-                />
-                {creditCustomerSearching && (
-                  <Loader2 className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-gray-400" />
-                )}
+              <div className="flex items-center gap-1.5">
+                <div className="relative flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search customer by name…"
+                    className="w-full rounded-lg border py-2 pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                    value={creditCustomerSearch}
+                    onChange={e => setCreditCustomerSearch(e.target.value)}
+                    autoFocus
+                  />
+                  {creditCustomerSearching && (
+                    <Loader2 className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-gray-400" />
+                  )}
+                </div>
+                <button
+                  type="button"
+                  title="Add new customer"
+                  onClick={() => setNewCustomerOpen(true)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-purple-200 bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors"
+                >
+                  <UserPlus className="h-4 w-4" />
+                </button>
               </div>
               {creditCustomerResults.length > 0 && (
                 <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
@@ -1054,6 +1097,22 @@ export function CartPanel({ mobileView }: Props) {
           <div className="flex gap-2 pt-1">
             <Button variant="outline" className="flex-1" onClick={() => setNewCustomerOpen(false)}>Cancel</Button>
             <Button className="flex-1 bg-brand-teal hover:bg-brand-teal-dark" loading={newCustomerSaving} disabled={!newCustomerForm.first_name.trim()} onClick={saveNewCustomer}>Save</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* New Employee Modal */}
+      <Modal open={newEmployeeOpen} onClose={() => setNewEmployeeOpen(false)} title="Create New Employee" size="sm">
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="First Name" required value={newEmployeeForm.first_name} onChange={e => setNewEmployeeForm(f => ({ ...f, first_name: e.target.value }))} />
+            <Input label="Last Name" value={newEmployeeForm.last_name} onChange={e => setNewEmployeeForm(f => ({ ...f, last_name: e.target.value }))} />
+          </div>
+          <Input label="Mobile" type="tel" value={newEmployeeForm.phone} onChange={e => setNewEmployeeForm(f => ({ ...f, phone: e.target.value }))} />
+          <Input label="Email Address" type="email" value={newEmployeeForm.email} onChange={e => setNewEmployeeForm(f => ({ ...f, email: e.target.value }))} />
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" className="flex-1" onClick={() => setNewEmployeeOpen(false)}>Cancel</Button>
+            <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700" loading={newEmployeeSaving} disabled={!newEmployeeForm.first_name.trim()} onClick={saveNewEmployee}>Save</Button>
           </div>
         </div>
       </Modal>

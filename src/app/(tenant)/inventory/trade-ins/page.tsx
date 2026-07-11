@@ -14,7 +14,7 @@ interface TradeIn {
   serial_number: string | null; imei: string | null
   notes: string | null; created_at: string
   products?: { name: string } | null
-  customers?: { id: string; full_name: string; phone: string | null } | null
+  customers?: { id: string; first_name: string; last_name: string | null; phone: string | null } | null
 }
 
 interface ProductOption { id: string; name: string; sku: string | null }
@@ -29,7 +29,7 @@ const emptyForm = {
 }
 
 export default function TradeInsPage() {
-  const { activeBranch, activeProfile } = useAuthStore()
+  const { activeBranch, profile } = useAuthStore()
   const [tradeIns,  setTradeIns]  = useState<TradeIn[]>([])
   const [total,     setTotal]     = useState(0)
   const [page,      setPage]      = useState(0)
@@ -57,13 +57,13 @@ export default function TradeInsPage() {
   useEffect(() => { fetchData() }, [fetchData])
 
   async function save() {
-    if (!activeBranch || !activeProfile) return
+    if (!activeBranch || !profile) return
     setSaving(true)
     await fetch('/api/inventory/trade-ins', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        business_id: activeProfile.business_id,
+        business_id: profile.business_id,
         branch_id: activeBranch.id,
         product_id: form.product_id,
         condition_grade: form.condition_grade,
@@ -96,7 +96,7 @@ export default function TradeInsPage() {
       header: 'Customer',
       cell: ({ getValue }) => {
         const c = getValue() as TradeIn['customers']
-        return c ? <span className="text-gray-700">{c.full_name}</span> : <span className="text-gray-400">—</span>
+        return c ? <span className="text-gray-700">{[c.first_name, c.last_name].filter(Boolean).join(' ')}</span> : <span className="text-gray-400">—</span>
       },
     },
     {

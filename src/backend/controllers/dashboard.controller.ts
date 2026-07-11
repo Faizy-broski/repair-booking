@@ -45,7 +45,7 @@ export const DashboardController = {
         repairsPartsRes,
         todaySalesRes,
         posRepairAmountsRes,
-        otherIncomeRes,
+        cashMovementsRes,
       ] = await Promise.all([
         adminSupabase.from('sales').select('id, total, created_at').eq('branch_id', branchId).gte('created_at', periodStart),
         adminSupabase.from('expenses').select('amount').eq('branch_id', branchId).gte('expense_date', periodStart),
@@ -62,15 +62,17 @@ export const DashboardController = {
         // Amounts actually charged through POS for repair-linked line items —
         // takes priority over the repairs-table fallback below.
         (adminSupabase as any).from('sale_items').select('repair_id, total, sales!inner(is_refund, branch_id, created_at)').eq('sales.branch_id', branchId).gte('sales.created_at', periodStart).not('repair_id', 'is', null),
-        // POS Cash In entries opted in as real income.
-        (adminSupabase as any).from('other_income').select('amount').eq('branch_id', branchId).gte('income_date', periodStart),
+        // Cash In adds to Sales revenue, Cash Out subtracts.
+        (adminSupabase as any).from('cash_movements').select('type, amount').eq('branch_id', branchId).gte('created_at', periodStart),
       ])
 
       const sales             = salesRes.data ?? []
       const expenses          = expensesRes.data ?? []
       const inventory         = inventoryRes.data ?? []
       const repairsRevenueRows = repairsRevenueRes.data ?? []
-      const totalOtherIncome  = ((otherIncomeRes.data ?? []) as any[]).reduce((s, r) => s + (r.amount ?? 0), 0)
+      const cashNet = ((cashMovementsRes.data ?? []) as any[]).reduce(
+        (s, r) => s + (r.type === 'cash_in' ? (r.amount ?? 0) : -(r.amount ?? 0)), 0
+      )
 
       const posRepairAmounts = new Map<string, number>()
       for (const row of (posRepairAmountsRes.data ?? []) as any[]) {
@@ -153,7 +155,10 @@ export const DashboardController = {
           low_stock_alert: i.low_stock_alert ?? 5,
         }))
       const lowStockCount = lowStockItems.length
-      const totalSales    = sales.reduce((s, r) => s + (r.total ?? 0), 0)
+      // Cash In adds to Sales revenue, Cash Out subtracts — baked directly
+      // into total_sales so every consumer of this stat (the "Sales Revenue"
+      // card, net_profit, sales_profit) reflects it automatically.
+      const totalSales    = sales.reduce((s, r) => s + (r.total ?? 0), 0) + cashNet
       const totalExpenses = expenses.reduce((s, r) => s + (r.amount ?? 0), 0)
       const repairsRevenue = repairsRevenueRows.reduce((s, r) => {
         const row = r as any
@@ -177,9 +182,8 @@ export const DashboardController = {
         repairs_completed:     repairsCompleted,
         repairs_urgent:        repairsUrgentRes.count ?? 0,
         total_expenses:        totalExpenses,
-        total_other_income:    totalOtherIncome,
         low_stock_count:       lowStockCount,
-        net_profit:            totalSales + repairsRevenue + totalOtherIncome - totalExpenses,
+        net_profit:            totalSales + repairsRevenue - totalExpenses,
         repairs_revenue:       repairsRevenue,
         sales_profit:          totalSales - salesCogs,
         repairs_profit:        repairsRevenue - repairsPartsCost,
@@ -257,7 +261,7 @@ export const DashboardController = {
         salesCogsRes,
         repairsPartsRes,
         posRepairAmountsRes,
-        otherIncomeRes,
+        cashMovementsRes,
       ] = await Promise.all([
         // Sales in selected period
         adminSupabase
@@ -346,19 +350,21 @@ export const DashboardController = {
           .gte('sales.created_at', periodStart)
           .not('repair_id', 'is', null),
 
-        // POS Cash In entries opted in as real income.
+        // Cash In adds to Sales revenue, Cash Out subtracts.
         (adminSupabase as any)
-          .from('other_income')
-          .select('amount')
+          .from('cash_movements')
+          .select('type, amount')
           .eq('branch_id', branchId)
-          .gte('income_date', periodStart),
+          .gte('created_at', periodStart),
       ])
 
       const sales              = salesRes.data ?? []
       const expenses           = expensesRes.data ?? []
       const inventory          = inventoryRes.data ?? []
       const repairsRevenueRows = repairsRevenueRes.data ?? []
-      const totalOtherIncome   = ((otherIncomeRes.data ?? []) as any[]).reduce((s, r) => s + (r.amount ?? 0), 0)
+      const cashNet = ((cashMovementsRes.data ?? []) as any[]).reduce(
+        (s, r) => s + (r.type === 'cash_in' ? (r.amount ?? 0) : -(r.amount ?? 0)), 0
+      )
 
       const posRepairAmounts = new Map<string, number>()
       for (const row of (posRepairAmountsRes.data ?? []) as any[]) {
@@ -414,7 +420,7 @@ export const DashboardController = {
         return i.quantity <= (i.low_stock_alert ?? 5)
       }).length
 
-      const totalSales    = sales.reduce((s, r) => s + (r.total ?? 0), 0)
+      const totalSales    = sales.reduce((s, r) => s + (r.total ?? 0), 0) + cashNet
       const totalExpenses = expenses.reduce((s, r) => s + (r.amount ?? 0), 0)
       const repairsRevenue = repairsRevenueRows.reduce((s, r) => {
           const row = r as any
@@ -438,9 +444,8 @@ export const DashboardController = {
         repairs_completed: repairsCompleted,
         repairs_urgent:    repairsUrgentRes.count ?? 0,
         total_expenses:    totalExpenses,
-        total_other_income: totalOtherIncome,
         low_stock_count:   lowStockCount,
-        net_profit:        totalSales + repairsRevenue + totalOtherIncome - totalExpenses,
+        net_profit:        totalSales + repairsRevenue - totalExpenses,
         repairs_revenue:   repairsRevenue,
         sales_profit:      totalSales - salesCogs,
         repairs_profit:    repairsRevenue - repairsPartsCost,

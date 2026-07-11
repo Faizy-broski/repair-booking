@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import Link from 'next/link'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Loader2, CreditCard, RefreshCw, Banknote, CheckCircle2, AlertCircle, Users, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -183,7 +184,16 @@ export default function CreditsPage() {
     {
       header: 'Customer',
       cell: ({ row }) => (
-        <span className="font-medium text-gray-900">{customerName(row.original.customers)}</span>
+        row.original.customer_id ? (
+          <Link
+            href={`/customers/${row.original.customer_id}?tab=credits`}
+            className="font-medium text-purple-700 hover:underline"
+          >
+            {customerName(row.original.customers)}
+          </Link>
+        ) : (
+          <span className="font-medium text-gray-900">{customerName(row.original.customers)}</span>
+        )
       ),
     },
     {

@@ -26,6 +26,20 @@ export const ReportService = {
     return data
   },
 
+  // Cash In/Out for the same window — Cash In adds to Sales revenue, Cash
+  // Out subtracts. Returned separately (not merged into `sales` rows) so
+  // the frontend can bucket them into the same daily groups.
+  async getCashMovementsReport(branchId: string, from: string, to: string) {
+    const { data, error } = await db('cash_movements')
+      .select('type, amount, created_at')
+      .eq('branch_id', branchId)
+      .gte('created_at', from)
+      .lte('created_at', to)
+      .order('created_at')
+    if (error) throw error
+    return data
+  },
+
   async getRepairsReport(branchId: string, from: string, to: string) {
     const { data, error } = await db('repairs')
       .select('id, status, actual_cost, estimated_cost, deposit_paid, refund_amount, created_at, updated_at, device_type, device_brand')
@@ -45,18 +59,21 @@ export const ReportService = {
     })
     if (error) {
       // Fallback to JS aggregation if function not migrated yet
-      const [salesRes, expensesRes, salariesRes, otherIncomeRes] = await Promise.all([
+      const [salesRes, expensesRes, salariesRes, cashMovementsRes] = await Promise.all([
         db('sales').select('total, discount, tax').eq('branch_id', branchId).gte('created_at', from).lte('created_at', to),
         db('expenses').select('amount').eq('branch_id', branchId).gte('expense_date', from).lte('expense_date', to),
         db('salaries').select('amount').eq('branch_id', branchId).gte('pay_date', from).lte('pay_date', to),
-        db('other_income').select('amount').eq('branch_id', branchId).gte('income_date', from).lte('income_date', to),
+        db('cash_movements').select('type, amount').eq('branch_id', branchId).gte('created_at', from).lte('created_at', to),
       ])
       const revenue = ((salesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.total, 0)
       const expenses = ((expensesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.amount, 0)
       const salaries = ((salariesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.amount, 0)
-      const otherIncome = ((otherIncomeRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.amount, 0)
-      const totalRevenue = revenue + otherIncome
-      return { revenue, repair_revenue: 0, other_income: otherIncome, total_revenue: totalRevenue, cogs: 0, expenses, salaries, total_costs: expenses + salaries, gross_profit: totalRevenue, net_profit: totalRevenue - expenses - salaries }
+      // Cash In adds to Sales revenue, Cash Out subtracts.
+      const cashNet = ((cashMovementsRes.data ?? []) as any[]).reduce(
+        (s: number, r: any) => s + (r.type === 'cash_in' ? r.amount : -r.amount), 0
+      )
+      const totalRevenue = revenue + cashNet
+      return { revenue, repair_revenue: 0, other_income: cashNet, total_revenue: totalRevenue, cogs: 0, expenses, salaries, total_costs: expenses + salaries, gross_profit: totalRevenue, net_profit: totalRevenue - expenses - salaries }
     }
     return data
   },
@@ -368,6 +385,12 @@ export const ReportService = {
       .upsert({ session_id: sessionId, profile_id: profileId }, { onConflict: 'session_id,profile_id' })
     if (error) throw error
     return session
+  },
+
+  async previewExpectedCash(sessionId: string) {
+    const { data, error } = await rpc('register_session_expected', { p_session_id: sessionId })
+    if (error) throw error
+    return data
   },
 
   async closeSession(sessionId: string, closingCash: number, closingNote?: string) {

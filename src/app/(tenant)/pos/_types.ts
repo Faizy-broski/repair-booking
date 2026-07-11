@@ -19,6 +19,8 @@ export interface ZReport {
   total_refunds?: number
   cash_sales?: number
   card_sales?: number
+  store_credit_sales?: number
+  loyalty_points_sales?: number
   other_sales?: number
   transaction_count?: number
   cash_in?: number
@@ -32,10 +34,23 @@ export interface ZReport {
   repair_transaction_count?: number
   repair_cash_sales?: number
   repair_card_sales?: number
+  repair_store_credit_sales?: number
+  repair_loyalty_points_sales?: number
   repair_other_sales?: number
+  credit_activity?: CreditActivityEntry[]
   grand_total?: number
   opened_at?: string
   closed_at?: string
+}
+
+export interface CreditActivityEntry {
+  type: 'store_credit' | 'loyalty_points'
+  customer_name: string
+  amount: number
+  reference_type: string
+  reference_id: string
+  note: string | null
+  created_at: string
 }
 
 export interface RepairLineItem {

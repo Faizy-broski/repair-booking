@@ -1,4 +1,5 @@
 import { adminSupabase } from '@/backend/config/supabase'
+import { RepairService } from '@/backend/services/repair.service'
 import type { Json } from '@/types/database'
 
 export interface PaymentSplit {
@@ -74,14 +75,47 @@ export const PosService = {
     return data as string
   },
 
-  async recordCreditPayment(saleId: string, amount: number, method: string): Promise<void> {
+  async recordCreditPayment(saleId: string, amount: number, method: string, businessId: string, createdBy: string): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (adminSupabase.rpc as any)('record_credit_payment', {
       p_sale_id: saleId,
       p_amount: amount,
       p_method: method,
+      p_business_id: businessId,
+      p_created_by: createdBy,
     })
     if (error) throw error
+  },
+
+  async getCustomerCreditPayments(customerId: string, params: { from?: string; to?: string } = {}) {
+    let salesQ = adminSupabase
+      .from('sales')
+      .select('id, sale_number, total, amount_paid, payment_status, created_at')
+      .eq('customer_id', customerId)
+      .eq('payment_method', 'on_account')
+      .order('created_at', { ascending: false })
+    if (params.from) salesQ = salesQ.gte('created_at', params.from)
+    if (params.to) salesQ = salesQ.lte('created_at', params.to)
+
+    const { data: sales, error: salesErr } = await salesQ
+    if (salesErr) throw salesErr
+
+    const saleIds = (sales ?? []).map((s: any) => s.id)
+    let payments: any[] = []
+    if (saleIds.length > 0) {
+      const { data, error } = await (adminSupabase as any)
+        .from('sale_payments')
+        .select('id, sale_id, amount, method, created_at, is_backfilled')
+        .in('sale_id', saleIds)
+        .order('created_at', { ascending: true })
+      if (error) throw error
+      payments = data ?? []
+    }
+
+    return (sales ?? []).map((s: any) => ({
+      ...s,
+      payments: payments.filter((p) => p.sale_id === s.id),
+    }))
   },
 
   async getSales(branchId: string, params: { page?: number; limit?: number; from?: string; to?: string; status?: string; search?: string; paymentMethod?: string; outstandingOnly?: boolean; employeeId?: string; employeePurchasesOnly?: boolean }) {
@@ -140,18 +174,46 @@ export const PosService = {
     const rows = data ?? []
     const sales = rows.filter(r => !r.is_refund)
     const refunds = rows.filter(r => r.is_refund)
-    return {
+    const stats = {
       sales_count: sales.length,
       revenue: sales.reduce((s, r) => s + Number(r.total), 0),
       refund_count: refunds.length,
       refund_amount: refunds.reduce((s, r) => s + Number(r.total), 0),
     }
+
+    // Cash In adds to Sales revenue, Cash Out subtracts — same window/branch.
+    let cashQ = (adminSupabase as any)
+      .from('cash_movements')
+      .select('type, amount')
+      .eq('branch_id', branchId)
+    if (from) cashQ = cashQ.gte('created_at', from)
+    if (to) cashQ = cashQ.lte('created_at', to)
+    const { data: cashRows } = await cashQ
+    const cashNet = ((cashRows ?? []) as any[]).reduce(
+      (s, r) => s + (r.type === 'cash_in' ? Number(r.amount) : -Number(r.amount)), 0
+    )
+    stats.revenue += cashNet
+
+    // Repair job revenue (deposits/final charges) has no `sales` row unless
+    // paid off through the POS cart — fold it in here so the Sales page
+    // totals reflect real revenue collected via the Repairs module too.
+    // Skipped when filtering by a `sales.payment_status` value, since repairs
+    // have no equivalent status to filter on.
+    if (!status) {
+      const repairStats = await RepairService.getRevenueStats(branchId, { from, to })
+      stats.sales_count   += repairStats.count
+      stats.revenue       += repairStats.revenue
+      stats.refund_count  += repairStats.refundCount
+      stats.refund_amount += repairStats.refundAmount
+    }
+
+    return stats
   },
 
   async getSaleById(id: string, branchId: string | null) {
     let q = adminSupabase
       .from('sales')
-      .select('*, sale_items(*), customers(*), profiles!cashier_id(full_name)')
+      .select('*, sale_items(*), customers(*), profiles!cashier_id(full_name), branches!branch_id(name,address,phone,email,logo_url)')
       .eq('id', id)
     if (branchId) q = q.eq('branch_id', branchId)
     const { data, error } = await q.single()

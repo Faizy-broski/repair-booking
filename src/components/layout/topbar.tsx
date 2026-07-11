@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
-import { Menu, ChevronDown, MessageSquare, ArrowRight, User, Settings, LogOut, Megaphone, Info, AlertTriangle, Wrench, X, Loader2 } from 'lucide-react'
+import { Menu, ChevronDown, MessageSquare, ArrowRight, User, Settings, LogOut, Megaphone, Info, AlertTriangle, Wrench, X, Loader2, Plus } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 import { useMessageStore } from '@/store/message.store'
 import { useBroadcastsStore } from '@/store/broadcasts.store'
@@ -23,7 +23,8 @@ const BROADCAST_ICON = {
 } as const
 
 export function Topbar({ onMenuClick }: TopbarProps) {
-  const { profile, branches, clear: clearAuthStore } = useAuthStore()
+  const { profile, branches, verticalTemplateSlug, clear: clearAuthStore } = useAuthStore()
+  const isRetail = verticalTemplateSlug === 'retail-store'
   const unreadCount = useMessageStore((s) => s.unreadCount)
   const unreadMessages = useMessageStore((s) => s.unreadMessages)
   const setPendingThreadId = useMessageStore((s) => s.setPendingThreadId)
@@ -91,6 +92,16 @@ export function Topbar({ onMenuClick }: TopbarProps) {
       <div className="flex-1" />
 
       <div className="flex items-center gap-2 ml-auto">
+        {!isRetail && (
+          <Link
+            href="/repairs?new=true"
+            className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-sm font-medium text-on-primary transition-colors hover:bg-primary-dim"
+          >
+            <Plus className="h-4 w-4" />
+            Book a Repair
+          </Link>
+        )}
+
         {/* ── System Announcements (Megaphone) ── */}
         <div ref={announceRef} className="relative">
           <button

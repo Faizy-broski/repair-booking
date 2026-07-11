@@ -1028,15 +1028,18 @@ export default function RepairsPage() {
 
   // ── Rename/Delete for Device Catalogue (Type/Brand/Model) ──────────────────
   async function renameDeviceType(oldName: string, newName: string) {
-    if (!activeBranch) return
+    if (!activeBranch) return false
     const id = (deviceData.typeIdMap ?? {})[oldName]
-    if (!id) { toast.error('Could not find this type to rename.'); return }
+    if (!id) { toast.error('Could not find this type to rename.'); return false }
     const res = await fetch(`/api/services/categories/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newName }),
     })
-    if (!res.ok) { toast.error('Failed to rename type. Please try again.'); return }
+    if (!res.ok) {
+      toast.error(res.status === 403 ? "You don't have permission to rename this (requires manager access)." : 'Failed to rename type. Please try again.')
+      return false
+    }
     queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
       if (!old) return old
       return {
@@ -1050,11 +1053,14 @@ export default function RepairsPage() {
   }
 
   async function deleteDeviceType(name: string) {
-    if (!activeBranch) return
+    if (!activeBranch) return false
     const id = (deviceData.typeIdMap ?? {})[name]
-    if (!id) { toast.error('Could not find this type to delete.'); return }
+    if (!id) { toast.error('Could not find this type to delete.'); return false }
     const res = await fetch(`/api/services/categories/${id}`, { method: 'DELETE' })
-    if (!res.ok) { toast.error('Failed to delete type. It may still be in use.'); return }
+    if (!res.ok) {
+      toast.error(res.status === 403 ? "You don't have permission to delete this (requires manager access)." : 'Failed to delete type. It may still be in use.')
+      return false
+    }
     queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
       if (!old) return old
       return { ...old, types: old.types.filter(v => v !== name) }
@@ -1064,15 +1070,18 @@ export default function RepairsPage() {
   }
 
   async function renameDeviceBrand(oldName: string, newName: string) {
-    if (!activeBranch) return
+    if (!activeBranch) return false
     const id = (deviceData.brandIdMap ?? {})[oldName]
-    if (!id) { toast.error('Could not find this brand to rename.'); return }
+    if (!id) { toast.error('Could not find this brand to rename.'); return false }
     const res = await fetch(`/api/services/manufacturers/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newName }),
     })
-    if (!res.ok) { toast.error('Failed to rename brand. Please try again.'); return }
+    if (!res.ok) {
+      toast.error(res.status === 403 ? "You don't have permission to rename this (requires manager access)." : 'Failed to rename brand. Please try again.')
+      return false
+    }
     queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
       if (!old) return old
       return {
@@ -1086,11 +1095,14 @@ export default function RepairsPage() {
   }
 
   async function deleteDeviceBrand(name: string) {
-    if (!activeBranch) return
+    if (!activeBranch) return false
     const id = (deviceData.brandIdMap ?? {})[name]
-    if (!id) { toast.error('Could not find this brand to delete.'); return }
+    if (!id) { toast.error('Could not find this brand to delete.'); return false }
     const res = await fetch(`/api/services/manufacturers/${id}`, { method: 'DELETE' })
-    if (!res.ok) { toast.error('Failed to delete brand. It may still be in use.'); return }
+    if (!res.ok) {
+      toast.error(res.status === 403 ? "You don't have permission to delete this (requires manager access)." : 'Failed to delete brand. It may still be in use.')
+      return false
+    }
     queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
       if (!old) return old
       return { ...old, brands: old.brands.filter(v => v !== name) }
@@ -1100,15 +1112,18 @@ export default function RepairsPage() {
   }
 
   async function renameDeviceModel(oldName: string, newName: string) {
-    if (!activeBranch) return
+    if (!activeBranch) return false
     const id = (deviceData.modelIdMap ?? {})[oldName]
-    if (!id) { toast.error('Could not find this model to rename.'); return }
+    if (!id) { toast.error('Could not find this model to rename.'); return false }
     const res = await fetch(`/api/services/devices/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newName }),
     })
-    if (!res.ok) { toast.error('Failed to rename model. Please try again.'); return }
+    if (!res.ok) {
+      toast.error(res.status === 403 ? "You don't have permission to rename this (requires manager access)." : 'Failed to rename model. Please try again.')
+      return false
+    }
     queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
       if (!old) return old
       return {
@@ -1122,11 +1137,14 @@ export default function RepairsPage() {
   }
 
   async function deleteDeviceModel(name: string) {
-    if (!activeBranch) return
+    if (!activeBranch) return false
     const id = (deviceData.modelIdMap ?? {})[name]
-    if (!id) { toast.error('Could not find this model to delete.'); return }
+    if (!id) { toast.error('Could not find this model to delete.'); return false }
     const res = await fetch(`/api/services/devices/${id}`, { method: 'DELETE' })
-    if (!res.ok) { toast.error('Failed to delete model. It may still be in use.'); return }
+    if (!res.ok) {
+      toast.error(res.status === 403 ? "You don't have permission to delete this (requires manager access)." : 'Failed to delete model. It may still be in use.')
+      return false
+    }
     queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
       if (!old) return old
       return { ...old, models: old.models.filter(v => v !== name) }

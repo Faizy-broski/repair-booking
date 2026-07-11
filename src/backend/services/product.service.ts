@@ -540,4 +540,72 @@ export const ProductService = {
 
     return result
   },
+
+  // Quick buyback from POS Cash Out: adds one unit to stock, tags the
+  // product as trade-in stock, and sets its cost to what was actually paid
+  // for it — deliberately simple (no separate ledger/condition-grade flow).
+  // Either an existing product_id is passed, or name/selling_price to
+  // quick-create a new product for the item just bought from the customer.
+  async recordBuyback(
+    branchId: string,
+    businessId: string,
+    amount: number,
+    opts: { product_id?: string; name?: string; selling_price?: number; sku?: string }
+  ) {
+    let productId = opts.product_id
+
+    if (!productId) {
+      const newProduct = await ProductService.create({
+        business_id: businessId,
+        name: opts.name,
+        selling_price: opts.selling_price,
+        cost_price: amount,
+        sku: opts.sku || null,
+        item_type: 'product',
+        is_trade_in: true,
+      } as InsertTables<'products'>)
+      productId = newProduct.id
+
+      await adminSupabase
+        .from('branch_products')
+        .upsert({ branch_id: branchId, product_id: productId, is_enabled: true }, { onConflict: 'branch_id,product_id' })
+    }
+
+    const { data: existingInv } = await adminSupabase
+      .from('inventory')
+      .select('id, quantity')
+      .eq('branch_id', branchId)
+      .eq('product_id', productId)
+      .maybeSingle()
+
+    if (existingInv) {
+      await adminSupabase
+        .from('inventory')
+        .update({ quantity: (existingInv as any).quantity + 1, updated_at: new Date().toISOString() })
+        .eq('id', (existingInv as any).id)
+    } else {
+      await adminSupabase
+        .from('inventory')
+        .insert({ branch_id: branchId, product_id: productId, quantity: 1, low_stock_alert: 5 })
+    }
+
+    await adminSupabase.from('stock_movements').insert({
+      branch_id: branchId, product_id: productId,
+      type: 'trade_in', quantity: 1,
+      note: 'Buyback from customer',
+    })
+
+    if (opts.product_id) {
+      const { data: product, error } = await adminSupabase
+        .from('products')
+        .update({ cost_price: amount, is_trade_in: true })
+        .eq('id', productId)
+        .select()
+        .single()
+      if (error) throw error
+      return product
+    }
+
+    return ProductService.getById(productId, businessId)
+  },
 }

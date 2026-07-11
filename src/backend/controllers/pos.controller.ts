@@ -58,8 +58,10 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
   const doc = React.createElement(SaleReceiptPdf, {
     saleId: s.id,
     date: new Date(s.created_at).toLocaleString('en-GB'),
-    customerName: s.customer_name ?? '—',
-    cashierName: s.cashier_name ?? '—',
+    customerName: s.customers
+      ? [s.customers.first_name, s.customers.last_name].filter(Boolean).join(' ')
+      : (s.customer_name ?? '—'),
+    cashierName: s.profiles?.full_name ?? s.cashier_name ?? '—',
     paymentMethod: s.payment_method ?? 'cash',
     paymentStatus: s.payment_status ?? 'paid',
     items: (s.sale_items ?? []).map((i: any) => ({
@@ -84,11 +86,11 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
       ? s.notes.replace(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi,
           (uuid: string) => `#${uuid.slice(-8).toUpperCase()}`)
       : null,
-    branchName: s.branch_name ?? null,
-    branchAddress: s.branch_address ?? null,
-    branchPhone: s.branch_phone ?? null,
-    branchEmail: s.branch_email ?? null,
-    logoUrl: s.branch_logo_url ?? null,
+    branchName: s.branches?.name ?? s.branch_name ?? null,
+    branchAddress: s.branches?.address ?? s.branch_address ?? null,
+    branchPhone: s.branches?.phone ?? s.branch_phone ?? null,
+    branchEmail: s.branches?.email ?? s.branch_email ?? null,
+    logoUrl: s.branches?.logo_url ?? s.branch_logo_url ?? null,
     currency: businessRow?.currency ?? undefined,
     settings: settings ?? undefined,
   })
@@ -182,7 +184,7 @@ export const PosController = {
     }
   },
 
-  async recordCreditPayment(request: NextRequest, _ctx: RequestContext, saleId: string) {
+  async recordCreditPayment(request: NextRequest, ctx: RequestContext, saleId: string) {
     const schema = z.object({
       amount: z.number().positive(),
       payment_method: z.enum(['cash', 'card']),
@@ -190,7 +192,7 @@ export const PosController = {
     const { data, error } = await validateBody(request, schema)
     if (error) return error
     try {
-      await PosService.recordCreditPayment(saleId, data.amount, data.payment_method)
+      await PosService.recordCreditPayment(saleId, data.amount, data.payment_method, ctx.businessId, ctx.auth.userId)
       return ok({})
     } catch (err: any) {
       return badRequest(err?.message ?? 'Failed to record payment')

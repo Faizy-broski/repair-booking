@@ -1,9 +1,10 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { SupplierService, PurchaseOrderService, GrnService, SpecialOrderService } from '@/backend/services/supply-chain.service'
-import { ok, created, notFound, serverError } from '@/backend/utils/api-response'
+import { ok, created, notFound, serverError, badRequest } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
+import { adminSupabase } from '@/backend/config/supabase'
 import { z } from 'zod'
 
 // ── Suppliers ────────────────────────────────────────────────────────────────
@@ -29,6 +30,13 @@ export const SupplierController = {
     try { return ok(await SupplierService.list(ctx.businessId)) }
     catch (err) { return serverError('Failed to fetch suppliers', err) }
   },
+  async getById(_req: NextRequest, ctx: RequestContext, id: string) {
+    try {
+      const supplier = await SupplierService.getById(id, ctx.businessId)
+      if (!supplier) return notFound('Supplier not found')
+      return ok(supplier)
+    } catch (err) { return serverError('Failed to fetch supplier', err) }
+  },
   async create(req: NextRequest, ctx: RequestContext) {
     const { data, error } = await validateBody(req, supplierSchema)
     if (error) return error
@@ -44,6 +52,65 @@ export const SupplierController = {
   async remove(_req: NextRequest, ctx: RequestContext, id: string) {
     try { await SupplierService.remove(id, ctx.businessId); return ok({ id }) }
     catch (err) { return serverError('Failed to delete supplier', err) }
+  },
+
+  async getPaymentHistory(req: NextRequest, _ctx: RequestContext, supplierId: string) {
+    const { searchParams } = req.nextUrl
+    try {
+      const purchaseOrders = await SupplierService.getPaymentHistory(supplierId, {
+        from: searchParams.get('from') ?? undefined,
+        to: searchParams.get('to') ?? undefined,
+      })
+      return ok({ purchaseOrders })
+    } catch (err) {
+      return serverError('Failed to fetch supplier payment history', err)
+    }
+  },
+
+  async downloadStatement(req: NextRequest, ctx: RequestContext, supplierId: string) {
+    const { searchParams } = req.nextUrl
+    const from = searchParams.get('from') ?? undefined
+    const to = searchParams.get('to') ?? undefined
+    try {
+      const [supplier, purchaseOrders, renderToBuffer, { SupplierStatementPdf }, { InvoiceSettingsService }, business, React] = await Promise.all([
+        adminSupabase.from('suppliers').select('name').eq('id', supplierId).eq('business_id', ctx.businessId).single().then((r) => r.data),
+        SupplierService.getPaymentHistory(supplierId, { from, to }),
+        import('@react-pdf/renderer').then((m) => m.renderToBuffer),
+        import('@/components/pdf/supplier-statement-pdf'),
+        import('@/backend/services/invoice-settings.service'),
+        adminSupabase.from('businesses').select('name, phone, email, currency').eq('id', ctx.businessId).single().then((r) => r.data),
+        import('react').then((m) => m.default),
+      ])
+
+      if (!supplier) return serverError('Supplier not found', null)
+
+      const settings = await InvoiceSettingsService.get(ctx.businessId, ctx.auth.branchId ?? null)
+
+      const doc = React.createElement(SupplierStatementPdf, {
+        supplierName: (supplier as any).name,
+        from: from ?? null,
+        to: to ?? null,
+        purchaseOrders: purchaseOrders as any,
+        businessName: (business as any)?.name ?? '—',
+        businessPhone: (business as any)?.phone ?? null,
+        businessEmail: (business as any)?.email ?? null,
+        logoUrl: settings.logo_url,
+        currency: (business as any)?.currency ?? undefined,
+        settings,
+      })
+
+      const buffer = await renderToBuffer(doc as any)
+      const filename = `supplier-statement-${supplierId.slice(-8)}.pdf`
+      return new NextResponse(buffer as unknown as BodyInit, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        },
+      })
+    } catch (err) {
+      return serverError('Failed to generate supplier statement', err)
+    }
   },
 }
 
@@ -81,10 +148,28 @@ export const PurchaseOrderController = {
     try {
       const { data, count } = await PurchaseOrderService.list(ctx.businessId, branchId, {
         status: searchParams.get('status') ?? undefined, page, limit,
+        outstandingOnly: searchParams.get('outstanding_only') === 'true',
+        supplierId: searchParams.get('supplier_id') ?? undefined,
       })
       return ok(data, { page, limit, total: count ?? 0 })
     } catch (err) {
       return serverError('Failed to fetch purchase orders', err)
+    }
+  },
+
+  async recordPayment(req: NextRequest, ctx: RequestContext, poId: string) {
+    const schema = z.object({
+      amount: z.number().positive(),
+      method: z.enum(['cash', 'card', 'bank_transfer', 'cheque', 'other']),
+      note: z.string().optional(),
+    })
+    const { data, error } = await validateBody(req, schema)
+    if (error) return error
+    try {
+      await PurchaseOrderService.recordPayment(poId, data.amount, data.method, data.note, ctx.businessId, ctx.auth.userId)
+      return ok({})
+    } catch (err: any) {
+      return badRequest(err?.message ?? 'Failed to record payment')
     }
   },
 
@@ -125,8 +210,17 @@ export const PurchaseOrderController = {
     try {
       const po = await PurchaseOrderService.update(id, ctx.businessId, data)
       return ok(po)
-    } catch (err) {
-      return serverError('Failed to update purchase order', err)
+    } catch (err: any) {
+      return badRequest(err?.message ?? 'Failed to update purchase order')
+    }
+  },
+
+  async remove(_req: NextRequest, ctx: RequestContext, id: string) {
+    try {
+      await PurchaseOrderService.remove(id, ctx.businessId)
+      return ok({ id })
+    } catch (err: any) {
+      return badRequest(err?.message ?? 'Failed to delete purchase order')
     }
   },
 
@@ -160,6 +254,51 @@ export const PurchaseOrderController = {
       return serverError('Failed to create PO from low stock', err)
     }
   },
+
+  // Single-PO payment receipt — reuses the supplier statement PDF layout
+  // scoped to just this one purchase order, so a cashier can hand over
+  // proof of a specific payment without generating the full statement.
+  async downloadReceipt(req: NextRequest, ctx: RequestContext, poId: string) {
+    try {
+      const [receipt, renderToBuffer, { SupplierStatementPdf }, { InvoiceSettingsService }, business, React] = await Promise.all([
+        PurchaseOrderService.getReceiptData(poId, ctx.businessId),
+        import('@react-pdf/renderer').then((m) => m.renderToBuffer),
+        import('@/components/pdf/supplier-statement-pdf'),
+        import('@/backend/services/invoice-settings.service'),
+        adminSupabase.from('businesses').select('name, phone, email, currency').eq('id', ctx.businessId).single().then((r) => r.data),
+        import('react').then((m) => m.default),
+      ])
+
+      if (!receipt) return notFound('Purchase order not found')
+
+      const settings = await InvoiceSettingsService.get(ctx.businessId, ctx.auth.branchId ?? null)
+
+      const doc = React.createElement(SupplierStatementPdf, {
+        supplierName: (receipt as any).suppliers?.name ?? '—',
+        from: null,
+        to: null,
+        purchaseOrders: [receipt] as any,
+        businessName: (business as any)?.name ?? '—',
+        businessPhone: (business as any)?.phone ?? null,
+        businessEmail: (business as any)?.email ?? null,
+        logoUrl: settings.logo_url,
+        currency: (business as any)?.currency ?? undefined,
+        settings,
+      })
+
+      const buffer = await renderToBuffer(doc as any)
+      const filename = `po-receipt-${poId.slice(-8)}.pdf`
+      return new NextResponse(buffer as unknown as BodyInit, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        },
+      })
+    } catch (err) {
+      return serverError('Failed to generate purchase order receipt', err)
+    }
+  },
 }
 
 // ── GRN ──────────────────────────────────────────────────────────────────────
@@ -177,9 +316,14 @@ export const GrnController = {
   async create(req: NextRequest, ctx: RequestContext, poId: string) {
     const { data, error } = await validateBody(req, grnSchema)
     if (error) return error
-    const branchId = req.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
     try {
-      const grn = await GrnService.create(ctx.businessId, branchId, poId, ctx.auth.userId ?? '', data.items, data.notes)
+      // A GRN must always belong to the PO's own branch — trusting the
+      // request's branch_id (or ctx.auth.branchId, which is null for
+      // business owners not pinned to a branch) can insert a null/wrong
+      // branch_id, so we derive it from the PO record itself instead.
+      const po = await PurchaseOrderService.getById(poId, ctx.businessId)
+      if (!po) return notFound('Purchase order not found')
+      const grn = await GrnService.create(ctx.businessId, (po as any).branch_id, poId, ctx.auth.userId ?? '', data.items, data.notes)
       return created(grn)
     } catch (err) {
       return serverError('Failed to process GRN', err)

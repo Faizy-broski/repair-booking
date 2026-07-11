@@ -411,4 +411,29 @@ export const ProductController = {
       return serverError('Failed to check availability', err)
     }
   },
+
+  async recordBuyback(request: NextRequest, ctx: RequestContext) {
+    const { data, error } = await validateBody(request, z.object({
+      branch_id: z.string().uuid(),
+      amount: z.number().positive(),
+      product_id: z.string().uuid().optional(),
+      name: z.string().min(1).optional(),
+      selling_price: z.number().min(0).optional(),
+      sku: z.string().optional(),
+    }).refine(d => d.product_id || (d.name && d.selling_price !== undefined), {
+      message: 'Either product_id or name + selling_price is required',
+    }))
+    if (error) return error
+    try {
+      const product = await ProductService.recordBuyback(data.branch_id, ctx.businessId, data.amount, {
+        product_id: data.product_id,
+        name: data.name,
+        selling_price: data.selling_price,
+        sku: data.sku,
+      })
+      return ok(product)
+    } catch (err) {
+      return serverError('Failed to record buyback', err)
+    }
+  },
 }

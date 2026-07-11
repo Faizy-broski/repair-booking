@@ -73,8 +73,8 @@ export const TradeInService = {
     const from = (page - 1) * limit
     const to   = from + limit - 1
     const { data, count, error } = await adminSupabase
-      .from('trade_ins')
-      .select('*, products(name), customers(id, full_name, phone)', { count: 'exact' })
+      .from('trade_in_transactions')
+      .select('*, products(name), customers(id, first_name, last_name, phone)', { count: 'exact' })
       .eq('branch_id', branchId)
       .order('created_at', { ascending: false })
       .range(from, to)
@@ -88,11 +88,56 @@ export const TradeInService = {
     serial_number?: string; imei?: string; notes?: string; customer_id?: string
   }) {
     const { data, error } = await adminSupabase
-      .from('trade_ins')
+      .from('trade_in_transactions')
       .insert(payload)
       .select()
       .single()
     if (error) throw error
+
+    // Add the traded-in unit back into stock — same pattern GrnService.create()
+    // uses for received POs (upsert inventory, log stock_movements, add a
+    // cost layer, update average cost).
+    const { branch_id, product_id, trade_in_value } = payload
+
+    const { data: existingInv } = await adminSupabase
+      .from('inventory')
+      .select('id, quantity')
+      .eq('branch_id', branch_id)
+      .eq('product_id', product_id)
+      .maybeSingle()
+
+    if (existingInv) {
+      await adminSupabase
+        .from('inventory')
+        .update({ quantity: (existingInv as any).quantity + 1, updated_at: new Date().toISOString() })
+        .eq('id', (existingInv as any).id)
+    } else {
+      await adminSupabase
+        .from('inventory')
+        .insert({ branch_id, product_id, quantity: 1, low_stock_alert: 5 })
+    }
+
+    await adminSupabase.from('stock_movements').insert({
+      branch_id, product_id,
+      type: 'trade_in',
+      quantity: 1,
+      reference_id: data.id,
+      note: 'Trade-in / buyback',
+    })
+
+    await adminSupabase.from('inventory_cost_layers').insert({
+      product_id, branch_id,
+      quantity: 1,
+      unit_cost: trade_in_value,
+      source_id: data.id,
+      source_type: 'trade_in',
+    })
+    await (adminSupabase as any).rpc('update_average_cost', {
+      p_product_id: product_id,
+      p_new_qty: 1,
+      p_new_cost: trade_in_value,
+    })
+
     return data
   },
 }

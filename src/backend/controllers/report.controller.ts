@@ -50,8 +50,11 @@ export const ReportController = {
 
     try {
       if (type === 'sales') {
-        const data = await ReportService.getSalesReport(branchId, from, to)
-        return ok(data)
+        const [sales, cashMovements] = await Promise.all([
+          ReportService.getSalesReport(branchId, from, to),
+          ReportService.getCashMovementsReport(branchId, from, to),
+        ])
+        return ok({ sales, cash_movements: cashMovements })
       }
       if (type === 'repairs') {
         const data = await ReportService.getRepairsReport(branchId, from, to)
@@ -182,11 +185,26 @@ export const ReportController = {
     }
   },
 
+  async previewExpectedCash(request: NextRequest, ctx: RequestContext, sessionId: string) {
+    try {
+      const data = await ReportService.previewExpectedCash(sessionId)
+      return ok(data)
+    } catch (err: any) {
+      return serverError(err?.message ?? 'Failed to compute expected cash', err)
+    }
+  },
+
   async closeSession(request: NextRequest, ctx: RequestContext) {
     const body = await request.json()
     const parsed = closeSessionSchema.safeParse(body)
     if (!parsed.success) return badRequest(parsed.error.message)
     try {
+      const note = parsed.data.closing_note?.trim()
+      const preview = await ReportService.previewExpectedCash(parsed.data.session_id)
+      const diff = parsed.data.closing_cash - (preview?.expected_cash ?? 0)
+      if (Math.abs(diff) > 0.01 && !note) {
+        return badRequest('A reason note is required when the counted cash does not match the expected amount.')
+      }
       const data = await ReportService.closeSession(parsed.data.session_id, parsed.data.closing_cash, parsed.data.closing_note)
       return ok(data)
     } catch (err: any) {

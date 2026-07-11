@@ -392,10 +392,11 @@ export const RepairController = {
         await adminSupabase.from('repair_items').insert(items)
 
         // Deduct inventory for physical parts immediately on creation
-        await adminSupabase.rpc('deduct_repair_parts', {
+        const { error: deductError } = await adminSupabase.rpc('deduct_repair_parts', {
           p_repair_id: repair.id,
           p_branch_id: data.branch_id,
         })
+        if (deductError) console.error('[RepairController.create] deduct_repair_parts failed:', deductError)
       }
 
       // Fire ticket_created notification in background

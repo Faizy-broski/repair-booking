@@ -1,9 +1,9 @@
 'use client'
 import { useState, use } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, User, Wrench, ShoppingBag, FileText, Phone, Mail, MapPin, Cpu, CreditCard, Star, Plus, Pencil, Trash2, Coins, Banknote } from 'lucide-react'
+import { ArrowLeft, User, Wrench, ShoppingBag, FileText, Phone, Mail, MapPin, Cpu, CreditCard, Star, Plus, Pencil, Trash2, Banknote, Download, Receipt } from 'lucide-react'
 import { BrandSpinner } from '@/components/ui/brand-spinner'
 import { Button } from '@/components/ui/button'
 import { Badge, REPAIR_STATUS_VARIANTS } from '@/components/ui/badge'
@@ -73,14 +73,21 @@ interface Asset {
 }
 interface CreditTxn { id: string; amount: number; type: string; note: string | null; created_at: string }
 interface LoyaltyTxn { id: string; points: number; type: string; created_at: string }
+interface CreditPayment { id: string; amount: number; method: string; created_at: string; is_backfilled: boolean }
+interface CreditPaymentSale {
+  id: string; sale_number: string | null; total: number; amount_paid: number
+  payment_status: string; created_at: string; payments: CreditPayment[]
+}
 
 const emptyAssetForm = { name: '', brand: '', model: '', serial_number: '', imei: '', color: '' }
 
 export default function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const queryClient = useQueryClient()
-  const [tab, setTab] = useState<Tab>('overview')
+  const initialTab = (searchParams.get('tab') as Tab | null) ?? 'overview'
+  const [tab, setTab] = useState<Tab>(initialTab)
   const { verticalTemplateSlug } = useAuthStore()
   const isRetailStore = verticalTemplateSlug === 'retail-store'
 
@@ -139,6 +146,86 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   })
   const loyaltyBalance = loyaltyData?.balance ?? 0
   const loyaltyTxns    = loyaltyData?.transactions ?? []
+
+  // Full per-payment history for on-account sales (date/amount/method per invoice)
+  const { data: creditPaymentsData } = useQuery({
+    queryKey: ['customer-credit-payments', id],
+    queryFn: async () => {
+      const res = await fetch(`/api/customers/${id}/credit-payments`)
+      const j = await res.json()
+      return (j.data?.sales ?? []) as CreditPaymentSale[]
+    },
+    staleTime: 2 * 60_000,
+  })
+  const creditPaymentSales = creditPaymentsData ?? []
+
+  const [statementFrom, setStatementFrom] = useState('')
+  const [statementTo,   setStatementTo]   = useState('')
+  const [creditSearch,  setCreditSearch]  = useState('')
+  const [downloadingStatement, setDownloadingStatement] = useState(false)
+  const [downloadingReceiptId, setDownloadingReceiptId] = useState<string | null>(null)
+
+  // Live-filtered view of on-account sales (search + date range)
+  const filteredCreditSales = creditPaymentSales.filter((s) => {
+    const ref = (s.sale_number ?? s.id.slice(-8)).toLowerCase()
+    if (creditSearch && !ref.includes(creditSearch.toLowerCase())) return false
+    if (statementFrom) {
+      const saleDate = new Date(s.created_at)
+      const from = new Date(statementFrom)
+      from.setHours(0, 0, 0, 0)
+      if (saleDate < from) return false
+    }
+    if (statementTo) {
+      const saleDate = new Date(s.created_at)
+      const to = new Date(statementTo)
+      to.setHours(23, 59, 59, 999)
+      if (saleDate > to) return false
+    }
+    return true
+  })
+  const hasActiveFilters = !!(creditSearch || statementFrom || statementTo)
+
+  // Download the sale receipt PDF — reuses the same /api/pos/sales/[id]/pdf
+  // endpoint that the POS uses, so formatting is always consistent.
+  async function downloadPaymentReceipt(saleId: string, saleRef: string) {
+    if (downloadingReceiptId) return
+    setDownloadingReceiptId(saleId)
+    try {
+      const res = await fetch(`/api/pos/sales/${saleId}/pdf`)
+      if (!res.ok) { toast.error('Failed to generate receipt'); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `receipt-${saleRef}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Failed to download receipt')
+    } finally {
+      setDownloadingReceiptId(null)
+    }
+  }
+
+  async function downloadStatement() {
+    setDownloadingStatement(true)
+    try {
+      const params = new URLSearchParams()
+      if (statementFrom) params.set('from', statementFrom)
+      if (statementTo) params.set('to', statementTo)
+      const res = await fetch(`/api/customers/${id}/statement?${params.toString()}`)
+      if (!res.ok) { toast.error('Failed to generate statement'); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `statement-${id.slice(-8)}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } finally {
+      setDownloadingStatement(false)
+    }
+  }
 
   // Customer Credit (on-account sales) — a separate system from the prepaid
   // Store Credits wallet above: this is accounts-receivable for unpaid/partially
@@ -249,9 +336,9 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
     { id: 'overview',  label: 'Overview' },
     ...(!isRetailStore ? [{ id: 'repairs' as Tab, label: 'Repairs', count: customer.stats.repair_count }] : []),
     { id: 'sales',     label: 'Sales',    count: customer.stats.sale_count },
+    { id: 'credits',   label: 'Credits & Points' },
     { id: 'invoices',  label: 'Invoices', count: customer.stats.invoice_count },
     ...(!isRetailStore ? [{ id: 'assets' as Tab, label: 'Devices', count: assets.length }] : []),
-    { id: 'credits',   label: 'Credits & Points' },
   ]
 
   return (
@@ -477,85 +564,268 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
       {/* Credits & Points tab */}
       {tab === 'credits' && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {/* Store Credits */}
-          <Card>
-            <CardContent className="pt-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CreditCard className="h-4 w-4 text-blue-500" />
-                  <h3 className="text-sm font-semibold text-gray-700">Store Credits</h3>
+        <div className="space-y-5">
+
+          {/* ── Top row: Store Credits + Loyalty Points ────────────────────── */}
+          <div className="grid gap-4 sm:grid-cols-2">
+
+            {/* Store Credits Card */}
+            <div className="relative overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-indigo-50 shadow-sm">
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(99,102,241,0.08),_transparent_60%)]" />
+              <div className="relative p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 shadow-inner">
+                      <CreditCard className="h-4.5 w-4.5 h-[18px] w-[18px] text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-widest text-blue-400">Store Credits</p>
+                      <p className="text-2xl font-extrabold text-blue-700 leading-tight">{formatCurrency(creditBalance)}</p>
+                    </div>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={() => setAddCreditModal(true)}
+                    className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300 text-xs font-semibold gap-1">
+                    <Plus className="h-3.5 w-3.5" /> Add
+                  </Button>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => setAddCreditModal(true)}>
-                  <Plus className="h-3.5 w-3.5" /> Add
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {creditTxns.length === 0
+                    ? <p className="text-xs text-gray-400 italic py-2 text-center">No transactions yet</p>
+                    : creditTxns.map((t) => (
+                      <div key={t.id} className="flex items-center justify-between rounded-lg bg-white/70 px-2.5 py-1.5 text-xs border border-blue-50">
+                        <span className={`font-semibold ${t.amount >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                          {t.amount >= 0 ? '+' : ''}{formatCurrency(t.amount)}
+                        </span>
+                        <span className="truncate max-w-[8rem] mx-2 text-gray-500">{t.note ?? t.type}</span>
+                        <span className="text-gray-400 shrink-0">{new Date(t.created_at).toLocaleDateString()}</span>
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
+            </div>
+
+            {/* Loyalty Points Card */}
+            <div className="relative overflow-hidden rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-orange-50 shadow-sm">
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(251,191,36,0.1),_transparent_60%)]" />
+              <div className="relative p-5 space-y-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 shadow-inner">
+                    <Star className="h-[18px] w-[18px] text-amber-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-amber-400">Loyalty Points</p>
+                    <p className="text-2xl font-extrabold text-amber-700 leading-tight">{loyaltyBalance.toLocaleString()} <span className="text-base font-semibold">pts</span></p>
+                  </div>
+                </div>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {loyaltyTxns.length === 0
+                    ? <p className="text-xs text-gray-400 italic py-2 text-center">No transactions yet</p>
+                    : loyaltyTxns.map((t) => (
+                      <div key={t.id} className="flex items-center justify-between rounded-lg bg-white/70 px-2.5 py-1.5 text-xs border border-amber-50">
+                        <span className={`font-semibold ${t.points >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                          {t.points >= 0 ? '+' : ''}{t.points} pts
+                        </span>
+                        <span className="text-gray-500">{t.type}</span>
+                        <span className="text-gray-400 shrink-0">{new Date(t.created_at).toLocaleDateString()}</span>
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Customer Credit — full-width tabular ──────────────────────── */}
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+            {/* Section header */}
+            <div className="flex items-center justify-between bg-gradient-to-r from-purple-600 to-violet-700 px-5 py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20">
+                  <Banknote className="h-4 w-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-xs font-black uppercase tracking-widest text-purple-200">On-Account Sales</p>
+                  <p className="text-lg font-extrabold text-white leading-tight">Customer Credit</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-[11px] text-purple-200 font-black uppercase tracking-wider">Total Outstanding</p>
+                <p className={`text-2xl font-extrabold ${onAccountOutstanding > 0 ? 'text-red-300' : 'text-emerald-300'}`}>
+                  {formatCurrency(onAccountOutstanding)}
+                </p>
+              </div>
+            </div>
+
+            {/* Filter toolbar */}
+            <div className="border-b border-gray-200 bg-slate-800 px-5 py-3 space-y-2">
+              {/* Row 1: Search + date range */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Sale # search */}
+                <div className="relative flex items-center">
+                  <svg className="absolute left-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                  <input
+                    type="text"
+                    placeholder="Search sale #..."
+                    value={creditSearch}
+                    onChange={(e) => setCreditSearch(e.target.value)}
+                    className="h-8 w-44 rounded-lg border border-slate-600 bg-slate-700 pl-7 pr-2.5 text-xs text-white placeholder-slate-400 focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  />
+                </div>
+
+                {/* Date range */}
+                <div className="flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-700 px-2.5 h-8">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">From</span>
+                  <input
+                    type="date"
+                    value={statementFrom}
+                    onChange={(e) => setStatementFrom(e.target.value)}
+                    className="w-[118px] border-0 bg-transparent text-xs text-white focus:outline-none [color-scheme:dark]"
+                  />
+                </div>
+                <span className="text-slate-500 text-xs font-bold">→</span>
+                <div className="flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-700 px-2.5 h-8">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">To</span>
+                  <input
+                    type="date"
+                    value={statementTo}
+                    onChange={(e) => setStatementTo(e.target.value)}
+                    className="w-[118px] border-0 bg-transparent text-xs text-white focus:outline-none [color-scheme:dark]"
+                  />
+                </div>
+
+                {/* Clear filters */}
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={() => { setCreditSearch(''); setStatementFrom(''); setStatementTo('') }}
+                    className="flex items-center gap-1 rounded-lg border border-slate-600 bg-slate-700 px-2.5 h-8 text-xs text-slate-300 hover:border-red-400 hover:bg-red-900/40 hover:text-red-300 transition-colors"
+                  >
+                    <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                    Clear
+                  </button>
+                )}
+
+                {/* Spacer */}
+                <div className="flex-1" />
+
+                {/* Actions */}
+                <Button size="sm" variant="outline" loading={downloadingStatement} onClick={downloadStatement}
+                  className="border-purple-400 text-purple-300 hover:bg-purple-900/40 text-xs font-semibold h-8 gap-1 bg-transparent">
+                  <Download className="h-3.5 w-3.5" /> Statement
                 </Button>
+                <Link href="/credits" className="flex h-8 items-center text-xs font-semibold text-slate-300 hover:text-white hover:underline">
+                  Manage →
+                </Link>
               </div>
-              <p className="text-2xl font-bold text-gray-900">{formatCurrency(creditBalance)}</p>
-              <div className="space-y-1 max-h-40 overflow-y-auto">
-                {creditTxns.map((t) => (
-                  <div key={t.id} className="flex items-center justify-between text-xs text-gray-500">
-                    <span className={t.amount >= 0 ? 'text-green-600' : 'text-red-500'}>
-                      {t.amount >= 0 ? '+' : ''}{formatCurrency(t.amount)}
-                    </span>
-                    <span className="truncate max-w-[8rem] mx-2">{t.note ?? t.type}</span>
-                    <span>{new Date(t.created_at).toLocaleDateString()}</span>
-                  </div>
-                ))}
-                {creditTxns.length === 0 && <p className="text-xs text-gray-400 italic">No transactions yet</p>}
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Loyalty Points */}
-          <Card>
-            <CardContent className="pt-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Star className="h-4 w-4 text-yellow-500" />
-                <h3 className="text-sm font-semibold text-gray-700">Loyalty Points</h3>
-              </div>
-              <p className="text-2xl font-bold text-gray-900">{loyaltyBalance.toLocaleString()} pts</p>
-              <div className="space-y-1 max-h-40 overflow-y-auto">
-                {loyaltyTxns.map((t) => (
-                  <div key={t.id} className="flex items-center justify-between text-xs text-gray-500">
-                    <span className={t.points >= 0 ? 'text-green-600' : 'text-red-500'}>
-                      {t.points >= 0 ? '+' : ''}{t.points} pts
-                    </span>
-                    <span>{t.type}</span>
-                    <span>{new Date(t.created_at).toLocaleDateString()}</span>
-                  </div>
-                ))}
-                {loyaltyTxns.length === 0 && <p className="text-xs text-gray-400 italic">No transactions yet</p>}
-              </div>
-            </CardContent>
-          </Card>
+              {/* Active filter summary */}
+              {hasActiveFilters && (
+                <p className="text-[10px] text-purple-300 font-medium">
+                  Showing {filteredCreditSales.length} of {creditPaymentSales.length} sales
+                  {creditSearch ? ` · matching "${creditSearch}"` : ''}
+                  {(statementFrom || statementTo) ? ` · ${statementFrom || '…'} → ${statementTo || '…'}` : ''}
+                </p>
+              )}
+            </div>
 
-          {/* Customer Credit (on-account sales) — separate from the prepaid Store Credits wallet above */}
-          <Card>
-            <CardContent className="pt-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Banknote className="h-4 w-4 text-purple-500" />
-                <h3 className="text-sm font-semibold text-gray-700">Customer Credit</h3>
+            {/* Table */}
+            {filteredCreditSales.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-14 text-gray-400">
+                <Receipt className="h-10 w-10 mb-3 opacity-30" />
+                {creditPaymentSales.length === 0
+                  ? <><p className="text-sm font-medium">No on-account sales</p><p className="text-xs mt-1">Sales paid by &quot;On Account&quot; will appear here</p></>
+                  : <><p className="text-sm font-medium">No results match your filters</p><p className="text-xs mt-1">Try adjusting the date range or sale # search</p></>}
               </div>
-              <p className={`text-2xl font-bold ${onAccountOutstanding > 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                {formatCurrency(onAccountOutstanding)}
-              </p>
-              <div className="space-y-1 max-h-40 overflow-y-auto">
-                {onAccountSales.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between text-xs text-gray-500">
-                    <span className="font-mono">#{s.sale_number ?? s.id.slice(-8).toUpperCase()}</span>
-                    <span className="font-semibold text-red-600">
-                      {formatCurrency(Number(s.total) - Number(s.amount_paid ?? 0))}
-                    </span>
-                    <span>{new Date(s.created_at).toLocaleDateString()}</span>
-                  </div>
-                ))}
-                {onAccountSales.length === 0 && <p className="text-xs text-gray-400 italic">No outstanding balance</p>}
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-800" style={{ backgroundColor: '#1e293b' }}>
+                    <tr>
+                      <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-300" style={{ color: '#cbd5e1' }}>Sale #</th>
+                      <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-300" style={{ color: '#cbd5e1' }}>Sale Date</th>
+                      <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-300" style={{ color: '#cbd5e1' }}>Total</th>
+                      <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-300" style={{ color: '#cbd5e1' }}>Paid</th>
+                      <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-300" style={{ color: '#cbd5e1' }}>Outstanding</th>
+                      <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-300" style={{ color: '#cbd5e1' }}>Payments</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-300">
+                    {filteredCreditSales.map((s) => {
+                      const outstanding = Number(s.total) - Number(s.amount_paid ?? 0)
+                      const isPaid = outstanding <= 0.01
+                      return (
+                        <tr key={s.id} className="border-b border-gray-300 group hover:bg-purple-50/40 transition-colors">
+                          {/* Sale # */}
+                          <td className="px-5 py-3 align-top">
+                            <span className="font-mono text-xs font-semibold text-gray-700">
+                              #{s.sale_number ?? s.id.slice(-8).toUpperCase()}
+                            </span>
+                          </td>
+                          {/* Date */}
+                          <td className="px-4 py-3 align-top text-xs text-gray-500">
+                            {new Date(s.created_at).toLocaleDateString()}
+                          </td>
+                          {/* Total */}
+                          <td className="px-4 py-3 align-top text-right text-xs font-semibold text-gray-700">
+                            {formatCurrency(Number(s.total))}
+                          </td>
+                          {/* Paid */}
+                          <td className="px-4 py-3 align-top text-right text-xs font-semibold text-emerald-600">
+                            {formatCurrency(Number(s.amount_paid ?? 0))}
+                          </td>
+                          {/* Outstanding badge */}
+                          <td className="px-4 py-3 align-top text-right">
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                              isPaid
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-red-100 text-red-700'
+                            }`}>
+                              {isPaid ? '✓ Cleared' : formatCurrency(outstanding)}
+                            </span>
+                          </td>
+                          {/* Payment sub-rows */}
+                          <td className="px-5 py-3 align-top">
+                            {s.payments.length === 0 ? (
+                              <span className="text-xs text-gray-300 italic">No payments yet</span>
+                            ) : (
+                              <div className="space-y-1.5">
+                                {s.payments.map((p) => (
+                                  <div key={p.id} className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-[11px] text-gray-500">
+                                      {new Date(p.created_at).toLocaleDateString()}
+                                    </span>
+                                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium capitalize text-gray-600">
+                                      {p.method}
+                                    </span>
+                                    <span className="font-semibold text-[11px] text-emerald-600">
+                                      +{formatCurrency(Number(p.amount))}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      disabled={downloadingReceiptId === s.id}
+                                      title="Download sale receipt PDF"
+                                      onClick={() => downloadPaymentReceipt(s.id, s.sale_number ?? s.id.slice(-8).toUpperCase())}
+                                      className="ml-auto flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-600 hover:bg-purple-100 hover:border-purple-300 transition-colors disabled:opacity-50 disabled:cursor-wait"
+                                    >
+                                      {downloadingReceiptId === s.id
+                                        ? <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                        : <Download className="h-3 w-3" />}
+                                      Receipt
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
-              <Link href="/credits" className="inline-block text-xs font-medium text-purple-600 hover:underline">
-                Manage in Customer Credit →
-              </Link>
-            </CardContent>
-          </Card>
+            )}
+          </div>
         </div>
       )}
 

@@ -13,3 +13,7 @@ export const PUT = withMiddleware(
   (req, ctx, { params }) => params.then((p) => PurchaseOrderController.update(req, ctx, p.id)),
   { requiredRole: 'branch_manager' }
 )
+export const DELETE = withMiddleware(
+  (req, ctx, { params }) => params.then((p) => PurchaseOrderController.remove(req, ctx, p.id)),
+  { requiredRole: 'branch_manager' }
+)

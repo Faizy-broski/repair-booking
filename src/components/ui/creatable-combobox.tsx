@@ -14,8 +14,10 @@ interface Props {
   value: string
   onChange: (value: string, label: string) => void
   onCreate?: (text: string) => Promise<void> | void
-  onEdit?: (value: string, newLabel: string) => Promise<void> | void
-  onDelete?: (value: string, label: string) => Promise<void> | void
+  /** Return `false` (or resolve to it) to keep the edit row open on failure — anything else is treated as success. */
+  onEdit?: (value: string, newLabel: string) => Promise<boolean | void> | boolean | void
+  /** Return `false` (or resolve to it) to keep the confirm row open on failure — anything else is treated as success. */
+  onDelete?: (value: string, label: string) => Promise<boolean | void> | boolean | void
   placeholder?: string
   createLabel?: string
   disabled?: boolean
@@ -38,15 +40,12 @@ export function CreatableCombobox({
   const [query, setQuery]           = useState('')
   const [creating, setCreating]     = useState(false)
   const [editId, setEditId]         = useState<string | null>(null)
-  const [editLabel, setEditLabel]   = useState('')
-  const [editBusy, setEditBusy]     = useState(false)
   const [deleteId, setDeleteId]     = useState<string | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
 
   const wrapRef      = useRef<HTMLDivElement>(null)
   const triggerRef   = useRef<HTMLButtonElement>(null)
   const searchRef    = useRef<HTMLInputElement>(null)
-  const editInputRef = useRef<HTMLInputElement>(null)
   const [dropdownRect, setDropdownRect] = useState<{ top: number; left: number; width: number } | null>(null)
 
   const selectedLabel = options.find(o => o.value === value)?.label ?? ''
@@ -71,9 +70,7 @@ export function CreatableCombobox({
     return () => document.removeEventListener('mousedown', onOutside)
   }, [])
 
-  useEffect(() => {
-    if (editId) setTimeout(() => editInputRef.current?.focus(), 0)
-  }, [editId])
+
 
   function close() {
     setOpen(false)
@@ -84,10 +81,6 @@ export function CreatableCombobox({
 
   function openDropdown() {
     if (disabled) return
-    if (triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect()
-      setDropdownRect({ top: rect.bottom + 4, left: rect.left, width: rect.width })
-    }
     setOpen(true)
     setQuery('')
     setEditId(null)
@@ -127,21 +120,6 @@ export function CreatableCombobox({
     e.stopPropagation()
     setDeleteId(null)
     setEditId(opt.value)
-    setEditLabel(opt.label)
-  }
-
-  async function saveEdit(e?: React.MouseEvent) {
-    e?.stopPropagation()
-    if (!editId || !onEdit || !editLabel.trim()) return
-    setEditBusy(true)
-    await onEdit(editId, editLabel.trim())
-    setEditBusy(false)
-    setEditId(null)
-  }
-
-  function cancelEdit(e: React.MouseEvent) {
-    e.stopPropagation()
-    setEditId(null)
   }
 
   function beginDelete(e: React.MouseEvent, opt: ComboboxOption) {
@@ -154,8 +132,9 @@ export function CreatableCombobox({
     e.stopPropagation()
     if (!onDelete) return
     setDeleteBusy(true)
-    await onDelete(opt.value, opt.label)
+    const result = await onDelete(opt.value, opt.label)
     setDeleteBusy(false)
+    if (result === false) return
     setDeleteId(null)
     if (value === opt.value) onChange('', '')
   }
@@ -206,14 +185,12 @@ export function CreatableCombobox({
         </span>
       </button>
 
-      {/* Dropdown panel — rendered via portal so it escapes modal overflow/clipping */}
-      {open && dropdownRect && createPortal(
+      {open && (
         <div
           ref={dropdownRef}
           data-combobox-dropdown="true"
           onMouseDown={(e) => e.stopPropagation()}
-          style={{ position: 'fixed', top: dropdownRect.top, left: dropdownRect.left, width: dropdownRect.width, zIndex: 9999, pointerEvents: 'auto' }}
-          className="rounded-lg border border-gray-200 bg-white shadow-xl"
+          className="absolute top-full left-0 z-50 mt-1 w-full min-w-[220px] rounded-lg border border-gray-200 bg-white shadow-xl"
         >
 
           {/* Search input */}
@@ -239,35 +216,15 @@ export function CreatableCombobox({
             {filtered.map(opt => {
               /* Edit row */
               if (editId === opt.value) return (
-                <li key={opt.value} className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1.5">
-                  <input
-                    ref={editInputRef}
-                    type="text"
-                    value={editLabel}
-                    onChange={e => setEditLabel(e.target.value)}
-                    onClick={e => e.stopPropagation()}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') { e.preventDefault(); saveEdit() }
-                      if (e.key === 'Escape') { e.stopPropagation(); setEditId(null) }
-                    }}
-                    className="min-w-0 flex-1 rounded border border-blue-300 px-2 py-0.5 text-sm outline-none focus:ring-1 focus:ring-blue-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={saveEdit}
-                    disabled={editBusy || !editLabel.trim()}
-                    className="shrink-0 rounded bg-blue-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {editBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={cancelEdit}
-                    className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </li>
+                <EditRow
+                  key={opt.value}
+                  opt={opt}
+                  onSave={async (id, newLabel) => {
+                    if (!onEdit) return false
+                    return await onEdit(id, newLabel)
+                  }}
+                  onCancel={(e) => { e.stopPropagation(); setEditId(null) }}
+                />
               )
 
               /* Delete confirm row */
@@ -353,9 +310,69 @@ export function CreatableCombobox({
             )}
 
           </ul>
-        </div>,
-        document.body
+        </div>
       )}
     </div>
+  )
+}
+
+function EditRow({
+  opt,
+  onSave,
+  onCancel
+}: {
+  opt: ComboboxOption
+  onSave: (id: string, newLabel: string) => Promise<any> | any
+  onCancel: (e: React.MouseEvent) => void
+}) {
+  const [label, setLabel] = useState(opt.label)
+  const [busy, setBusy] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  
+  useEffect(() => {
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }, [])
+
+  async function handleSave(e?: React.MouseEvent) {
+    e?.stopPropagation()
+    if (!label.trim()) return
+    setBusy(true)
+    const res = await onSave(opt.value, label.trim())
+    setBusy(false)
+    if (res !== false) onCancel(e as any)
+  }
+
+  return (
+    <li className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1.5">
+      <input
+        ref={inputRef}
+        type="text"
+        value={label}
+        onChange={e => setLabel(e.target.value)}
+        onClick={e => e.stopPropagation()}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { e.preventDefault(); handleSave() }
+          if (e.key === 'Escape') { e.stopPropagation(); onCancel(e as any) }
+        }}
+        className="min-w-0 flex-1 rounded border border-blue-300 px-2 py-0.5 text-sm outline-none focus:ring-1 focus:ring-blue-400"
+      />
+      <button
+        type="button"
+        title="Save"
+        onClick={handleSave}
+        disabled={busy || !label.trim()}
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+      >
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+      </button>
+      <button
+        type="button"
+        title="Cancel"
+        onClick={onCancel}
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-700"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </li>
   )
 }

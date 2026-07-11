@@ -241,10 +241,16 @@ export function RepairsTab() {
     if (!res.ok) { toast.error('Failed to rename type. Please try again.'); return }
     queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], old => {
       if (!old) return old
+      const newMap = { ...(old.typeIdMap || {}) }
+      if (newMap[oldName]) {
+        newMap[newName] = newMap[oldName]
+        delete newMap[oldName]
+      }
       return {
         ...old,
         types: old.types.map(v => v === oldName ? newName : v),
         raw: old.raw.map(r => r.device_type === oldName ? { ...r, device_type: newName } : r),
+        typeIdMap: newMap
       }
     })
     if (repairDetails.device_type === oldName) setRepairDetails(d => ({ ...d, device_type: newName }))
@@ -275,10 +281,16 @@ export function RepairsTab() {
     if (!res.ok) { toast.error('Failed to rename brand. Please try again.'); return }
     queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], old => {
       if (!old) return old
+      const newMap = { ...(old.brandIdMap || {}) }
+      if (newMap[oldName]) {
+        newMap[newName] = newMap[oldName]
+        delete newMap[oldName]
+      }
       return {
         ...old,
         brands: old.brands.map(v => v === oldName ? newName : v),
         raw: old.raw.map(r => r.device_brand === oldName ? { ...r, device_brand: newName } : r),
+        brandIdMap: newMap
       }
     })
     if (repairDetails.device_brand === oldName) setRepairDetails(d => ({ ...d, device_brand: newName }))
@@ -309,10 +321,16 @@ export function RepairsTab() {
     if (!res.ok) { toast.error('Failed to rename model. Please try again.'); return }
     queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], old => {
       if (!old) return old
+      const newMap = { ...(old.modelIdMap || {}) }
+      if (newMap[oldName]) {
+        newMap[newName] = newMap[oldName]
+        delete newMap[oldName]
+      }
       return {
         ...old,
         models: old.models.map(v => v === oldName ? newName : v),
         raw: old.raw.map(r => r.device_model === oldName ? { ...r, device_model: newName } : r),
+        modelIdMap: newMap
       }
     })
     if (repairDetails.device_model === oldName) setRepairDetails(d => ({ ...d, device_model: newName }))

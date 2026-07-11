@@ -1,9 +1,11 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { StoreCreditService } from '@/backend/services/store-credit.service'
 import { LoyaltyService } from '@/backend/services/loyalty.service'
 import { CustomerGroupService } from '@/backend/services/customer-group.service'
 import { CustomerAssetService } from '@/backend/services/customer-asset.service'
+import { PosService } from '@/backend/services/pos.service'
+import { CustomerService } from '@/backend/services/customer.service'
 import { adminSupabase } from '@/backend/config/supabase'
 import { ok, created, serverError } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
@@ -229,6 +231,69 @@ export const CustomerAssetController = {
   async remove(_req: NextRequest, ctx: RequestContext, assetId: string) {
     try { await CustomerAssetService.remove(assetId, ctx.businessId); return ok({ id: assetId }) }
     catch (err) { return serverError('Failed to delete asset', err) }
+  },
+}
+
+// ── Customer Credit (on-account sale payments) ──────────────────────────────
+
+export const CreditPaymentsController = {
+  async getCustomerCreditPayments(req: NextRequest, ctx: RequestContext, customerId: string) {
+    const { searchParams } = req.nextUrl
+    try {
+      const sales = await PosService.getCustomerCreditPayments(customerId, {
+        from: searchParams.get('from') ?? undefined,
+        to: searchParams.get('to') ?? undefined,
+      })
+      return ok({ sales })
+    } catch (err) {
+      return serverError('Failed to fetch credit payment history', err)
+    }
+  },
+
+  async downloadStatement(req: NextRequest, ctx: RequestContext, customerId: string) {
+    const { searchParams } = req.nextUrl
+    const from = searchParams.get('from') ?? undefined
+    const to = searchParams.get('to') ?? undefined
+    try {
+      const [customer, sales, renderToBuffer, { CustomerStatementPdf }, { InvoiceSettingsService }, business, React] = await Promise.all([
+        CustomerService.getById(customerId, ctx.businessId),
+        PosService.getCustomerCreditPayments(customerId, { from, to }),
+        import('@react-pdf/renderer').then((m) => m.renderToBuffer),
+        import('@/components/pdf/customer-statement-pdf'),
+        import('@/backend/services/invoice-settings.service'),
+        adminSupabase.from('businesses').select('name, phone, email, currency').eq('id', ctx.businessId).single().then((r) => r.data),
+        import('react').then((m) => m.default),
+      ])
+
+      if (!customer) return serverError('Customer not found', null)
+
+      const settings = await InvoiceSettingsService.get(ctx.businessId, ctx.auth.branchId ?? null)
+
+      const doc = React.createElement(CustomerStatementPdf, {
+        customerName: `${(customer as any).first_name} ${(customer as any).last_name ?? ''}`.trim(),
+        from: from ?? null,
+        to: to ?? null,
+        sales: sales as any,
+        businessName: (business as any)?.name ?? '—',
+        businessPhone: (business as any)?.phone ?? null,
+        businessEmail: (business as any)?.email ?? null,
+        logoUrl: settings.logo_url,
+        currency: (business as any)?.currency ?? undefined,
+        settings,
+      })
+
+      const buffer = await renderToBuffer(doc as any)
+      const filename = `statement-${customerId.slice(-8)}.pdf`
+      return new NextResponse(buffer as unknown as BodyInit, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        },
+      })
+    } catch (err) {
+      return serverError('Failed to generate customer statement', err)
+    }
   },
 }
 
