@@ -918,6 +918,12 @@ export default function RepairsPage() {
       setPage(0)
       queryClient.invalidateQueries({ queryKey: repairsBaseKey })
       invalidateStats()
+      if (repairParts.length > 0) {
+        // Repair creation deducts part stock server-side (deduct_repair_parts RPC);
+        // refresh inventory so the stock cards reflect the new quantities.
+        queryClient.invalidateQueries({ queryKey: ['inventory-stats'] })
+        queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      }
       toast.success('Repair job created.')
       if (j.data?.credit_apply_warning) toast.error(j.data.credit_apply_warning)
     } else {
