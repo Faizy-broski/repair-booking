@@ -71,7 +71,8 @@ export default function PosPage() {
     total_sales: number; repair_sales: number; total_refunds: number; repair_refunds: number
     store_credit_sales: number; loyalty_points_sales: number; on_account_sales: number
     repair_store_credit_sales: number; repair_loyalty_points_sales: number
-    cash_in: number; cash_out: number
+    cash_in: number; cash_out: number; buyback_out: number
+    credit_repayments_cash: number; credit_repayments_total: number
     expected_cash: number; opening_float: number
   } | null>(null)
 
@@ -271,6 +272,16 @@ export default function PosPage() {
     setCashMovementSaving(true)
     const amount = parseFloat(cashMovementAmount)
 
+    const purpose = cashMovementType !== 'cash_out' ? 'plain'
+      : addToLedger ? 'expense'
+      : buyback ? 'buyback'
+      : 'plain'
+
+    // Everything (cash movement + its offsetting expense/buyback entry) is
+    // recorded atomically server-side (record_cash_movement RPC) — if the
+    // offsetting side fails (e.g. a duplicate barcode), the whole thing rolls
+    // back, so we never end up with cash removed from the drawer and nothing
+    // to show for it.
     const res = await fetch('/api/pos/session/movements', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -279,50 +290,26 @@ export default function PosPage() {
         type: cashMovementType,
         amount,
         notes: cashMovementNotes || undefined,
+        purpose,
+        expense_category_id: purpose === 'expense' ? (categoryId || null) : undefined,
+        expense_title: purpose === 'expense' ? (cashMovementNotes?.trim() || 'POS Cash Out') : undefined,
+        buyback_name: purpose === 'buyback' ? buyback?.name : undefined,
+        buyback_selling_price: purpose === 'buyback' ? buyback?.selling_price : undefined,
+        buyback_barcode: purpose === 'buyback' ? buyback?.barcode : undefined,
       }),
     })
 
     if (res.ok) {
-      // Cash In always counts directly as Sales revenue, Cash Out always
-      // subtracts — no opt-in needed. "Record as expense"/"Buyback" are
-      // optional bookkeeping entries on top of that; the cash_movements
-      // record above is the source of truth, so if either fails we still
-      // report the movement as recorded rather than rolling back.
-      if (cashMovementType === 'cash_out' && addToLedger && activeBranch?.id) {
-        const expRes = await fetch('/api/expenses', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            branch_id: activeBranch.id,
-            category_id: categoryId || null,
-            title: cashMovementNotes?.trim() || 'POS Cash Out',
-            amount,
-            expense_date: new Date().toISOString().split('T')[0],
-            notes: cashMovementNotes?.trim() || null,
-          }),
-        })
-        if (expRes.ok) toast.success(`Cash out of ${formatCurrency(amount)} recorded as expense`)
-        else toast.error(`Cash out recorded, but failed to log the expense`)
-      } else if (cashMovementType === 'cash_out' && buyback && activeBranch?.id) {
-        const bbRes = await fetch('/api/inventory/buyback', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            branch_id: activeBranch.id,
-            amount,
-            ...buyback,
-          }),
-        })
-        if (bbRes.ok) toast.success(`Cash out of ${formatCurrency(amount)} recorded as buyback — 1 unit added to stock`)
-        else toast.error(`Cash out recorded, but failed to log the buyback`)
-      } else if (cashMovementType === 'cash_out') {
-        toast.success(`Cash out of ${formatCurrency(amount)} recorded`)
-      } else {
-        toast.success(`Cash in of ${formatCurrency(amount)} recorded`)
-      }
+      if (purpose === 'expense') toast.success(`Cash out of ${formatCurrency(amount)} recorded as expense`)
+      else if (purpose === 'buyback') toast.success(`Cash out of ${formatCurrency(amount)} recorded as buyback — 1 unit added to stock`)
+      else if (cashMovementType === 'cash_out') toast.success(`Cash out of ${formatCurrency(amount)} recorded`)
+      else toast.success(`Cash in of ${formatCurrency(amount)} recorded`)
       setCashMovementOpen(false)
       setCashMovementAmount('')
       setCashMovementNotes('')
     } else {
-      toast.error('Failed to record cash movement')
+      const errJson = await res.json().catch(() => ({}))
+      toast.error(errJson?.error?.message ?? 'Failed to record cash movement')
     }
     setCashMovementSaving(false)
   }
@@ -371,6 +358,7 @@ export default function PosPage() {
           handleCloseRegister={handleCloseRegister}
           expectedCash={expectedCash}
           expectedCashLoading={expectedCashLoading}
+          sessionStats={sessionStats}
         />
       </>
     )
@@ -425,27 +413,36 @@ export default function PosPage() {
         // not yet collected. Store credit / loyalty are prepaid tenders (the
         // customer already paid in advance), so they're excluded here.
         const creditSales = sessionStats.on_account_sales
-        // Cash In adds to Sales revenue, Cash Out subtracts — folded into
-        // Net Sales alongside product/repair sales.
+        // Net Sales is pure revenue recognized this session (product + repair,
+        // less refunds) — deliberately EXCLUDING Cash In/Out, which are manual
+        // drawer adjustments, not sales performance. They're shown as their own
+        // tiles instead of being blended into this figure.
         const netSales = (sessionStats.total_sales - sessionStats.total_refunds)
           + (sessionStats.repair_sales - sessionStats.repair_refunds)
-          + sessionStats.cash_in - sessionStats.cash_out
         return (
-          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-3 py-2 sm:px-5">
-            {([
-              ['Net Sales',      netSales,                     'bg-brand-teal-light text-brand-teal-dark'],
-              ['Product Sales',  productSales,                 'bg-blue-50 text-blue-700'],
-              ['Repair Sales',   repairSales,                  'bg-indigo-50 text-indigo-700'],
-              ['Credit Sales',   creditSales,                  'bg-purple-50 text-purple-700'],
-              ['Cash In',        sessionStats.cash_in,         'bg-green-50 text-green-700'],
-              ['Cash Out',       sessionStats.cash_out,        'bg-orange-50 text-orange-700'],
-              ['Expected Cash',  sessionStats.expected_cash,   'bg-amber-50 text-amber-700'],
-            ] as [string, number, string][]).map(([label, value, cls]) => (
-              <div key={label} className={`flex flex-col gap-0.5 rounded-lg px-3 py-1.5 ${cls}`}>
-                <span className="text-[10px] font-semibold uppercase tracking-wide opacity-70">{label}</span>
-                <span className="text-sm font-extrabold leading-none">{formatCurrency(value)}</span>
-              </div>
-            ))}
+          <div className="shrink-0 border-b border-gray-200 bg-gray-50 px-3 py-2 sm:px-5">
+            <div className="flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {([
+                ['Net Sales',      netSales,                                'text-brand-teal-dark', 'bg-brand-teal'],
+                ['Product Sales',  productSales,                            'text-blue-700',   'bg-blue-500'],
+                ['Credit Sales',   creditSales,                             'text-purple-700', 'bg-purple-500'],
+                ['Repair Sales',   repairSales,                             'text-indigo-700', 'bg-indigo-500'],
+                ['Credit Repaid',  sessionStats.credit_repayments_cash ?? 0, 'text-cyan-700',  'bg-cyan-500'],
+                ['Refunds',        -(sessionStats.total_refunds + sessionStats.repair_refunds), 'text-red-700', 'bg-red-500'],
+                ['Cash In',        sessionStats.cash_in,                    'text-green-700',  'bg-green-500'],
+                ['Cash Out',       sessionStats.cash_out,                   'text-orange-700', 'bg-orange-500'],
+                ['Buyback',        sessionStats.buyback_out ?? 0,           'text-pink-700',   'bg-pink-500'],
+                ['Expected Cash',  sessionStats.expected_cash,              'text-amber-700',  'bg-amber-500'],
+              ] as [string, number, string, string][]).map(([label, value, textCls, dotCls]) => (
+                <div key={label} className="flex shrink-0 flex-col gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm">
+                  <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-bold uppercase tracking-wide text-gray-500">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${dotCls}`} />
+                    {label}
+                  </span>
+                  <span className={`whitespace-nowrap text-base font-bold leading-none ${textCls}`}>{formatCurrency(value)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )
       })()}
@@ -521,6 +518,7 @@ export default function PosPage() {
         handleCloseRegister={handleCloseRegister}
         expectedCash={expectedCash}
         expectedCashLoading={expectedCashLoading}
+        sessionStats={sessionStats}
       />
 
       <CashMovementModal

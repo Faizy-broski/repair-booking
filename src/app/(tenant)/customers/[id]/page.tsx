@@ -187,17 +187,17 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
   // Download the sale receipt PDF — reuses the same /api/pos/sales/[id]/pdf
   // endpoint that the POS uses, so formatting is always consistent.
-  async function downloadPaymentReceipt(saleId: string, saleRef: string) {
+  async function downloadPaymentReceipt(saleId: string, paymentId: string, saleRef: string) {
     if (downloadingReceiptId) return
-    setDownloadingReceiptId(saleId)
+    setDownloadingReceiptId(paymentId)
     try {
-      const res = await fetch(`/api/pos/sales/${saleId}/pdf`)
+      const res = await fetch(`/api/pos/sales/${saleId}/pdf?paymentId=${paymentId}`)
       if (!res.ok) { toast.error('Failed to generate receipt'); return }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `receipt-${saleRef}.pdf`
+      a.download = `receipt-${saleRef}-payment-${paymentId.slice(-6)}.pdf`
       a.click()
       URL.revokeObjectURL(url)
     } catch {
@@ -803,12 +803,12 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                                     </span>
                                     <button
                                       type="button"
-                                      disabled={downloadingReceiptId === s.id}
-                                      title="Download sale receipt PDF"
-                                      onClick={() => downloadPaymentReceipt(s.id, s.sale_number ?? s.id.slice(-8).toUpperCase())}
+                                      disabled={downloadingReceiptId === p.id}
+                                      title="Download receipt for this payment"
+                                      onClick={() => downloadPaymentReceipt(s.id, p.id, s.sale_number ?? s.id.slice(-8).toUpperCase())}
                                       className="ml-auto flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-600 hover:bg-purple-100 hover:border-purple-300 transition-colors disabled:opacity-50 disabled:cursor-wait"
                                     >
-                                      {downloadingReceiptId === s.id
+                                      {downloadingReceiptId === p.id
                                         ? <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
                                         : <Download className="h-3 w-3" />}
                                       Receipt

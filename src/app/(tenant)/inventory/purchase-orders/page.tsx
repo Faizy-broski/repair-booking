@@ -2,7 +2,8 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import Link from 'next/link'
-import { Plus, Eye, X, CheckCircle, Copy, Banknote, Loader2, Pencil, Trash2, ArrowLeft } from 'lucide-react'
+import { Plus, Eye, X, CheckCircle, Copy, Banknote, Loader2, Pencil, Trash2, ArrowLeft, MoreVertical } from 'lucide-react'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -293,51 +294,65 @@ export default function PurchaseOrdersPage() {
     },
     {
       id: 'actions',
-      header: '',
+      header: 'Actions',
       cell: ({ row }) => (
-        <div className="flex gap-1">
-          <Link
-            href={`/inventory/purchase-orders/${row.original.id}`}
-            onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center justify-center rounded-md p-1.5 text-sm text-on-surface-variant hover:bg-surface-container transition-colors"
-          >
-            <Eye className="h-3.5 w-3.5" />
-          </Link>
-          {row.original.status === 'draft' && (
-            <Button size="sm" variant="ghost" title="Edit" onClick={(e) => { e.stopPropagation(); openEditRow(row.original.id) }}>
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-          )}
-          <Button size="sm" variant="ghost" title="Clone" onClick={async (e) => {
-            e.stopPropagation()
-            if (!activeBranch) return
-            const res = await fetch(`/api/purchase-orders/${row.original.id}/clone?branch_id=${activeBranch.id}`, { method: 'POST' })
-            if (res.ok) queryClient.invalidateQueries({ queryKey: ['purchase-orders', activeBranch?.id] })
-          }}>
-            <Copy className="h-3.5 w-3.5" />
-          </Button>
-          {row.original.status === 'received' && row.original.payment_status !== 'paid' && (
-            <Button
-              size="sm"
-              variant="ghost"
-              title="Record Payment"
-              className="text-purple-600 hover:text-purple-700"
-              onClick={(e) => { e.stopPropagation(); setPaymentPO(row.original); setPaymentAmount(''); setPaymentMethod('bank_transfer') }}
-            >
-              <Banknote className="h-3.5 w-3.5" />
-            </Button>
-          )}
-          {DELETABLE_STATUSES.includes(row.original.status) && (
-            <Button
-              size="sm"
-              variant="ghost"
-              title="Delete"
-              className="text-red-500 hover:text-red-600"
-              onClick={(e) => { e.stopPropagation(); handleDelete(row.original) }}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          )}
+        <div className="flex justify-start" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none">
+                <MoreVertical className="h-4 w-4 stroke-[2.5]" />
+              </button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content align="end" sideOffset={4} className="z-50 min-w-[180px] overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                <DropdownMenu.Item asChild>
+                  <Link
+                    href={`/inventory/purchase-orders/${row.original.id}`}
+                    className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-50"
+                  >
+                    <Eye className="h-4 w-4 text-gray-400" /> View
+                  </Link>
+                </DropdownMenu.Item>
+                {row.original.status === 'draft' && (
+                  <DropdownMenu.Item
+                    onSelect={() => openEditRow(row.original.id)}
+                    className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-50"
+                  >
+                    <Pencil className="h-4 w-4 text-gray-400" /> Edit
+                  </DropdownMenu.Item>
+                )}
+                <DropdownMenu.Item
+                  onSelect={async () => {
+                    if (!activeBranch) return
+                    const res = await fetch(`/api/purchase-orders/${row.original.id}/clone?branch_id=${activeBranch.id}`, { method: 'POST' })
+                    if (res.ok) queryClient.invalidateQueries({ queryKey: ['purchase-orders', activeBranch?.id] })
+                  }}
+                  className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-50"
+                >
+                  <Copy className="h-4 w-4 text-gray-400" /> Clone
+                </DropdownMenu.Item>
+                {row.original.status === 'received' && row.original.payment_status !== 'paid' && (
+                  <DropdownMenu.Item
+                    onSelect={() => { setPaymentPO(row.original); setPaymentAmount(''); setPaymentMethod('bank_transfer') }}
+                    className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-purple-600 outline-none hover:bg-purple-50"
+                  >
+                    <Banknote className="h-4 w-4" /> Record Payment
+                  </DropdownMenu.Item>
+                )}
+                {DELETABLE_STATUSES.includes(row.original.status) && (
+                  <>
+                    <DropdownMenu.Separator className="my-1 border-t border-gray-100" />
+                    <DropdownMenu.Item
+                      onSelect={() => handleDelete(row.original)}
+                      className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-red-600 outline-none hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" /> Delete
+                    </DropdownMenu.Item>
+                  </>
+                )}
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
         </div>
       ),
     },

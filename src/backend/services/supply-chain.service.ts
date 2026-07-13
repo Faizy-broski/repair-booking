@@ -75,7 +75,7 @@ export const SupplierService = {
     }))
   },
 
-  async getReceiptData(poId: string, businessId: string) {
+  async getReceiptData(poId: string, businessId: string, paymentId?: string) {
     const { data: po, error: poErr } = await adminSupabase
       .from('purchase_orders')
       .select('id, po_number, total, amount_paid, payment_status, status, created_at, supplier_id, suppliers(name)')
@@ -91,7 +91,18 @@ export const SupplierService = {
       .order('created_at', { ascending: true })
     if (payErr) throw payErr
 
-    return { ...po, payments: payments ?? [] }
+    const ordered = payments ?? []
+    if (paymentId) {
+      const idx = ordered.findIndex((p: any) => p.id === paymentId)
+      if (idx !== -1) {
+        const cumulativePaidThroughThisPayment = ordered
+          .slice(0, idx + 1)
+          .reduce((sum: number, p: any) => sum + Number(p.amount), 0)
+        return { ...po, payments: [ordered[idx]], amount_paid: cumulativePaidThroughThisPayment }
+      }
+    }
+
+    return { ...po, payments: ordered }
   },
 }
 

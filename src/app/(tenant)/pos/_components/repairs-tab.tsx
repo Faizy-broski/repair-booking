@@ -54,7 +54,7 @@ export function RepairsTab() {
 
   // ── Repair parts search ────────────────────────────────────────────────────
   const [partQuery, setPartQuery]           = useState('')
-  const [partResults, setPartResults]       = useState<Array<{ id: string; name: string; selling_price: number | null; cost_price: number | null }>>([])
+  const [partResults, setPartResults]       = useState<Array<{ id: string; name: string; selling_price: number | null; cost_price: number | null; on_hand?: number; is_service?: boolean }>>([])
   const [showPartDrop, setShowPartDrop]     = useState(false)
   const [partSearchLoading, setPartSearchLoading] = useState(false)
   const partSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -137,11 +137,23 @@ export function RepairsTab() {
     }, 300)
   }
 
-  function addPartFromInventory(p: { id: string; name: string; selling_price: number | null; cost_price: number | null }) {
+  function addPartFromInventory(p: { id: string; name: string; selling_price: number | null; cost_price: number | null; on_hand?: number; is_service?: boolean }) {
+    const maxStock = p.is_service ? null : (p.on_hand ?? 0)
     setRepairParts(prev => {
       const existing = prev.find(r => r.product_id === p.id)
-      if (existing) return prev.map(r => r.product_id === p.id ? { ...r, qty: r.qty + 1 } : r)
-      return [...prev, { tempId: Math.random().toString(36).slice(2), product_id: p.id, name: p.name, qty: 1, unit_price: p.selling_price ?? 0, unit_cost: p.cost_price ?? 0 }]
+      if (existing) {
+        const cap = existing.max_stock ?? Infinity
+        if (existing.qty >= cap) {
+          toast.error(`Only ${cap} in stock for "${existing.name}"`)
+          return prev
+        }
+        return prev.map(r => r.product_id === p.id ? { ...r, qty: Math.min(r.qty + 1, cap) } : r)
+      }
+      if (maxStock !== null && maxStock <= 0) {
+        toast.error(`"${p.name}" is out of stock`)
+        return prev
+      }
+      return [...prev, { tempId: Math.random().toString(36).slice(2), product_id: p.id, name: p.name, qty: 1, unit_price: p.selling_price ?? 0, unit_cost: p.cost_price ?? 0, max_stock: maxStock }]
     })
     setPartQuery(''); setPartResults([]); setShowPartDrop(false)
   }
@@ -151,7 +163,7 @@ export function RepairsTab() {
     const price = parseFloat(quickPartPrice) || 0
     const cost  = parseFloat(quickPartCost)  || 0
     if (!name) return
-    setRepairParts(prev => [...prev, { tempId: Math.random().toString(36).slice(2), product_id: null, name, qty: 1, unit_price: price, unit_cost: cost }])
+    setRepairParts(prev => [...prev, { tempId: Math.random().toString(36).slice(2), product_id: null, name, qty: 1, unit_price: price, unit_cost: cost, max_stock: null }])
     setPartQuery(''); setQuickPartPrice(''); setQuickPartCost(''); setShowPartDrop(false)
   }
 
@@ -592,8 +604,13 @@ export function RepairsTab() {
                           className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
                           onMouseDown={(e) => { e.preventDefault(); addPartFromInventory(p) }}
                         >
-                          <span className="text-gray-700">{p.name}</span>
-                          <span className="text-xs font-semibold text-teal-700">{formatCurrency(p.selling_price ?? 0)}</span>
+                          <span className="min-w-0 flex-1 truncate text-gray-700">{p.name}</span>
+                          {!p.is_service && (
+                            <span className={`shrink-0 text-xs font-medium ${(p.on_hand ?? 0) > 0 ? 'text-gray-400' : 'text-red-500'}`}>
+                              {(p.on_hand ?? 0) > 0 ? `${p.on_hand} in stock` : 'Out of stock'}
+                            </span>
+                          )}
+                          <span className="shrink-0 text-xs font-semibold text-teal-700">{formatCurrency(p.selling_price ?? 0)}</span>
                         </button>
                       </li>
                     ))}
@@ -664,8 +681,14 @@ export function RepairsTab() {
                         <td className="px-3 py-1.5 text-gray-700">{p.name}</td>
                         <td className="px-2 py-1.5 text-center">
                           <input
-                            type="number" min="1" value={p.qty}
-                            onChange={(e) => setRepairParts(prev => prev.map(r => r.tempId === p.tempId ? { ...r, qty: Math.max(1, parseInt(e.target.value) || 1) } : r))}
+                            type="number" min="1" max={p.max_stock ?? undefined} value={p.qty}
+                            onChange={(e) => setRepairParts(prev => prev.map(r => {
+                              if (r.tempId !== p.tempId) return r
+                              const cap = r.max_stock ?? Infinity
+                              const requested = Math.max(1, parseInt(e.target.value) || 1)
+                              if (requested > cap) toast.error(`Only ${cap} in stock for "${r.name}"`)
+                              return { ...r, qty: Math.min(requested, cap) }
+                            }))}
                             className="h-6 w-12 rounded border border-gray-200 px-1 text-center text-xs"
                           />
                         </td>

@@ -12,9 +12,10 @@
  * lowest price_monthly rather than by name — robust to renaming) — never
  * hardcoded, so a superadmin edit to that plan's numbers is picked up
  * automatically everywhere a Custom Plan is built or priced. Only the
- * *increment costs* (+£10/branch, +£5 per 5 staff, +£5 per 1000 units,
+ * *increment costs* (+£15/branch, +£5 per 5 staff, +£5 per 1000 units,
  * +£10 flat for "Unlimited") are fixed business rules, independent of
- * any plan row.
+ * any plan row. Must be kept in sync with the client-side mirror in
+ * src/components/landing/custom-plan-card.tsx.
  */
 import { z } from 'zod'
 
@@ -90,7 +91,7 @@ export type CustomPlanDimensions = {
 /** Recomputes the monthly price in pence. Never trust a client-sent total — always call this. */
 export function computeCustomPlanPricePence(dims: CustomPlanDimensions, baseline: CustomPlanBaseline): number {
   let total = baseline.basePricePence
-  total += (dims.branches - baseline.baseBranches) * 1000
+  total += (dims.branches - baseline.baseBranches) * 1500
   total += ((dims.staff - baseline.baseStaff) / 5) * 500
   total += dims.inventoryLimit === null ? 1000 : ((dims.inventoryLimit - baseline.baseInventory) / 1000) * 500
   total += dims.repairLimit === null ? 1000 : ((dims.repairLimit - baseline.baseRepair) / 1000) * 500

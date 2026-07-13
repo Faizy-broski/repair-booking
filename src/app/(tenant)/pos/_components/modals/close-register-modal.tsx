@@ -1,10 +1,20 @@
 'use client'
-import { AlertTriangle, Plus, Minus } from 'lucide-react'
+import { useState } from 'react'
+import { AlertTriangle, Plus, Minus, ChevronDown, ChevronUp } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
 import { formatCurrency } from '@/lib/utils'
 import { DENOMINATIONS, denomTotal, type ZReport } from '../../_types'
+
+interface SessionStats {
+  total_sales: number; repair_sales: number; total_refunds: number; repair_refunds: number
+  store_credit_sales: number; loyalty_points_sales: number; on_account_sales: number
+  repair_store_credit_sales: number; repair_loyalty_points_sales: number
+  cash_in: number; cash_out: number; buyback_out: number
+  credit_repayments_cash: number; credit_repayments_total: number
+  expected_cash: number; opening_float: number
+}
 
 interface Props {
   open: boolean
@@ -18,18 +28,20 @@ interface Props {
   handleCloseRegister: () => void
   expectedCash: number | null
   expectedCashLoading: boolean
+  sessionStats: SessionStats | null
 }
 
 export function CloseRegisterModal({
   open, onClose, zReport, sessionProcessing,
   closingDenoms, setClosingDenoms, closingNote, setClosingNote, handleCloseRegister,
-  expectedCash, expectedCashLoading,
+  expectedCash, expectedCashLoading, sessionStats,
 }: Props) {
   const verifiedTotal = denomTotal(closingDenoms)
   const difference = expectedCash !== null ? verifiedTotal - expectedCash : null
   const hasDiscrepancy = difference !== null && Math.abs(difference) > 0.01
+  const [showBreakdown, setShowBreakdown] = useState(false)
   return (
-    <Modal open={open} onClose={onClose} title="End Shift" size={zReport ? 'xl' : 'sm'}>
+    <Modal open={open} onClose={onClose} title="End Shift" size={zReport ? 'xl' : showBreakdown ? 'md' : 'sm'}>
       {zReport ? (
         <div className="space-y-5">
           <p className="-mt-2 text-sm text-gray-500">Register closed successfully. Here&apos;s the summary for this shift.</p>
@@ -87,9 +99,24 @@ export function CloseRegisterModal({
                   <p className="mt-0.5 font-semibold text-orange-700">-{formatCurrency(zReport.cash_out ?? 0)}</p>
                 </div>
               )}
+              {(zReport.buyback_out ?? 0) > 0 && (
+                <div className="rounded-xl border border-pink-200 bg-pink-50 p-3">
+                  <p className="text-xs text-pink-700">Buyback</p>
+                  <p className="mt-0.5 font-semibold text-pink-700">-{formatCurrency(zReport.buyback_out ?? 0)}</p>
+                </div>
+              )}
+              {(zReport.credit_repayments_cash ?? 0) > 0 && (
+                <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-3">
+                  <p className="text-xs text-cyan-700">Credit Repaid (Cash)</p>
+                  <p className="mt-0.5 font-semibold text-cyan-700">+{formatCurrency(zReport.credit_repayments_cash ?? 0)}</p>
+                </div>
+              )}
             </div>
             {((zReport.cash_in ?? 0) > 0 || (zReport.cash_out ?? 0) > 0) && (
-              <p className="mt-2 text-xs text-gray-400 italic">Cash In/Out are manual drawer adjustments for the whole shift — not tied to product or repair sales specifically.</p>
+              <p className="mt-2 text-xs text-gray-400 italic">Cash In/Out are manual drawer adjustments for the whole shift — not tied to product or repair sales specifically. Buyback is a subset of Cash Out, shown separately for clarity.</p>
+            )}
+            {(zReport.credit_repayments_cash ?? 0) > 0 && (
+              <p className="mt-1 text-xs text-gray-400 italic">Credit Repaid (Cash) is cash collected today against a balance sold in a prior shift — it affects Expected Cash but is not new revenue this shift.</p>
             )}
           </div>
 
@@ -182,10 +209,10 @@ export function CloseRegisterModal({
 
           <div>
             <p className="mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Count Denominations</p>
-            <div className="grid grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
               {DENOMINATIONS.map(d => (
-                <div key={d.value} className="flex flex-col gap-1 rounded-lg border border-gray-200 bg-white p-1.5 shadow-sm">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase text-center">{d.label}</span>
+                <div key={d.value} className="flex min-w-0 flex-col gap-1 rounded-lg border border-gray-200 bg-white p-1.5 shadow-sm">
+                  <span className="truncate text-[10px] font-bold text-gray-400 uppercase text-center">{d.label}</span>
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
@@ -193,7 +220,7 @@ export function CloseRegisterModal({
                         const v = (closingDenoms[String(d.value)] ?? 0)
                         if (v > 0) setClosingDenoms(prev => ({ ...prev, [String(d.value)]: v - 1 }))
                       }}
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200 sm:h-6 sm:w-6"
                     >
                       <Minus className="h-3 w-3" />
                     </button>
@@ -204,7 +231,7 @@ export function CloseRegisterModal({
                         const v = parseInt(e.target.value) || 0
                         setClosingDenoms(prev => ({ ...prev, [String(d.value)]: v }))
                       }}
-                      className="h-6 w-full min-w-0 bg-transparent text-center text-sm font-bold text-gray-900 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className="h-7 w-full min-w-0 bg-transparent text-center text-sm font-bold text-gray-900 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none sm:h-6"
                     />
                     <button
                       type="button"
@@ -212,7 +239,7 @@ export function CloseRegisterModal({
                         const v = (closingDenoms[String(d.value)] ?? 0)
                         setClosingDenoms(prev => ({ ...prev, [String(d.value)]: v + 1 }))
                       }}
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-brand-teal/10 text-brand-teal hover:bg-brand-teal/20"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-brand-teal/10 text-brand-teal hover:bg-brand-teal/20 sm:h-6 sm:w-6"
                     >
                       <Plus className="h-3 w-3" />
                     </button>
@@ -221,6 +248,49 @@ export function CloseRegisterModal({
               ))}
             </div>
           </div>
+
+          {sessionStats && (() => {
+            // Pure revenue (product + repair, less refunds) — Cash In/Out are
+            // manual drawer adjustments, shown as their own tiles instead of
+            // being blended into this figure.
+            const netSales = (sessionStats.total_sales - sessionStats.total_refunds)
+              + (sessionStats.repair_sales - sessionStats.repair_refunds)
+            return (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowBreakdown(v => !v)}
+                  className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:bg-gray-50"
+                >
+                  View Full Breakdown
+                  {showBreakdown ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                </button>
+                {showBreakdown && (
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {([
+                      ['Net Sales',     netSales,                            'text-brand-teal-dark', 'bg-brand-teal'],
+                      ['Product Sales', sessionStats.total_sales,            'text-blue-700',   'bg-blue-500'],
+                      ['Credit Sales',  sessionStats.on_account_sales,       'text-purple-700', 'bg-purple-500'],
+                      ['Repair Sales',  sessionStats.repair_sales,           'text-indigo-700', 'bg-indigo-500'],
+                      ['Credit Repaid', sessionStats.credit_repayments_cash, 'text-cyan-700',   'bg-cyan-500'],
+                      ['Refunds',       -(sessionStats.total_refunds + sessionStats.repair_refunds), 'text-red-700', 'bg-red-500'],
+                      ['Cash In',       sessionStats.cash_in,                'text-green-700',  'bg-green-500'],
+                      ['Cash Out',      sessionStats.cash_out,               'text-orange-700', 'bg-orange-500'],
+                      ['Buyback',       sessionStats.buyback_out,            'text-pink-700',   'bg-pink-500'],
+                    ] as [string, number | undefined, string, string][]).map(([label, value, textCls, dotCls]) => (
+                      <div key={label} className="min-w-0 rounded-xl border border-gray-200 bg-white p-2.5 sm:p-3">
+                        <p className="flex items-center gap-1.5 truncate text-[11px] text-gray-500 sm:text-xs" title={label}>
+                          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotCls}`} />
+                          {label}
+                        </p>
+                        <p className={`mt-0.5 truncate text-sm font-bold sm:text-base ${textCls}`}>{formatCurrency(value ?? 0)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           <div className="rounded-lg bg-gray-50 px-4 py-2.5 text-sm">
             <div className="flex items-center justify-between text-gray-600">

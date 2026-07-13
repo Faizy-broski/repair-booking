@@ -550,7 +550,7 @@ export const ProductService = {
     branchId: string,
     businessId: string,
     amount: number,
-    opts: { product_id?: string; name?: string; selling_price?: number; sku?: string }
+    opts: { product_id?: string; name?: string; selling_price?: number; barcode?: string }
   ) {
     let productId = opts.product_id
 
@@ -560,7 +560,7 @@ export const ProductService = {
         name: opts.name,
         selling_price: opts.selling_price,
         cost_price: amount,
-        sku: opts.sku || null,
+        barcode: opts.barcode || null,
         item_type: 'product',
         is_trade_in: true,
       } as InsertTables<'products'>)

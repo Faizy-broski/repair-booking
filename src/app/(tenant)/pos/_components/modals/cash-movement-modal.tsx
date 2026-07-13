@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
@@ -11,7 +12,7 @@ interface LedgerCategory { id: string; name: string }
 export interface BuybackPayload {
   name: string
   selling_price: number
-  sku?: string
+  barcode?: string
 }
 
 interface Props {
@@ -51,7 +52,8 @@ export function CashMovementModal({
 
   const [buybackName, setBuybackName] = useState('')
   const [buybackSellingPrice, setBuybackSellingPrice] = useState('')
-  const [buybackSku, setBuybackSku] = useState('')
+  const [buybackBarcode, setBuybackBarcode] = useState('')
+  const [barcodeConflict, setBarcodeConflict] = useState(false)
 
   // Fetch expense categories only when user opts in
   useEffect(() => {
@@ -74,8 +76,21 @@ export function CashMovementModal({
     setCategoryId('')
     setBuybackName('')
     setBuybackSellingPrice('')
-    setBuybackSku('')
+    setBuybackBarcode('')
+    setBarcodeConflict(false)
   }
+
+  // Debounced duplicate-barcode check, same pattern as the product creation page
+  useEffect(() => {
+    if (!buybackBarcode) { setBarcodeConflict(false); return }
+    const t = setTimeout(async () => {
+      const res = await fetch(`/api/products/check-availability?barcode=${encodeURIComponent(buybackBarcode)}`).catch(() => null)
+      if (!res) return
+      const json = await res.json()
+      if (json.data) setBarcodeConflict(json.data.barcodeExists)
+    }, 500)
+    return () => clearTimeout(t)
+  }, [buybackBarcode])
 
   async function createCategory(name: string) {
     if (!businessId) return
@@ -195,12 +210,27 @@ export function CashMovementModal({
                   value={buybackSellingPrice}
                   onChange={e => setBuybackSellingPrice(e.target.value)}
                 />
-                <Input
-                  label="SKU (optional)"
-                  placeholder="Leave blank to assign later"
-                  value={buybackSku}
-                  onChange={e => setBuybackSku(e.target.value)}
-                />
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Barcode <span className="text-xs font-normal text-gray-400">(optional)</span></label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Leave blank to auto-generate"
+                      value={buybackBarcode}
+                      onChange={e => setBuybackBarcode(e.target.value)}
+                      className={`flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal ${barcodeConflict ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                    />
+                    <button
+                      type="button"
+                      title="Generate Barcode"
+                      onClick={() => setBuybackBarcode(Math.floor(100000000000 + Math.random() * 900000000000).toString())}
+                      className="shrink-0 rounded-lg border border-brand-teal bg-brand-teal/10 px-2.5 py-2 text-brand-teal hover:bg-brand-teal hover:text-white transition-colors"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {barcodeConflict && <p className="mt-1 text-xs text-red-500">This barcode is already in use</p>}
+                </div>
                 <p className="text-xs text-gray-400">The amount above becomes this product's cost, and one unit is added to stock.</p>
               </div>
             )}
@@ -218,13 +248,13 @@ export function CashMovementModal({
             loading={cashMovementSaving}
             disabled={
               !cashMovementAmount || parseFloat(cashMovementAmount) <= 0 ||
-              (isCashOut && purpose === 'buyback' && (!buybackName.trim() || !buybackSellingPrice || parseFloat(buybackSellingPrice) < 0))
+              (isCashOut && purpose === 'buyback' && (!buybackName.trim() || !buybackSellingPrice || parseFloat(buybackSellingPrice) < 0 || barcodeConflict))
             }
             onClick={() => handleCashMovement(
               isCashOut && purpose === 'expense' ? categoryId || null : null,
               isCashOut && purpose === 'expense',
               isCashOut && purpose === 'buyback'
-                ? { name: buybackName.trim(), selling_price: parseFloat(buybackSellingPrice), sku: buybackSku.trim() || undefined }
+                ? { name: buybackName.trim(), selling_price: parseFloat(buybackSellingPrice), barcode: buybackBarcode.trim() || undefined }
                 : null
             )}
           >

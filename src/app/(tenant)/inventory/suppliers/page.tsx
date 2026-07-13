@@ -23,7 +23,7 @@ import { DataTable } from '@/components/shared/data-table'
 
 interface Supplier {
   id: string; name: string; contact_person: string | null
-  email: string | null; phone: string | null; city: string | null
+  email: string | null; phone: string | null; city: string | null; country: string | null
   payment_terms_days: number; currency: string; is_active: boolean
 }
 
@@ -308,18 +308,28 @@ export default function SuppliersPage() {
             </div>
           ) : (
             <div className="w-full overflow-x-auto rounded-xl border border-outline-variant/50 bg-white shadow-sm">
-              <table className="w-full min-w-[720px] table-fixed text-sm">
+              <table className="w-full min-w-[980px] table-fixed text-sm">
                 <colgroup>
-                  <col className="w-[32%]" />
-                  <col className="w-[34%]" />
-                  <col className="w-[18%]" />
                   <col className="w-[16%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[10%]" />
                 </colgroup>
                 <thead>
                   <tr className="bg-primary">
                     <th className="px-4 py-3 text-left text-[13px] font-bold uppercase tracking-wider text-white">Supplier</th>
-                    <th className="px-4 py-3 text-left text-[13px] font-bold uppercase tracking-wider text-white">Contact</th>
+                    <th className="px-4 py-3 text-left text-[13px] font-bold uppercase tracking-wider text-white">Name</th>
+                    <th className="px-4 py-3 text-left text-[13px] font-bold uppercase tracking-wider text-white">Email</th>
+                    <th className="px-4 py-3 text-left text-[13px] font-bold uppercase tracking-wider text-white">Phone</th>
+                    <th className="px-4 py-3 text-left text-[13px] font-bold uppercase tracking-wider text-white">City</th>
+                    <th className="px-4 py-3 text-left text-[13px] font-bold uppercase tracking-wider text-white">Country</th>
                     <th className="px-4 py-3 text-left text-[13px] font-bold uppercase tracking-wider text-white">Terms</th>
+                    <th className="px-4 py-3 text-left text-[13px] font-bold uppercase tracking-wider text-white">Currency</th>
                     <th className="px-4 py-3 text-right text-[13px] font-bold uppercase tracking-wider text-white">Actions</th>
                   </tr>
                 </thead>
@@ -331,31 +341,42 @@ export default function SuppliersPage() {
                       className={`group cursor-pointer border-t border-gray-100 transition-colors hover:bg-blue-50 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                     >
                       <td className="px-4 py-3 align-middle">
-                        <div className="flex min-w-0 items-center gap-3">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 shadow-sm shadow-blue-500/30">
-                            <Truck className="h-4 w-4 text-white" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                              <span className="truncate font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{s.name}</span>
-                              {!s.is_active && <Badge variant="default">Inactive</Badge>}
-                            </div>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span className="truncate font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{s.name}</span>
+                            {!s.is_active && <Badge variant="default">Inactive</Badge>}
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 align-middle text-gray-500">
-                        <div className="flex flex-col gap-0.5 text-xs">
-                          {s.contact_person && <span className="truncate font-medium text-gray-700">{s.contact_person}</span>}
-                          {s.email && <span className="flex min-w-0 items-center gap-1"><Mail className="h-3 w-3 shrink-0" /> <span className="truncate">{s.email}</span></span>}
-                          {s.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3 shrink-0" /> {s.phone}</span>}
-                          {!s.contact_person && !s.email && !s.phone && <span className="italic text-gray-300">No contact details</span>}
-                        </div>
+                      <td className="px-4 py-3 align-middle text-xs">
+                        {s.contact_person
+                          ? <span className="truncate font-medium text-gray-700">{s.contact_person}</span>
+                          : <span className="italic text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3 align-middle text-xs text-gray-500">
+                        {s.email
+                          ? <span className="flex min-w-0 items-center gap-1"><Mail className="h-3 w-3 shrink-0" /> <span className="truncate">{s.email}</span></span>
+                          : <span className="italic text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3 align-middle text-xs text-gray-500">
+                        {s.phone
+                          ? <span className="flex items-center gap-1"><Phone className="h-3 w-3 shrink-0" /> {s.phone}</span>
+                          : <span className="italic text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3 align-middle text-xs text-gray-500">
+                        {s.city
+                          ? <span className="flex items-center gap-1 truncate"><MapPin className="h-3 w-3 shrink-0" /> {s.city}</span>
+                          : <span className="italic text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3 align-middle text-xs text-gray-500">
+                        {s.country
+                          ? <span className="truncate">{s.country}</span>
+                          : <span className="italic text-gray-300">—</span>}
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <span className="font-bold text-gray-700">Net {s.payment_terms_days}d</span>
-                        <span className="ml-1 text-xs text-gray-400">· {s.currency}</span>
-                        {s.city && <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-gray-400"><MapPin className="h-3 w-3 shrink-0" /> {s.city}</p>}
                       </td>
+                      <td className="px-4 py-3 align-middle text-xs text-gray-500">{s.currency}</td>
                       <td className="px-4 py-3 align-middle text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-1">
                           <Button size="sm" variant="ghost" onClick={() => openModal(s)}>
@@ -458,7 +479,7 @@ export default function SuppliersPage() {
         open={modal.open}
         onClose={() => setModal({ open: false, editing: null })}
         title={modal.editing ? 'Edit Supplier' : 'New Supplier'}
-        size="sm"
+        size="md"
       >
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
@@ -468,8 +489,12 @@ export default function SuppliersPage() {
             <Input label="Contact Person" value={form.contact_person} onChange={(e) => setForm((f) => ({ ...f, contact_person: e.target.value }))} />
           </div>
 
-          <Input label="Email" type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
-          <Input label="Phone" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+          <div className="col-span-2">
+            <Input label="Email" type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+          </div>
+          <div className="col-span-2">
+            <Input label="Phone" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+          </div>
 
           <Input label="City" value={form.city} onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))} />
           <Input label="Country" value={form.country} onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))} />

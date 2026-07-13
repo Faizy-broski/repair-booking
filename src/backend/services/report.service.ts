@@ -296,6 +296,54 @@ export const ReportService = {
     }))
   },
 
+  // Repairs still open (not in a terminal status) after `staleDays`, whose
+  // parts already left inventory (deducted at booking time — deduct_repair_parts,
+  // migration 098) but whose cost hasn't hit COGS yet (get_profit_loss only
+  // counts repair_items cost for terminal-status repairs, migration 131). This
+  // surfaces stock that's "in limbo": already gone from stock counts, but not
+  // yet reflected as a cost anywhere, for as long as the ticket stays open.
+  async getStaleRepairPartsReport(branchId: string, staleDays: number) {
+    const TERMINAL_NAMES      = new Set(['repaired', 'collected', 'unrepairable', 'refunded', 'completed', 'done', 'fixed', 'closed', 'picked_up', 'handover'])
+    const COMPLETION_KEYWORDS = ['complet', 'done', 'fixed', 'pick', 'closed', 'resolv', 'finish', 'collect', 'handover']
+    const isTerminal = (s: string) => {
+      const lo = (s ?? '').toLowerCase().trim()
+      return TERMINAL_NAMES.has(lo) || COMPLETION_KEYWORDS.some(kw => lo.includes(kw))
+    }
+
+    const cutoff = new Date(Date.now() - staleDays * 24 * 60 * 60 * 1000).toISOString()
+
+    const { data, error } = await db('repair_items')
+      .select('repair_id, quantity, unit_cost, repairs!inner(id, job_number, status, created_at, device_type, device_brand, customers(first_name, last_name))')
+      .eq('repairs.branch_id', branchId)
+      .lte('repairs.created_at', cutoff)
+      .not('product_id', 'is', null)
+    if (error) throw error
+
+    const byRepair: Record<string, { repair: any; parts_count: number; total_cost: number }> = {}
+    for (const item of data ?? []) {
+      const repair = (item as any).repairs
+      if (!repair || isTerminal(repair.status)) continue
+      if (!byRepair[item.repair_id]) byRepair[item.repair_id] = { repair, parts_count: 0, total_cost: 0 }
+      byRepair[item.repair_id].parts_count += item.quantity ?? 0
+      byRepair[item.repair_id].total_cost += (item.quantity ?? 0) * (item.unit_cost ?? 0)
+    }
+
+    const now = Date.now()
+    return Object.values(byRepair)
+      .map(({ repair, parts_count, total_cost }) => ({
+        repair_id: repair.id,
+        job_number: repair.job_number,
+        customer_name: repair.customers ? [repair.customers.first_name, repair.customers.last_name].filter(Boolean).join(' ') : null,
+        device: [repair.device_brand, repair.device_type].filter(Boolean).join(' ') || null,
+        status: repair.status,
+        created_at: repair.created_at,
+        days_open: Math.floor((now - new Date(repair.created_at).getTime()) / (24 * 60 * 60 * 1000)),
+        parts_count,
+        total_cost_at_risk: total_cost,
+      }))
+      .sort((a, b) => b.days_open - a.days_open)
+  },
+
   async getInventoryAdjustmentsReport(branchId: string, from: string, to: string) {
     const { data, error } = await adminSupabase
       .from('stock_movements')
@@ -427,25 +475,37 @@ export const ReportService = {
     }
   },
 
+  // Records the cash movement and, when purpose is 'expense' or 'buyback', its
+  // offsetting expense/product-inventory entries — all inside a single Postgres
+  // transaction (record_cash_movement RPC), so a failure in the offsetting side
+  // (e.g. a duplicate barcode) rolls back the cash movement too, instead of
+  // leaving cash recorded as removed from the drawer with nothing to show for it.
   async addCashMovement(payload: {
     sessionId: string; branchId: string; businessId: string
     cashierId: string; type: 'cash_in' | 'cash_out'
     amount: number; paymentType?: string; notes?: string
+    purpose?: 'plain' | 'expense' | 'buyback'
+    expenseCategoryId?: string | null; expenseTitle?: string | null
+    buybackProductId?: string | null; buybackName?: string | null
+    buybackSellingPrice?: number | null; buybackBarcode?: string | null
   }) {
-    const { data, error } = await (adminSupabase as any)
-      .from('cash_movements')
-      .insert({
-        session_id: payload.sessionId,
-        branch_id: payload.branchId,
-        business_id: payload.businessId,
-        cashier_id: payload.cashierId,
-        type: payload.type,
-        amount: payload.amount,
-        payment_type: payload.paymentType ?? 'cash',
-        notes: payload.notes ?? null,
-      })
-      .select()
-      .single()
+    const { data, error } = await (adminSupabase as any).rpc('record_cash_movement', {
+      p_session_id: payload.sessionId,
+      p_branch_id: payload.branchId,
+      p_business_id: payload.businessId,
+      p_cashier_id: payload.cashierId,
+      p_type: payload.type,
+      p_amount: payload.amount,
+      p_payment_type: payload.paymentType ?? 'cash',
+      p_notes: payload.notes ?? null,
+      p_purpose: payload.purpose ?? 'plain',
+      p_expense_category_id: payload.expenseCategoryId ?? null,
+      p_expense_title: payload.expenseTitle ?? null,
+      p_buyback_product_id: payload.buybackProductId ?? null,
+      p_buyback_name: payload.buybackName ?? null,
+      p_buyback_selling_price: payload.buybackSellingPrice ?? null,
+      p_buyback_barcode: payload.buybackBarcode ?? null,
+    })
     if (error) throw error
     return data
   },

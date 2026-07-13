@@ -86,7 +86,7 @@ export function makeDefaultCustomPlanState(baseline: CustomPlanBaseline): Custom
 /** Display-only — the server always independently recomputes this in pence. */
 export function computeCustomPlanPrice(state: CustomPlanState, baseline: CustomPlanBaseline): number {
   let total = baseline.basePricePence / 100;
-  total += (state.branches - baseline.baseBranches) * 10;
+  total += (state.branches - baseline.baseBranches) * 15;
   total += ((state.staff - baseline.baseStaff) / 5) * 5;
   total += state.inventoryUnlimited
     ? 10
@@ -226,7 +226,7 @@ export function CustomPlanCard({
       </div>
 
       <p className="mt-4 text-sm leading-relaxed text-white/55">
-        Build your own plan — scale branches, staff, and limits exactly to
+        Build your own plan scale branches, staff, and limits exactly to
         your needs.
       </p>
 

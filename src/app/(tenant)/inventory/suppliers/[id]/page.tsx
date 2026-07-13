@@ -3,7 +3,7 @@ import { useState, use } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Truck, Phone, Mail, MapPin, Banknote, FileText, Download, Receipt, Search, X, Loader2 } from 'lucide-react'
+import { ArrowLeft, Truck, Phone, Mail, MapPin, Banknote, FileText, Download, Receipt, Search, X, Loader2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { BrandSpinner } from '@/components/ui/brand-spinner'
 import { Button } from '@/components/ui/button'
@@ -73,7 +73,7 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
     staleTime: 60_000,
   })
 
-  const { data: payablePOs = [] } = useQuery<PayablePO[]>({
+  const { data: payablePOs = [], refetch: refetchPayablePOs, isFetching: isRefreshingPayablePOs } = useQuery<PayablePO[]>({
     queryKey: ['supplier-payment-history', id],
     queryFn: async () => {
       const res = await fetch(`/api/suppliers/${id}/payments`)
@@ -108,17 +108,17 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
   })
   const hasActiveFilters = !!(poSearch || statementFrom || statementTo)
 
-  async function downloadReceipt(poId: string, poRef: string) {
+  async function downloadReceipt(poId: string, paymentId: string, poRef: string) {
     if (downloadingReceiptId) return
-    setDownloadingReceiptId(poId)
+    setDownloadingReceiptId(paymentId)
     try {
-      const res = await fetch(`/api/purchase-orders/${poId}/receipt`)
+      const res = await fetch(`/api/purchase-orders/${poId}/receipt?paymentId=${paymentId}`)
       if (!res.ok) { toast.error('Failed to generate receipt'); return }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `po-receipt-${poRef}.pdf`
+      a.download = `po-receipt-${poRef}-payment-${paymentId.slice(-6)}.pdf`
       a.click()
       URL.revokeObjectURL(url)
     } catch {
@@ -324,6 +324,10 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
 
               <div className="flex-1" />
 
+              <Button size="sm" variant="outline" onClick={() => refetchPayablePOs()}
+                className="border-slate-500 text-slate-300 hover:bg-slate-700 text-xs font-semibold h-8 gap-1 bg-transparent">
+                <RefreshCw className={`h-3.5 w-3.5 ${isRefreshingPayablePOs ? 'animate-spin' : ''}`} /> Refresh
+              </Button>
               <Button size="sm" variant="outline" loading={downloadingStatement} onClick={downloadStatement}
                 className="border-purple-400 text-purple-300 hover:bg-purple-900/40 text-xs font-semibold h-8 gap-1 bg-transparent">
                 <FileText className="h-3.5 w-3.5" /> Statement
@@ -402,12 +406,12 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
                                   </span>
                                   <button
                                     type="button"
-                                    disabled={downloadingReceiptId === po.id}
-                                    title="Download purchase order receipt PDF"
-                                    onClick={() => downloadReceipt(po.id, po.po_number)}
+                                    disabled={downloadingReceiptId === p.id}
+                                    title="Download receipt for this payment"
+                                    onClick={() => downloadReceipt(po.id, p.id, po.po_number)}
                                     className="ml-auto flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-600 hover:bg-purple-100 hover:border-purple-300 transition-colors disabled:opacity-50 disabled:cursor-wait"
                                   >
-                                    {downloadingReceiptId === po.id
+                                    {downloadingReceiptId === p.id
                                       ? <Loader2 className="h-3 w-3 animate-spin" />
                                       : <Download className="h-3 w-3" />}
                                     Receipt

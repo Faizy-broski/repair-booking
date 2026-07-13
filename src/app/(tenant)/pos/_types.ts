@@ -25,6 +25,9 @@ export interface ZReport {
   transaction_count?: number
   cash_in?: number
   cash_out?: number
+  buyback_out?: number
+  credit_repayments_cash?: number
+  credit_repayments_total?: number
   opening_float?: number
   closing_cash?: number
   expected_cash?: number
@@ -60,6 +63,7 @@ export interface RepairLineItem {
   qty: number
   unit_price: number
   unit_cost: number
+  max_stock: number | null
 }
 
 export interface RepairDetailsForm {

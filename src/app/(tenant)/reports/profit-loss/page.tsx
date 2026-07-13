@@ -5,6 +5,7 @@ import { Download, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency } from '@/lib/utils'
+import { exportExcel } from '@/lib/export-excel'
 import { DateRangeBar } from '../_components/date-range-bar'
 import Link from 'next/link'
 
@@ -16,10 +17,9 @@ interface ProfitLossData {
 
 function firstOfMonth() { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] }
 function today() { return new Date().toISOString().split('T')[0] }
-function exportCsv(data: ProfitLossData, filename: string) {
-  const rows = Object.entries(data).map(([k, v]) => `${k},${v}`)
-  const csv = ['metric,value', ...rows].join('\n')
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = filename; a.click()
+function exportPL(data: ProfitLossData, filename: string) {
+  const rows = Object.entries(data).map(([metric, value]) => ({ metric, value }))
+  exportExcel(rows, filename)
 }
 
 export default function ProfitLossReportPage() {
@@ -52,8 +52,8 @@ export default function ProfitLossReportPage() {
             <p className="text-sm text-on-surface-variant mt-0.5">Revenue, costs and net profit analysis</p>
           </div>
         </div>
-        <Button size="sm" className="w-full sm:w-auto" onClick={() => data && exportCsv(data, `pl-${dateFrom}-${dateTo}.csv`)} disabled={!data}>
-          <Download className="h-4 w-4" /> Export CSV
+        <Button size="sm" className="w-full sm:w-auto" onClick={() => data && exportPL(data, `pl-${dateFrom}-${dateTo}.xlsx`)} disabled={!data}>
+          <Download className="h-4 w-4" /> Export Excel
         </Button>
       </div>
 

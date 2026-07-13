@@ -31,6 +31,13 @@ const cashMovementSchema = z.object({
   amount: z.number().positive(),
   payment_type: z.string().optional(),
   notes: z.string().optional(),
+  purpose: z.enum(['plain', 'expense', 'buyback']).optional(),
+  expense_category_id: z.string().uuid().nullable().optional(),
+  expense_title: z.string().optional(),
+  buyback_product_id: z.string().uuid().optional(),
+  buyback_name: z.string().optional(),
+  buyback_selling_price: z.number().min(0).optional(),
+  buyback_barcode: z.string().optional(),
 })
 
 const savedReportSchema = z.object({
@@ -144,6 +151,11 @@ export const ReportController = {
         const data = await ReportService.getLowStockReport(branchId)
         return ok(data)
       }
+      if (subtype === 'stale_repairs') {
+        const staleDays = Number(searchParams.get('stale_days') ?? '14')
+        const data = await ReportService.getStaleRepairPartsReport(branchId, staleDays)
+        return ok(data)
+      }
       return badRequest('Unknown subtype')
     } catch (err) {
       return serverError('Failed to generate inventory report', err)
@@ -228,6 +240,13 @@ export const ReportController = {
         amount: parsed.data.amount,
         paymentType: parsed.data.payment_type,
         notes: parsed.data.notes,
+        purpose: parsed.data.purpose,
+        expenseCategoryId: parsed.data.expense_category_id,
+        expenseTitle: parsed.data.expense_title,
+        buybackProductId: parsed.data.buyback_product_id,
+        buybackName: parsed.data.buyback_name,
+        buybackSellingPrice: parsed.data.buyback_selling_price,
+        buybackBarcode: parsed.data.buyback_barcode,
       })
       return ok(data)
     } catch (err: any) {

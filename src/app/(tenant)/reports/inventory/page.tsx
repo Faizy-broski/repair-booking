@@ -7,27 +7,26 @@ import { DataTable } from '@/components/shared/data-table'
 import { Badge } from '@/components/ui/badge'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { exportExcel } from '@/lib/export-excel'
 import { DateRangeBar } from '../_components/date-range-bar'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import type { ColumnDef } from '@tanstack/react-table'
 
-type SubTab = 'summary' | 'low_stock' | 'parts_consumption' | 'adjustments'
+type SubTab = 'summary' | 'low_stock' | 'parts_consumption' | 'adjustments' | 'stale_repairs'
 
 interface InventorySummaryRow { product_id: string; product_name: string; sku: string | null; category: string; quantity: number; cost_price: number; stock_value: number; retail_value: number }
 interface PartConsumptionRow  { product_id: string; product_name: string; sku: string | null; quantity: number; total_cost: number }
 interface AdjustmentRow       { id: string; product_id: string; quantity_change: number; reason: string | null; reference_type: string | null; created_at: string; products: { name: string; sku: string | null } | null }
 interface LowStockRow         { id: string; product_id: string; quantity: number; low_stock_alert: number; products?: { id: string; name: string; sku: string | null } | null }
 interface InventoryOverview   { low_stock_count: number; low_stock_items: LowStockRow[]; total_items: number; total_value: number }
+interface StaleRepairRow {
+  repair_id: string; job_number: string; customer_name: string | null; device: string | null
+  status: string; created_at: string; days_open: number; parts_count: number; total_cost_at_risk: number
+}
 
 function firstOfMonth() { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] }
 function today() { return new Date().toISOString().split('T')[0] }
-function exportCsv<T extends Record<string, unknown>>(rows: T[], filename: string) {
-  if (!rows.length) return
-  const h = Object.keys(rows[0])
-  const csv = [h.join(','), ...rows.map((r) => h.map((k) => JSON.stringify(r[k] ?? '')).join(','))].join('\n')
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = filename; a.click()
-}
 
 export default function InventoryReportPage() {
   const { activeBranch } = useAuthStore()
@@ -80,6 +79,19 @@ export default function InventoryReportPage() {
     { accessorKey: 'total_cost',   header: 'Total Cost', cell: ({ getValue }) => formatCurrency(getValue() as number) },
   ]
 
+  const staleRepairColumns: ColumnDef<StaleRepairRow>[] = [
+    { accessorKey: 'job_number',    header: 'Job #' },
+    { accessorKey: 'customer_name', header: 'Customer', cell: ({ getValue }) => (getValue() as string) ?? '—' },
+    { accessorKey: 'device',        header: 'Device',   cell: ({ getValue }) => (getValue() as string) ?? '—' },
+    { accessorKey: 'status',        header: 'Status',   cell: ({ getValue }) => <span className="capitalize">{(getValue() as string).replace('_', ' ')}</span> },
+    { accessorKey: 'days_open',     header: 'Days Open', cell: ({ getValue }) => {
+      const v = getValue() as number
+      return <span className={v >= 30 ? 'font-semibold text-red-600' : v >= 14 ? 'font-semibold text-orange-600' : ''}>{v}</span>
+    }},
+    { accessorKey: 'parts_count',        header: 'Parts' },
+    { accessorKey: 'total_cost_at_risk',  header: 'Cost At Risk', cell: ({ getValue }) => formatCurrency(getValue() as number) },
+  ]
+
   const adjColumns: ColumnDef<AdjustmentRow>[] = [
     { accessorKey: 'created_at',    header: 'Date',    cell: ({ getValue }) => formatDate(getValue() as string) },
     { id: 'product', header: 'Product', cell: ({ row }) => row.original.products?.name ?? row.original.product_id },
@@ -92,10 +104,11 @@ export default function InventoryReportPage() {
   ]
 
   const exportCurrentTab = () => {
-    if (subTab === 'summary')           exportCsv(detailData as unknown as Record<string, unknown>[], `inventory-summary-${dateFrom}-${dateTo}.csv`)
-    if (subTab === 'parts_consumption') exportCsv(detailData as unknown as Record<string, unknown>[], `parts-usage-${dateFrom}-${dateTo}.csv`)
-    if (subTab === 'adjustments')       exportCsv(detailData as unknown as Record<string, unknown>[], `adjustments-${dateFrom}-${dateTo}.csv`)
-    if (subTab === 'low_stock' && overview) exportCsv(overview.low_stock_items as unknown as Record<string, unknown>[], `low-stock-${dateFrom}-${dateTo}.csv`)
+    if (subTab === 'summary')           exportExcel(detailData as unknown as Record<string, unknown>[], `inventory-summary-${dateFrom}-${dateTo}.xlsx`)
+    if (subTab === 'parts_consumption') exportExcel(detailData as unknown as Record<string, unknown>[], `parts-usage-${dateFrom}-${dateTo}.xlsx`)
+    if (subTab === 'adjustments')       exportExcel(detailData as unknown as Record<string, unknown>[], `adjustments-${dateFrom}-${dateTo}.xlsx`)
+    if (subTab === 'stale_repairs')     exportExcel(detailData as unknown as Record<string, unknown>[], `stale-repair-parts-${dateFrom}-${dateTo}.xlsx`)
+    if (subTab === 'low_stock' && overview) exportExcel(overview.low_stock_items as unknown as Record<string, unknown>[], `low-stock-${dateFrom}-${dateTo}.xlsx`)
   }
 
   const SUB_TABS: { value: SubTab; label: string }[] = [
@@ -103,6 +116,7 @@ export default function InventoryReportPage() {
     { value: 'low_stock',         label: 'Low Stock'   },
     { value: 'parts_consumption', label: 'Part Usage'  },
     { value: 'adjustments',       label: 'Adjustments' },
+    { value: 'stale_repairs',     label: 'Stale Repairs' },
   ]
 
   return (
@@ -120,7 +134,7 @@ export default function InventoryReportPage() {
           </div>
         </div>
         <Button size="sm" className="w-full sm:w-auto" onClick={exportCurrentTab}>
-          <Download className="h-4 w-4" /> Export CSV
+          <Download className="h-4 w-4" /> Export Excel
         </Button>
       </div>
 
@@ -226,6 +240,18 @@ export default function InventoryReportPage() {
       {/* Adjustments */}
       {subTab === 'adjustments' && (
         <DataTable data={detailData as AdjustmentRow[]} columns={adjColumns} isLoading={loading} emptyMessage="No inventory adjustments for this period." />
+      )}
+
+      {/* Stale repairs — parts already deducted from stock, cost not yet in P&L */}
+      {subTab === 'stale_repairs' && (
+        <>
+          <p className="text-xs text-on-surface-variant">
+            Repair jobs open 14+ days whose parts were already pulled from stock at booking time, but whose cost won&apos;t
+            hit Profit &amp; Loss until the job is marked complete/collected. Long-open tickets here mean that cost is
+            currently missing from your reports.
+          </p>
+          <DataTable data={detailData as StaleRepairRow[]} columns={staleRepairColumns} isLoading={loading} emptyMessage="No stale open repairs with deducted parts." />
+        </>
       )}
     </div>
   )

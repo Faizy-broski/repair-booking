@@ -18,6 +18,7 @@ interface POItem {
 interface Supplier { id: string; name: string; email: string | null; phone: string | null }
 interface PO {
   id: string; po_number: string; status: string; total: number
+  amount_paid: number; payment_status: string
   supplier_id: string
   notes: string | null; expected_delivery_date: string | null; created_at: string
   suppliers?: Supplier | null
@@ -198,15 +199,17 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {[
           { label: 'Total Value', value: formatCurrency(po.total) },
+          { label: 'Deposit Paid', value: formatCurrency(po.amount_paid ?? 0), className: 'text-emerald-600' },
+          { label: 'Outstanding', value: formatCurrency(Math.max(0, po.total - (po.amount_paid ?? 0))), className: (po.total - (po.amount_paid ?? 0)) > 0.01 ? 'text-red-600' : 'text-emerald-600' },
           { label: 'Expected Delivery', value: po.expected_delivery_date ? formatDate(po.expected_delivery_date) : '—' },
           { label: 'Supplier', value: po.suppliers?.name ?? '—' },
         ].map((card) => (
           <div key={card.label} className="rounded-lg border border-gray-200 bg-white p-3">
             <p className="text-xs text-gray-400">{card.label}</p>
-            <p className="font-semibold text-gray-900">{card.value}</p>
+            <p className={`font-semibold ${card.className ?? 'text-gray-900'}`}>{card.value}</p>
           </div>
         ))}
       </div>

@@ -419,7 +419,7 @@ export const ProductController = {
       product_id: z.string().uuid().optional(),
       name: z.string().min(1).optional(),
       selling_price: z.number().min(0).optional(),
-      sku: z.string().optional(),
+      barcode: z.string().optional(),
     }).refine(d => d.product_id || (d.name && d.selling_price !== undefined), {
       message: 'Either product_id or name + selling_price is required',
     }))
@@ -429,7 +429,7 @@ export const ProductController = {
         product_id: data.product_id,
         name: data.name,
         selling_price: data.selling_price,
-        sku: data.sku,
+        barcode: data.barcode,
       })
       return ok(product)
     } catch (err) {

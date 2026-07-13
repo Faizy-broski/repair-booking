@@ -9,7 +9,7 @@ import { z } from 'zod'
 import { adminSupabase } from '@/backend/config/supabase'
 
 // ── Shared receipt PDF generator (used by both on-demand and background warm) ──
-async function buildReceiptBuffer(saleId: string, branchId: string | null, businessId: string | null) {
+async function buildReceiptBuffer(saleId: string, branchId: string | null, businessId: string | null, paymentId?: string) {
   const [sale, renderToBuffer, { SaleReceiptPdf }, { InvoiceSettingsService }, { getCurrencySymbol }, React] = await Promise.all([
     PosService.getSaleById(saleId, branchId),
     import('@react-pdf/renderer').then((m) => m.renderToBuffer),
@@ -22,6 +22,24 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
   if (!sale) return null
 
   const s = sale as any
+
+  // For a single-payment receipt, resolve this payment's own amount and the
+  // running total paid through (and including) it — not the sale's all-time total.
+  let depositLabelAmount: number | undefined
+  let amountPaidOverride: number | undefined
+  if (paymentId) {
+    const { data: payments } = await adminSupabase
+      .from('sale_payments')
+      .select('id, amount, created_at')
+      .eq('sale_id', saleId)
+      .order('created_at', { ascending: true })
+    const ordered = (payments ?? []) as { id: string; amount: number; created_at: string }[]
+    const idx = ordered.findIndex((p) => p.id === paymentId)
+    if (idx !== -1) {
+      depositLabelAmount = Number(ordered[idx].amount)
+      amountPaidOverride = ordered.slice(0, idx + 1).reduce((sum, p) => sum + Number(p.amount), 0)
+    }
+  }
 
   const [settings, businessRow] = await Promise.all([
     businessId ? InvoiceSettingsService.get(businessId, s.branch_id ?? null) : Promise.resolve(null),
@@ -75,7 +93,8 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
     discount: Number(s.discount ?? 0),
     tax: Number(s.tax ?? 0),
     total: Number(s.total ?? 0),
-    amountPaid: Number(s.amount_paid ?? 0),
+    amountPaid: amountPaidOverride ?? Number(s.amount_paid ?? 0),
+    depositLabelAmount,
     isRefund: s.is_refund ?? false,
     isExchange: s.is_exchange ?? false,
     exchangeReturnedItems,
@@ -225,14 +244,16 @@ export const PosController = {
     }
   },
 
-  async generateReceiptPdf(_request: NextRequest, ctx: RequestContext, id: string) {
+  async generateReceiptPdf(_request: NextRequest, ctx: RequestContext, id: string, paymentId?: string) {
     try {
       // Always regenerate — PDF content depends on invoice design settings which can
       // change at any time, so a cached copy would silently ignore setting updates.
-      const result = await buildReceiptBuffer(id, ctx.auth.branchId ?? null, ctx.businessId)
+      const result = await buildReceiptBuffer(id, ctx.auth.branchId ?? null, ctx.businessId, paymentId)
       if (!result) return notFound()
 
-      const filename = `receipt-${id.slice(-8)}.pdf`
+      const filename = paymentId
+        ? `receipt-${id.slice(-8)}-payment-${paymentId.slice(-6)}.pdf`
+        : `receipt-${id.slice(-8)}.pdf`
       return new NextResponse(result.buffer as unknown as BodyInit, {
         status: 200,
         headers: {

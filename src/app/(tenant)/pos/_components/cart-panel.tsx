@@ -576,7 +576,8 @@ export function CartPanel({ mobileView }: Props) {
     const res = await lookup(val)
     if (res.status === 'found' && res.product) {
       if (res.matchedVariant) {
-        pos.addToCart(res.product as any, res.matchedVariant as any)
+        const maxStock = res.product.is_service ? null : (res.matchedVariant.stock ?? 0)
+        pos.addToCart(res.product as any, res.matchedVariant as any, maxStock)
         return
       }
       setScannerDefaultState('found')
@@ -732,7 +733,11 @@ export function CartPanel({ mobileView }: Props) {
                           <Minus className="h-3.5 w-3.5" />
                         </button>
                         <span className="w-5 sm:w-7 text-center text-sm font-bold text-gray-900">{item.quantity}</span>
-                        <button onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity + 1)} className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-md bg-green-100 hover:bg-green-200 text-green-600 transition-colors">
+                        <button
+                          disabled={item.quantity >= (item.maxStock ?? Infinity)}
+                          onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity + 1)}
+                          className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-md bg-green-100 hover:bg-green-200 text-green-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-green-100"
+                        >
                           <Plus className="h-3.5 w-3.5" />
                         </button>
                       </div>
@@ -1229,7 +1234,7 @@ export function CartPanel({ mobileView }: Props) {
         onProductCreated={() => { queryClient.invalidateQueries({ queryKey: ['pos-products'] }) }}
         onAddToCart={(scanned: ScannedProduct) => {
           const product = scanned as unknown as ProductWithStock
-          pos.addToCart(product as unknown as Product)
+          pos.addToCart(product as unknown as Product, null, product.is_service ? null : (product.on_hand ?? 0))
           toast.success(`${product.name} added to cart`)
           setScannerOpen(false)
         }}

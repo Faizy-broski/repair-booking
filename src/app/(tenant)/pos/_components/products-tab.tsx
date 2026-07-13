@@ -444,7 +444,8 @@ export function ProductsTab() {
         const res = await lookup(code)
         if (res.status === 'found' && res.product) {
           if (res.matchedVariant) {
-            pos.addToCart(res.product as unknown as Product, res.matchedVariant as any)
+            const maxStock = res.product.is_service ? null : (res.matchedVariant.stock ?? 0)
+            pos.addToCart(res.product as unknown as Product, res.matchedVariant as any, maxStock)
             return
           }
           if (res.product.has_variants || (res.product.variant_count ?? 0) > 0) {
@@ -485,7 +486,8 @@ export function ProductsTab() {
   function addSingleVariantToCart(variant: ProductVariant) {
     if (!variantProduct) return
     if (typeof variant.stock === 'number' && variant.stock <= 0) return
-    pos.addToCart(variantProduct as unknown as Product, variant as any)
+    const maxStock = variantProduct.is_service ? null : (variant.stock ?? 0)
+    pos.addToCart(variantProduct as unknown as Product, variant as any, maxStock)
   }
 
   function prefetchVariants(product: ProductWithStock) {
@@ -732,7 +734,8 @@ export function ProductsTab() {
                     const res = await lookup(val)
                     if (res.status === 'found' && res.product) {
                       if (res.matchedVariant) {
-                        pos.addToCart(res.product as unknown as Product, res.matchedVariant as any)
+                        const maxStock = res.product.is_service ? null : (res.matchedVariant.stock ?? 0)
+                        pos.addToCart(res.product as unknown as Product, res.matchedVariant as any, maxStock)
                         setAllProductsSearch('')
                         return
                       }
@@ -789,13 +792,13 @@ export function ProductsTab() {
               {!allProductsLoading && <span className="ml-auto text-xs text-gray-400">{allProductsList.length} of {allProductsTotal} item{allProductsTotal !== 1 ? 's' : ''}</span>}
             </div>
             {allProductsLoading && allProductsList.length === 0 ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
                 {Array.from({ length: 10 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}
               </div>
             ) : allProductsList.length > 0 ? (
               <>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                  {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} />)}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
+                  {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product, null, p.is_service ? null : (p.on_hand ?? 0))} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} />)}
                 </div>
                 {hasNextPage && (
                   <div className="flex justify-center pt-2 pb-1">
@@ -842,7 +845,7 @@ export function ProductsTab() {
               catItemsLoading ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-32 animate-pulse rounded-xl bg-gray-200" />)}</div>
               ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
                   {catItems.map(item => (
                     <button key={item.id} onClick={() => selectCatItem(item)} className="flex flex-col w-full overflow-hidden rounded-xl border border-gray-200 bg-white hover:border-brand-teal hover:shadow-sm transition-all text-center min-h-[140px]">
                       {item.image_url ? (
@@ -875,8 +878,8 @@ export function ProductsTab() {
                 {categoryProductsLoading ? (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}</div>
                 ) : categoryProducts.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                    {categoryProducts.map(product => <ProductCard key={product.id} product={product} size="sm" onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} />)}
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
+                    {categoryProducts.map(product => <ProductCard key={product.id} product={product} size="sm" onAdd={p => pos.addToCart(p as unknown as Product, null, p.is_service ? null : (p.on_hand ?? 0))} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} />)}
                   </div>
                 ) : (
                   <p className="py-4 text-center text-sm text-gray-400">No products for this model</p>
@@ -909,12 +912,12 @@ export function ProductsTab() {
               partProductsLoading ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-32 animate-pulse rounded-xl bg-gray-200" />)}</div>
               ) : partProducts.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
                   {partProducts.map(product => {
                     const hasVariants = product.has_variants || (product as any).variant_count > 0
                     const oos = !hasVariants && typeof product.on_hand === 'number' && product.on_hand <= 0
                     return (
-                      <button key={product.id} disabled={oos} onClick={(e) => hasVariants ? openVariantSelect(product, e) : pos.addToCart(product as unknown as Product)}
+                      <button key={product.id} disabled={oos} onClick={(e) => hasVariants ? openVariantSelect(product, e) : pos.addToCart(product as unknown as Product, null, product.is_service ? null : (product.on_hand ?? 0))}
                         className={`relative flex flex-col items-center rounded-xl border bg-white p-3 text-center transition-all w-full overflow-hidden ${oos ? 'border-gray-100 opacity-50 cursor-not-allowed' : 'border-gray-200 hover:border-brand-teal hover:shadow-sm cursor-pointer'}`}>
                         {oos && (
                           <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/60">
@@ -943,7 +946,7 @@ export function ProductsTab() {
                 <p className="py-8 text-center text-sm text-gray-400">No parts found for this part type</p>
               )
             ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
                 {partItems.map(item => (
                   <button key={item.id} onClick={() => selectPartItem(item)} className="flex flex-col w-full overflow-hidden rounded-xl border border-gray-200 bg-white hover:border-brand-teal hover:shadow-sm transition-all cursor-pointer text-center min-h-[140px]">
                     {item.image_url ? (
@@ -983,7 +986,7 @@ export function ProductsTab() {
                   <p className="text-sm text-gray-500 font-medium">No categories found</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
                   {allCats.map(cat => (
                     <button
                       key={cat.id}
@@ -1006,13 +1009,13 @@ export function ProductsTab() {
                   <span className="font-semibold text-gray-800">{allCats.find(c => c.id === allProductsCategoryId)?.name}</span>
                 </div>
                 {allProductsLoading && allProductsList.length === 0 ? (
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
                     {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}
                   </div>
                 ) : allProductsList.length > 0 ? (
                   <>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                      {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product)} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} />)}
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
+                      {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product, null, p.is_service ? null : (p.on_hand ?? 0))} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} />)}
                     </div>
                     {hasNextPage && (
                       <div className="flex justify-center pt-2 pb-1">
@@ -1147,7 +1150,7 @@ export function ProductsTab() {
                                 <button
                                   disabled={advOos}
                                   title={advOos ? 'Out of stock' : undefined}
-                                  onClick={() => { if ((p.has_variants || (p.variant_count ?? 0) > 0)) { setAdvSearchOpen(false); openVariantSelect(p) } else { pos.addToCart(p as unknown as Product); setAdvSearchOpen(false) } }}
+                                  onClick={() => { if ((p.has_variants || (p.variant_count ?? 0) > 0)) { setAdvSearchOpen(false); openVariantSelect(p) } else { pos.addToCart(p as unknown as Product, null, p.is_service ? null : (p.on_hand ?? 0)); setAdvSearchOpen(false) } }}
                                   className={`flex h-7 w-7 items-center justify-center rounded border text-gray-500 ${advOos ? 'border-gray-100 opacity-40 cursor-not-allowed' : 'border-gray-200 hover:border-brand-teal hover:text-brand-teal'}`}
                                 >
                                   <Plus className="h-3.5 w-3.5" />
@@ -1316,7 +1319,7 @@ export function ProductsTab() {
           if (product.has_variants || (product as any).variant_count > 0) {
             setVariantProduct(product)
           } else {
-            pos.addToCart(product as unknown as Product)
+            pos.addToCart(product as unknown as Product, null, product.is_service ? null : (product.on_hand ?? 0))
             toast.success(`${product.name} added to cart`)
           }
           setScannerOpen(false)

@@ -255,15 +255,16 @@ export const PurchaseOrderController = {
     }
   },
 
-  // Single-PO payment receipt — reuses the supplier statement PDF layout
-  // scoped to just this one purchase order, so a cashier can hand over
-  // proof of a specific payment without generating the full statement.
-  async downloadReceipt(req: NextRequest, ctx: RequestContext, poId: string) {
+  // Single-PO payment receipt — when scoped to one payment (paymentId), renders
+  // a proper settings-driven receipt (same paper-size/branding logic as the
+  // sales receipt) instead of the multi-PO supplier statement layout.
+  async downloadReceipt(req: NextRequest, ctx: RequestContext, poId: string, paymentId?: string) {
     try {
-      const [receipt, renderToBuffer, { SupplierStatementPdf }, { InvoiceSettingsService }, business, React] = await Promise.all([
-        PurchaseOrderService.getReceiptData(poId, ctx.businessId),
+      const [receipt, renderToBuffer, { SupplierStatementPdf }, { SupplierReceiptPdf }, { InvoiceSettingsService }, business, React] = await Promise.all([
+        SupplierService.getReceiptData(poId, ctx.businessId, paymentId),
         import('@react-pdf/renderer').then((m) => m.renderToBuffer),
         import('@/components/pdf/supplier-statement-pdf'),
+        import('@/components/pdf/supplier-receipt-pdf'),
         import('@/backend/services/invoice-settings.service'),
         adminSupabase.from('businesses').select('name, phone, email, currency').eq('id', ctx.businessId).single().then((r) => r.data),
         import('react').then((m) => m.default),
@@ -272,22 +273,42 @@ export const PurchaseOrderController = {
       if (!receipt) return notFound('Purchase order not found')
 
       const settings = await InvoiceSettingsService.get(ctx.businessId, ctx.auth.branchId ?? null)
+      const r = receipt as any
 
-      const doc = React.createElement(SupplierStatementPdf, {
-        supplierName: (receipt as any).suppliers?.name ?? '—',
-        from: null,
-        to: null,
-        purchaseOrders: [receipt] as any,
-        businessName: (business as any)?.name ?? '—',
-        businessPhone: (business as any)?.phone ?? null,
-        businessEmail: (business as any)?.email ?? null,
-        logoUrl: settings.logo_url,
-        currency: (business as any)?.currency ?? undefined,
-        settings,
-      })
+      const doc = paymentId && r.payments[0]
+        ? React.createElement(SupplierReceiptPdf, {
+          poNumber: r.po_number,
+          poDate: new Date(r.created_at).toLocaleDateString('en-GB'),
+          supplierName: r.suppliers?.name ?? '—',
+          paymentDate: new Date(r.payments[0].created_at).toLocaleDateString('en-GB'),
+          paymentMethod: r.payments[0].method,
+          paymentAmount: Number(r.payments[0].amount),
+          poTotal: Number(r.total),
+          cumulativePaid: Number(r.amount_paid),
+          branchName: (business as any)?.name ?? '—',
+          branchPhone: (business as any)?.phone ?? null,
+          branchEmail: (business as any)?.email ?? null,
+          logoUrl: settings.logo_url,
+          currency: (business as any)?.currency ?? undefined,
+          settings,
+        })
+        : React.createElement(SupplierStatementPdf, {
+          supplierName: r.suppliers?.name ?? '—',
+          from: null,
+          to: null,
+          purchaseOrders: [receipt] as any,
+          businessName: (business as any)?.name ?? '—',
+          businessPhone: (business as any)?.phone ?? null,
+          businessEmail: (business as any)?.email ?? null,
+          logoUrl: settings.logo_url,
+          currency: (business as any)?.currency ?? undefined,
+          settings,
+        })
 
       const buffer = await renderToBuffer(doc as any)
-      const filename = `po-receipt-${poId.slice(-8)}.pdf`
+      const filename = paymentId
+        ? `po-receipt-${poId.slice(-8)}-payment-${paymentId.slice(-6)}.pdf`
+        : `po-receipt-${poId.slice(-8)}.pdf`
       return new NextResponse(buffer as unknown as BodyInit, {
         status: 200,
         headers: {

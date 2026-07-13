@@ -41,6 +41,8 @@ interface Props {
   logoUrl: string | null
   currency?: string
   settings?: InvoiceSettings
+  documentTitle?: string
+  footerNote?: string
 }
 
 export function SupplierStatementPdf({
@@ -48,6 +50,8 @@ export function SupplierStatementPdf({
   businessName, businessPhone, businessEmail, logoUrl,
   currency,
   settings = DEFAULT_INVOICE_SETTINGS,
+  documentTitle = 'Supplier Statement',
+  footerNote = 'Statement covers received purchase orders for the selected period only.',
 }: Props) {
   const totalOutstanding = purchaseOrders.reduce((sum, p) => sum + (Number(p.total) - Number(p.amount_paid)), 0)
 
@@ -92,7 +96,7 @@ export function SupplierStatementPdf({
             {settings.show_email && businessEmail && <Text style={s.businessSub}>{businessEmail}</Text>}
           </View>
           <View style={{ alignItems: 'flex-end' }}>
-            <Text style={s.title}>Supplier Statement</Text>
+            <Text style={s.title}>{documentTitle}</Text>
             <Text style={s.titleSub}>Generated {new Date().toLocaleDateString('en-GB')}</Text>
           </View>
         </View>
@@ -147,7 +151,7 @@ export function SupplierStatementPdf({
         </View>
 
         <Text style={s.footer} fixed>
-          {businessName} · Statement covers received purchase orders for the selected period only.
+          {businessName} · {footerNote}
         </Text>
       </Page>
     </Document>

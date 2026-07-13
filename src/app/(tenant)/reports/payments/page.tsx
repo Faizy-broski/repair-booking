@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency } from '@/lib/utils'
+import { exportExcel } from '@/lib/export-excel'
 import { DateRangeBar } from '../_components/date-range-bar'
 import Link from 'next/link'
 import {
@@ -20,12 +21,6 @@ const COLORS = ['#0d9488', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6'
 
 function firstOfMonth() { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] }
 function today() { return new Date().toISOString().split('T')[0] }
-function exportCsv<T extends Record<string, unknown>>(rows: T[], filename: string) {
-  if (!rows.length) return
-  const h = Object.keys(rows[0])
-  const csv = [h.join(','), ...rows.map((r) => h.map((k) => JSON.stringify(r[k] ?? '')).join(','))].join('\n')
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = filename; a.click()
-}
 
 export default function PaymentsReportPage() {
   const { activeBranch } = useAuthStore()
@@ -66,8 +61,8 @@ export default function PaymentsReportPage() {
             <p className="text-sm text-on-surface-variant mt-0.5">Revenue breakdown by payment method</p>
           </div>
         </div>
-        <Button size="sm" className="w-full sm:w-auto" onClick={() => exportCsv(data as unknown as Record<string, unknown>[], `payments-${dateFrom}-${dateTo}.csv`)}>
-          <Download className="h-4 w-4" /> Export CSV
+        <Button size="sm" className="w-full sm:w-auto" onClick={() => exportExcel(data as unknown as Record<string, unknown>[], `payments-${dateFrom}-${dateTo}.xlsx`)}>
+          <Download className="h-4 w-4" /> Export Excel
         </Button>
       </div>
 

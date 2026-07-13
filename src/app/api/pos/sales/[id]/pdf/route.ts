@@ -2,6 +2,8 @@ import { withMiddleware } from '@/backend/middleware'
 import { PosController } from '@/backend/controllers/pos.controller'
 
 export const GET = withMiddleware(
-  (req, ctx, { params }) => params.then((p) => PosController.generateReceiptPdf(req, ctx, p.id)),
+  (req, ctx, { params }) => params.then((p) =>
+    PosController.generateReceiptPdf(req, ctx, p.id, req.nextUrl.searchParams.get('paymentId') ?? undefined)
+  ),
   { requiredRole: 'cashier' }
 )
