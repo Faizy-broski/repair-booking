@@ -1,10 +1,27 @@
 import { adminSupabase } from '@/backend/config/supabase'
 import type { InsertTables, UpdateTables } from '@/types/database'
+import { escapeIlike } from '@/backend/utils/search'
 
 // product_history and product_group_pricing are from migration 033 — use `as any`
 const db = adminSupabase as any
 
 export const ProductService = {
+  // Live FIFO/LIFO cost batches for a product — lets the UI show what the
+  // backend's inventory_cost_layers table actually contains, oldest first
+  // (the order FIFO consumption would draw from them).
+  async getCostLayers(productId: string, branchId?: string) {
+    let q = db
+      .from('inventory_cost_layers')
+      .select('id, quantity, unit_cost, received_at, source_type, branch_id')
+      .eq('product_id', productId)
+      .order('received_at', { ascending: true })
+    if (branchId) q = q.eq('branch_id', branchId)
+    const { data, error } = await q
+    if (error) throw error
+    return data ?? []
+  },
+
+
   async list(businessId: string, params: {
     page?: number; limit?: number; search?: string; categoryId?: string
     branchId?: string; includeInactive?: boolean; includeDrafts?: boolean
@@ -42,7 +59,8 @@ export const ProductService = {
       // We must wrap the barcode in double quotes so PostgREST treats numeric barcodes as text, avoiding casting errors.
       q = q.or(`barcode.eq."${barcode}",sku.eq."${barcode}"`)
     } else if (search) {
-      q = q.or(`name.ilike.%${search}%,sku.ilike.%${search}%,barcode.ilike.%${search}%,imei.ilike.%${search}%`)
+      const term = `%${escapeIlike(search)}%`
+      q = q.or(`name.ilike.${term},sku.ilike.${term},barcode.ilike.${term},imei.ilike.${term}`)
     }
     if (categoryId) q = q.eq('category_id', categoryId)
     if (brandId) q = q.eq('brand_id', brandId)

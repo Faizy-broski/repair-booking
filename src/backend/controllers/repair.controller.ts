@@ -45,7 +45,7 @@ async function getRepairInvoiceData(repairId: string, branchId: string | null, b
   const [settings, branchRow, businessRow] = await Promise.all([
     InvoiceSettingsService.get(businessId, r.branch_id ?? null),
     adminSupabase.from('branches').select('name, address, phone, email, logo_url').eq('id', r.branch_id).single().then((res) => res.data),
-    adminSupabase.from('businesses').select('currency').eq('id', businessId).single().then((res) => res.data),
+    adminSupabase.from('businesses').select('name, currency').eq('id', businessId).single().then((res) => res.data),
   ])
 
   const repairItems: any[] = Array.isArray(r.repair_items) ? r.repair_items : []
@@ -84,7 +84,7 @@ async function getRepairInvoiceData(repairId: string, branchId: string | null, b
     status:          r.status as string,
     issuedAt:        r.created_at as string,
     dueAt:           (cf.due_date as string) ?? null,
-    businessName:    branchRow?.name ?? 'Business',
+    businessName:    businessRow?.name ?? branchRow?.name ?? 'Business',
     branchName:      branchRow?.name ?? null,
     branchAddress:   branchRow?.address ?? null,
     branchPhone:     branchRow?.phone ?? null,
@@ -133,11 +133,10 @@ async function getRepairSlipData(repairId: string, branchId: string | null, busi
   const settings = await InvoiceSettingsService.get(businessId, r.branch_id ?? null)
 
   // Fetch branch info for header (name, address, phone)
-  const { data: branchRow } = await adminSupabase
-    .from('branches')
-    .select('name, address, phone')
-    .eq('id', r.branch_id)
-    .single()
+  const [{ data: branchRow }, { data: businessRow }] = await Promise.all([
+    adminSupabase.from('branches').select('name, address, phone').eq('id', r.branch_id).single(),
+    adminSupabase.from('businesses').select('name').eq('id', businessId).single(),
+  ])
 
   const customer = r.customers
   const customerName = customer
@@ -168,7 +167,7 @@ async function getRepairSlipData(repairId: string, branchId: string | null, busi
     paperSize: settings.paper_size as string,
     customWidth: settings.custom_width ?? null,
     // Full repair details for the HTML slip
-    businessName:   branchRow?.name ?? 'Business',
+    businessName:   businessRow?.name ?? branchRow?.name ?? 'Business',
     branchAddress:  branchRow?.address ?? null,
     branchPhone:    branchRow?.phone ?? null,
     customerName,
@@ -654,7 +653,8 @@ export const RepairController = {
     try {
       await RepairService.remove(id, branchId)
       return ok({ deleted: true })
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.message?.includes('not found')) return notFound('Repair not found')
       return serverError('Failed to delete repair', err)
     }
   },

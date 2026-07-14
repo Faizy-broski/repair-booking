@@ -75,7 +75,7 @@ function DiscountInput({ value, max, onChange, className }: { value: number; max
 
 export function CartPanel({ mobileView }: Props) {
   const router = useRouter()
-  const { activeBranch, profile, verticalTemplateSlug, currency } = useAuthStore()
+  const { activeBranch, profile, verticalTemplateSlug, currency, businessName } = useAuthStore()
   const pos = usePosStore()
   const queryClient = useQueryClient()
   const { isModuleEnabled, getConfig } = useModuleConfigStore()
@@ -284,7 +284,7 @@ export function CartPanel({ mobileView }: Props) {
         invoiceNumber: `#${saleId.slice(-8).toUpperCase()}`,
         status:        paymentStatus ?? 'paid',
         issuedAt:      new Date().toISOString(),
-        businessName:  activeBranch?.name ?? 'Business',
+        businessName:  businessName ?? activeBranch?.name ?? 'Business',
         branchName:    activeBranch?.name ?? null,
         branchAddress: activeBranch?.address ?? null,
         branchPhone:   activeBranch?.phone ?? null,
@@ -319,6 +319,7 @@ export function CartPanel({ mobileView }: Props) {
           items={pdfItems}
           subtotal={subtotal} discount={discountAmt} tax={taxAmt} total={total}
           paymentSplits={paymentSplits?.map(s => ({ method: s.method, amount: s.amount }))}
+          businessName={businessName ?? activeBranch?.name}
           branchName={activeBranch?.name}
           branchAddress={activeBranch?.address ?? undefined}
           branchPhone={activeBranch?.phone ?? undefined}

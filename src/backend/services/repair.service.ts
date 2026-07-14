@@ -1,5 +1,6 @@
 import { adminSupabase } from '@/backend/config/supabase'
 import type { InsertTables, UpdateTables } from '@/types/database'
+import { escapeIlike } from '@/backend/utils/search'
 
 const db = (t: string): any => (adminSupabase as any).from(t)
 const rpc = (fn: string, args?: Record<string, unknown>): any => (adminSupabase as any).rpc(fn, args)
@@ -30,20 +31,21 @@ export const RepairService = {
     if (status) q = q.eq('status', status)
     if (customerId) q = q.eq('customer_id', customerId)
     if (search) {
+      const term = `%${escapeIlike(search)}%`
       // Look up customer IDs that match email or phone so we can include them
       const { data: matchedCustomers } = await adminSupabase
         .from('customers')
         .select('id')
-        .or(`email.ilike.%${search}%,phone.ilike.%${search}%`)
+        .or(`email.ilike.${term},phone.ilike.${term}`)
         .limit(50)
       const customerIds = (matchedCustomers ?? []).map((c) => c.id)
 
       if (customerIds.length > 0) {
         q = q.or(
-          `job_number.ilike.%${search}%,device_model.ilike.%${search}%,customer_id.in.(${customerIds.join(',')})`
+          `job_number.ilike.${term},device_model.ilike.${term},customer_id.in.(${customerIds.join(',')})`
         )
       } else {
-        q = q.or(`job_number.ilike.%${search}%,device_model.ilike.%${search}%`)
+        q = q.or(`job_number.ilike.${term},device_model.ilike.${term}`)
       }
     }
 
@@ -112,9 +114,10 @@ export const RepairService = {
   },
 
   async remove(id: string, branchId?: string) {
-    let q = adminSupabase.from('repairs').delete().eq('id', id)
-    if (branchId) q = q.eq('branch_id', branchId)
-    const { error } = await q
+    const { error } = await rpc('delete_repair', {
+      p_repair_id: id,
+      p_branch_id: branchId ?? null,
+    })
     if (error) throw error
   },
 

@@ -161,6 +161,7 @@ export function RepairReceiptHtml({
         {settings.thank_you_message && (
           <div style={s.thankYou}>{settings.thank_you_message}</div>
         )}
+        {settings.footer_address && <div style={s.footLine}>{settings.footer_address}</div>}
         {footerLines.map((line, i) => (
           <div key={i} style={s.footLine}>{line}</div>
         ))}

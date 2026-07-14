@@ -197,6 +197,7 @@ ${L(bal > 0, `<div class="bar"><span class="bl">Balance Due</span><span class="b
 <div class="ft">
   <hr>
   <div class="ty">${esc(thankYou)}</div>
+  ${L(settings.footer_address, `<div class="fl">${esc(settings.footer_address)}</div>`)}
   ${footerLines.map(l => `<div class="fl">${esc(l)}</div>`).join('')}
   ${socials.map(s => `<div class="fl">${esc(s.label)}: ${esc(s.val)}</div>`).join('')}
   ${L(settings.policy_text, `<div class="pl">${esc(settings.policy_text)}</div>`)}

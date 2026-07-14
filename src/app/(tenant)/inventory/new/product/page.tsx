@@ -306,6 +306,7 @@ export default function NewProductPage() {
         has_variants: hasVariants,
         cost_price: parseFloat(costPrice) || 0,
         selling_price: hasVariants ? (parseFloat(sellingPrice) || 0) : (parseFloat(sellingPrice) || 0),
+        valuation_method: 'fifo',
         supplier_id: supplierId || null, track_inventory: true,
         low_stock_alert: parseInt(lowStockAlert) || 0,
         initial_stock: hasVariants ? 0 : (parseInt(initialStock) || 0),

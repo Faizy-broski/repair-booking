@@ -161,7 +161,7 @@ export const PosService = {
     const { from, to, status } = params
     let q = adminSupabase
       .from('sales')
-      .select('total, is_refund')
+      .select('total, is_refund, payment_method, payment_splits')
       .eq('branch_id', branchId)
 
     if (from) q = q.gte('created_at', from)
@@ -179,6 +179,22 @@ export const PosService = {
       revenue: sales.reduce((s, r) => s + Number(r.total), 0),
       refund_count: refunds.length,
       refund_amount: refunds.reduce((s, r) => s + Number(r.total), 0),
+      cash_total: 0,
+      card_total: 0,
+    }
+
+    // Cash/card breakdown — used by the retail template's Sales page cards.
+    for (const r of sales) {
+      if (r.payment_method === 'cash') {
+        stats.cash_total += Number(r.total)
+      } else if (r.payment_method === 'card') {
+        stats.card_total += Number(r.total)
+      } else if (r.payment_method === 'split' && Array.isArray(r.payment_splits)) {
+        for (const s of r.payment_splits as { method: string; amount: number }[]) {
+          if (s.method === 'cash') stats.cash_total += Number(s.amount)
+          else if (s.method === 'card') stats.card_total += Number(s.amount)
+        }
+      }
     }
 
     // Cash In adds to Sales revenue, Cash Out subtracts — same window/branch.

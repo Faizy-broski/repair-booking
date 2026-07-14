@@ -44,7 +44,7 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
   const [settings, businessRow] = await Promise.all([
     businessId ? InvoiceSettingsService.get(businessId, s.branch_id ?? null) : Promise.resolve(null),
     businessId
-      ? adminSupabase.from('businesses').select('currency').eq('id', businessId).single().then(r => r.data)
+      ? adminSupabase.from('businesses').select('name, currency').eq('id', businessId).single().then(r => r.data)
       : Promise.resolve(null),
   ])
 
@@ -105,6 +105,7 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
       ? s.notes.replace(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi,
           (uuid: string) => `#${uuid.slice(-8).toUpperCase()}`)
       : null,
+    businessName: businessRow?.name ?? null,
     branchName: s.branches?.name ?? s.branch_name ?? null,
     branchAddress: s.branches?.address ?? s.branch_address ?? null,
     branchPhone: s.branches?.phone ?? s.branch_phone ?? null,

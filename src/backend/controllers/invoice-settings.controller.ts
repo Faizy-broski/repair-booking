@@ -6,12 +6,12 @@ import { validateBody } from '@/backend/utils/validate'
 import { z } from 'zod'
 
 const socialLinksSchema = z.object({
-  website:   z.string().url().optional().or(z.literal('')),
-  facebook:  z.string().url().optional().or(z.literal('')),
-  instagram: z.string().url().optional().or(z.literal('')),
-  twitter:   z.string().url().optional().or(z.literal('')),
+  website:   z.string().optional().or(z.literal('')),
+  facebook:  z.string().optional().or(z.literal('')),
+  instagram: z.string().optional().or(z.literal('')),
+  twitter:   z.string().optional().or(z.literal('')),
   whatsapp:  z.string().optional().or(z.literal('')),
-  tiktok:    z.string().url().optional().or(z.literal('')),
+  tiktok:    z.string().optional().or(z.literal('')),
 }).optional()
 
 const schema = z.object({
@@ -38,6 +38,7 @@ const schema = z.object({
   show_email:         z.boolean().optional(),
 
   // Footer
+  footer_address:    z.string().nullable().optional(),
   footer_line_1:     z.string().nullable().optional(),
   footer_line_2:     z.string().nullable().optional(),
   footer_line_3:     z.string().nullable().optional(),

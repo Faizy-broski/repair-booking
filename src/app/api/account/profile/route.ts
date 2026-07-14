@@ -10,12 +10,12 @@ async function getProfile(request: NextRequest, ctx: RequestContext) {
     const [{ data: profile, error }, { data: bizData }] = await Promise.all([
       db.from('profiles').select('*').eq('id', ctx.auth.userId).single(),
       ctx.businessId
-        ? db.from('businesses').select('business_vertical_templates(slug)').eq('id', ctx.businessId).single()
+        ? db.from('businesses').select('name, business_vertical_templates(slug)').eq('id', ctx.businessId).single()
         : Promise.resolve({ data: null }),
     ])
     if (error) throw error
     const verticalTemplateSlug = (bizData?.business_vertical_templates as { slug?: string } | null)?.slug ?? null
-    return ok({ ...profile, verticalTemplateSlug })
+    return ok({ ...profile, verticalTemplateSlug, businessName: bizData?.name ?? null })
   } catch (err) {
     return serverError('Failed to fetch profile', err)
   }

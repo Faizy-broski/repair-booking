@@ -160,13 +160,25 @@ export const ProductController = {
         if (bpResult.error) console.error('[ProductController.create] branch_products upsert failed:', bpResult.error)
         if (invResult.error) console.error('[ProductController.create] inventory insert failed:', invResult.error)
 
-        // Stock movement is independent — fire after inventory insert succeeds
+        // Stock movement + cost layer are independent — fire after inventory insert succeeds.
+        // The cost layer is what lets FIFO/LIFO products draw an accurate cost from their very
+        // first sale instead of relying on the zero-layer catch-up fallback in consume_and_freeze_cost.
         if (needsStock && qty > 0 && !invResult.error) {
+          const openingCost = (productData as any).cost_price ?? 0
           adminSupabase.from('stock_movements').insert({
             branch_id: targetBranch, product_id: product.id, variant_id: null,
             quantity: qty, type: 'adjustment', note: 'Opening stock', created_by: ctx.auth.userId,
           }).then(({ error }) => {
             if (error) console.error('[ProductController.create] stock_movements insert failed:', error)
+          })
+          adminSupabase.from('inventory_cost_layers').insert({
+            branch_id: targetBranch, product_id: product.id, quantity: qty,
+            unit_cost: openingCost, source_type: 'adjustment',
+          }).then(({ error }) => {
+            if (error) console.error('[ProductController.create] inventory_cost_layers insert failed:', error)
+          })
+          adminSupabase.from('products').update({ average_cost: openingCost }).eq('id', product.id).then(({ error }) => {
+            if (error) console.error('[ProductController.create] average_cost update failed:', error)
           })
         }
       } else {
@@ -215,11 +227,12 @@ export const ProductController = {
         const { adminSupabase } = await import('@/backend/config/supabase')
         const { data: existing } = await adminSupabase
           .from('inventory')
-          .select('id')
+          .select('id, quantity')
           .eq('branch_id', targetBranch)
           .eq('product_id', id)
           .is('variant_id', null)
           .maybeSingle()
+        const openingCost = (product as any)?.cost_price ?? 0
         if (existing) {
           const updatePayload: Record<string, unknown> = { low_stock_alert: low_stock_alert ?? 5 }
           if (initial_stock !== undefined) updatePayload.quantity = initial_stock
@@ -229,6 +242,17 @@ export const ProductController = {
             .eq('product_id', id)
             .is('variant_id', null)
           if (updErr) console.error('[ProductController.update] Update inventory error:', updErr)
+          // Only a net INCREASE in stock gets a new cost layer — the product
+          // form sets an absolute quantity, not a delta, so a decrease here
+          // is a correction, not a new purchase, and shouldn't fabricate cost.
+          const delta = initial_stock !== undefined ? initial_stock - (existing.quantity ?? 0) : 0
+          if (!updErr && delta > 0) {
+            const { error: layerErr } = await adminSupabase.from('inventory_cost_layers').insert({
+              branch_id: targetBranch, product_id: id, quantity: delta,
+              unit_cost: openingCost, source_type: 'adjustment',
+            })
+            if (layerErr) console.error('[ProductController.update] inventory_cost_layers insert failed:', layerErr)
+          }
         } else {
           const { error: insErr } = await adminSupabase.from('inventory').insert({
             branch_id: targetBranch,
@@ -237,6 +261,13 @@ export const ProductController = {
             low_stock_alert: low_stock_alert ?? 5,
           })
           if (insErr) console.error('[ProductController.update] Insert inventory error:', insErr)
+          if (!insErr && (initial_stock ?? 0) > 0) {
+            const { error: layerErr } = await adminSupabase.from('inventory_cost_layers').insert({
+              branch_id: targetBranch, product_id: id, quantity: initial_stock,
+              unit_cost: openingCost, source_type: 'adjustment',
+            })
+            if (layerErr) console.error('[ProductController.update] inventory_cost_layers insert failed:', layerErr)
+          }
         }
         
         // ── NEW: Ensure product is enabled in this branch's catalog ──
@@ -290,6 +321,18 @@ export const ProductController = {
       return ok(result)
     } catch (err) {
       return serverError('Failed to set group pricing', err)
+    }
+  },
+
+  // ── Cost layer visibility (FIFO/LIFO batches) ─────────────────────────────
+
+  async getCostLayers(request: NextRequest, ctx: RequestContext, productId: string) {
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? undefined
+    try {
+      const data = await ProductService.getCostLayers(productId, branchId)
+      return ok(data)
+    } catch (err) {
+      return serverError('Failed to fetch cost layers', err)
     }
   },
 

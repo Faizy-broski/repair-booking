@@ -321,6 +321,7 @@ export function SupplierReceiptPdf({
             {settings.thank_you_message && (
               <Text style={s.footerMain}>{settings.thank_you_message}</Text>
             )}
+            {settings.footer_address && <Text style={s.footerSub}>{settings.footer_address}</Text>}
             {uniqueFooterLines.map((line, i) => (
               <Text key={i} style={s.footerSub}>{line}</Text>
             ))}

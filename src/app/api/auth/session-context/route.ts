@@ -41,7 +41,7 @@ async function getSessionContext(
       businessId
         ? adminSupabase
             .from('businesses')
-            .select('currency, brand_color, business_vertical_templates(slug)')
+            .select('name, currency, brand_color, business_vertical_templates(slug)')
             .eq('id', businessId)
             .single()
         : Promise.resolve({ data: null }),
@@ -96,6 +96,7 @@ async function getSessionContext(
       subscriptionStatus,
       currency: bizData?.currency ?? 'GBP',
       brandColor: bizData?.brand_color ?? '#008080',
+      businessName: bizData?.name ?? null,
     })
   } catch (err) {
     return serverError('Failed to load session context', err)

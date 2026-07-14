@@ -8,8 +8,16 @@ import { useAuthStore } from '@/store/auth.store'
 import {
   Save, Building2, Palette, Type, AlignLeft, Share2,
   FileText, Settings2, Eye, RefreshCw, CheckCircle2,
-  Globe, Facebook, Instagram, Twitter, Phone, Layers, AlertCircle,
+  Globe, Facebook, Instagram, Twitter, Phone, AlertCircle,
 } from 'lucide-react'
+
+function TikTokIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.76a4.85 4.85 0 0 1-1.01-.07z" />
+    </svg>
+  )
+}
 import { cn } from '@/lib/utils'
 import {
   DEFAULT_INVOICE_SETTINGS,
@@ -40,7 +48,7 @@ const SOCIAL_FIELDS: { key: keyof SocialLinks; label: string; icon: React.Elemen
   { key: 'instagram', label: 'Instagram', icon: Instagram, placeholder: 'https://instagram.com/yourhandle' },
   { key: 'twitter',   label: 'Twitter / X', icon: Twitter, placeholder: 'https://x.com/yourhandle' },
   { key: 'whatsapp',  label: 'WhatsApp',  icon: Phone,     placeholder: '+44 7700 900000' },
-  { key: 'tiktok',    label: 'TikTok',    icon: Layers,    placeholder: 'https://tiktok.com/@yourhandle' },
+  { key: 'tiktok',    label: 'TikTok',    icon: TikTokIcon, placeholder: 'https://tiktok.com/@yourhandle' },
 ]
 
 // ── Toggle row ────────────────────────────────────────────────────────────────
@@ -152,6 +160,7 @@ function InvoicePreview({ s, businessName, branchName }: {
         </div>
         <hr style={{ border: 'none', borderTop: '1px dashed #d1d5db', margin: '6px 0' }} />
         {s.thank_you_message && <p style={{ textAlign: 'center', fontWeight: 700, color: s.primary_color, margin: '0 0 2px' }}>{s.thank_you_message}</p>}
+        {s.footer_address && <p style={{ textAlign: 'center', color: '#9ca3af', margin: '1px 0' }}>{s.footer_address}</p>}
         {footerLines.map((l, i) => <p key={i} style={{ textAlign: 'center', color: '#9ca3af', margin: '1px 0' }}>{l}</p>)}
         {socials.map(([k, v]) => <p key={k} style={{ textAlign: 'center', color: '#9ca3af', margin: '1px 0' }}>{k}: {v as string}</p>)}
         {s.policy_text && <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: 6.5, marginTop: 6, borderTop: '1px solid #e5e7eb', paddingTop: 5 }}>{s.policy_text}</p>}
@@ -246,6 +255,7 @@ function InvoicePreview({ s, businessName, branchName }: {
       {/* Footer */}
       <div style={{ backgroundColor: '#f9fafb', borderTop: '1px solid #e5e7eb', padding: '10px 24px' }}>
         {s.thank_you_message && <p style={{ textAlign: 'center', fontWeight: 700, color: s.primary_color, margin: '0 0 4px' }}>{s.thank_you_message}</p>}
+        {s.footer_address && <p style={{ textAlign: 'center', color: '#6b7280', margin: '1px 0' }}>{s.footer_address}</p>}
         {footerLines.map((l, i) => <p key={i} style={{ textAlign: 'center', color: '#6b7280', margin: '1px 0' }}>{l}</p>)}
         {socials.length > 0 && (
           <p style={{ textAlign: 'center', color: '#9ca3af', margin: '4px 0 1px' }}>
@@ -532,6 +542,12 @@ export function InvoiceDesignTab() {
                 placeholder="Thank you for your business!"
                 value={settings.thank_you_message ?? ''}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ thank_you_message: e.target.value || null })}
+              />
+              <Input
+                label="Address"
+                placeholder="e.g. 164-Bukhsi Market Bano Bazar Anarkali Lahore, Pakistan"
+                value={settings.footer_address ?? ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ footer_address: e.target.value || null })}
               />
               <Input
                 label="Footer Line 1"

@@ -37,6 +37,7 @@ export interface InvoiceSettings {
   show_email: boolean
 
   // Footer
+  footer_address: string | null
   footer_line_1: string | null
   footer_line_2: string | null
   footer_line_3: string | null
@@ -68,6 +69,7 @@ export const DEFAULT_INVOICE_SETTINGS: InvoiceSettings = {
   show_address: true,
   show_phone: true,
   show_email: true,
+  footer_address: null,
   footer_line_1: null,
   footer_line_2: null,
   footer_line_3: null,
