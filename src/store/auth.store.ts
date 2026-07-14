@@ -15,6 +15,7 @@ interface AuthState {
   profile: Profile | null
   activeBranch: Branch | null
   branches: Branch[]
+  businessName: string | null
   isLoading: boolean
   currency: string
   brandColor: string
@@ -27,6 +28,7 @@ interface AuthState {
   setProfile: (profile: Profile | null) => void
   setActiveBranch: (branch: Branch) => void
   setBranches: (branches: Branch[]) => void
+  setBusinessName: (businessName: string | null) => void
   setLoading: (loading: boolean) => void
   setCurrency: (currency: string) => void
   setBrandColor: (brandColor: string) => void
@@ -65,6 +67,7 @@ export const useAuthStore = create<AuthState>()(
       profile: null,
       activeBranch: null,
       branches: [],
+      businessName: null,
       isLoading: true,
       currency: 'GBP',
       brandColor: '#008080',
@@ -74,12 +77,13 @@ export const useAuthStore = create<AuthState>()(
       setProfile: (profile) => set({ profile }),
       setActiveBranch: (branch) => set({ activeBranch: branch }),
       setBranches: (branches) => set({ branches }),
+      setBusinessName: (businessName) => set({ businessName }),
       setLoading: (isLoading) => set({ isLoading }),
       setCurrency: (currency) => set({ currency }),
       setBrandColor: (brandColor) => set({ brandColor }),
       setSubscriptionStatus: (subscriptionStatus) => set({ subscriptionStatus }),
       setVerticalTemplateSlug: (verticalTemplateSlug) => set({ verticalTemplateSlug }),
-      clear: () => set({ profile: null, activeBranch: null, branches: [], currency: 'GBP', brandColor: '#008080', subscriptionStatus: null, verticalTemplateSlug: null }),
+      clear: () => set({ profile: null, activeBranch: null, branches: [], businessName: null, currency: 'GBP', brandColor: '#008080', subscriptionStatus: null, verticalTemplateSlug: null }),
 
       isOwner: () => {
         const role = get().profile?.role
@@ -101,6 +105,7 @@ export const useAuthStore = create<AuthState>()(
         profile: state.profile,
         activeBranch: state.activeBranch,
         branches: state.branches,
+        businessName: state.businessName,
         currency: state.currency,
         brandColor: state.brandColor,
         verticalTemplateSlug: state.verticalTemplateSlug,

@@ -152,7 +152,7 @@ export const InvoiceService = {
         ? InvoiceSettingsService.get(bizId, branch?.id ?? null)
         : (await import('@/types/invoice-settings')).DEFAULT_INVOICE_SETTINGS,
       bizId
-        ? adminSupabase.from('businesses').select('currency').eq('id', bizId).single().then(r => r.data)
+        ? adminSupabase.from('businesses').select('name, currency').eq('id', bizId).single().then(r => r.data)
         : Promise.resolve(null),
     ])
 
@@ -169,7 +169,7 @@ export const InvoiceService = {
       status: data.status ?? 'unpaid',
       issuedAt: data.issued_at ?? data.created_at,
       dueAt: data.due_at ?? null,
-      businessName: branch?.name ?? 'Business',
+      businessName: bizRow?.name ?? branch?.name ?? 'Business',
       branchName: branch?.name ?? null,
       branchAddress: branch?.address ?? null,
       branchPhone: branch?.phone ?? null,

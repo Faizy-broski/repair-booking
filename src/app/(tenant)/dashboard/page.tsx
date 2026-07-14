@@ -181,22 +181,22 @@ export default function DashboardPage() {
           ))
         ) : (
           <>
-            {/* Row 1 — Sales & Repairs */}
+            {/* Row 1 */}
             <StatsCard title="Sales Revenue" value={formatCurrency(stats?.total_sales ?? 0)} subtitle={PERIODS.find(p => p.value === period)?.label} icon={<Banknote className="h-5 w-5" />} color="green" />
             <StatsCard title="Sales Profit" value={formatCurrency(stats?.sales_profit ?? 0)} subtitle="revenue − cost of goods" icon={<TrendingUp className="h-5 w-5" />} color={(stats?.sales_profit ?? 0) >= 0 ? 'green' : 'red'} />
-            {isRetail ? (
-              <StatsCard title="Today's Cash" value={formatCurrency(stats?.today_cash_revenue ?? 0)} subtitle="today" icon={<Banknote className="h-5 w-5" />} color="green" />
-            ) : (
-              <StatsCard title="Repairs Revenue" value={formatCurrency(stats?.repairs_revenue ?? 0)} subtitle="collected" icon={<Receipt className="h-5 w-5" />} color="purple" />
-            )}
-            {/* Row 2 — Operations */}
             <StatsCard title="Net Profit" value={formatCurrency(stats?.net_profit ?? 0)} subtitle="all revenue − expenses" icon={<TrendingUp className="h-5 w-5" />} color={(stats?.net_profit ?? 0) >= 0 ? 'green' : 'red'} />
+            <StatsCard title="Open Repairs" value={stats?.repairs_open ?? 0} icon={<Wrench className="h-5 w-5" />} color="yellow" />
+            {/* Row 2 */}
             {isRetail ? (
               <StatsCard title="Today's Card" value={formatCurrency(stats?.today_card_revenue ?? 0)} subtitle="today" icon={<ArrowLeftRight className="h-5 w-5" />} color="blue" />
             ) : (
               <StatsCard title="Transactions" value={stats?.sales_count ?? 0} subtitle={PERIODS.find(p => p.value === period)?.label} icon={<ArrowLeftRight className="h-5 w-5" />} color="blue" />
             )}
-            <StatsCard title="Open Repairs" value={stats?.repairs_open ?? 0} icon={<Wrench className="h-5 w-5" />} color="yellow" />
+            {isRetail ? (
+              <StatsCard title="Today's Cash" value={formatCurrency(stats?.today_cash_revenue ?? 0)} subtitle="today" icon={<Banknote className="h-5 w-5" />} color="green" />
+            ) : (
+              <StatsCard title="Repairs Revenue" value={formatCurrency(stats?.repairs_revenue ?? 0)} subtitle="collected" icon={<Receipt className="h-5 w-5" />} color="purple" />
+            )}
             <StatsCard title="Total Expenses" value={formatCurrency(stats?.total_expenses ?? 0)} subtitle={PERIODS.find(p => p.value === period)?.label} icon={<TrendingUp className="h-5 w-5" />} color="red" />
             <Link href="/inventory?low_stock=true" className="block w-full h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl">
               <StatsCard title="Low Stock" value={stats?.low_stock_count ?? 0} subtitle={(stats?.low_stock_count ?? 0) > 0 ? 'view in inventory' : 'items'} icon={<AlertTriangle className="h-5 w-5" />} color={(stats?.low_stock_count ?? 0) > 0 ? 'red' : 'green'} className="cursor-pointer hover:shadow-md transition-shadow" />

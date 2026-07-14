@@ -148,11 +148,13 @@ export interface SaleReceiptPdfProps {
   tax: number
   total: number
   amountPaid?: number
+  depositLabelAmount?: number
   isRefund?: boolean
   refundReason?: string | null
   paymentSplits?: { method: string; amount: number }[] | null
   notes?: string | null
   // Branch info
+  businessName?: string | null
   branchName?: string | null
   branchAddress?: string | null
   branchPhone?: string | null
@@ -191,9 +193,9 @@ const STATUS_COLORS: Record<string, string> = {
 
 export function SaleReceiptPdf({
   saleId, date, customerName, cashierName, paymentMethod, paymentStatus,
-  items, subtotal, discount, tax, total, amountPaid,
+  items, subtotal, discount, tax, total, amountPaid, depositLabelAmount,
   isRefund, refundReason, paymentSplits, notes,
-  branchName, branchAddress, branchPhone, branchEmail, logoUrl,
+  businessName, branchName, branchAddress, branchPhone, branchEmail, logoUrl,
   currency = 'GBP', taxRate, isRushJob, isExchange,
   exchangeReturnedItems = [], exchangeReturnedTotal = 0,
   settings = DEFAULT_INVOICE_SETTINGS,
@@ -203,6 +205,7 @@ export function SaleReceiptPdf({
   const isCreditSale = paymentMethod === 'on_account'
   const depositPaid = amountPaid ?? 0
   const outstanding = Math.max(0, total - depositPaid)
+  const displayDepositAmount = depositLabelAmount ?? depositPaid
 
   const isReceipt = settings.paper_size?.startsWith('Receipt')
   const family = settings.font_family || 'Helvetica'
@@ -384,8 +387,9 @@ export function SaleReceiptPdf({
             <Image src={settings.logo_url || (logoUrl ?? '')} style={s.logoImage} />
           ) : null}
 
-          {/* Branch name / address */}
-          {settings.show_business_name && <Text style={s.brandName}>{branchName ?? 'Business Name'}</Text>}
+          {/* Business name / branch name / address */}
+          {settings.show_business_name && <Text style={s.brandName}>{businessName ?? branchName ?? 'Business Name'}</Text>}
+          {settings.show_branch_name && branchName && <Text style={s.brandSub}>{branchName}</Text>}
           {settings.show_address && branchAddress && <Text style={s.brandSub}>{branchAddress}</Text>}
           <View style={{ flexDirection: isReceipt ? 'column' : 'row', alignItems: isReceipt ? 'center' : 'flex-start', marginTop: 2 }}>
             {settings.show_phone && branchPhone && <Text style={s.brandSub}>{branchPhone}</Text>}
@@ -654,9 +658,9 @@ export function SaleReceiptPdf({
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                 <Text style={{ fontSize: 9, color: C.mid }}>
-                  {depositPaid > 0 ? `Deposit Paid${paymentSplits?.[0]?.method ? ` (${PAYMENT_LABELS[paymentSplits[0].method] ?? paymentSplits[0].method})` : ''}` : 'Deposit Paid'}
+                  {displayDepositAmount > 0 ? `Deposit Paid${paymentSplits?.[0]?.method ? ` (${PAYMENT_LABELS[paymentSplits[0].method] ?? paymentSplits[0].method})` : ''}` : 'Deposit Paid'}
                 </Text>
-                <Text style={{ fontSize: 9, color: depositPaid > 0 ? C.green : C.mid, fontFamily: bold }}>{fmt(depositPaid)}</Text>
+                <Text style={{ fontSize: 9, color: displayDepositAmount > 0 ? C.green : C.mid, fontFamily: bold }}>{fmt(displayDepositAmount)}</Text>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 5, borderTopWidth: 0.5, borderTopColor: '#e9d5ff' }}>
                 <Text style={{ fontSize: 10, color: '#7c3aed', fontFamily: bold }}>Outstanding Balance</Text>
@@ -698,6 +702,7 @@ export function SaleReceiptPdf({
                 {isRefund ? 'Your refund has been processed.' : settings.thank_you_message}
               </Text>
             )}
+            {settings.footer_address && <Text style={s.footerSub}>{settings.footer_address}</Text>}
             {uniqueFooterLines.map((line, i) => (
               <Text key={i} style={s.footerSub}>{line}</Text>
             ))}

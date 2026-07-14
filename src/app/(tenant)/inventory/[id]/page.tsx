@@ -11,7 +11,7 @@ import { Select } from '@/components/ui/select'
 import { CreatableCombobox } from '@/components/ui/creatable-combobox'
 import { Modal } from '@/components/ui/modal'
 import { ImageUpload } from '@/components/ui/image-upload'
-import { formatCurrency, getCurrencySymbol } from '@/lib/utils'
+import { formatCurrency, getCurrencySymbol, formatDate } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import Link from 'next/link'
 import { BarcodeModal } from '@/components/inventory/barcode-modal'
@@ -26,6 +26,7 @@ interface BranchAvailability {
 interface Product {
   id: string; name: string; sku: string | null; barcode: string | null
   selling_price: number; cost_price: number | null; is_service: boolean
+  valuation_method?: string | null
   image_url: string | null; item_type?: string; part_type?: string | null
   physical_location?: string | null; has_variants?: boolean
   commission_enabled: boolean; commission_type: string; commission_rate: number
@@ -202,6 +203,19 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       return json.data ?? []
     },
     staleTime: 30_000,
+    enabled: !!id,
+  })
+
+  // ── Cost batches fetch — lets FIFO/LIFO products show their live layers ────
+  const { data: costLayers } = useQuery<{ id: string; quantity: number; unit_cost: number; received_at: string; source_type: string }[]>({
+    queryKey: ['inv-product-cost-layers', id, activeBranch?.id],
+    queryFn: async () => {
+      const branchParam = activeBranch ? `?branch_id=${activeBranch.id}` : ''
+      const res = await fetch(`/api/products/${id}/cost-layers${branchParam}`)
+      const json = await res.json()
+      return json.data ?? []
+    },
+    staleTime: 15_000,
     enabled: !!id,
   })
 
@@ -972,6 +986,57 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input label={`Cost Price (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
                 <Input label={`Selling Price (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0.00" required value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
+              </div>
+              {/* FIFO stock batches — visual proof of which stock sells next and at what cost.
+                  Single-hue sequential ramp (teal, darkest = oldest = next to sell) since the
+                  story here is order, not category identity. */}
+              <div className="overflow-hidden rounded-xl border border-teal-100 bg-gradient-to-br from-teal-50/70 to-white shadow-sm">
+                <div className="flex items-center gap-2 border-b border-teal-100/80 px-4 py-2.5">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-100">
+                    <Layers className="h-4 w-4 text-teal-700" />
+                  </span>
+                  <p className="text-sm font-semibold text-gray-800">Stock Batches</p>
+                  <span className="ml-auto rounded-full bg-teal-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-teal-700">FIFO</span>
+                </div>
+                <div className="p-4">
+                  {!costLayers || costLayers.length === 0 ? (
+                    <div className="flex items-center gap-3 rounded-lg bg-white/60 px-3 py-4 text-center">
+                      <p className="w-full text-sm text-gray-500">No open batches yet — the next sale of this product will seed one from the current cost price.</p>
+                    </div>
+                  ) : (() => {
+                    const totalQty = costLayers.reduce((s, l) => s + l.quantity, 0)
+                    const shades = ['bg-teal-700', 'bg-teal-500', 'bg-teal-400', 'bg-teal-300', 'bg-teal-200']
+                    return (
+                      <>
+                        <div className="flex h-9 w-full overflow-hidden rounded-lg shadow-inner ring-1 ring-black/5" role="img" aria-label={`${costLayers.length} stock batches, oldest sells first`}>
+                          {costLayers.map((layer, i) => (
+                            <div
+                              key={layer.id}
+                              className={`${shades[Math.min(i, shades.length - 1)]} h-full border-r-2 border-white/80 transition-all last:border-r-0 hover:brightness-110`}
+                              style={{ width: `${(layer.quantity / totalQty) * 100}%` }}
+                              title={`${layer.quantity} unit${layer.quantity === 1 ? '' : 's'} @ ${formatCurrency(layer.unit_cost)}, received ${formatDate(layer.received_at)}`}
+                            />
+                          ))}
+                        </div>
+                        <div className="mt-3 space-y-2">
+                          {costLayers.map((layer, i) => (
+                            <div key={layer.id} className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-sm ${i === 0 ? 'bg-teal-50' : ''}`}>
+                              <span className="flex items-center gap-2 text-gray-600">
+                                <span className={`inline-block h-3 w-3 rounded-sm shadow-sm ${shades[Math.min(i, shades.length - 1)]}`} />
+                                <span>{layer.quantity} unit{layer.quantity === 1 ? '' : 's'} received {formatDate(layer.received_at)}</span>
+                                {i === 0 && (
+                                  <span className="rounded-full bg-teal-700 px-2 py-0.5 text-[11px] font-semibold text-white">Next to sell</span>
+                                )}
+                              </span>
+                              <span className="font-semibold text-gray-800">{formatCurrency(layer.unit_cost)} / unit</span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )
+                  })()}
+                  <p className="mt-3 text-xs text-gray-400">Oldest batch is sold first — stock is consumed left to right.</p>
+                </div>
               </div>
               {hasMargin && (
                 <div className="rounded-lg bg-green-50 border border-green-100 px-4 py-2.5 flex items-center gap-4 text-sm">

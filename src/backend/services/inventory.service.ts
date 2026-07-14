@@ -27,37 +27,20 @@ export const InventoryService = {
     userId: string,
     note?: string
   ) {
-    // Upsert inventory
-    const { data: inv } = await adminSupabase
-      .from('inventory')
-      .select('id, quantity')
-      .eq('branch_id', branchId)
-      .eq('product_id', productId)
-      .maybeSingle()
-
-    if (inv) {
-      await db('inventory')
-        .update({ quantity: (inv as any).quantity + quantity })
-        .eq('id', (inv as any).id)
-    } else {
-      await db('inventory').insert({
-        branch_id: branchId,
-        product_id: productId,
-        variant_id: variantId,
-        quantity: Math.max(0, quantity),
-      })
-    }
-
-    // Log movement
-    await db('stock_movements').insert({
-      branch_id: branchId,
-      product_id: productId,
-      variant_id: variantId,
-      type: 'adjustment',
-      quantity,
-      note,
-      created_by: userId,
+    // Single atomic RPC: locks the inventory row, applies the quantity
+    // delta, and creates/consumes a cost layer accordingly (positive delta
+    // seeds a layer at the current best-known cost; negative delta consumes
+    // via the same FIFO/LIFO path a real sale uses) — see
+    // apply_inventory_adjustment in migration 136_true_fifo_costing.sql.
+    const { error } = await (adminSupabase.rpc as any)('apply_inventory_adjustment', {
+      p_branch_id: branchId,
+      p_product_id: productId,
+      p_variant_id: variantId,
+      p_delta: quantity,
+      p_note: note ?? null,
+      p_user_id: userId,
     })
+    if (error) throw error
   },
 
   async getLowStockAlerts(branchId: string) {

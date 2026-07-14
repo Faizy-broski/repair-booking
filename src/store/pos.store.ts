@@ -8,6 +8,7 @@ export interface CartItem {
   quantity: number
   unitPrice: number
   discount: number
+  maxStock: number | null
 }
 
 export interface PaymentSplit {
@@ -36,7 +37,7 @@ interface PosState {
   setExistingSession: (session: RegisterSession | null) => void
   setSessionLoaded: (loaded: boolean) => void
 
-  addToCart: (product: Product, variant?: ProductVariant | null) => void
+  addToCart: (product: Product, variant?: ProductVariant | null, maxStock?: number | null) => void
   removeFromCart: (productId: string, variantId?: string | null) => void
   updateQuantity: (productId: string, variantId: string | null, quantity: number) => void
   setItemDiscount: (productId: string, variantId: string | null, discount: number) => void
@@ -79,7 +80,7 @@ export const usePosStore = create<PosState>((set, get) => ({
   setExistingSession: (existingSession) => set({ existingSession }),
   setSessionLoaded: (sessionLoaded) => set({ sessionLoaded }),
 
-  addToCart: (product, variant = null) => {
+  addToCart: (product, variant = null, maxStock = null) => {
     const { cart } = get()
     const existingIdx = cart.findIndex(
       (i) => i.product.id === product.id && (i.variant?.id ?? null) === (variant?.id ?? null)
@@ -87,11 +88,15 @@ export const usePosStore = create<PosState>((set, get) => ({
 
     if (existingIdx >= 0) {
       const updated = [...cart]
-      updated[existingIdx] = { ...updated[existingIdx], quantity: updated[existingIdx].quantity + 1 }
+      const existing = updated[existingIdx]
+      const cap = existing.maxStock ?? Infinity
+      updated[existingIdx] = { ...existing, quantity: Math.min(existing.quantity + 1, cap) }
       set({ cart: updated })
     } else {
+      const cap = maxStock ?? Infinity
+      if (cap <= 0) return
       const price = variant?.selling_price ?? product.selling_price
-      set({ cart: [...cart, { product, variant: variant ?? null, quantity: 1, unitPrice: price, discount: 0 }] })
+      set({ cart: [...cart, { product, variant: variant ?? null, quantity: 1, unitPrice: price, discount: 0, maxStock }] })
     }
   },
 
@@ -106,7 +111,9 @@ export const usePosStore = create<PosState>((set, get) => ({
     }
     set({
       cart: get().cart.map((i) =>
-        i.product.id === productId && (i.variant?.id ?? null) === variantId ? { ...i, quantity } : i
+        i.product.id === productId && (i.variant?.id ?? null) === variantId
+          ? { ...i, quantity: Math.min(quantity, i.maxStock ?? Infinity) }
+          : i
       ),
     })
   },
