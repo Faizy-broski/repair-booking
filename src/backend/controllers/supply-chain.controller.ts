@@ -118,16 +118,24 @@ export const SupplierController = {
 
 const poItemSchema = z.object({
   product_id:       z.string().uuid().optional(),
+  variant_id:       z.string().uuid().optional(),
   name:             z.string().min(1),
   sku:              z.string().optional(),
   quantity_ordered: z.number().int().positive(),
   unit_cost:        z.number().min(0),
 })
 
+const depositSchema = z.object({
+  amount: z.number().positive(),
+  method: z.enum(['cash', 'card', 'bank_transfer', 'cheque', 'other']),
+  note:   z.string().optional(),
+})
+
 const createPoSchema = z.object({
   supplier_id:            z.string().uuid(),
   notes:                  z.string().optional(),
   expected_delivery_date: z.string().optional(),
+  deposit:                depositSchema.optional(),
   items:                  z.array(poItemSchema).min(1),
 })
 
@@ -201,7 +209,7 @@ export const PurchaseOrderController = {
     const { data, error } = await validateBody(req, statusSchema)
     if (error) return error
     try { return ok(await PurchaseOrderService.updateStatus(id, ctx.businessId, data.status)) }
-    catch (err) { return serverError('Failed to update PO status', err) }
+    catch (err: any) { return badRequest(err?.message ?? 'Failed to update PO status') }
   },
 
   async update(req: NextRequest, ctx: RequestContext, id: string) {

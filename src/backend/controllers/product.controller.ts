@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { ProductService } from '@/backend/services/product.service'
-import { ok, created, notFound, forbidden, serverError, conflict } from '@/backend/utils/api-response'
+import { ok, created, notFound, forbidden, serverError, conflict, badRequest } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
 import { PlanLimitService } from '@/backend/services/plan-limit.service'
@@ -333,6 +333,49 @@ export const ProductController = {
       return ok(data)
     } catch (err) {
       return serverError('Failed to fetch cost layers', err)
+    }
+  },
+
+  // ── Quantity-scoped discount (retail-store template) ─────────────────────
+
+  async getDiscount(request: NextRequest, ctx: RequestContext, productId: string) {
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? undefined
+    const variantId = request.nextUrl.searchParams.get('variant_id') ?? undefined
+    if (!branchId) return badRequest('branch_id required')
+    try {
+      const data = await ProductService.getActiveDiscount(productId, branchId, variantId)
+      return ok(data)
+    } catch (err) {
+      return serverError('Failed to fetch discount', err)
+    }
+  },
+
+  async setDiscount(request: NextRequest, ctx: RequestContext, productId: string) {
+    const schema = z.object({
+      branch_id: z.string().uuid(),
+      variant_id: z.string().uuid().optional(),
+      quantity: z.number().int().min(1),
+      discount_price: z.number().min(0),
+    })
+    const { data, error } = await validateBody(request, schema)
+    if (error) return error
+    try {
+      const result = await ProductService.setDiscount(productId, data.branch_id, data.quantity, data.discount_price, ctx.auth.userId, data.variant_id)
+      return ok(result)
+    } catch (err: any) {
+      return badRequest(err?.message ?? 'Failed to set discount')
+    }
+  },
+
+  async endDiscount(request: NextRequest, ctx: RequestContext, productId: string) {
+    const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? undefined
+    const variantId = request.nextUrl.searchParams.get('variant_id') ?? undefined
+    if (!branchId) return badRequest('branch_id required')
+    try {
+      await ProductService.endDiscount(productId, branchId, variantId)
+      return ok({ ended: true })
+    } catch (err) {
+      return serverError('Failed to end discount', err)
     }
   },
 

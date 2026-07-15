@@ -9,6 +9,11 @@ export interface CartItem {
   unitPrice: number
   discount: number
   maxStock: number | null
+  // Set when this line was added via the quantity-scoped discount picker
+  // (retail-store template) — keeps a discount-priced line and a normal-
+  // priced line of the SAME product from merging into one cart row, since
+  // they draw from two separate stock pools server-side.
+  isDiscount?: boolean
 }
 
 export interface PaymentSplit {
@@ -37,10 +42,13 @@ interface PosState {
   setExistingSession: (session: RegisterSession | null) => void
   setSessionLoaded: (loaded: boolean) => void
 
-  addToCart: (product: Product, variant?: ProductVariant | null, maxStock?: number | null) => void
-  removeFromCart: (productId: string, variantId?: string | null) => void
-  updateQuantity: (productId: string, variantId: string | null, quantity: number) => void
-  setItemDiscount: (productId: string, variantId: string | null, discount: number) => void
+  addToCart: (
+    product: Product, variant?: ProductVariant | null, maxStock?: number | null,
+    options?: { isDiscount?: boolean; unitPriceOverride?: number }
+  ) => void
+  removeFromCart: (productId: string, variantId?: string | null, isDiscount?: boolean) => void
+  updateQuantity: (productId: string, variantId: string | null, quantity: number, isDiscount?: boolean) => void
+  setItemDiscount: (productId: string, variantId: string | null, discount: number, isDiscount?: boolean) => void
   setCustomer: (customer: Customer | null) => void
   setDiscount: (discount: number) => void
   setTaxRate: (rate: number) => void
@@ -80,10 +88,12 @@ export const usePosStore = create<PosState>((set, get) => ({
   setExistingSession: (existingSession) => set({ existingSession }),
   setSessionLoaded: (sessionLoaded) => set({ sessionLoaded }),
 
-  addToCart: (product, variant = null, maxStock = null) => {
+  addToCart: (product, variant = null, maxStock = null, options) => {
     const { cart } = get()
+    const isDiscount = options?.isDiscount ?? false
     const existingIdx = cart.findIndex(
       (i) => i.product.id === product.id && (i.variant?.id ?? null) === (variant?.id ?? null)
+        && (i.isDiscount ?? false) === isDiscount
     )
 
     if (existingIdx >= 0) {
@@ -95,33 +105,39 @@ export const usePosStore = create<PosState>((set, get) => ({
     } else {
       const cap = maxStock ?? Infinity
       if (cap <= 0) return
-      const price = variant?.selling_price ?? product.selling_price
-      set({ cart: [...cart, { product, variant: variant ?? null, quantity: 1, unitPrice: price, discount: 0, maxStock }] })
+      const price = options?.unitPriceOverride ?? (variant?.selling_price ?? product.selling_price)
+      set({ cart: [...cart, { product, variant: variant ?? null, quantity: 1, unitPrice: price, discount: 0, maxStock, isDiscount }] })
     }
   },
 
-  removeFromCart: (productId, variantId = null) => {
-    set({ cart: get().cart.filter((i) => !(i.product.id === productId && (i.variant?.id ?? null) === variantId)) })
+  removeFromCart: (productId, variantId = null, isDiscount = false) => {
+    set({
+      cart: get().cart.filter((i) =>
+        !(i.product.id === productId && (i.variant?.id ?? null) === variantId && (i.isDiscount ?? false) === isDiscount)
+      ),
+    })
   },
 
-  updateQuantity: (productId, variantId, quantity) => {
+  updateQuantity: (productId, variantId, quantity, isDiscount = false) => {
     if (quantity <= 0) {
-      get().removeFromCart(productId, variantId)
+      get().removeFromCart(productId, variantId, isDiscount)
       return
     }
     set({
       cart: get().cart.map((i) =>
-        i.product.id === productId && (i.variant?.id ?? null) === variantId
+        i.product.id === productId && (i.variant?.id ?? null) === variantId && (i.isDiscount ?? false) === isDiscount
           ? { ...i, quantity: Math.min(quantity, i.maxStock ?? Infinity) }
           : i
       ),
     })
   },
 
-  setItemDiscount: (productId, variantId, discount) => {
+  setItemDiscount: (productId, variantId, discount, isDiscount = false) => {
     set({
       cart: get().cart.map((i) =>
-        i.product.id === productId && (i.variant?.id ?? null) === variantId ? { ...i, discount } : i
+        i.product.id === productId && (i.variant?.id ?? null) === variantId && (i.isDiscount ?? false) === isDiscount
+          ? { ...i, discount }
+          : i
       ),
     })
   },

@@ -1,5 +1,6 @@
 ﻿import { adminSupabase } from '@/backend/config/supabase'
 import { InventoryService } from './inventory.service'
+import { ProductService } from './product.service'
 
 const db = (table: string): any => (adminSupabase as any).from(table)
 const rpc = (fn: string, args?: Record<string, unknown>): any => (adminSupabase as any).rpc(fn, args)
@@ -108,16 +109,28 @@ export const ReportService = {
   },
 
   async getInventoryReport(branchId: string) {
-    const lowStockItems = await InventoryService.getLowStockAlerts(branchId)
+    const [lowStockItems, batchValuation] = await Promise.all([
+      InventoryService.getLowStockAlerts(branchId),
+      ProductService.getBatchValuationByBranch(branchId),
+    ])
 
     const { data: totalStock } = await db('inventory')
-      .select('quantity, products(cost_price)')
+      .select('quantity, product_id, variant_id, products(cost_price)')
       .eq('branch_id', branchId)
 
     const totalItems = ((totalStock ?? []) as any[]).reduce((s: number, r: any) => s + (r.quantity ?? 0), 0)
-    const totalValue = ((totalStock ?? []) as any[]).reduce(
-      (s: number, r: any) => s + (r.quantity ?? 0) * (r.products?.cost_price ?? 0), 0
-    )
+    const totalValue = ((totalStock ?? []) as any[]).reduce((s: number, r: any) => {
+      // Batch totals are per-product for the whole branch — only apply them to
+      // the single base (non-variant) row per product, or a product with
+      // variants would have its full batch value added once per variant row.
+      // Variant rows keep the pre-existing parent-cost_price×qty calc (no
+      // per-variant cost layers exist — see plan's scope decision).
+      if (r.variant_id === null) {
+        const batch = batchValuation.get(r.product_id)
+        return s + (batch ? batch.totalValue : (r.quantity ?? 0) * (r.products?.cost_price ?? 0))
+      }
+      return s + (r.quantity ?? 0) * (r.products?.cost_price ?? 0)
+    }, 0)
 
     return {
       low_stock_count: lowStockItems.length,
@@ -243,14 +256,25 @@ export const ReportService = {
   },
 
   async getInventorySummaryReport(branchId: string) {
-    const { data, error } = await db('inventory')
-      .select('quantity, products(id, name, sku, cost_price, selling_price, categories(name))')
-      .eq('branch_id', branchId)
-      .order('quantity')
+    const [{ data, error }, batchValuation] = await Promise.all([
+      db('inventory')
+        .select('quantity, products(id, name, sku, cost_price, selling_price, categories(name))')
+        // Fix: previously unfiltered, so a variant's inventory row leaked into
+        // this report and got priced with the PARENT product's cost/selling
+        // price regardless of which variant it actually was. Base rows only —
+        // matches how this report has always been described (per-product, not
+        // per-variant); also required for the batch-valuation lookup below,
+        // which is keyed per product and would double-count across variant rows.
+        .is('variant_id', null)
+        .eq('branch_id', branchId)
+        .order('quantity'),
+      ProductService.getBatchValuationByBranch(branchId),
+    ])
     if (error) throw error
 
     return ((data ?? []) as any[]).map((row: any) => {
       const p = row.products
+      const batch = batchValuation.get(p?.id)
       return {
         product_id: p?.id,
         product_name: p?.name,
@@ -259,7 +283,7 @@ export const ReportService = {
         quantity: row.quantity,
         cost_price: p?.cost_price ?? 0,
         sale_price: p?.selling_price ?? 0,
-        stock_value: (row.quantity ?? 0) * (p?.cost_price ?? 0),
+        stock_value: batch ? batch.totalValue : (row.quantity ?? 0) * (p?.cost_price ?? 0),
         retail_value: (row.quantity ?? 0) * (p?.selling_price ?? 0),
       }
     })
@@ -358,22 +382,32 @@ export const ReportService = {
 
   async getLowStockReport(branchId: string) {
     // PostgREST can't compare two columns, so fetch all and filter in JS
-    const { data, error } = await adminSupabase
-      .from('inventory')
-      .select('quantity, low_stock_alert, products(id, name, sku, cost_price, selling_price)')
-      .eq('branch_id', branchId)
+    const [{ data, error }, batchValuation] = await Promise.all([
+      adminSupabase
+        .from('inventory')
+        .select('quantity, low_stock_alert, product_id, products(id, name, sku, cost_price, selling_price)')
+        .eq('branch_id', branchId),
+      ProductService.getBatchValuationByBranch(branchId),
+    ])
     if (error) throw error
     return ((data ?? []) as any[])
       .filter((r: any) => (r.quantity ?? 0) <= (r.low_stock_alert ?? 5))
-      .map((r: any) => ({
-        product_id: r.products?.id,
-        product_name: r.products?.name,
-        sku: r.products?.sku,
-        quantity: r.quantity,
-        low_stock_alert: r.low_stock_alert ?? 5,
-        cost_price: r.products?.cost_price ?? 0,
-        selling_price: r.products?.selling_price ?? 0,
-      }))
+      .map((r: any) => {
+        // "Value at risk" for a low-stock line is best represented by the
+        // batch that's about to run out (the next-to-sell cost), not a
+        // blended total — this report is about "what will it cost to
+        // restock/what's the cost of the unit sitting at the front."
+        const batch = batchValuation.get(r.product_id)
+        return {
+          product_id: r.products?.id,
+          product_name: r.products?.name,
+          sku: r.products?.sku,
+          quantity: r.quantity,
+          low_stock_alert: r.low_stock_alert ?? 5,
+          cost_price: batch ? batch.nextUnitCost : (r.products?.cost_price ?? 0),
+          selling_price: r.products?.selling_price ?? 0,
+        }
+      })
       .sort((a: any, b: any) => a.quantity - b.quantity)
   },
 

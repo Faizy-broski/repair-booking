@@ -10,6 +10,10 @@ function money(n: number, currency?: string) {
   return formatCurrency(n, currency)
 }
 
+function num(n: number) {
+  return new Intl.NumberFormat('en-GB', { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 }).format(n)
+}
+
 function esc(s: string | null | undefined): string {
   if (!s) return ''
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -25,7 +29,7 @@ export interface ReceiptPrintData {
   branchAddress?: string | null
   branchPhone?: string | null
   customerName: string
-  items: Array<{ description: string; quantity: number; unit_price: number }>
+  items: Array<{ description: string; quantity: number; unit_price: number; discount?: number; original_unit_price?: number | null }>
   subtotal: number
   discount?: number
   tax?: number
@@ -53,6 +57,10 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
                  : '80mm'
   const date     = new Date(issuedAt).toLocaleDateString('en-GB')
   const thankYou = settings.thank_you_message || 'Thank you for your business!'
+
+  const bnParts = (businessName || '').split('|')
+  const mainBn = bnParts[0].trim()
+  const tagline = bnParts.length > 1 ? bnParts[1].trim() : null
 
   const socials = Object.entries(settings.social_links ?? {})
     .filter(([, v]) => !!v)
@@ -92,9 +100,18 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
     .row { display: flex; justify-content: space-between; margin-bottom: 2px }
     .lbl { font-size: 9.5px; color: #000; font-weight: 600 }
     .val { font-size: 9.5px; font-weight: bold }
-    .ir  { display: flex; align-items: flex-start; margin-bottom: 4px }
-    .id  { flex: 1; padding-right: 4px; font-size: 10px; word-break: break-word }
-    .ia  { font-size: 10px; text-align: right; width: 52px; flex-shrink: 0 }
+    /* ── Items table ── */
+    .it  { width: 100%; border-collapse: collapse; margin: 0 }
+    .it th { font-size: 8.5px; color: #888; font-weight: 600; padding: 0 2px 3px 2px; border-bottom: 1px dotted #bbb }
+    .it td { font-size: 9.5px; padding: 3px 2px; vertical-align: top }
+    .it td.nm { font-weight: 600; color: #000; word-break: break-word }
+    .it td.qt { text-align: center; white-space: nowrap; color: #555 }
+    .it td.un { text-align: center; white-space: nowrap; color: #555 }
+    .it td.dc { text-align: center; white-space: nowrap }
+    .it td.am { text-align: right; font-weight: bold; color: #000; white-space: nowrap }
+    .it th.qt, .it th.un, .it th.dc, .it th.am { width: 1%; white-space: nowrap; text-align: center; padding-left: 6px }
+    .it th.am { text-align: right }
+    .it td.qt, .it td.un, .it td.dc, .it td.am { padding-left: 6px }
     .tr  { display: flex; justify-content: space-between; margin-bottom: 1.5px }
     .tl  { font-size: 10px; color: #000; font-weight: 600 }
     .tv  { font-size: 10px; font-weight: bold }
@@ -114,7 +131,7 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
     .fl { font-size: 9.5px; color: #000; text-align: center; margin-top: 2px; word-break: break-word }
     .pl { font-size: 8.5px; color: #000; text-align: center; margin-top: 5px;
           border-top: 1px solid #000; padding-top: 4px }
-    .grn { color: #000 }
+    .grn { color: #1a7a3a }
 
     /* Debug panel — visible on screen, hidden when printing */
     #dbg {
@@ -175,20 +192,56 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>
 ${debugMode ? debugPanel : '<div id="dbg" style="display:none"></div>'}
 ${L(settings.show_logo && settings.logo_url, `<img src="${esc(settings.logo_url)}" class="logo" alt="">`)}
-${L(settings.show_business_name !== false, `<div class="bn">${esc(businessName)}</div>`)}
+${L(settings.show_business_name !== false, `<div class="bn">${esc(mainBn || businessName)}</div>`)}
+${L(settings.show_business_name !== false && !!tagline, `<div class="br" style="font-weight:bold;font-size:11px;margin-top:2px;margin-bottom:2px">${esc(tagline)}</div>`)}
 ${L(settings.show_branch_name && branchName, `<div class="br">${esc(branchName)}</div>`)}
 ${L(settings.show_address && branchAddress, `<div class="dt">${esc(branchAddress)}</div>`)}
 ${L(settings.show_phone && branchPhone, `<div class="dt">${esc(branchPhone)}</div>`)}
 <hr>
 <div class="ino">${esc(invoiceNumber)}</div>
-<div class="row"><span class="lbl">Date</span><span class="val">${esc(date)}</span></div>
+${date.includes(',') 
+  ? `<div style="display:flex;justify-content:space-between;margin-bottom:2px">
+       <span style="font-size:9px"><span class="lbl">Date</span><span style="font-weight:bold">${esc(date.split(',')[0].trim())}</span></span>
+       <span style="font-size:9px"><span class="lbl">Time</span><span style="font-weight:bold">${esc(date.split(',')[1].trim())}</span></span>
+     </div>`
+  : `<div class="row"><span class="lbl">Date</span><span class="val">${esc(date)}</span></div>`
+}
 <div class="row"><span class="lbl">Customer</span><span class="val">${esc(customerName)}</span></div>
 <div class="row"><span class="lbl">Status</span><span class="val">${esc(status)}</span></div>
 <hr>
-${items.map(i => `<div class="ir"><div class="id">${esc(i.description)}</div><div class="ia">${money(i.quantity * i.unit_price, currency)}</div></div>`).join('')}
+<table class="it">
+  <thead><tr>
+    <th style="text-align:left">ITEM</th>
+    <th class="qt">QTY</th>
+    <th class="un">UNIT PRICE</th>
+    <th class="dc">DISC</th>
+    <th class="am">AMT</th>
+  </tr></thead>
+  <tbody>
+${items.map(i => {
+  const manualDisc = i.discount ?? 0
+  const hasOriginal = i.original_unit_price != null && i.original_unit_price > i.unit_price
+  const saleDisc = hasOriginal ? (i.original_unit_price! - i.unit_price) : 0
+  const totalDiscDisplay = saleDisc + manualDisc
+  const lineAmt = (i.unit_price - manualDisc) * i.quantity
+  
+  const unitHtml = hasOriginal 
+    ? num(i.original_unit_price!)
+    : num(i.unit_price)
+
+  return `  <tr>
+    <td class="nm">${esc(i.description)}</td>
+    <td class="qt">${i.quantity}</td>
+    <td class="un">${unitHtml}</td>
+    <td class="dc${totalDiscDisplay > 0 ? ' grn' : ''}">${totalDiscDisplay > 0 ? '-' + num(totalDiscDisplay) : '0'}</td>
+    <td class="am">${num(lineAmt)}</td>
+  </tr>`
+}).join('\n')}
+  </tbody>
+</table>
 <hr>
 <div class="tr"><span class="tl">Subtotal</span><span class="tv">${money(subtotal, currency)}</span></div>
-${L(discount > 0, `<div class="tr"><span class="tl">Discount</span><span class="tv grn">-${money(discount, currency)}</span></div>`)}
+<div class="tr"><span class="tl">Discount</span><span class="tv${discount > 0 ? ' grn' : ''}">${discount > 0 ? '-' + money(discount, currency) : money(0, currency)}</span></div>
 ${L(settings.show_tax_breakdown && tax > 0, `<div class="tr"><span class="tl">Tax</span><span class="tv">${money(tax, currency)}</span></div>`)}
 <hr>
 <div class="gr"><span class="gl">Total</span><span class="gv">${money(total, currency)}</span></div>

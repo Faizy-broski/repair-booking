@@ -139,8 +139,18 @@ export function CartPanel({ mobileView }: Props) {
 
   // ── Computed totals ────────────────────────────────────────────────────────
   const subtotal        = pos.subtotal()
-  const grossSubtotal   = pos.cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0)
-  const itemDiscTotal   = pos.cart.reduce((s, i) => s + i.discount * i.quantity, 0)
+  // A sale-priced line's unitPrice is already the discounted price it was
+  // charged at — unitPrice*quantity alone (and item.discount, a separate
+  // manual per-line reduction) don't capture that discount at all, so both
+  // grossSubtotal and itemDiscTotal must also account for the gap back up to
+  // the item's regular selling price, or "Total Discount" silently shows 0
+  // for sale items even though their receipt lines show a real DISC amount.
+  const saleDiscTotal   = pos.cart.reduce((s, i) => {
+    const orig = cartItemOriginalPrice(i)
+    return s + (orig !== undefined && orig > i.unitPrice ? (orig - i.unitPrice) * i.quantity : 0)
+  }, 0)
+  const grossSubtotal   = pos.cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0) + saleDiscTotal
+  const itemDiscTotal   = pos.cart.reduce((s, i) => s + i.discount * i.quantity, 0) + saleDiscTotal
   const discountAmt     = discountType === 'percent' ? subtotal * (pos.discount / 100) : pos.discount
   const totalDiscount   = itemDiscTotal + discountAmt
   const taxAmt          = (subtotal - discountAmt) * (pos.taxRate / 100)
@@ -253,13 +263,24 @@ export function CartPanel({ mobileView }: Props) {
     )
   }
 
+  // For a sale-price cart line, the "unit price" stored is already the
+  // discounted price — this recovers what the item normally sells for, so
+  // both the on-screen cart and printed receipts can show the discount
+  // (original price crossed out / DISC column) instead of just the charged
+  // price with no context.
+  function cartItemOriginalPrice(item: (typeof pos.cart)[number]): number | undefined {
+    return (item.isDiscount ?? false)
+      ? (item.variant as any)?.selling_price ?? (item.product as any)?.selling_price
+      : undefined
+  }
+
   // Prints the receipt for a completed sale.
   // receiptItems must be captured BEFORE pos.clearCart() is called.
   // preWin must be opened BEFORE any await (user-gesture context) then passed here.
   async function printReceipt(
     saleId: string,
     paymentMethod: string,
-    receiptItems: { description: string; quantity: number; unit_price: number }[],
+    receiptItems: { description: string; quantity: number; unit_price: number; discount?: number; original_unit_price?: number }[],
     preWin: Window | null,
     paymentSplits?: PaymentSplit[],
     paymentStatus?: string,
@@ -290,8 +311,11 @@ export function CartPanel({ mobileView }: Props) {
         branchPhone:   activeBranch?.phone ?? null,
         customerName,
         items:         receiptItems,
-        subtotal,
-        discount:      discountAmt,
+        // Gross subtotal / total discount (not the net subtotal/order-level
+        // discount) so the summary reconciles with what each line's UNIT/DISC
+        // columns show — total itself is unaffected, still the actual amount charged.
+        subtotal:      grossSubtotal,
+        discount:      totalDiscount,
         tax:           taxAmt,
         total,
         amountPaid:    amountPaid ?? total,
@@ -303,10 +327,14 @@ export function CartPanel({ mobileView }: Props) {
 
     // ── Standard paper (A4/A5/Letter): keep existing PDF blob path ────────────
     try {
-      const pdfItems = receiptItems.map(i => ({
-        name: i.description, quantity: i.quantity, unit_price: i.unit_price,
-        discount: 0, total: i.quantity * i.unit_price,
-      }))
+      const pdfItems = receiptItems.map(i => {
+        const disc = i.discount ?? 0
+        return {
+          name: i.description, quantity: i.quantity, unit_price: i.unit_price,
+          discount: disc, total: (i.unit_price - disc) * i.quantity,
+          original_unit_price: i.original_unit_price,
+        }
+      })
       const blob = await pdf(
         <SaleReceiptPdf
           saleId={saleId}
@@ -317,7 +345,7 @@ export function CartPanel({ mobileView }: Props) {
           paymentStatus={paymentStatus ?? 'paid'}
           amountPaid={amountPaid}
           items={pdfItems}
-          subtotal={subtotal} discount={discountAmt} tax={taxAmt} total={total}
+          subtotal={grossSubtotal} discount={totalDiscount} tax={taxAmt} total={total}
           paymentSplits={paymentSplits?.map(s => ({ method: s.method, amount: s.amount }))}
           businessName={businessName ?? activeBranch?.name}
           branchName={activeBranch?.name}
@@ -348,6 +376,8 @@ export function CartPanel({ mobileView }: Props) {
       description: item.variant ? `${item.product.name} – ${item.variant.name}` : item.product.name,
       quantity: item.quantity,
       unit_price: item.unitPrice,
+      discount: item.discount,
+      original_unit_price: cartItemOriginalPrice(item),
     }))
     const preWin = openPrintWindow()
 
@@ -376,6 +406,7 @@ export function CartPanel({ mobileView }: Props) {
         quantity: item.quantity, unit_price: item.unitPrice,
         discount: item.discount, total: (item.unitPrice - item.discount) * item.quantity,
         is_service: item.product.is_service,
+        is_discount: item.isDiscount ?? false,
       })),
     }
 
@@ -394,6 +425,11 @@ export function CartPanel({ mobileView }: Props) {
       setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
       queryClient.invalidateQueries({ queryKey: ['sales'] })
       queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
+      // Refresh the product grid so stock/discount status (e.g. a discount
+      // pool that just sold out) reflects immediately, not after a manual
+      // page refresh.
+      queryClient.invalidateQueries({ queryKey: ['pos-products'] })
+      queryClient.invalidateQueries({ queryKey: ['pos-variants'] })
       await printReceipt(saleJson.data?.sale_id ?? 'unknown', paymentMethod, receiptItems, preWin, paymentSplits)
       setTimeout(() => { setSuccess(false); setPaymentOpen(false) }, 2500)
     } else {
@@ -418,6 +454,8 @@ export function CartPanel({ mobileView }: Props) {
       description: item.product.name,
       quantity: item.quantity,
       unit_price: item.unitPrice,
+      discount: item.discount,
+      original_unit_price: cartItemOriginalPrice(item),
     }))
     const preWinCash = openPrintWindow()
 
@@ -429,6 +467,7 @@ export function CartPanel({ mobileView }: Props) {
       name: item.product.name, quantity: item.quantity, unit_price: item.unitPrice,
       discount: item.discount, total: (item.unitPrice - item.discount) * item.quantity,
       is_service: item.product.is_service,
+      is_discount: item.isDiscount ?? false,
     }))
 
     // Optimistic update: clear cart and show success before server responds
@@ -455,6 +494,11 @@ export function CartPanel({ mobileView }: Props) {
       setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
       queryClient.invalidateQueries({ queryKey: ['sales'] })
       queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
+      // Refresh the product grid so stock/discount status (e.g. a discount
+      // pool that just sold out) reflects immediately, not after a manual
+      // page refresh.
+      queryClient.invalidateQueries({ queryKey: ['pos-products'] })
+      queryClient.invalidateQueries({ queryKey: ['pos-variants'] })
       await printReceipt(saleJson.data?.sale_id ?? 'unknown', 'cash', receiptItemsCash, preWinCash)
       setTimeout(() => setSuccess(false), 2500)
     } else {
@@ -505,6 +549,8 @@ export function CartPanel({ mobileView }: Props) {
       description: item.variant ? `${item.product.name} – ${item.variant.name}` : item.product.name,
       quantity: item.quantity,
       unit_price: item.unitPrice,
+      discount: item.discount,
+      original_unit_price: cartItemOriginalPrice(item),
     }))
     const preWinCredit = openPrintWindow()
 
@@ -517,6 +563,7 @@ export function CartPanel({ mobileView }: Props) {
       quantity: item.quantity, unit_price: item.unitPrice,
       discount: item.discount, total: (item.unitPrice - item.discount) * item.quantity,
       is_service: item.product.is_service,
+      is_discount: item.isDiscount ?? false,
     }))
 
     setCreditOpen(false)
@@ -546,6 +593,11 @@ export function CartPanel({ mobileView }: Props) {
       setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
       queryClient.invalidateQueries({ queryKey: ['sales'] })
       queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
+      // Refresh the product grid so stock/discount status (e.g. a discount
+      // pool that just sold out) reflects immediately, not after a manual
+      // page refresh.
+      queryClient.invalidateQueries({ queryKey: ['pos-products'] })
+      queryClient.invalidateQueries({ queryKey: ['pos-variants'] })
       queryClient.invalidateQueries({ queryKey: ['credits'] })
       const creditStatus  = deposit <= 0 ? 'on_account' : deposit >= total ? 'paid' : 'partial'
       const depositSplits = deposit > 0 ? [{ method: creditDepositMethod as PaymentSplit['method'], amount: deposit }] : undefined
@@ -718,6 +770,7 @@ export function CartPanel({ mobileView }: Props) {
               <tr>
                 <th className="w-[88px] px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">QTY</th>
                 <th className="px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Item</th>
+                <th className="w-[72px] px-2 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Unit</th>
                 <th className="w-[78px] px-2 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Disc</th>
                 <th className="w-[80px] px-2 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Total</th>
                 <th className="w-[32px]"></th>
@@ -726,17 +779,20 @@ export function CartPanel({ mobileView }: Props) {
             <tbody className="divide-y divide-gray-200">
               {pos.cart.map(item => {
                 const lineTotal = (item.unitPrice - item.discount) * item.quantity
+                const isDiscount = item.isDiscount ?? false
+                const originalPrice = cartItemOriginalPrice(item)
+                const hasSaleDiscount = isDiscount && originalPrice !== undefined && originalPrice > item.unitPrice
                 return (
-                  <tr key={`${item.product.id}-${item.variant?.id}`} className="bg-white hover:bg-gray-50">
+                  <tr key={`${item.product.id}-${item.variant?.id}-${isDiscount}`} className="bg-white hover:bg-gray-50">
                     <td className="px-2 py-2.5 align-middle">
                       <div className="flex items-center justify-center gap-1.5">
-                        <button onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity - 1)} className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-md bg-red-100 hover:bg-red-200 text-red-600 transition-colors">
+                        <button onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity - 1, isDiscount)} className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-md bg-red-100 hover:bg-red-200 text-red-600 transition-colors">
                           <Minus className="h-3.5 w-3.5" />
                         </button>
                         <span className="w-5 sm:w-7 text-center text-sm font-bold text-gray-900">{item.quantity}</span>
                         <button
                           disabled={item.quantity >= (item.maxStock ?? Infinity)}
-                          onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity + 1)}
+                          onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity + 1, isDiscount)}
                           className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-md bg-green-100 hover:bg-green-200 text-green-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-green-100"
                         >
                           <Plus className="h-3.5 w-3.5" />
@@ -747,23 +803,36 @@ export function CartPanel({ mobileView }: Props) {
                       <p className="truncate text-sm font-semibold text-gray-900">
                         {item.product.name}
                         {item.variant && <span className="font-normal text-indigo-600"> · {item.variant.name}</span>}
+                        {isDiscount && (
+                          <span className="ml-1.5 rounded-full bg-brand-teal px-1.5 py-0.5 text-[10px] font-semibold text-white align-middle">SALE</span>
+                        )}
                       </p>
                       {(item.variant?.sku ?? item.product.sku) && (
                         <p className="text-gray-400 text-xs truncate">#{item.variant?.sku ?? item.product.sku}</p>
                       )}
-                      <p className="text-xs text-gray-500">{formatCurrency(item.unitPrice)}</p>
+                    </td>
+                    {/* Unit price cell — shows original crossed out + sale price for discount items */}
+                    <td className="px-2 py-2.5 align-middle text-right">
+                      {hasSaleDiscount ? (
+                        <div>
+                          <p className="text-[10px] text-gray-400 line-through">{formatCurrency(originalPrice!)}</p>
+                          <p className="text-xs font-bold text-brand-teal">{formatCurrency(item.unitPrice)}</p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-500">{formatCurrency(item.unitPrice)}</p>
+                      )}
                     </td>
                     <td className="px-2 py-2.5 align-middle">
                       <DiscountInput
                         value={item.discount}
                         max={item.unitPrice}
-                        onChange={v => pos.setItemDiscount(item.product.id, item.variant?.id ?? null, v)}
+                        onChange={v => pos.setItemDiscount(item.product.id, item.variant?.id ?? null, v, isDiscount)}
                         className="h-8 sm:h-9 w-full rounded-md border border-gray-300 px-1.5 text-right text-sm font-medium text-green-600 focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/30"
                       />
                     </td>
                     <td className="px-2 py-2.5 align-middle text-right font-bold text-gray-900 text-xs">{formatCurrency(lineTotal)}</td>
                     <td className="px-2 py-2.5 align-middle">
-                      <button onClick={() => pos.removeFromCart(item.product.id, item.variant?.id ?? null)} className="text-red-400 hover:text-red-600 transition-colors">
+                      <button onClick={() => pos.removeFromCart(item.product.id, item.variant?.id ?? null, isDiscount)} className="text-red-400 hover:text-red-600 transition-colors">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </td>
@@ -783,6 +852,8 @@ export function CartPanel({ mobileView }: Props) {
           <div className="px-4 pt-3 pb-2 space-y-2">
             <div className="flex justify-between text-sm text-gray-500"><span>Total Items</span><span className="font-semibold text-gray-700">{pos.itemCount()}</span></div>
             <div className="flex justify-between text-sm text-gray-600"><span>Sub Total</span><span className="font-medium text-gray-800">{formatCurrency(grossSubtotal)}</span></div>
+
+            {/* Order-level discount input — always shown */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-medium text-gray-600">Discount</span>
@@ -798,9 +869,13 @@ export function CartPanel({ mobileView }: Props) {
                 className="h-8 w-24 rounded border border-gray-200 px-2 text-right text-sm text-green-700 focus:border-brand-teal focus:outline-none"
               />
             </div>
-            {totalDiscount > 0 && (
-              <div className="flex justify-between text-sm font-medium text-green-600"><span>Discount Applied</span><span>-{formatCurrency(totalDiscount)}</span></div>
-            )}
+
+            {/* Collective discount summary — always visible, 0 if none */}
+            <div className={`flex justify-between text-sm font-medium rounded-md px-2 py-1 ${totalDiscount > 0 ? 'bg-green-50 text-green-600' : 'text-gray-400'}`}>
+              <span>Total Discount</span>
+              <span>{totalDiscount > 0 ? '-' : ''}{formatCurrency(totalDiscount)}</span>
+            </div>
+
             {/* Gift card */}
             <div className="flex items-center justify-between gap-2">
               <div className="flex shrink-0 items-center gap-1.5">

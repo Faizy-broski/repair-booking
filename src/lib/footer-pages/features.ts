@@ -105,7 +105,7 @@ export const featurePages: CapabilityPage[] = [
     related: [
       { label: "All Industries", href: "/industries" },
       { label: "Customization", href: "/features/customization" },
-      { label: "Why Repair Pilot?", href: "/features/why-repair-pilot" },
+      { label: "Why iRepairly?", href: "/features/why-irepairly" },
     ],
   },
   {

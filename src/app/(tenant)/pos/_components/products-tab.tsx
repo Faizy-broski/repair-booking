@@ -38,25 +38,38 @@ const ProductCard = memo(function ProductCard({
   onAdd,
   onVariantSelect,
   onVariantHover,
+  onDiscountSelect,
 }: {
   product: ProductWithStock
   size?: 'sm' | 'md'
   onAdd: (product: ProductWithStock) => void
   onVariantSelect: (product: ProductWithStock, e: React.MouseEvent<HTMLButtonElement>) => void
   onVariantHover?: (product: ProductWithStock) => void
+  onDiscountSelect?: (product: ProductWithStock) => void
 }) {
   const hasVariants = product.has_variants || (product.variant_count ?? 0) > 0
+  // hasDiscount drives click routing (opens the product-level price picker) —
+  // only applies to non-variant products. showSaleBadge is purely visual and
+  // also covers variant products where ANY variant has an active discount
+  // (the exact price/qty choice happens in the variant popover instead).
+  const hasDiscount = !hasVariants && !!product.active_discount && product.active_discount.quantity_remaining > 0
+  const showSaleBadge = hasDiscount || (hasVariants && !!product.has_variant_discount)
   const outOfStock = !product.is_service && !hasVariants && product.on_hand !== undefined && (product.on_hand ?? 0) <= 0
   return (
     <button
       disabled={outOfStock}
       onMouseEnter={() => hasVariants && onVariantHover?.(product)}
-      onClick={(e) => hasVariants ? onVariantSelect(product, e) : onAdd(product)}
+      onClick={(e) => hasVariants ? onVariantSelect(product, e) : hasDiscount ? onDiscountSelect?.(product) : onAdd(product)}
       className={`relative flex w-full flex-col overflow-hidden rounded-xl border bg-white p-3 text-left transition-all ${outOfStock
           ? 'border-gray-100 opacity-50 cursor-not-allowed'
           : 'border-gray-200 hover:border-brand-teal hover:shadow-sm cursor-pointer'
         }`}
     >
+      {showSaleBadge && (
+        <span className="absolute right-2 top-2 z-10 rounded-full bg-brand-teal px-2 py-0.5 text-[10px] font-semibold text-white shadow">
+          SALE
+        </span>
+      )}
       {outOfStock && (
         <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/60">
           <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-600">Out of Stock</span>
@@ -85,13 +98,24 @@ const ProductCard = memo(function ProductCard({
         </div>
 
         <div className="space-y-1">
-          <span className="text-sm font-bold text-brand-teal">{formatCurrency(product.selling_price)}</span>
+          {hasDiscount ? (
+            <span className="flex items-center gap-1.5">
+              <span className="text-sm font-bold text-brand-teal">{formatCurrency(product.active_discount!.discount_price)}</span>
+              <span className="text-xs text-gray-400 line-through">{formatCurrency(product.selling_price)}</span>
+            </span>
+          ) : (
+            <span className="text-sm font-bold text-brand-teal">{formatCurrency(product.selling_price)}</span>
+          )}
           {product.on_hand !== undefined && !product.is_service && !hasVariants && (
             <span className={`block text-xs font-medium ${(product.on_hand ?? 0) > 0 ? 'text-gray-400' : 'text-red-500'}`}>
               {(product.on_hand ?? 0) > 0 ? `${product.on_hand} in stock` : 'Out of stock'}
             </span>
           )}
-          {hasVariants && <span className="block text-xs text-indigo-500 font-medium">Select variant</span>}
+          {hasVariants && (
+            <span className="block text-xs font-medium text-indigo-500">
+              {product.has_variant_discount ? 'Select variant · some on sale' : 'Select variant'}
+            </span>
+          )}
         </div>
       </div>
     </button>
@@ -104,7 +128,6 @@ const VariantPopover = memo(function VariantPopover({
   variants,
   loading,
   fetching,
-  anchorRect,
   onAdd,
   onClose,
 }: {
@@ -112,49 +135,9 @@ const VariantPopover = memo(function VariantPopover({
   variants: ProductVariant[]
   loading: boolean
   fetching: boolean
-  anchorRect: DOMRect | null
-  onAdd: (variant: ProductVariant) => void
+  onAdd: (variant: ProductVariant, isDiscount?: boolean) => void
   onClose: () => void
 }) {
-  const panelRef = useRef<HTMLDivElement>(null)
-
-  // Calculate position and reveal the panel in a single synchronous layout pass.
-  // Starting with visibility:hidden prevents the -9999px flash; the animation
-  // keyframe origin is computed from the final coordinates, not the hidden position.
-  useLayoutEffect(() => {
-    const el = panelRef.current
-    if (!el) return
-
-    if (!anchorRect) {
-      // Centered fallback (scanner path) — position already set via inline style
-      el.style.visibility = 'visible'
-      return
-    }
-
-    const ph = el.offsetHeight
-    const pw = el.offsetWidth
-    let top  = anchorRect.bottom + 8
-    let left = anchorRect.left
-    if (top + ph > window.innerHeight)  top  = anchorRect.top - ph - 8
-    if (left + pw > window.innerWidth)  left = anchorRect.right - pw
-    left = Math.max(8, left)
-    top  = Math.max(8, top)
-    el.style.top        = `${top}px`
-    el.style.left       = `${left}px`
-    el.style.visibility = 'visible'
-  }, [anchorRect])
-
-  // Dismiss on background scroll/swipe — prevents floating ghost when grid scrolls
-  useEffect(() => {
-    const dismiss = () => onClose()
-    window.addEventListener('wheel', dismiss, { passive: true })
-    window.addEventListener('touchmove', dismiss, { passive: true })
-    return () => {
-      window.removeEventListener('wheel', dismiss)
-      window.removeEventListener('touchmove', dismiss)
-    }
-  }, [onClose])
-
   // Dismiss on Escape
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -162,124 +145,247 @@ const VariantPopover = memo(function VariantPopover({
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  // For the scanner/centered fallback (no anchorRect), seed the position so
-  // useLayoutEffect only needs to set visibility. For the card-anchored path,
-  // position is written directly to el.style — no initial coordinates here so
-  // there is nothing to tween from.
-  const initialStyle: React.CSSProperties = anchorRect
-    ? { visibility: 'hidden' }
-    : { visibility: 'hidden', top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }
-
   return (
-    <>
-      {/* Dimmed + blurred backdrop — pushes the grid layer backwards */}
-      <div className="fixed inset-0 z-40 animate-in fade-in duration-150 bg-slate-900/20 backdrop-blur-[2px]" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150" onClick={onClose}>
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-slate-900/20" />
 
-      {/* Popover panel — no transition-* classes so top/left snap instantly */}
+      {/* Modal Container */}
       <div
-        ref={panelRef}
-        style={initialStyle}
-        className="fixed z-50 w-[320px] animate-in fade-in slide-in-from-top-2 duration-150 origin-top rounded-2xl border border-slate-200 bg-white shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] ring-1 ring-black/5"
+        className="relative z-10 w-full max-w-md flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-150 rounded-2xl border border-slate-200 bg-white shadow-[0_32px_64px_-12px_rgba(0,0,0,0.35)] ring-1 ring-black/5 overflow-hidden"
+        onClick={e => e.stopPropagation()}
       >
+        {/* Brand accent bar */}
+        <div className="h-1.5 w-full bg-brand-teal shrink-0" />
+
         {/* Header */}
-        <div className="flex items-center justify-between rounded-t-2xl border-b border-slate-200 bg-slate-50/80 px-4 pt-4 pb-3 backdrop-blur">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-white px-5 pt-4 pb-4 shrink-0">
           <div className="min-w-0">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400 mb-0.5">Select variant</p>
-            <p className="truncate text-sm font-semibold text-slate-800">{product.name}</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-brand-teal mb-0.5">Select variant</p>
+            <p className="truncate text-lg font-bold text-slate-900">{product.name}</p>
           </div>
           <div className="ml-3 flex items-center gap-2 shrink-0">
-            {fetching && variants.length > 0 && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-300" />}
+            {fetching && variants.length > 0 && <Loader2 className="h-4 w-4 animate-spin text-brand-teal/50" />}
             <button
               onClick={onClose}
-              className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
         {/* Body */}
-        <div className="max-h-[260px] overflow-y-auto p-3">
+        <div className="flex-1 overflow-y-auto bg-slate-50 p-4 space-y-2">
           {loading ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {[1, 2, 3].map(i => (
-                <div key={i} className="h-[58px] animate-pulse rounded-xl bg-slate-100/70" />
+                <div key={i} className="h-20 w-full animate-pulse rounded-xl bg-slate-200/60" />
               ))}
             </div>
           ) : variants.length === 0 ? (
-            <p className="py-8 text-center text-sm text-slate-400">No variants found</p>
-          ) : (
-            <div className="space-y-1.5">
-              {variants.map(v => {
-                const oos = typeof v.stock === 'number' && v.stock <= 0
-                return (
-                  <button
-                    key={v.id}
-                    onClick={() => !oos && onAdd(v)}
-                    className={`flex w-full items-center justify-between rounded-xl border p-3 text-left transition-all ${
-                      oos
-                        ? 'pointer-events-none border-dashed border-slate-200 bg-slate-100/40 opacity-60'
-                        : 'border-transparent bg-slate-50/50 hover:border-brand-teal/30 hover:bg-teal-50/60 cursor-pointer'
-                    }`}
-                  >
-                    {/* Left: image + name + attributes */}
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      {v.image_url ? (
-                        <img
-                          src={v.image_url}
-                          alt={v.name}
-                          className="h-9 w-9 shrink-0 rounded-lg border border-slate-100 object-cover"
-                        />
-                      ) : (
-                        <div className="h-9 w-9 shrink-0 rounded-lg border border-dashed border-slate-200 bg-slate-50" />
-                      )}
-                      <div className="min-w-0">
-                        <p className={`truncate text-sm font-medium ${oos ? 'text-slate-400' : 'text-slate-700'}`}>
-                          {v.name}
-                        </p>
-                        {Object.keys(v.attributes ?? {}).length > 0 && (
-                          <div className="mt-0.5 flex flex-wrap gap-1">
-                            {Object.entries(v.attributes).map(([k, val]) => (
-                              <span
-                                key={k}
-                                className="rounded-full bg-white/80 px-1.5 py-px text-[10px] font-medium text-slate-500 ring-1 ring-slate-200/70"
-                              >
-                                {k}: {val}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Right: price + stock */}
-                    <div className="ml-3 shrink-0 text-right">
-                      {oos ? (
-                        <span className="text-[11px] font-medium text-slate-400">Out of stock</span>
-                      ) : (
-                        <>
-                          <p className="text-sm font-semibold text-slate-900">{formatCurrency(v.selling_price)}</p>
-                          {typeof v.stock === 'number' && (
-                            <p className="text-[11px] text-slate-400">{v.stock} left</p>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </button>
-                )
-              })}
+            <div className="py-12 flex flex-col items-center text-center">
+              <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+                <X className="h-5 w-5 text-slate-300" />
+              </div>
+              <p className="text-sm font-medium text-slate-400">No variants found</p>
             </div>
+          ) : (
+            variants.map(v => {
+              const oos = typeof v.stock === 'number' && v.stock <= 0
+              const hasDiscount = !oos && !!v.active_discount && v.active_discount.quantity_remaining > 0
+
+              const variantImage = v.image_url ? (
+                <img
+                  src={v.image_url}
+                  alt={v.name}
+                  className="h-12 w-12 shrink-0 rounded-lg border border-slate-100 object-cover shadow-sm"
+                />
+              ) : (
+                <div className="h-12 w-12 shrink-0 rounded-lg bg-brand-teal-light/50 border border-brand-teal/10 flex items-center justify-center">
+                  <span className="text-xs font-bold text-brand-teal/60 uppercase leading-none text-center px-1 break-all line-clamp-2">
+                    {v.name.slice(0, 3)}
+                  </span>
+                </div>
+              )
+
+              const attrPills = Object.keys(v.attributes ?? {}).length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {Object.entries(v.attributes).map(([k, val]) => (
+                    <span
+                      key={k}
+                      className="rounded-md bg-slate-200/50 px-2 py-0.5 text-[10px] font-semibold text-slate-500"
+                    >
+                      {k}: {val}
+                    </span>
+                  ))}
+                </div>
+              )
+
+              // ── Discounted variant ──────────────────────────────────────────
+              if (hasDiscount) {
+                return (
+                  <div key={v.id} className="rounded-xl border border-brand-teal/30 bg-white shadow-sm overflow-hidden">
+                    {/* Variant identity row */}
+                    <div className="flex items-start gap-3 px-4 pt-4 pb-3">
+                      {variantImage}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-base font-bold text-slate-800">{v.name}</p>
+                        {attrPills}
+                      </div>
+                      <span className="shrink-0 rounded-full bg-brand-teal px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm mt-1">Sale</span>
+                    </div>
+                    {/* Price choice buttons */}
+                    <div className="grid grid-cols-2 gap-2 px-4 pb-4">
+                      <button
+                        onClick={() => onAdd(v, true)}
+                        className="flex flex-col items-start rounded-xl border-2 border-brand-teal/60 bg-brand-teal-light/20 px-3.5 py-2.5 text-left transition-all hover:border-brand-teal hover:bg-brand-teal-light/40 active:scale-[0.98]"
+                      >
+                        <span className="text-[10px] font-bold text-brand-teal uppercase tracking-wide">Sale price</span>
+                        <span className="text-lg font-extrabold text-brand-teal leading-tight mt-0.5">{formatCurrency(v.active_discount!.discount_price)}</span>
+                        <div className="flex items-center gap-2 mt-1 w-full justify-between">
+                          <span className="text-[10px] text-slate-400 line-through">{formatCurrency(v.selling_price)}</span>
+                          <span className="text-[10px] font-bold text-brand-teal/70">{v.active_discount!.quantity_remaining} left</span>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => onAdd(v, false)}
+                        className="flex flex-col items-start justify-center rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-left transition-all hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98]"
+                      >
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Regular</span>
+                        <span className="text-lg font-bold text-slate-800 leading-tight mt-0.5">{formatCurrency(v.selling_price)}</span>
+                      </button>
+                    </div>
+                  </div>
+                )
+              }
+
+              // ── Normal variant ──────────────────────────────────────────────
+              return (
+                <button
+                  key={v.id}
+                  onClick={() => !oos && onAdd(v)}
+                  className={`flex w-full items-center gap-4 rounded-xl border p-3.5 text-left transition-all ${
+                    oos
+                      ? 'pointer-events-none border-dashed border-slate-200 bg-slate-50 opacity-50'
+                      : 'border-slate-200 bg-white hover:border-brand-teal/40 hover:bg-brand-teal-light/20 hover:shadow-sm cursor-pointer active:scale-[0.99]'
+                  }`}
+                >
+                  {variantImage}
+
+                  {/* Name + attributes */}
+                  <div className="min-w-0 flex-1">
+                    <p className={`truncate text-base font-bold leading-snug ${oos ? 'text-slate-400' : 'text-slate-800'}`}>
+                      {v.name}
+                    </p>
+                    {attrPills}
+                  </div>
+
+                  {/* Price + stock */}
+                  <div className="shrink-0 text-right">
+                    {oos ? (
+                      <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-500">Out of stock</span>
+                    ) : (
+                      <>
+                        <p className="text-base font-bold text-slate-900">{formatCurrency(v.selling_price)}</p>
+                        {typeof v.stock === 'number' && (
+                          <p className="text-xs font-semibold text-slate-400 mt-0.5">{v.stock} left</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </button>
+              )
+            })
           )}
         </div>
 
-        {/* Footer hint */}
+        {/* Footer */}
         {!loading && variants.length > 0 && (
-          <p className="px-4 pb-3 pt-1 text-[11px] text-slate-400">
-            Tap a variant to add it to the cart
-          </p>
+          <div className="border-t border-slate-100 bg-white px-5 py-3 shrink-0">
+            <p className="text-center text-xs font-medium text-slate-400">Tap a variant to add it to the cart</p>
+          </div>
         )}
       </div>
-    </>
+    </div>
+  )
+})
+
+// ── Discount Price Modal (retail-store template) ─────────────────────────────
+// Centered modal dialog — two-option picker for a product with a
+// quantity-scoped discount active. Uses a simple centered overlay instead of
+// anchor-based positioning to avoid the panel appearing at odd positions near
+// product cards.
+const DiscountPricePopover = memo(function DiscountPricePopover({
+  product,
+  onPick,
+  onClose,
+}: {
+  product: ProductWithStock
+  onPick: (isDiscount: boolean) => void
+  onClose: () => void
+}) {
+  const discount = product.active_discount
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  if (!discount) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150" onClick={onClose}>
+      <div className="absolute inset-0 bg-slate-900/20" />
+      <div
+        className="relative z-10 w-full max-w-sm animate-in fade-in zoom-in-95 duration-150 rounded-2xl border border-slate-200 bg-white shadow-[0_32px_64px_-12px_rgba(0,0,0,0.35)] ring-1 ring-black/5"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between rounded-t-2xl border-b border-slate-100 bg-brand-teal-light/30 px-4 pt-4 pb-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-brand-teal mb-0.5">This item is on sale</p>
+            <p className="truncate text-base font-bold text-slate-900">{product.name}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="ml-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-white/70 hover:text-slate-600 transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        {/* Price options */}
+        <div className="space-y-2 p-4">
+          {/* Sale price row */}
+          <button
+            onClick={() => onPick(true)}
+            className="group flex w-full items-center justify-between rounded-xl border-2 border-brand-teal/50 bg-brand-teal-light/40 p-4 text-left transition-all hover:border-brand-teal/70 hover:bg-brand-teal-light/60 active:scale-[0.99]"
+          >
+            <div className="min-w-0">
+              <div className="mb-1.5 flex items-center gap-2">
+                <span className="rounded-full bg-brand-teal px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Sale</span>
+                <span className="text-xs font-semibold text-brand-teal">{discount.quantity_remaining} left at this price</span>
+              </div>
+              <p className="text-[11px] text-slate-400 line-through">{formatCurrency(product.selling_price)}</p>
+            </div>
+            <p className="shrink-0 ml-3 text-2xl font-extrabold text-brand-teal">{formatCurrency(discount.discount_price)}</p>
+          </button>
+
+          {/* Regular price row */}
+          <button
+            onClick={() => onPick(false)}
+            className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-left transition-all hover:border-slate-300 hover:bg-white active:scale-[0.99]"
+          >
+            <p className="text-sm font-semibold text-slate-600">Regular Price</p>
+            <p className="text-lg font-bold text-slate-900">{formatCurrency(product.selling_price)}</p>
+          </button>
+        </div>
+
+        <p className="px-4 pb-4 pt-0 text-center text-[11px] text-slate-400">Tap a price to add it to the cart</p>
+      </div>
+    </div>
   )
 })
 
@@ -395,6 +501,9 @@ export function ProductsTab() {
   const [variantProduct, setVariantProduct] = useState<ProductWithStock | null>(null)
   const [variantAnchorRect, setVariantAnchorRect] = useState<DOMRect | null>(null)
 
+  // ── Discount price modal (retail-store template) ─────────────────────────
+  const [discountProduct, setDiscountProduct] = useState<ProductWithStock | null>(null)
+
   const { data: variantData, isFetching: variantFetching } = useQuery<ProductVariant[]>({
     queryKey: ['pos-variants', variantProduct?.id, activeBranch?.id],
     queryFn: async () => {
@@ -483,12 +592,58 @@ export function ProductsTab() {
     setVariantAnchorRect(null)
   }, [])
 
-  function addSingleVariantToCart(variant: ProductVariant) {
+  function addSingleVariantToCart(variant: ProductVariant, isDiscount?: boolean) {
     if (!variantProduct) return
     if (typeof variant.stock === 'number' && variant.stock <= 0) return
-    const maxStock = variantProduct.is_service ? null : (variant.stock ?? 0)
-    pos.addToCart(variantProduct as unknown as Product, variant as any, maxStock)
+    // Same fix as addDiscountChoiceToCart — cap a discount-priced variant
+    // line at the discount pool's remaining quantity, not the variant's
+    // total on-hand stock.
+    const maxStock = variantProduct.is_service
+      ? null
+      : isDiscount
+        ? (variant.active_discount?.quantity_remaining ?? 0)
+        : (variant.stock ?? 0)
+    const price = isDiscount ? variant.active_discount?.discount_price : undefined
+    pos.addToCart(variantProduct as unknown as Product, variant as any, maxStock, { isDiscount, unitPriceOverride: price })
   }
+
+  const openDiscountSelect = useCallback((product: ProductWithStock) => {
+    setDiscountProduct(product)
+  }, [])
+
+  const closeDiscountPopover = useCallback(() => {
+    setDiscountProduct(null)
+  }, [])
+
+  function addDiscountChoiceToCart(isDiscount: boolean) {
+    if (!discountProduct) return
+    // A discount-priced line's cap is the discount POOL's remaining
+    // quantity, not the product's total on-hand — otherwise the cart lets
+    // the cashier increment past what's actually reserved for the discount,
+    // building a line the backend will reject at checkout anyway.
+    const maxStock = discountProduct.is_service
+      ? null
+      : isDiscount
+        ? (discountProduct.active_discount?.quantity_remaining ?? 0)
+        : (discountProduct.on_hand ?? 0)
+    const price = isDiscount ? discountProduct.active_discount?.discount_price : undefined
+    pos.addToCart(discountProduct as unknown as Product, null, maxStock, { isDiscount, unitPriceOverride: price })
+    closeDiscountPopover()
+  }
+
+  // Single decision point for "what happens when a product tile is clicked" —
+  // used everywhere a product can be added to the cart, so variant selection
+  // and the discount-price picker never have to be wired in more than once.
+  const handleProductClick = useCallback((product: ProductWithStock, e?: React.MouseEvent<HTMLElement>) => {
+    const hasVariants = product.has_variants || (product.variant_count ?? 0) > 0
+    if (hasVariants) {
+      openVariantSelect(product, e)
+    } else if (isRetail && product.active_discount && product.active_discount.quantity_remaining > 0) {
+      openDiscountSelect(product)
+    } else {
+      pos.addToCart(product as unknown as Product, null, product.is_service ? null : (product.on_hand ?? 0))
+    }
+  }, [isRetail, openVariantSelect, openDiscountSelect, pos])
 
   function prefetchVariants(product: ProductWithStock) {
     queryClient.prefetchQuery({
@@ -798,7 +953,7 @@ export function ProductsTab() {
             ) : allProductsList.length > 0 ? (
               <>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
-                  {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product, null, p.is_service ? null : (p.on_hand ?? 0))} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} />)}
+                  {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product, null, p.is_service ? null : (p.on_hand ?? 0))} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} onDiscountSelect={p => openDiscountSelect(p)} />)}
                 </div>
                 {hasNextPage && (
                   <div className="flex justify-center pt-2 pb-1">
@@ -879,7 +1034,7 @@ export function ProductsTab() {
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}</div>
                 ) : categoryProducts.length > 0 ? (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
-                    {categoryProducts.map(product => <ProductCard key={product.id} product={product} size="sm" onAdd={p => pos.addToCart(p as unknown as Product, null, p.is_service ? null : (p.on_hand ?? 0))} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} />)}
+                    {categoryProducts.map(product => <ProductCard key={product.id} product={product} size="sm" onAdd={p => pos.addToCart(p as unknown as Product, null, p.is_service ? null : (p.on_hand ?? 0))} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} onDiscountSelect={p => openDiscountSelect(p)} />)}
                   </div>
                 ) : (
                   <p className="py-4 text-center text-sm text-gray-400">No products for this model</p>
@@ -917,7 +1072,7 @@ export function ProductsTab() {
                     const hasVariants = product.has_variants || (product as any).variant_count > 0
                     const oos = !hasVariants && typeof product.on_hand === 'number' && product.on_hand <= 0
                     return (
-                      <button key={product.id} disabled={oos} onClick={(e) => hasVariants ? openVariantSelect(product, e) : pos.addToCart(product as unknown as Product, null, product.is_service ? null : (product.on_hand ?? 0))}
+                      <button key={product.id} disabled={oos} onClick={(e) => handleProductClick(product, e)}
                         className={`relative flex flex-col items-center rounded-xl border bg-white p-3 text-center transition-all w-full overflow-hidden ${oos ? 'border-gray-100 opacity-50 cursor-not-allowed' : 'border-gray-200 hover:border-brand-teal hover:shadow-sm cursor-pointer'}`}>
                         {oos && (
                           <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/60">
@@ -1015,7 +1170,7 @@ export function ProductsTab() {
                 ) : allProductsList.length > 0 ? (
                   <>
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
-                      {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product, null, p.is_service ? null : (p.on_hand ?? 0))} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} />)}
+                      {allProductsList.map(product => <ProductCard key={product.id} product={product} onAdd={p => pos.addToCart(p as unknown as Product, null, p.is_service ? null : (p.on_hand ?? 0))} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} onDiscountSelect={p => openDiscountSelect(p)} />)}
                     </div>
                     {hasNextPage && (
                       <div className="flex justify-center pt-2 pb-1">
@@ -1065,6 +1220,14 @@ export function ProductsTab() {
           anchorRect={variantAnchorRect}
           onAdd={addSingleVariantToCart}
           onClose={closeVariantPopover}
+        />
+      )}
+
+      {discountProduct && (
+        <DiscountPricePopover
+          product={discountProduct}
+          onPick={addDiscountChoiceToCart}
+          onClose={closeDiscountPopover}
         />
       )}
 
@@ -1150,7 +1313,7 @@ export function ProductsTab() {
                                 <button
                                   disabled={advOos}
                                   title={advOos ? 'Out of stock' : undefined}
-                                  onClick={() => { if ((p.has_variants || (p.variant_count ?? 0) > 0)) { setAdvSearchOpen(false); openVariantSelect(p) } else { pos.addToCart(p as unknown as Product, null, p.is_service ? null : (p.on_hand ?? 0)); setAdvSearchOpen(false) } }}
+                                  onClick={() => { setAdvSearchOpen(false); handleProductClick(p) }}
                                   className={`flex h-7 w-7 items-center justify-center rounded border text-gray-500 ${advOos ? 'border-gray-100 opacity-40 cursor-not-allowed' : 'border-gray-200 hover:border-brand-teal hover:text-brand-teal'}`}
                                 >
                                   <Plus className="h-3.5 w-3.5" />
@@ -1316,13 +1479,16 @@ export function ProductsTab() {
         }}
         onAddToCart={(scanned: ScannedProduct) => {
           const product = scanned as unknown as ProductWithStock
-          if (product.has_variants || (product as any).variant_count > 0) {
-            setVariantProduct(product)
-          } else {
-            pos.addToCart(product as unknown as Product, null, product.is_service ? null : (product.on_hand ?? 0))
+          const hasVariants = product.has_variants || (product as any).variant_count > 0
+          const hasDiscount = !hasVariants && isRetail && !!product.active_discount && product.active_discount.quantity_remaining > 0
+          setScannerOpen(false)
+          // Variant/discount products still need a choice made — the popover
+          // (centered, no anchor for a scan) covers that; a direct scan of a
+          // plain product adds it immediately with the usual confirmation toast.
+          handleProductClick(product)
+          if (!hasVariants && !hasDiscount) {
             toast.success(`${product.name} added to cart`)
           }
-          setScannerOpen(false)
         }}
       />
     </div>

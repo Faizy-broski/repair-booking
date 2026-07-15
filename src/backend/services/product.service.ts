@@ -21,6 +21,109 @@ export const ProductService = {
     return data ?? []
   },
 
+  // One query, one pass — the JS equivalent of a CTE + window function, since
+  // the Supabase query builder can't express those directly. Rows come back
+  // ordered oldest-first per branch; the first row seen for a product is its
+  // oldest open batch, i.e. the one FIFO will consume next. Used everywhere a
+  // "stock value"/"unit cost" figure needs to reflect real batches instead of
+  // the single mutable products.cost_price scalar. Products with no rows here
+  // (never restocked since the FIFO rollout) simply won't appear in the map —
+  // callers fall back to products.cost_price for those, unchanged from before.
+  async getBatchValuationByBranch(branchId: string) {
+    const { data, error } = await db
+      .from('inventory_cost_layers')
+      .select('product_id, quantity, unit_cost')
+      .eq('branch_id', branchId)
+      .order('received_at', { ascending: true })
+    if (error) throw error
+
+    const map = new Map<string, { totalValue: number; totalQty: number; nextUnitCost: number }>()
+    for (const layer of (data ?? []) as any[]) {
+      const value = layer.quantity * layer.unit_cost
+      const existing = map.get(layer.product_id)
+      if (existing) {
+        existing.totalValue += value
+        existing.totalQty += layer.quantity
+      } else {
+        map.set(layer.product_id, { totalValue: value, totalQty: layer.quantity, nextUnitCost: layer.unit_cost })
+      }
+    }
+    return map
+  },
+
+  // ── Quantity-scoped discount (retail-store template) ────────────────────
+  // Mirrors the FIFO cost-layer pattern (a per-branch, per-product lot with a
+  // decrementing quantity) but for SELLING price instead of cost price. Only
+  // one 'active' row per (product_id, branch_id) — enforced by a partial
+  // unique index in migration 137.
+
+  // variantId omitted/undefined targets the base product (variant_id IS
+  // NULL); a product with has_variants=true always passes a specific
+  // variantId instead — the two never mix for the same product (see plan).
+  async getActiveDiscount(productId: string, branchId: string, variantId?: string) {
+    let q = db
+      .from('product_discount_allocations')
+      .select('id, variant_id, discount_price, quantity_total, quantity_remaining, status, created_at')
+      .eq('product_id', productId)
+      .eq('branch_id', branchId)
+      .eq('status', 'active')
+    q = variantId ? q.eq('variant_id', variantId) : q.is('variant_id', null)
+    const { data, error } = await q.maybeSingle()
+    if (error) throw error
+    return data ?? null
+  },
+
+  async setDiscount(productId: string, branchId: string, quantity: number, discountPrice: number, userId?: string, variantId?: string) {
+    let invQ = adminSupabase
+      .from('inventory')
+      .select('quantity')
+      .eq('product_id', productId)
+      .eq('branch_id', branchId)
+    invQ = variantId ? invQ.eq('variant_id', variantId) : invQ.is('variant_id', null)
+    const { data: inv } = await invQ.maybeSingle()
+    const onHand = (inv as any)?.quantity ?? 0
+    if (quantity > onHand) throw new Error(`Cannot discount ${quantity} units — only ${onHand} on hand`)
+
+    const existing = await ProductService.getActiveDiscount(productId, branchId, variantId)
+    if (existing) {
+      const alreadySold = existing.quantity_total - existing.quantity_remaining
+      if (quantity < alreadySold) {
+        throw new Error(`Cannot reduce discount quantity below ${alreadySold} — that many units have already sold at the discount price`)
+      }
+      const { data, error } = await db
+        .from('product_discount_allocations')
+        .update({ discount_price: discountPrice, quantity_total: quantity, quantity_remaining: quantity - alreadySold })
+        .eq('id', existing.id)
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    }
+
+    const { data, error } = await db
+      .from('product_discount_allocations')
+      .insert({
+        product_id: productId, branch_id: branchId, variant_id: variantId ?? null,
+        discount_price: discountPrice, quantity_total: quantity, quantity_remaining: quantity,
+        created_by: userId ?? null,
+      })
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async endDiscount(productId: string, branchId: string, variantId?: string) {
+    let q = db
+      .from('product_discount_allocations')
+      .update({ status: 'ended', ended_at: new Date().toISOString() })
+      .eq('product_id', productId)
+      .eq('branch_id', branchId)
+      .eq('status', 'active')
+    q = variantId ? q.eq('variant_id', variantId) : q.is('variant_id', null)
+    const { error } = await q
+    if (error) throw error
+  },
 
   async list(businessId: string, params: {
     page?: number; limit?: number; search?: string; categoryId?: string
@@ -73,6 +176,35 @@ export const ProductService = {
     const { data, error, count } = await q
     if (error) throw error
 
+    // FIFO batch costs, keyed by product_id — lets the "Unit Cost" column show
+    // the real next-to-sell batch cost instead of the raw (possibly stale)
+    // cost_price scalar. Product-level only (see getBatchValuationByBranch);
+    // variant products fall back to their own cost_price, unchanged.
+    const batchValuation = branchId ? await ProductService.getBatchValuationByBranch(branchId) : new Map()
+
+    // Active discount allocations, keyed by product_id — one query for the
+    // whole page instead of one per row. discountMap carries the full detail
+    // for base-product-level rows (variant_id NULL); productsWithVariantDiscount
+    // is just a "does ANY variant of this product have an active discount"
+    // flag, used to show a SALE indicator on the card even though the exact
+    // price/quantity varies per variant (shown in the variant popover instead).
+    const discountMap = new Map<string, { discount_price: number; quantity_remaining: number }>()
+    const productsWithVariantDiscount = new Set<string>()
+    if (branchId) {
+      const { data: discounts } = await db
+        .from('product_discount_allocations')
+        .select('product_id, variant_id, discount_price, quantity_remaining')
+        .eq('branch_id', branchId)
+        .eq('status', 'active')
+      for (const d of (discounts ?? []) as any[]) {
+        if (d.variant_id) {
+          productsWithVariantDiscount.add(d.product_id)
+        } else {
+          discountMap.set(d.product_id, { discount_price: d.discount_price, quantity_remaining: d.quantity_remaining })
+        }
+      }
+    }
+
     let enriched = (data ?? []).map((p: Record<string, unknown>) => {
       const variantCount = Array.isArray(p.product_variants) ? (p.product_variants as unknown[]).length : 0
       if (!branchId || !Array.isArray(p.inventory)) {
@@ -80,13 +212,21 @@ export const ProductService = {
       }
       const branchInv = (p.inventory as Array<{ branch_id: string; quantity: number; low_stock_alert: number | null; variant_id: string | null }>)
         .find((i) => i.branch_id === branchId && i.variant_id === null)
-      
-      const hasLowStockVariant = p.has_variants 
+
+      const hasLowStockVariant = p.has_variants
         ? (p.inventory as Array<any>).some(i => i.branch_id === branchId && i.variant_id !== null && i.quantity <= (i.low_stock_alert ?? 5))
         : false;
 
       const on_hand = branchInv?.quantity ?? 0
-      return { ...p, on_hand, low_stock_alert: branchInv?.low_stock_alert ?? null, has_low_stock_variant: hasLowStockVariant, inventory: undefined, branch_products: undefined, variant_count: variantCount, product_variants: undefined }
+      const batch = !p.has_variants ? batchValuation.get(p.id as string) : undefined
+      const activeDiscount = !p.has_variants ? discountMap.get(p.id as string) : undefined
+      return {
+        ...p, on_hand, low_stock_alert: branchInv?.low_stock_alert ?? null, has_low_stock_variant: hasLowStockVariant,
+        inventory: undefined, branch_products: undefined, variant_count: variantCount, product_variants: undefined,
+        next_batch_cost: batch ? batch.nextUnitCost : null,
+        active_discount: activeDiscount ?? null,
+        has_variant_discount: !!p.has_variants && productsWithVariantDiscount.has(p.id as string),
+      }
     })
 
     if (hideOutOfStock) {
@@ -322,8 +462,8 @@ export const ProductService = {
     let stockCostValue   = 0
     let lowStockCount    = 0
 
-    // Run all three queries in parallel
-    const [invResult, variantInvResult, poResult] = await Promise.all([
+    // Run all queries in parallel
+    const [invResult, variantInvResult, poResult, batchValuation] = await Promise.all([
       // Base product rows (variant_id IS NULL) — includes has_variants so we can skip those below
       branchId
         ? adminSupabase
@@ -346,6 +486,7 @@ export const ProductService = {
         .gt('quantity_ordered', 0)
         .eq('purchase_orders.business_id', businessId)
         .in('purchase_orders.status', ['pending', 'ordered', 'partial']),
+      branchId ? ProductService.getBatchValuationByBranch(branchId) : Promise.resolve(new Map()),
     ])
 
     if (branchId && invResult.data) {
@@ -357,7 +498,8 @@ export const ProductService = {
         if (p?.has_variants) return
         if (p?.is_active && !p?.is_service) {
           stockRetailValue += (p.selling_price ?? 0) * row.quantity
-          stockCostValue   += (p.cost_price   ?? 0) * row.quantity
+          const batch = (batchValuation as Map<string, { totalValue: number }>).get(row.product_id)
+          stockCostValue += batch ? batch.totalValue : (p.cost_price ?? 0) * row.quantity
         }
         const threshold = row.low_stock_alert ?? 5
         if (row.quantity <= threshold) lowStockCount++
@@ -407,11 +549,28 @@ export const ProductService = {
     const { data, error } = await adminSupabase
       .from('product_variants').select('*, inventory!left(quantity, branch_id)').eq('product_id', productId).order('name', { ascending: true })
     if (error) throw error
-    
+
+    // Active discount allocations, keyed by variant_id — same bulk-fetch
+    // pattern as ProductService.list()'s product-level discountMap, just
+    // scoped to this one product's variants instead of a whole branch page.
+    const discountByVariant = new Map<string, { discount_price: number; quantity_remaining: number }>()
+    if (branchId) {
+      const { data: discounts } = await db
+        .from('product_discount_allocations')
+        .select('variant_id, discount_price, quantity_remaining')
+        .eq('product_id', productId)
+        .eq('branch_id', branchId)
+        .eq('status', 'active')
+        .not('variant_id', 'is', null)
+      for (const d of (discounts ?? []) as any[]) {
+        discountByVariant.set(d.variant_id, { discount_price: d.discount_price, quantity_remaining: d.quantity_remaining })
+      }
+    }
+
     return (data ?? []).map((v: any) => {
       const inv = branchId ? v.inventory?.find((i: any) => i.branch_id === branchId) : null
       const stock = branchId ? (inv ? inv.quantity : null) : null
-      return { ...v, stock, inventory: undefined }
+      return { ...v, stock, inventory: undefined, active_discount: discountByVariant.get(v.id) ?? null }
     })
   },
 

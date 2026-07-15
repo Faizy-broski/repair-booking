@@ -7,8 +7,19 @@ export type CatLevel = 'device_types' | 'brands' | 'models' | 'products'
 export type PartLevel = 'device_types' | 'brands' | 'models' | 'part_types' | 'parts'
 
 // ── Domain interfaces ──────────────────────────────────────────────────────────
-export interface ProductVariant   { id: string; name: string; sku: string | null; selling_price: number; cost_price: number | null; attributes: Record<string, string>; image_url?: string | null; stock?: number | null }
-export type ProductWithStock = Product & { on_hand?: number; has_variants?: boolean; variant_count?: number }
+export interface ProductVariant   {
+  id: string; name: string; sku: string | null; selling_price: number; cost_price: number | null
+  attributes: Record<string, string>; image_url?: string | null; stock?: number | null
+  active_discount?: { discount_price: number; quantity_remaining: number } | null
+}
+export type ProductWithStock = Product & {
+  on_hand?: number; has_variants?: boolean; variant_count?: number
+  active_discount?: { discount_price: number; quantity_remaining: number } | null
+  // True when at least one variant of this product has an active discount —
+  // the exact price/quantity varies per variant, so the card just shows a
+  // SALE indicator; the specific price choice happens in the variant popover.
+  has_variant_discount?: boolean
+}
 export interface RegisterSession  { id: string; status: 'open' | 'closed'; opening_float: number; opened_at: string; cashier_id: string }
 export interface Employee         { id: string; full_name: string }
 

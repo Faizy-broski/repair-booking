@@ -73,6 +73,24 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
     }
   }
 
+  // Gross subtotal / total discount (not the sale's stored net subtotal/
+  // order-level discount) so the summary reconciles with each line's own
+  // UNIT/DISC — a sale-priced line's frozen original_unit_price means its
+  // real discount isn't captured by the stale sale.discount total alone.
+  let grossSubtotal = 0
+  let totalDiscount = 0
+  for (const i of (s.sale_items ?? []) as any[]) {
+    const unitPrice = Number(i.unit_price)
+    const discount = Number(i.discount ?? 0)
+    const original = i.original_unit_price != null ? Number(i.original_unit_price) : null
+    const hasOriginal = original != null && original > unitPrice
+    grossSubtotal += (hasOriginal ? original! : unitPrice) * i.quantity
+    // Additive — a line can carry both a frozen sale-price discount AND a
+    // manual per-line discount; dropping either one understates the total.
+    totalDiscount += (hasOriginal ? (original! - unitPrice + discount) : discount) * i.quantity
+  }
+  totalDiscount += Number(s.discount ?? 0)
+
   const doc = React.createElement(SaleReceiptPdf, {
     saleId: s.id,
     date: new Date(s.created_at).toLocaleString('en-GB'),
@@ -88,9 +106,10 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
       unit_price: Number(i.unit_price),
       discount: Number(i.discount ?? 0),
       total: Number(i.total),
+      original_unit_price: i.original_unit_price != null ? Number(i.original_unit_price) : undefined,
     })),
-    subtotal: Number(s.subtotal ?? 0),
-    discount: Number(s.discount ?? 0),
+    subtotal: grossSubtotal,
+    discount: totalDiscount,
     tax: Number(s.tax ?? 0),
     total: Number(s.total ?? 0),
     amountPaid: amountPaidOverride ?? Number(s.amount_paid ?? 0),
@@ -128,6 +147,11 @@ const saleItemSchema = z.object({
   discount: z.number().min(0).default(0),
   total: z.number().min(0),
   is_service: z.boolean().default(false),
+  // Quantity-scoped discount picker (retail-store template) — true when this
+  // line was added at the discount price, so process_sale knows to consume
+  // from the product's active discount allocation instead of/alongside the
+  // normal reservation check.
+  is_discount: z.boolean().optional().default(false),
 })
 
 const paymentSplitSchema = z.object({

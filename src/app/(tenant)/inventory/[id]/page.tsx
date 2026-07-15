@@ -786,7 +786,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">SKU</th>
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Barcode</th>
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Cost ({currSymbol})</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Price ({currSymbol})</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Selling Price ({currSymbol})</th>
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Stock</th>
                       <th className="px-3 py-2.5" />
                     </tr>
@@ -914,7 +914,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">SKU</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Barcode</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Cost ({currSymbol})</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Price ({currSymbol}) *</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Selling Price ({currSymbol}) *</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Stock</th>
                             <th className="px-3 py-2" />
                           </tr>
@@ -990,13 +990,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               {/* FIFO stock batches — visual proof of which stock sells next and at what cost.
                   Single-hue sequential ramp (teal, darkest = oldest = next to sell) since the
                   story here is order, not category identity. */}
-              <div className="overflow-hidden rounded-xl border border-teal-100 bg-gradient-to-br from-teal-50/70 to-white shadow-sm">
-                <div className="flex items-center gap-2 border-b border-teal-100/80 px-4 py-2.5">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-100">
-                    <Layers className="h-4 w-4 text-teal-700" />
+              <div className="overflow-hidden rounded-xl border border-brand-teal/20 bg-brand-teal-light/20 shadow-sm">
+                <div className="flex items-center gap-2 border-b border-brand-teal/10 px-4 py-2.5">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-teal-light">
+                    <Layers className="h-4 w-4 text-brand-teal" />
                   </span>
                   <p className="text-sm font-semibold text-gray-800">Stock Batches</p>
-                  <span className="ml-auto rounded-full bg-teal-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-teal-700">FIFO</span>
+                  <span className="ml-auto rounded-full bg-brand-teal-light px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-teal">FIFO</span>
                 </div>
                 <div className="p-4">
                   {!costLayers || costLayers.length === 0 ? (
@@ -1005,7 +1005,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                     </div>
                   ) : (() => {
                     const totalQty = costLayers.reduce((s, l) => s + l.quantity, 0)
-                    const shades = ['bg-teal-700', 'bg-teal-500', 'bg-teal-400', 'bg-teal-300', 'bg-teal-200']
+                    const shades = [
+                      'bg-brand-teal',
+                      'bg-brand-teal/70',
+                      'bg-brand-teal/50',
+                      'bg-brand-teal/35',
+                      'bg-brand-teal/20',
+                    ]
                     return (
                       <>
                         <div className="flex h-9 w-full overflow-hidden rounded-lg shadow-inner ring-1 ring-black/5" role="img" aria-label={`${costLayers.length} stock batches, oldest sells first`}>
@@ -1020,12 +1026,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                         </div>
                         <div className="mt-3 space-y-2">
                           {costLayers.map((layer, i) => (
-                            <div key={layer.id} className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-sm ${i === 0 ? 'bg-teal-50' : ''}`}>
+                            <div key={layer.id} className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-sm ${i === 0 ? 'bg-brand-teal-light/50' : ''}`}>
                               <span className="flex items-center gap-2 text-gray-600">
                                 <span className={`inline-block h-3 w-3 rounded-sm shadow-sm ${shades[Math.min(i, shades.length - 1)]}`} />
                                 <span>{layer.quantity} unit{layer.quantity === 1 ? '' : 's'} received {formatDate(layer.received_at)}</span>
                                 {i === 0 && (
-                                  <span className="rounded-full bg-teal-700 px-2 py-0.5 text-[11px] font-semibold text-white">Next to sell</span>
+                                  <span className="rounded-full bg-brand-teal px-2 py-0.5 text-[11px] font-semibold text-white">Next to sell</span>
                                 )}
                               </span>
                               <span className="font-semibold text-gray-800">{formatCurrency(layer.unit_cost)} / unit</span>

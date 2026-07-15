@@ -128,14 +128,14 @@ export const PurchaseOrderService = {
     return { data, count }
   },
 
-  async recordPayment(poId: string, amount: number, method: string, note: string | undefined, businessId: string, createdBy: string): Promise<void> {
+  async recordPayment(poId: string, amount: number, method: string, note: string | undefined, businessId: string, createdBy?: string): Promise<void> {
     const { error } = await (adminSupabase.rpc as any)('record_supplier_payment', {
       p_po_id: poId,
       p_amount: amount,
       p_method: method,
       p_note: note ?? null,
       p_business_id: businessId,
-      p_created_by: createdBy,
+      p_created_by: createdBy ?? null,
     })
     if (error) throw error
   },
@@ -143,7 +143,7 @@ export const PurchaseOrderService = {
   async getById(id: string, businessId: string) {
     const { data, error } = await adminSupabase
       .from('purchase_orders')
-      .select('*, suppliers(*), purchase_order_items(*, products(name, sku))')
+      .select('*, suppliers(*), purchase_order_items(*, products(name, sku), product_variants(name))')
       .eq('id', id)
       .eq('business_id', businessId)
       .single()
@@ -153,8 +153,9 @@ export const PurchaseOrderService = {
 
   async create(businessId: string, branchId: string, payload: {
     supplier_id: string; notes?: string; expected_delivery_date?: string
-    items: Array<{ product_id?: string; name: string; sku?: string; quantity_ordered: number; unit_cost: number }>
+    items: Array<{ product_id?: string; variant_id?: string; name: string; sku?: string; quantity_ordered: number; unit_cost: number }>
     created_by?: string
+    deposit?: { amount: number; method: string; note?: string }
   }) {
     const { data: poNum } = await rpc('generate_po_number', { p_branch_id: branchId })
 
@@ -181,10 +182,26 @@ export const PurchaseOrderService = {
       .insert(payload.items.map((i) => ({ ...i, po_id: po.id })))
     if (itemsErr) throw itemsErr
 
+    // An upfront deposit paid to the supplier when placing the order — same
+    // "pay something now, settle the rest later" pattern already used for
+    // repair/credit-sale deposits. record_supplier_payment (relaxed in
+    // migration 144) allows this while the PO is still draft.
+    if (payload.deposit && payload.deposit.amount > 0) {
+      await this.recordPayment(po.id, payload.deposit.amount, payload.deposit.method, payload.deposit.note, businessId, payload.created_by)
+    }
+
     return po
   },
 
   async updateStatus(id: string, businessId: string, status: string) {
+    // "received" must only ever be reached by actually receiving stock
+    // (GrnService.create -> process_grn), which is what updates inventory,
+    // cost layers, and PO status together atomically. Allowing it here would
+    // let a PO silently claim to be received without any of that happening.
+    if (status === 'received') {
+      throw new Error('Received status can only be set by receiving stock — use Receive Stock instead')
+    }
+
     const { data, error } = await db('purchase_orders')
       .update({ status, updated_at: new Date().toISOString() })
       .eq('id', id)
@@ -209,31 +226,34 @@ export const PurchaseOrderService = {
     if (fetchErr) throw fetchErr
     if (!po) throw new Error('Purchase order not found')
 
-    // Once any stock has been received (in_progress/received), the PO has
-    // real inventory/stock_movements/supplier_payments history tied to it —
-    // deleting it would corrupt that trail, so only draft/pending/cancelled
-    // orders (nothing received yet) can be deleted.
-    if (!['draft', 'pending', 'cancelled'].includes((po as any).status)) {
-      throw new Error('Only draft, pending, or cancelled purchase orders can be deleted — this order has already received stock')
-    }
-
-    const { error } = await adminSupabase.from('purchase_orders').delete().eq('id', id).eq('business_id', businessId)
+    // delete_purchase_order (migration 143) fully reverses whatever this PO
+    // already did — any inventory its GRN(s) added is subtracted back out,
+    // the cost layers/stock movements those GRNs created are removed, and any
+    // supplier_payments record is deleted along with the order. Safe to call
+    // regardless of status: a draft/pending/cancelled PO with no GRNs simply
+    // has nothing to reverse.
+    const { error } = await rpc('delete_purchase_order', { p_po_id: id })
     if (error) throw error
   },
 
   async update(id: string, businessId: string, payload: {
     supplier_id?: string; notes?: string | null; expected_delivery_date?: string | null
-    items?: Array<{ product_id?: string; name: string; sku?: string; quantity_ordered: number; unit_cost: number }>
+    items?: Array<{ product_id?: string; variant_id?: string; name: string; sku?: string; quantity_ordered: number; unit_cost: number }>
   }) {
     // Line items can only be replaced while nothing has been received yet —
     // once GRN/receiving has happened, quantity_received and the total tied
-    // to any supplier_payments would desync from a silent item rewrite.
+    // to any supplier_payments would desync from a silent item rewrite. Also
+    // block it once a deposit has been recorded — a lower rewritten total
+    // could end up less than what's already been paid.
     if (payload.items) {
       const { data: existing, error: fetchErr } = await adminSupabase
-        .from('purchase_orders').select('status').eq('id', id).eq('business_id', businessId).single()
+        .from('purchase_orders').select('status, amount_paid').eq('id', id).eq('business_id', businessId).single()
       if (fetchErr) throw fetchErr
       if ((existing as any)?.status !== 'draft') {
         throw new Error('Only draft purchase orders can have their line items edited')
+      }
+      if (Number((existing as any)?.amount_paid ?? 0) > 0) {
+        throw new Error('Cannot edit line items after a deposit has been recorded against this order')
       }
     }
 
@@ -261,7 +281,7 @@ export const PurchaseOrderService = {
       .update(updates)
       .eq('id', id)
       .eq('business_id', businessId)
-      .select('*, suppliers(*), purchase_order_items(*, products(name, sku))')
+      .select('*, suppliers(*), purchase_order_items(*, products(name, sku), product_variants(name))')
       .single()
     if (error) throw error
     return data
@@ -275,8 +295,9 @@ export const PurchaseOrderService = {
       supplier_id: original.supplier_id,
       notes: original.notes ?? undefined,
       expected_delivery_date: undefined,
-      items: original.purchase_order_items.map((i: { product_id: string | null; name: string; sku: string | null; quantity_ordered: number; unit_cost: number }) => ({
+      items: original.purchase_order_items.map((i: { product_id: string | null; variant_id: string | null; name: string; sku: string | null; quantity_ordered: number; unit_cost: number }) => ({
         product_id: i.product_id ?? undefined,
+        variant_id: i.variant_id ?? undefined,
         name: i.name,
         sku: i.sku ?? undefined,
         quantity_ordered: i.quantity_ordered,
@@ -336,48 +357,16 @@ export const GrnService = {
       .insert(items.map((i) => ({ grn_id: grn.id, ...i })))
     if (itemsErr) throw itemsErr
 
-    // Atomic processing: updates inventory + stock_movements + PO status
+    // Atomic processing: updates inventory (variant-aware) + stock_movements +
+    // cost layers / average cost + PO status, all inside one RPC transaction.
+    // This used to be duplicated here in JS too (a second inventory_cost_layers
+    // insert + a second update_average_cost call for every item), which
+    // double-counted stock value on every GRN — process_grn is now the sole
+    // writer for all of this.
     const { error: processErr } = await rpc('process_grn', {
       p_grn_id: grn.id, p_user_id: receivedBy,
     })
     if (processErr) throw processErr
-
-    // Populate cost layers and update average cost for each received product
-    const { data: grnItems } = await db('grn_items')
-      .select('quantity_received, purchase_order_items(product_id, unit_cost)')
-      .eq('grn_id', grn.id)
-
-    if (grnItems && grnItems.length > 0) {
-      const costLayers = (grnItems as any[])
-        .filter((gi) => {
-          const poi = gi.purchase_order_items as { product_id: string; unit_cost: number } | null
-          return poi?.product_id && gi.quantity_received > 0
-        })
-        .map((gi) => {
-          const poi = gi.purchase_order_items as { product_id: string; unit_cost: number }
-          return {
-            product_id: poi.product_id,
-            branch_id: branchId,
-            quantity: gi.quantity_received,
-            unit_cost: poi.unit_cost,
-            source_id: grn.id,
-            source_type: 'grn' as const,
-          }
-        })
-
-      if (costLayers.length > 0) {
-        await db('inventory_cost_layers').insert(costLayers)
-        await Promise.all(
-          costLayers.map((c) =>
-            adminSupabase.rpc('update_average_cost', {
-              p_product_id: c.product_id,
-              p_new_qty:    c.quantity,
-              p_new_cost:   c.unit_cost,
-            })
-          )
-        )
-      }
-    }
 
     return grn
   },

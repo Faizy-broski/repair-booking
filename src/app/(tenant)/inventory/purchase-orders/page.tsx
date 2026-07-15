@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/ui/modal'
+import { ProductVariantPicker } from '@/components/inventory/product-variant-picker'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
 import { DataTable } from '@/components/shared/data-table'
 import { useAuthStore } from '@/store/auth.store'
@@ -24,7 +25,16 @@ interface PORow {
   created_at: string; expected_delivery_date: string | null
   suppliers?: { name: string } | null
 }
-interface POItem { id: string; name: string; sku: string | null; quantity_ordered: number; unit_cost: number; product_id?: string | null }
+interface POItem {
+  id: string; name: string; sku: string | null; quantity_ordered: number; unit_cost: number
+  product_id?: string | null; variant_id?: string | null
+  products?: { name: string; sku: string | null } | null
+  product_variants?: { name: string } | null
+}
+interface DraftItem {
+  product_id?: string; variant_id?: string; variant_name?: string
+  name: string; sku: string; quantity_ordered: number; unit_cost: number
+}
 
 const PAYMENT_STATUS_VARIANT: Record<string, 'default' | 'warning' | 'success' | 'destructive'> = {
   unpaid: 'destructive',
@@ -32,8 +42,14 @@ const PAYMENT_STATUS_VARIANT: Record<string, 'default' | 'warning' | 'success' |
   paid: 'success',
 }
 
-const ALL_STATUSES = ['draft', 'pending', 'in_progress', 'received', 'cancelled']
-const DELETABLE_STATUSES = ['draft', 'pending', 'cancelled']
+// "received" is deliberately excluded from manual selection — it must only
+// ever be reached by actually receiving stock (Receive Stock → process_grn),
+// which is the only path that updates inventory/cost/payment. Picking it
+// here would silently skip all of that. Still shown as the current value
+// when a PO is already received, so staff can manually move it back off
+// that status (e.g. to fix a PO that reached "received" via this dropdown
+// before this restriction existed) without being able to set it again.
+const MANUAL_STATUSES = ['draft', 'pending', 'in_progress', 'cancelled']
 
 export default function PurchaseOrdersPage() {
   const { activeBranch } = useAuthStore()
@@ -49,8 +65,11 @@ export default function PurchaseOrdersPage() {
   const [supplierId,      setSupplierId]      = useState('')
   const [deliveryDate,    setDeliveryDate]    = useState('')
   const [poNotes,         setPoNotes]         = useState('')
-  const [lineItems,       setLineItems]       = useState([{ name: '', sku: '', quantity_ordered: 1, unit_cost: 0 }])
+  const [lineItems,       setLineItems]       = useState<DraftItem[]>([])
   const [submitting,      setSubmitting]      = useState(false)
+  const [pickerOpen,      setPickerOpen]      = useState(false)
+  const [depositAmount,   setDepositAmount]   = useState('')
+  const [depositMethod,   setDepositMethod]   = useState<'cash' | 'card' | 'bank_transfer' | 'cheque' | 'other'>('cash')
 
   // Edit sheet state
   const [editOpen,   setEditOpen]   = useState(false)
@@ -59,8 +78,9 @@ export default function PurchaseOrdersPage() {
   const [editSupplier, setEditSupplier] = useState('')
   const [editDate,     setEditDate]     = useState('')
   const [editNotes,    setEditNotes]    = useState('')
-  const [editItems,    setEditItems]    = useState<Array<{ product_id?: string; name: string; sku: string; quantity_ordered: number; unit_cost: number }>>([])
+  const [editItems,    setEditItems]    = useState<DraftItem[]>([])
   const [editSaving,   setEditSaving]   = useState(false)
+  const [editPickerOpen, setEditPickerOpen] = useState(false)
 
   async function openEditRow(id: string) {
     setEditId(id)
@@ -74,6 +94,8 @@ export default function PurchaseOrdersPage() {
     setEditNotes(po.notes ?? '')
     setEditItems((po.purchase_order_items as POItem[]).map((i) => ({
       product_id: i.product_id ?? undefined,
+      variant_id: i.variant_id ?? undefined,
+      variant_name: i.product_variants?.name,
       name: i.name,
       sku: i.sku ?? '',
       quantity_ordered: i.quantity_ordered,
@@ -134,12 +156,20 @@ export default function PurchaseOrdersPage() {
     onSuccess: () => {
       toast.success('Purchase order deleted')
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['pos-products'] })
+      queryClient.invalidateQueries({ queryKey: ['pos-variants'] })
     },
     onError: (err: Error) => toast.error(err.message),
   })
 
   async function handleDelete(po: PORow) {
-    if (!await confirmToast(`Delete purchase order ${po.po_number}?`, 'Delete')) return
+    const receivedSomething = po.status === 'received' || po.status === 'in_progress'
+    const message = receivedSomething
+      ? `Delete ${po.po_number}? This has already received stock — deleting will subtract that stock back out, remove its cost batches, and delete any recorded supplier payment. This cannot be undone.`
+      : `Delete purchase order ${po.po_number}?`
+    if (!await confirmToast(message, 'Delete')) return
     deleteMutation.mutate(po.id)
   }
 
@@ -185,6 +215,7 @@ export default function PurchaseOrdersPage() {
         supplier_id: supplierId,
         expected_delivery_date: deliveryDate || undefined,
         notes: poNotes || undefined,
+        deposit: parseFloat(depositAmount) > 0 ? { amount: parseFloat(depositAmount), method: depositMethod } : undefined,
         items,
       }),
     })
@@ -193,7 +224,9 @@ export default function PurchaseOrdersPage() {
       setSupplierId('')
       setDeliveryDate('')
       setPoNotes('')
-      setLineItems([{ name: '', sku: '', quantity_ordered: 1, unit_cost: 0 }])
+      setLineItems([])
+      setDepositAmount('')
+      setDepositMethod('cash')
       queryClient.invalidateQueries({ queryKey: ['purchase-orders', activeBranch?.id] })
     }
     setSubmitting(false)
@@ -257,13 +290,13 @@ export default function PurchaseOrdersPage() {
         return (
           <select
             value={s}
-            title="Manual override — does not replay GRN (won't touch inventory, cost layers, or payment status)"
+            title="Manual override — does not replay GRN (won't touch inventory, cost layers, or payment status). Received is set automatically when stock is receipted via Receive Stock, and can't be picked here."
             onClick={(e) => e.stopPropagation()}
             onChange={(e) => statusMutation.mutate({ id: row.original.id, status: e.target.value })}
             disabled={statusMutation.isPending}
             className="rounded-md border border-gray-200 bg-white px-1.5 py-1 text-xs font-medium capitalize disabled:opacity-50"
           >
-            {ALL_STATUSES.map((o) => (
+            {(s === 'received' ? ['received', ...MANUAL_STATUSES] : MANUAL_STATUSES).map((o) => (
               <option key={o} value={o}>{o.replace('_', ' ')}</option>
             ))}
           </select>
@@ -274,7 +307,11 @@ export default function PurchaseOrdersPage() {
       accessorKey: 'payment_status',
       header: 'Payment',
       cell: ({ row }) => {
-        if (row.original.status !== 'received') return <span className="text-xs text-gray-400">—</span>
+        if (row.original.status !== 'received') {
+          return row.original.amount_paid > 0
+            ? <Badge variant={PAYMENT_STATUS_VARIANT[row.original.payment_status] ?? 'default'}>{row.original.payment_status === 'paid' ? 'Deposit: paid in full' : 'Deposit: partial'}</Badge>
+            : <span className="text-xs text-gray-400">On credit</span>
+        }
         const s = row.original.payment_status
         return <Badge variant={PAYMENT_STATUS_VARIANT[s] ?? 'default'}>{s}</Badge>
       },
@@ -331,7 +368,7 @@ export default function PurchaseOrdersPage() {
                 >
                   <Copy className="h-4 w-4 text-gray-400" /> Clone
                 </DropdownMenu.Item>
-                {row.original.status === 'received' && row.original.payment_status !== 'paid' && (
+                {row.original.status !== 'cancelled' && row.original.payment_status !== 'paid' && (
                   <DropdownMenu.Item
                     onSelect={() => { setPaymentPO(row.original); setPaymentAmount(''); setPaymentMethod('bank_transfer') }}
                     className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-purple-600 outline-none hover:bg-purple-50"
@@ -339,17 +376,13 @@ export default function PurchaseOrdersPage() {
                     <Banknote className="h-4 w-4" /> Record Payment
                   </DropdownMenu.Item>
                 )}
-                {DELETABLE_STATUSES.includes(row.original.status) && (
-                  <>
-                    <DropdownMenu.Separator className="my-1 border-t border-gray-100" />
-                    <DropdownMenu.Item
-                      onSelect={() => handleDelete(row.original)}
-                      className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-red-600 outline-none hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" /> Delete
-                    </DropdownMenu.Item>
-                  </>
-                )}
+                <DropdownMenu.Separator className="my-1 border-t border-gray-100" />
+                <DropdownMenu.Item
+                  onSelect={() => handleDelete(row.original)}
+                  className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-red-600 outline-none hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4" /> Delete
+                </DropdownMenu.Item>
               </DropdownMenu.Content>
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
@@ -436,29 +469,66 @@ export default function PurchaseOrdersPage() {
           />
 
           <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Deposit Paid Now (optional)</label>
+            <div className="flex gap-2">
+              <input
+                type="number" min="0" step="0.01" placeholder="0.00"
+                value={depositAmount}
+                onChange={(e) => setDepositAmount(e.target.value)}
+                className="h-9 w-32 rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none"
+              />
+              <select
+                value={depositMethod}
+                onChange={(e) => setDepositMethod(e.target.value as typeof depositMethod)}
+                disabled={!depositAmount || parseFloat(depositAmount) <= 0}
+                className="h-9 flex-1 rounded-lg border border-gray-300 px-3 text-sm capitalize disabled:opacity-50"
+              >
+                {(['cash', 'card', 'bank_transfer', 'cheque', 'other'] as const).map(m => (
+                  <option key={m} value={m}>{m.replace('_', ' ')}</option>
+                ))}
+              </select>
+            </div>
+            <p className="mt-1 text-[11px] text-gray-400">
+              Recorded immediately as an upfront payment to the supplier — leave at 0 to buy fully on credit. Any remaining balance is settled later via Record Payment.
+            </p>
+          </div>
+
+          <div>
             <div className="mb-2 flex items-center justify-between">
               <label className="text-sm font-medium text-gray-700">Line Items</label>
-              <button
-                type="button"
-                onClick={() => setLineItems((l) => [...l, { name: '', sku: '', quantity_ordered: 1, unit_cost: 0 }])}
-                className="text-xs text-blue-600 hover:underline"
-              >
-                + Add row
-              </button>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setPickerOpen(true)} className="text-xs font-medium text-brand-teal hover:underline">
+                  + Add product
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLineItems((l) => [...l, { name: '', sku: '', quantity_ordered: 1, unit_cost: 0 }])}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  + Add misc item
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               {lineItems.map((item, idx) => (
                 <div key={idx} className="flex gap-2 items-end">
                   <div className="flex-1">
                     {idx === 0 && <label className="mb-1 block text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Item Name</label>}
-                    <input
-                      placeholder="e.g. iPhone 14 Screen"
-                      value={item.name}
-                      onChange={(e) => {
-                        const u = [...lineItems]; u[idx] = { ...u[idx], name: e.target.value }; setLineItems(u)
-                      }}
-                      className="h-8 w-full rounded-md border border-gray-300 px-2 text-sm focus:border-blue-400 focus:outline-none"
-                    />
+                    {item.product_id ? (
+                      <div className="flex h-8 items-center gap-1.5 rounded-md border border-brand-teal/30 bg-brand-teal-light/10 px-2 text-sm">
+                        <span className="truncate">{item.name}</span>
+                        <span className="shrink-0 rounded-full bg-brand-teal-light/40 px-1.5 py-0.5 text-[10px] font-medium text-brand-teal">Linked</span>
+                      </div>
+                    ) : (
+                      <input
+                        placeholder="e.g. iPhone 14 Screen (non-inventory item)"
+                        value={item.name}
+                        onChange={(e) => {
+                          const u = [...lineItems]; u[idx] = { ...u[idx], name: e.target.value }; setLineItems(u)
+                        }}
+                        className="h-8 w-full rounded-md border border-gray-300 px-2 text-sm focus:border-blue-400 focus:outline-none"
+                      />
+                    )}
                   </div>
                   <div className="w-16">
                     {idx === 0 && <label className="mb-1 block text-[11px] font-semibold text-gray-500 uppercase tracking-wide text-center">Qty</label>}
@@ -483,19 +553,37 @@ export default function PurchaseOrdersPage() {
                     />
                   </div>
                   <div className="flex w-8 items-end justify-center pb-0.5">
-                    {lineItems.length > 1 ? (
-                      <button
-                        onClick={() => setLineItems((l) => l.filter((_, i) => i !== idx))}
-                        className="flex h-8 w-8 items-center justify-center rounded-md text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    ) : <span className="h-8 w-8" />}
+                    <button
+                      onClick={() => setLineItems((l) => l.filter((_, i) => i !== idx))}
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
               ))}
+              {lineItems.length === 0 && (
+                <p className="py-3 text-center text-xs text-gray-400">Add a product or a misc item to get started</p>
+              )}
             </div>
           </div>
+
+          <ProductVariantPicker
+            open={pickerOpen}
+            onClose={() => setPickerOpen(false)}
+            branchId={activeBranch?.id}
+            onSelect={(product, variant) => {
+              setLineItems((l) => [...l, {
+                product_id: product.id,
+                variant_id: variant?.id,
+                variant_name: variant?.name,
+                name: variant ? `${product.name} – ${variant.name}` : product.name,
+                sku: variant?.sku ?? '',
+                quantity_ordered: 1,
+                unit_cost: variant?.cost_price ?? product.cost_price ?? 0,
+              }])
+            }}
+          />
 
           <div className="rounded-lg bg-gray-50 p-3 flex justify-between text-sm">
             <span className="text-gray-500">Total</span>
@@ -550,27 +638,39 @@ export default function PurchaseOrdersPage() {
             <div>
               <div className="mb-2 flex items-center justify-between">
                 <label className="text-sm font-medium text-gray-700">Line Items</label>
-                <button
-                  type="button"
-                  onClick={() => setEditItems((l) => [...l, { name: '', sku: '', quantity_ordered: 1, unit_cost: 0 }])}
-                  className="text-xs text-blue-600 hover:underline"
-                >
-                  + Add row
-                </button>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setEditPickerOpen(true)} className="text-xs font-medium text-brand-teal hover:underline">
+                    + Add product
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditItems((l) => [...l, { name: '', sku: '', quantity_ordered: 1, unit_cost: 0 }])}
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    + Add misc item
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 {editItems.map((item, idx) => (
                   <div key={idx} className="flex gap-2 items-end">
                     <div className="flex-1">
                       {idx === 0 && <label className="mb-1 block text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Item Name</label>}
-                      <input
-                        placeholder="e.g. iPhone 14 Screen"
-                        value={item.name}
-                        onChange={(e) => {
-                          const u = [...editItems]; u[idx] = { ...u[idx], name: e.target.value }; setEditItems(u)
-                        }}
-                        className="h-8 w-full rounded-md border border-gray-300 px-2 text-sm focus:border-blue-400 focus:outline-none"
-                      />
+                      {item.product_id ? (
+                        <div className="flex h-8 items-center gap-1.5 rounded-md border border-brand-teal/30 bg-brand-teal-light/10 px-2 text-sm">
+                          <span className="truncate">{item.name}</span>
+                          <span className="shrink-0 rounded-full bg-brand-teal-light/40 px-1.5 py-0.5 text-[10px] font-medium text-brand-teal">Linked</span>
+                        </div>
+                      ) : (
+                        <input
+                          placeholder="e.g. iPhone 14 Screen (non-inventory item)"
+                          value={item.name}
+                          onChange={(e) => {
+                            const u = [...editItems]; u[idx] = { ...u[idx], name: e.target.value }; setEditItems(u)
+                          }}
+                          className="h-8 w-full rounded-md border border-gray-300 px-2 text-sm focus:border-blue-400 focus:outline-none"
+                        />
+                      )}
                     </div>
                     <div className="w-16">
                       {idx === 0 && <label className="mb-1 block text-[11px] font-semibold text-gray-500 uppercase tracking-wide text-center">Qty</label>}
@@ -595,18 +695,36 @@ export default function PurchaseOrdersPage() {
                       />
                     </div>
                     <div className="flex w-8 items-end justify-center pb-0.5">
-                      {editItems.length > 1 ? (
-                        <button
-                          onClick={() => setEditItems((l) => l.filter((_, i) => i !== idx))}
-                          className="flex h-8 w-8 items-center justify-center rounded-md text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      ) : <span className="h-8 w-8" />}
+                      <button
+                        onClick={() => setEditItems((l) => l.filter((_, i) => i !== idx))}
+                        className="flex h-8 w-8 items-center justify-center rounded-md text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </div>
                 ))}
+                {editItems.length === 0 && (
+                  <p className="py-3 text-center text-xs text-gray-400">Add a product or a misc item to get started</p>
+                )}
               </div>
+
+              <ProductVariantPicker
+                open={editPickerOpen}
+                onClose={() => setEditPickerOpen(false)}
+                branchId={activeBranch?.id}
+                onSelect={(product, variant) => {
+                  setEditItems((l) => [...l, {
+                    product_id: product.id,
+                    variant_id: variant?.id,
+                    variant_name: variant?.name,
+                    name: variant ? `${product.name} – ${variant.name}` : product.name,
+                    sku: variant?.sku ?? '',
+                    quantity_ordered: 1,
+                    unit_cost: variant?.cost_price ?? product.cost_price ?? 0,
+                  }])
+                }}
+              />
             </div>
 
             <div className="rounded-lg bg-gray-50 p-3 flex justify-between text-sm">
