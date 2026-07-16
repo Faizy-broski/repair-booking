@@ -478,6 +478,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   // ── Save ──────────────────────────────────────────────────────────────────
   async function handleSave() {
+    if (!product) return
     if (!name.trim()) return
     setSaving(true)
 
