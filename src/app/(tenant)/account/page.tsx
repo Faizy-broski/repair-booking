@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import { Button } from '@/components/ui/button'
 import { useTour } from '@/hooks/use-tour'
+import { ANNUAL_DISCOUNT } from '@/lib/pricing'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -500,7 +501,9 @@ function AccountPageInner() {
                       isTrialing
                         ? 'Free trial'
                         : plan?.price_monthly
-                          ? `£${plan.price_monthly}/month`
+                          ? sub.billing_cycle === 'yearly'
+                            ? `£${Math.round(plan.price_monthly * 12 * (1 - ANNUAL_DISCOUNT))}/year, billed annually`
+                            : `£${plan.price_monthly}/month`
                           : '—'
                     } />
                     {isTrialing && <InfoRow label="Trial ends"  value={formatDate(sub.trial_ends_at)} />}

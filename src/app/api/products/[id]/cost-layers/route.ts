@@ -5,3 +5,8 @@ export const GET = withMiddleware(
   (req, ctx, { params }) => params.then((p) => ProductController.getCostLayers(req, ctx, p.id)),
   { requiredRole: 'cashier' }
 )
+
+export const POST = withMiddleware(
+  (req, ctx, { params }) => params.then((p) => ProductController.createCostLayer(req, ctx, p.id)),
+  { requiredRole: 'staff' }
+)

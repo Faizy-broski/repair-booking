@@ -88,6 +88,13 @@ export type CustomPlanDimensions = {
   repairLimit: number | null
 }
 
+export type CustomPlanBillingCycle = 'monthly' | 'yearly'
+
+// Custom Plan's own annual discount — intentionally separate from whatever
+// discount an admin sets via a regular plan's price_yearly column, since the
+// Custom Plan has no persisted Product/Price row to attach one to.
+export const CUSTOM_PLAN_YEARLY_DISCOUNT = 0.10
+
 /** Recomputes the monthly price in pence. Never trust a client-sent total — always call this. */
 export function computeCustomPlanPricePence(dims: CustomPlanDimensions, baseline: CustomPlanBaseline): number {
   let total = baseline.basePricePence
@@ -96,4 +103,20 @@ export function computeCustomPlanPricePence(dims: CustomPlanDimensions, baseline
   total += dims.inventoryLimit === null ? 1000 : ((dims.inventoryLimit - baseline.baseInventory) / 1000) * 500
   total += dims.repairLimit === null ? 1000 : ((dims.repairLimit - baseline.baseRepair) / 1000) * 500
   return Math.round(total)
+}
+
+/**
+ * Recomputes the total charge in pence for the given billing cycle. For
+ * 'yearly' this is the full annual charge (12 months at a 10% discount),
+ * not a monthly-equivalent — matches how regular plans bill price_yearly
+ * as a single annual amount via Stripe's `interval: 'year'`.
+ */
+export function computeCustomPlanTotalPence(
+  dims: CustomPlanDimensions,
+  baseline: CustomPlanBaseline,
+  billingCycle: CustomPlanBillingCycle = 'monthly'
+): number {
+  const monthlyPence = computeCustomPlanPricePence(dims, baseline)
+  if (billingCycle !== 'yearly') return monthlyPence
+  return Math.round(monthlyPence * 12 * (1 - CUSTOM_PLAN_YEARLY_DISCOUNT))
 }

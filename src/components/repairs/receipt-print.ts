@@ -84,7 +84,7 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
       /* No min-height / height — let content define the height */
       background: #fff;
       font-family: Arial, Helvetica, sans-serif;
-      font-size: 10px;
+      font-size: 12px;
       color: #000;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
@@ -92,44 +92,44 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
     body { padding: 10px 10px 20px 10px }
     .c  { text-align: center }
     .logo { display: block; margin: 0 auto 6px; width: 48px; height: 48px; object-fit: contain }
-    .bn { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 2px }
-    .br { font-size: 10px;  color: #000; text-align: center; margin-bottom: 2px }
-    .dt { font-size: 9.5px; color: #000; text-align: center; margin-bottom: 2px }
+    .bn { font-size: 15px; font-weight: bold; text-align: center; margin-bottom: 2px }
+    .br { font-size: 11px; color: #000; text-align: center; margin-bottom: 2px }
+    .dt { font-size: 11px; color: #000; text-align: center; margin-bottom: 2px }
     hr  { border: none; border-top: 1px dashed #000; margin: 6px 0 }
-    .ino { font-size: 11px; font-weight: bold; text-align: center; margin-bottom: 2px }
+    .ino { font-size: 13px; font-weight: bold; text-align: center; margin-bottom: 2px }
     .row { display: flex; justify-content: space-between; margin-bottom: 2px }
-    .lbl { font-size: 9.5px; color: #000; font-weight: 600 }
-    .val { font-size: 9.5px; font-weight: bold }
+    .lbl { font-size: 11px; color: #000; font-weight: 700 }
+    .val { font-size: 11px; font-weight: bold; color: #000 }
     /* ── Items table ── */
     .it  { width: 100%; border-collapse: collapse; margin: 0 }
-    .it th { font-size: 8.5px; color: #888; font-weight: 600; padding: 0 2px 3px 2px; border-bottom: 1px dotted #bbb }
-    .it td { font-size: 9.5px; padding: 3px 2px; vertical-align: top }
-    .it td.nm { font-weight: 600; color: #000; word-break: break-word }
-    .it td.qt { text-align: center; white-space: nowrap; color: #555 }
-    .it td.un { text-align: center; white-space: nowrap; color: #555 }
-    .it td.dc { text-align: center; white-space: nowrap }
+    .it th { font-size: 10px; color: #000; font-weight: 700; padding: 0 2px 4px 2px; border-bottom: 1px solid #000 }
+    .it td { font-size: 11px; padding: 4px 2px; vertical-align: top }
+    .it td.nm { font-weight: 700; color: #000; word-break: break-word }
+    .it td.qt { text-align: center; white-space: nowrap; color: #000; font-weight: 600 }
+    .it td.un { text-align: center; white-space: nowrap; color: #000; font-weight: 600 }
+    .it td.dc { text-align: center; white-space: nowrap; color: #000; font-weight: 600 }
     .it td.am { text-align: right; font-weight: bold; color: #000; white-space: nowrap }
     .it th.qt, .it th.un, .it th.dc, .it th.am { width: 1%; white-space: nowrap; text-align: center; padding-left: 6px }
     .it th.am { text-align: right }
     .it td.qt, .it td.un, .it td.dc, .it td.am { padding-left: 6px }
-    .tr  { display: flex; justify-content: space-between; margin-bottom: 1.5px }
-    .tl  { font-size: 10px; color: #000; font-weight: 600 }
-    .tv  { font-size: 10px; font-weight: bold }
-    .gr  { display: flex; justify-content: space-between; margin-top: 3px }
-    .gl  { font-size: 13px; font-weight: bold; color: #000 }
-    .gv  { font-size: 13px; font-weight: bold; color: #000 }
+    .tr  { display: flex; justify-content: space-between; margin-bottom: 2px }
+    .tl  { font-size: 11px; color: #000; font-weight: 700 }
+    .tv  { font-size: 11px; font-weight: bold; color: #000 }
+    .gr  { display: flex; justify-content: space-between; margin-top: 4px }
+    .gl  { font-size: 15px; font-weight: bold; color: #000 }
+    .gv  { font-size: 15px; font-weight: bold; color: #000 }
     .bar {
       display: flex; justify-content: space-between;
-      background: #000; padding: 6px; border-radius: 3px; margin-top: 4px;
+      background: #000; padding: 7px; border-radius: 3px; margin-top: 5px;
       -webkit-print-color-adjust: exact; print-color-adjust: exact
     }
-    .bl { font-size: 11px; font-weight: bold; color: #fff }
-    .bv { font-size: 11px; font-weight: bold; color: #fff }
+    .bl { font-size: 13px; font-weight: bold; color: #fff }
+    .bv { font-size: 13px; font-weight: bold; color: #fff }
     /* Footer — kept together, never orphaned onto a new page */
     .ft { page-break-inside: avoid; break-inside: avoid; page-break-before: avoid }
-    .ty { font-size: 11px; font-weight: bold; color: #000; text-align: center; margin-top: 6px }
-    .fl { font-size: 9.5px; color: #000; text-align: center; margin-top: 2px; word-break: break-word }
-    .pl { font-size: 8.5px; color: #000; text-align: center; margin-top: 5px;
+    .ty { font-size: 12px; font-weight: bold; color: #000; text-align: center; margin-top: 6px }
+    .fl { font-size: 11px; color: #000; text-align: center; margin-top: 2px; word-break: break-word }
+    .pl { font-size: 10px; color: #000; text-align: center; margin-top: 5px;
           border-top: 1px solid #000; padding-top: 4px }
     .grn { color: #1a7a3a }
 

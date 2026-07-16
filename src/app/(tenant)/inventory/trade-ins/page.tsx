@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/ui/modal'
 import { DataTable } from '@/components/shared/data-table'
+import { ProductVariantPicker } from '@/components/inventory/product-variant-picker'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import type { ColumnDef } from '@tanstack/react-table'
@@ -14,17 +15,17 @@ interface TradeIn {
   serial_number: string | null; imei: string | null
   notes: string | null; created_at: string
   products?: { name: string } | null
+  product_variants?: { name: string } | null
   customers?: { id: string; first_name: string; last_name: string | null; phone: string | null } | null
 }
-
-interface ProductOption { id: string; name: string; sku: string | null }
 
 const GRADE_VARIANT: Record<string, 'success' | 'warning' | 'destructive' | 'default'> = {
   A: 'success', B: 'success', C: 'warning', D: 'destructive', faulty: 'destructive',
 }
 
 const emptyForm = {
-  product_id: '', condition_grade: 'B', trade_in_value: 0,
+  product_id: '', variant_id: '', product_name: '', variant_name: '',
+  condition_grade: 'B', trade_in_value: 0,
   serial_number: '', imei: '', notes: '',
 }
 
@@ -34,23 +35,19 @@ export default function TradeInsPage() {
   const [total,     setTotal]     = useState(0)
   const [page,      setPage]      = useState(0)
   const [pageSize,  setPageSize]  = useState(20)
-  const [products,  setProducts]  = useState<ProductOption[]>([])
   const [loading,   setLoading]   = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [form,      setForm]      = useState(emptyForm)
   const [saving,    setSaving]    = useState(false)
 
   const fetchData = useCallback(async () => {
     if (!activeBranch) return
     setLoading(true)
-    const [tiRes, pRes] = await Promise.all([
-      fetch(`/api/inventory/trade-ins?branch_id=${activeBranch.id}&page=${page + 1}&limit=${pageSize}`),
-      fetch(`/api/products?limit=200`),
-    ])
-    const [tiJson, pJson] = await Promise.all([tiRes.json(), pRes.json()])
+    const tiRes = await fetch(`/api/inventory/trade-ins?branch_id=${activeBranch.id}&page=${page + 1}&limit=${pageSize}`)
+    const tiJson = await tiRes.json()
     setTradeIns(tiJson.data ?? [])
     setTotal(tiJson.meta?.total ?? 0)
-    setProducts(pJson.data ?? [])
     setLoading(false)
   }, [activeBranch, page, pageSize])
 
@@ -66,6 +63,7 @@ export default function TradeInsPage() {
         business_id: profile.business_id,
         branch_id: activeBranch.id,
         product_id: form.product_id,
+        variant_id: form.variant_id || undefined,
         condition_grade: form.condition_grade,
         trade_in_value: form.trade_in_value,
         serial_number: form.serial_number || undefined,
@@ -85,7 +83,10 @@ export default function TradeInsPage() {
       header: 'Device',
       cell: ({ getValue, row }) => (
         <div>
-          <p className="font-medium text-gray-800">{(getValue() as TradeIn['products'])?.name ?? '—'}</p>
+          <p className="font-medium text-gray-800">
+            {(getValue() as TradeIn['products'])?.name ?? '—'}
+            {row.original.product_variants?.name && <span className="text-gray-500"> – {row.original.product_variants.name}</span>}
+          </p>
           {row.original.serial_number && <p className="text-xs text-gray-400">S/N: {row.original.serial_number}</p>}
           {row.original.imei && <p className="text-xs text-gray-400">IMEI: {row.original.imei}</p>}
         </div>
@@ -147,17 +148,44 @@ export default function TradeInsPage() {
         <div className="space-y-3">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Device / Product *</label>
-            <select
-              value={form.product_id}
-              onChange={(e) => setForm((f) => ({ ...f, product_id: e.target.value }))}
-              className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm"
-            >
-              <option value="">Select product…</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>
-              ))}
-            </select>
+            {form.product_id ? (
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                className="flex h-9 w-full items-center justify-between rounded-lg border border-brand-teal/30 bg-brand-teal-light/10 px-3 text-sm text-left"
+              >
+                <span className="truncate">
+                  {form.product_name}
+                  {form.variant_name && <span className="text-gray-500"> – {form.variant_name}</span>}
+                </span>
+                <span className="shrink-0 text-xs text-brand-teal">Change</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                className="flex h-9 w-full items-center rounded-lg border border-dashed border-gray-300 px-3 text-sm text-gray-400 hover:border-brand-teal/40 hover:text-brand-teal"
+              >
+                Select product…
+              </button>
+            )}
           </div>
+
+          <ProductVariantPicker
+            open={pickerOpen}
+            onClose={() => setPickerOpen(false)}
+            branchId={activeBranch?.id}
+            title="Select the traded-in product"
+            onSelect={(product, variant) => {
+              setForm((f) => ({
+                ...f,
+                product_id: product.id,
+                variant_id: variant?.id ?? '',
+                product_name: product.name,
+                variant_name: variant?.name ?? '',
+              }))
+            }}
+          />
 
           <div className="grid grid-cols-2 gap-2">
             <div>

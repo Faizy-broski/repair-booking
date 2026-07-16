@@ -22,6 +22,9 @@ interface Props {
   createLabel?: string
   disabled?: boolean
   className?: string
+  /** When true the dropdown renders inline (static block) instead of floating,
+   *  so it expands the parent scroll container and requires scrolling to discover options. */
+  inline?: boolean
 }
 
 export function CreatableCombobox({
@@ -35,6 +38,7 @@ export function CreatableCombobox({
   createLabel = 'Add',
   disabled,
   className,
+  inline,
 }: Props) {
   const [open, setOpen]             = useState(false)
   const [query, setQuery]           = useState('')
@@ -190,7 +194,11 @@ export function CreatableCombobox({
           ref={dropdownRef}
           data-combobox-dropdown="true"
           onMouseDown={(e) => e.stopPropagation()}
-          className="absolute top-full left-0 z-50 mt-1 w-full min-w-[220px] rounded-lg border border-gray-200 bg-white shadow-xl"
+          className={cn(
+            inline
+              ? 'mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-md'
+              : 'absolute top-full left-0 z-50 mt-1 w-full min-w-[220px] rounded-lg border border-gray-200 bg-white shadow-xl',
+          )}
         >
 
           {/* Search input */}

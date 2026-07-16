@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/backend/config/supabase'
-import { customPlanDimensionsSchema, computeCustomPlanPricePence, getCustomPlanBaseline } from '@/backend/services/custom-plan-pricing'
+import { customPlanDimensionsSchema, computeCustomPlanTotalPence, getCustomPlanBaseline, type CustomPlanBillingCycle } from '@/backend/services/custom-plan-pricing'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', { apiVersion: '2026-02-25.clover' })
 
@@ -41,10 +41,13 @@ export async function POST(request: NextRequest) {
       )
     }
     const dims = parsed.data
+    const billingCycle: CustomPlanBillingCycle = body.billingCycle === 'yearly' ? 'yearly' : 'monthly'
 
     // Never trust a client-sent total — recompute here, in pence, from the
-    // raw dimension values. This is what actually gets sent to Stripe.
-    const totalPence = computeCustomPlanPricePence(dims, baseline)
+    // raw dimension values. This is what actually gets sent to Stripe. For
+    // 'yearly' this is the full annual charge (10% off), not a
+    // monthly-equivalent — see computeCustomPlanTotalPence.
+    const totalPence = computeCustomPlanTotalPence(dims, baseline, billingCycle)
 
     const { data: profile } = await supabase
       .from('profiles')
@@ -104,6 +107,7 @@ export async function POST(request: NextRequest) {
       customInventory: dims.inventoryLimit === null ? 'unlimited' : String(dims.inventoryLimit),
       customRepair:    dims.repairLimit === null ? 'unlimited' : String(dims.repairLimit),
       customPricePence: String(totalPence),
+      billingCycle,
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -114,7 +118,7 @@ export async function POST(request: NextRequest) {
           currency: 'gbp',
           product_data: { name: 'Custom Plan' },
           unit_amount: totalPence,
-          recurring: { interval: 'month' },
+          recurring: { interval: billingCycle === 'yearly' ? 'year' : 'month' },
         },
         quantity: 1,
         ...(vatTaxRateId ? { tax_rates: [vatTaxRateId] } : {}),

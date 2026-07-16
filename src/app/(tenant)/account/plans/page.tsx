@@ -13,6 +13,7 @@ import {
   toCustomPlanPayload,
   type CustomPlanState,
 } from '@/components/landing/custom-plan-card'
+import { ANNUAL_DISCOUNT } from '@/lib/pricing'
 
 interface Plan {
   id: string
@@ -120,7 +121,7 @@ export default function PlansPage() {
       const res = await fetch('/api/stripe/upgrade-custom', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(toCustomPlanPayload(effectiveCustomPlan)),
+        body: JSON.stringify({ ...toCustomPlanPayload(effectiveCustomPlan), billingCycle }),
       })
       const json = await res.json()
       if (!res.ok) setErrorMsg(json.error?.message ?? 'Something went wrong')
@@ -152,6 +153,11 @@ export default function PlansPage() {
   }
 
   const midIndex = plans.length >= 2 ? Math.floor(plans.length / 2) : -1
+
+  // Every plan (including Custom) gets the same flat annual discount — see
+  // src/lib/pricing.ts. Annual total is always monthly * 12 * (1 - ANNUAL_DISCOUNT),
+  // never each plan's separately admin-set price_yearly.
+  const annualDiscountPct = Math.round(ANNUAL_DISCOUNT * 100)
 
   return (
     <div className="min-h-screen bg-surface px-4 py-10">
@@ -203,7 +209,7 @@ export default function PlansPage() {
                 'rounded-full px-2 py-0.5 text-[10px] font-bold',
                 billingCycle === 'yearly' ? 'bg-white/20 text-white' : 'bg-green-100 text-green-700'
               )}>
-                Save 20%
+                Save {annualDiscountPct}%
               </span>
             </button>
           </div>
@@ -224,10 +230,11 @@ export default function PlansPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {plans.map((p, i) => {
               const highlighted = i === midIndex
-              const showYearly = billingCycle === 'yearly' && !!p.price_yearly
-              const displayPrice = showYearly ? p.price_yearly! : p.price_monthly
+              const showYearly = billingCycle === 'yearly'
+              const yearlyTotal = Math.round(p.price_monthly * 12 * (1 - ANNUAL_DISCOUNT))
+              const displayPrice = showYearly ? yearlyTotal : p.price_monthly
               const priceSuffix = showYearly ? '/yr' : '/mo'
-              const savings = p.price_yearly ? (p.price_monthly * 12) - p.price_yearly : 0
+              const savings = showYearly ? (p.price_monthly * 12) - yearlyTotal : 0
 
               return (
                 <div
@@ -303,6 +310,8 @@ export default function PlansPage() {
               state={effectiveCustomPlan}
               onChange={setCustomPlan}
               baseline={customPlanBaseline}
+              variant="light"
+              billingCycle={billingCycle}
               ctaLabel={
                 customEditable
                   ? (savingCustom ? 'Saving…' : 'Save changes')

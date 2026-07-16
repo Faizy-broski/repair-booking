@@ -1089,15 +1089,17 @@ export default function InventoryPage() {
                               </div>
                             )}
                           </div>
-                          {isRetail && (
-                            <button
-                              onClick={() => setDiscountTarget({ product: variantDrawer!, variant: v })}
-                              className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all active:scale-[0.98] bg-brand-teal text-white hover:bg-brand-teal/90 shadow-sm"
-                            >
-                              <Percent className="h-3.5 w-3.5" />
-                              {isSale ? 'Edit Sale' : 'Put on Sale'}
-                            </button>
-                          )}
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            {isRetail && (
+                              <button
+                                onClick={() => setDiscountTarget({ product: variantDrawer!, variant: v })}
+                                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all active:scale-[0.98] bg-brand-teal text-white hover:bg-brand-teal/90 shadow-sm"
+                              >
+                                <Percent className="h-3.5 w-3.5" />
+                                {isSale ? 'Edit Sale' : 'Put on Sale'}
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         <div className="mt-4 grid grid-cols-3 gap-3 border-t border-gray-100 pt-3">
@@ -1181,6 +1183,7 @@ export default function InventoryPage() {
           if (variantDrawer) openVariantDrawer(variantDrawer)
         }}
       />
+
     </div>
   )
 }

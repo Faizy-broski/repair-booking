@@ -74,7 +74,7 @@ export const TradeInService = {
     const to   = from + limit - 1
     const { data, count, error } = await adminSupabase
       .from('trade_in_transactions')
-      .select('*, products(name), customers(id, first_name, last_name, phone)', { count: 'exact' })
+      .select('*, products(name), product_variants(name), customers(id, first_name, last_name, phone)', { count: 'exact' })
       .eq('branch_id', branchId)
       .order('created_at', { ascending: false })
       .range(from, to)
@@ -83,7 +83,7 @@ export const TradeInService = {
   },
 
   async create(payload: {
-    business_id: string; branch_id: string; product_id: string
+    business_id: string; branch_id: string; product_id: string; variant_id?: string | null
     condition_grade: string; trade_in_value: number
     serial_number?: string; imei?: string; notes?: string; customer_id?: string
   }) {
@@ -94,17 +94,22 @@ export const TradeInService = {
       .single()
     if (error) throw error
 
-    // Add the traded-in unit back into stock — same pattern GrnService.create()
-    // uses for received POs (upsert inventory, log stock_movements, add a
-    // cost layer, update average cost).
-    const { branch_id, product_id, trade_in_value } = payload
+    // Add the traded-in unit back into stock — same pattern GrnService.create()/
+    // process_grn use for received POs (upsert the specific product+variant
+    // inventory row, log stock_movements, freeze cost per the product's
+    // valuation method). variant_id must match exactly (NULL-safe) so a
+    // variant-tracked product's buyback lands on that variant's own row, not
+    // the pooled base row.
+    const { branch_id, product_id, variant_id, trade_in_value } = payload
+    const v_variant_id = variant_id ?? null
 
-    const { data: existingInv } = await adminSupabase
+    let invQuery = adminSupabase
       .from('inventory')
       .select('id, quantity')
       .eq('branch_id', branch_id)
       .eq('product_id', product_id)
-      .maybeSingle()
+    invQuery = v_variant_id === null ? invQuery.is('variant_id', null) : invQuery.eq('variant_id', v_variant_id)
+    const { data: existingInv } = await invQuery.maybeSingle()
 
     if (existingInv) {
       await adminSupabase
@@ -114,29 +119,39 @@ export const TradeInService = {
     } else {
       await adminSupabase
         .from('inventory')
-        .insert({ branch_id, product_id, quantity: 1, low_stock_alert: 5 })
+        .insert({ branch_id, product_id, variant_id: v_variant_id, quantity: 1, low_stock_alert: 5 })
     }
 
     await adminSupabase.from('stock_movements').insert({
-      branch_id, product_id,
+      branch_id, product_id, variant_id: v_variant_id,
       type: 'trade_in',
       quantity: 1,
       reference_id: data.id,
       note: 'Trade-in / buyback',
     })
 
-    await adminSupabase.from('inventory_cost_layers').insert({
-      product_id, branch_id,
-      quantity: 1,
-      unit_cost: trade_in_value,
-      source_id: data.id,
-      source_type: 'trade_in',
-    })
-    await (adminSupabase as any).rpc('update_average_cost', {
-      p_product_id: product_id,
-      p_new_qty: 1,
-      p_new_cost: trade_in_value,
-    })
+    const { data: product } = await adminSupabase
+      .from('products')
+      .select('valuation_method')
+      .eq('id', product_id)
+      .maybeSingle()
+    const valuation = (product as any)?.valuation_method ?? 'weighted_average'
+
+    if (valuation === 'fifo' || valuation === 'lifo') {
+      await adminSupabase.from('inventory_cost_layers').insert({
+        product_id, branch_id, variant_id: v_variant_id,
+        quantity: 1,
+        unit_cost: trade_in_value,
+        source_id: data.id,
+        source_type: 'trade_in',
+      })
+    } else {
+      await (adminSupabase as any).rpc('update_average_cost', {
+        p_product_id: product_id,
+        p_new_qty: 1,
+        p_new_cost: trade_in_value,
+      })
+    }
 
     return data
   },

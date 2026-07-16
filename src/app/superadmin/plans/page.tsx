@@ -191,7 +191,7 @@ export default function PlansPage() {
                       <span className="text-3xl font-bold text-white">{formatCurrency(plan.price_monthly)}</span>
                       <span className="text-sm text-white/70">/mo</span>
                     </div>
-                    <p className="text-xs text-white/60 mt-0.5">{formatCurrency(plan.price_yearly)}/yr</p>
+                    <p className="text-xs text-white/60 mt-0.5">{formatCurrency(plan.price_yearly)}/yr (legacy, unused)</p>
                   </div>
                   <div className="flex flex-col items-end gap-2 mt-0.5">
                     <Badge variant={plan.is_active ? 'success' : 'destructive'}>
@@ -286,7 +286,7 @@ export default function PlansPage() {
               <Input label="Plan Name" required error={errors.name?.message} {...register('name')} />
               <div className="grid grid-cols-2 gap-3">
                 <Input label="Monthly Price (£)" type="number" step="0.01" required error={errors.price_monthly?.message} {...register('price_monthly')} />
-                <Input label="Yearly Price (£)" type="number" step="0.01" {...register('price_yearly')} />
+                <Input label="Yearly Price (£) — legacy" type="number" step="0.01" hint="No longer used for new checkouts — annual billing is now a flat 10% off the monthly price for every plan. Kept for historical reporting on existing subscribers only." {...register('price_yearly')} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Input label="Max Branches" type="number" required {...register('max_branches')} />
@@ -304,7 +304,7 @@ export default function PlansPage() {
                 </label>
               </div>
               <Input label="Stripe Monthly Price ID (optional)" placeholder="price_..." {...register('stripe_price_id_monthly')} />
-              <Input label="Stripe Yearly Price ID (optional)" placeholder="price_..." {...register('stripe_price_id_yearly')} />
+              <Input label="Stripe Yearly Price ID (legacy, optional)" placeholder="price_..." hint="No longer read at checkout — annual pricing is computed on the fly." {...register('stripe_price_id_yearly')} />
             </div>
           )}
 

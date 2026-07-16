@@ -192,7 +192,11 @@ const VariantPopover = memo(function VariantPopover({
             </div>
           ) : (
             variants.map(v => {
-              const oos = typeof v.stock === 'number' && v.stock <= 0
+              // Treat null stock as 0 for non-service products — if someone
+              // never entered a quantity in inventory, stock is null and the
+              // variant should show "Out of stock" rather than appear available.
+              const effectiveStock = v.stock ?? (product.is_service ? null : 0)
+              const oos = !product.is_service && (effectiveStock === null || effectiveStock <= 0)
               const hasDiscount = !oos && !!v.active_discount && v.active_discount.quantity_remaining > 0
 
               const variantImage = v.image_url ? (
@@ -288,8 +292,8 @@ const VariantPopover = memo(function VariantPopover({
                     ) : (
                       <>
                         <p className="text-base font-bold text-slate-900">{formatCurrency(v.selling_price)}</p>
-                        {typeof v.stock === 'number' && (
-                          <p className="text-xs font-semibold text-slate-400 mt-0.5">{v.stock} left</p>
+                        {effectiveStock !== null && (
+                          <p className="text-xs font-semibold text-slate-400 mt-0.5">{effectiveStock} left</p>
                         )}
                       </>
                     )}
@@ -594,7 +598,10 @@ export function ProductsTab() {
 
   function addSingleVariantToCart(variant: ProductVariant, isDiscount?: boolean) {
     if (!variantProduct) return
-    if (typeof variant.stock === 'number' && variant.stock <= 0) return
+    // Treat null stock as 0 for non-service products — block adding a
+    // variant whose stock was never set (null) to the cart.
+    const stockValue = variant.stock ?? (variantProduct.is_service ? null : 0)
+    if (!variantProduct.is_service && (stockValue === null || stockValue <= 0)) return
     // Same fix as addDiscountChoiceToCart — cap a discount-priced variant
     // line at the discount pool's remaining quantity, not the variant's
     // total on-hand stock.
@@ -602,7 +609,7 @@ export function ProductsTab() {
       ? null
       : isDiscount
         ? (variant.active_discount?.quantity_remaining ?? 0)
-        : (variant.stock ?? 0)
+        : (stockValue ?? 0)
     const price = isDiscount ? variant.active_discount?.discount_price : undefined
     pos.addToCart(variantProduct as unknown as Product, variant as any, maxStock, { isDiscount, unitPriceOverride: price })
   }

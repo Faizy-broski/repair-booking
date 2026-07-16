@@ -191,6 +191,7 @@ export function CashMovementModal({
                     onCreate={createCategory}
                     placeholder="Select or type to create..."
                     createLabel="Add category"
+                    inline
                   />
                 )}
               </div>

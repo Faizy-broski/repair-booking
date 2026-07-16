@@ -226,6 +226,7 @@ export default function UpgradePage() {
             state={effectiveCustomPlan}
             onChange={setCustomPlan}
             baseline={customPlanBaseline}
+            variant="light"
             ctaLabel={upgradingCustom ? 'Upgrading…' : 'Upgrade now'}
             onCtaClick={handleUpgradeCustom}
             disabled={upgradingCustom}

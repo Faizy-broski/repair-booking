@@ -56,6 +56,21 @@ const createSchema = z.object({
 
 const updateSchema = createSchema.partial()
 
+const costLayerCreateSchema = z.object({
+  branch_id: z.string().uuid(),
+  variant_id: z.string().uuid().optional().nullable(),
+  quantity: z.number().int().min(1),
+  unit_cost: z.number().min(0),
+  selling_price: z.number().min(0).optional().nullable(),
+  note: z.string().optional(),
+})
+
+const costLayerUpdateSchema = z.object({
+  quantity: z.number().int().min(0),
+  unit_cost: z.number().min(0),
+  selling_price: z.number().min(0).optional().nullable(),
+})
+
 export const ProductController = {
   async list(request: NextRequest, ctx: RequestContext) {
     const { searchParams } = request.nextUrl
@@ -165,6 +180,7 @@ export const ProductController = {
         // first sale instead of relying on the zero-layer catch-up fallback in consume_and_freeze_cost.
         if (needsStock && qty > 0 && !invResult.error) {
           const openingCost = (productData as any).cost_price ?? 0
+          const openingPrice = (productData as any).selling_price ?? null
           adminSupabase.from('stock_movements').insert({
             branch_id: targetBranch, product_id: product.id, variant_id: null,
             quantity: qty, type: 'adjustment', note: 'Opening stock', created_by: ctx.auth.userId,
@@ -173,7 +189,7 @@ export const ProductController = {
           })
           adminSupabase.from('inventory_cost_layers').insert({
             branch_id: targetBranch, product_id: product.id, quantity: qty,
-            unit_cost: openingCost, source_type: 'adjustment',
+            unit_cost: openingCost, selling_price: openingPrice, source_type: 'adjustment',
           }).then(({ error }) => {
             if (error) console.error('[ProductController.create] inventory_cost_layers insert failed:', error)
           })
@@ -233,6 +249,7 @@ export const ProductController = {
           .is('variant_id', null)
           .maybeSingle()
         const openingCost = (product as any)?.cost_price ?? 0
+        const openingPrice = (product as any)?.selling_price ?? null
         if (existing) {
           const updatePayload: Record<string, unknown> = { low_stock_alert: low_stock_alert ?? 5 }
           if (initial_stock !== undefined) updatePayload.quantity = initial_stock
@@ -249,7 +266,7 @@ export const ProductController = {
           if (!updErr && delta > 0) {
             const { error: layerErr } = await adminSupabase.from('inventory_cost_layers').insert({
               branch_id: targetBranch, product_id: id, quantity: delta,
-              unit_cost: openingCost, source_type: 'adjustment',
+              unit_cost: openingCost, selling_price: openingPrice, source_type: 'adjustment',
             })
             if (layerErr) console.error('[ProductController.update] inventory_cost_layers insert failed:', layerErr)
           }
@@ -264,7 +281,7 @@ export const ProductController = {
           if (!insErr && (initial_stock ?? 0) > 0) {
             const { error: layerErr } = await adminSupabase.from('inventory_cost_layers').insert({
               branch_id: targetBranch, product_id: id, quantity: initial_stock,
-              unit_cost: openingCost, source_type: 'adjustment',
+              unit_cost: openingCost, selling_price: openingPrice, source_type: 'adjustment',
             })
             if (layerErr) console.error('[ProductController.update] inventory_cost_layers insert failed:', layerErr)
           }
@@ -333,6 +350,52 @@ export const ProductController = {
       return ok(data)
     } catch (err) {
       return serverError('Failed to fetch cost layers', err)
+    }
+  },
+
+  async createCostLayer(request: NextRequest, ctx: RequestContext, productId: string) {
+    const { data, error } = await validateBody(request, costLayerCreateSchema)
+    if (error) return error
+    try {
+      const layerId = await ProductService.createCostLayer({
+        branchId: data.branch_id,
+        productId,
+        variantId: data.variant_id ?? null,
+        quantity: data.quantity,
+        unitCost: data.unit_cost,
+        sellingPrice: data.selling_price ?? null,
+        note: data.note,
+        userId: ctx.auth.userId,
+      })
+      return created({ id: layerId })
+    } catch (err) {
+      return serverError('Failed to add stock batch', err)
+    }
+  },
+
+  async updateCostLayer(request: NextRequest, ctx: RequestContext, layerId: string) {
+    const { data, error } = await validateBody(request, costLayerUpdateSchema)
+    if (error) return error
+    try {
+      await ProductService.updateCostLayer({
+        layerId,
+        quantity: data.quantity,
+        unitCost: data.unit_cost,
+        sellingPrice: data.selling_price ?? null,
+        userId: ctx.auth.userId,
+      })
+      return ok({ id: layerId })
+    } catch (err) {
+      return serverError('Failed to update stock batch', err)
+    }
+  },
+
+  async deleteCostLayer(request: NextRequest, ctx: RequestContext, layerId: string) {
+    try {
+      await ProductService.deleteCostLayer(layerId, ctx.auth.userId)
+      return ok({ id: layerId })
+    } catch (err) {
+      return serverError('Failed to delete stock batch', err)
     }
   },
 

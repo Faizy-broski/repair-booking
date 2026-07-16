@@ -26,6 +26,7 @@ import {
   toCustomPlanPayload,
   type CustomPlanState,
 } from '@/components/landing/custom-plan-card'
+import { ANNUAL_DISCOUNT } from '@/lib/pricing'
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
@@ -1008,7 +1009,7 @@ export default function RegisterPage() {
               >
                 Annual
                 <span className="absolute -top-3 -right-3 rounded-full bg-brand-yellow px-1.5 py-0.5 text-[10px] font-black text-slate-900 shadow">
-                  -20%
+                  -{Math.round(ANNUAL_DISCOUNT * 100)}%
                 </span>
               </button>
             </div>
@@ -1027,7 +1028,7 @@ export default function RegisterPage() {
                 const isTrulyFree = plan.price_monthly === 0
                 const isEnterprise = plan.plan_type === 'enterprise'
                 const isYearly = billing === 'yearly' && !isTrulyFree && !isEnterprise
-                const yearlyTotal = plan.price_yearly > 0 ? plan.price_yearly : Math.round(plan.price_monthly * 12 * 0.8)
+                const yearlyTotal = Math.round(plan.price_monthly * 12 * (1 - ANNUAL_DISCOUNT))
                 const fmtPrice = (n: number) => n % 1 === 0 ? String(Math.round(n)) : n.toFixed(2)
 
                 return (
@@ -1165,7 +1166,7 @@ export default function RegisterPage() {
                       : (() => {
                           const isYearly = billing === 'yearly'
                           const price = isYearly
-                            ? (selectedPlan.price_yearly > 0 ? selectedPlan.price_yearly : Math.round(selectedPlan.price_monthly * 12 * 0.8))
+                            ? Math.round(selectedPlan.price_monthly * 12 * (1 - ANNUAL_DISCOUNT))
                             : selectedPlan.price_monthly
                           const fmt = (n: number) => n % 1 === 0 ? String(Math.round(n)) : n.toFixed(2)
                           return `Start free trial — £${fmt(price)}${isYearly ? '/year' : '/mo'}`

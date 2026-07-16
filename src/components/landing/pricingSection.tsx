@@ -12,6 +12,7 @@ import {
   makeDefaultCustomPlanState,
   type CustomPlanState,
 } from "@/components/landing/custom-plan-card";
+import { ANNUAL_DISCOUNT } from "@/lib/pricing";
 
 interface PricingPlan {
   id: string;
@@ -130,6 +131,11 @@ export default function PricingSection() {
       .finally(() => setPlansLoading(false));
   }, []);
 
+  // Every plan (including Custom) gets the same flat annual discount — see
+  // src/lib/pricing.ts. Annual total is always monthly * 12 * (1 - ANNUAL_DISCOUNT),
+  // never each plan's separately admin-set price_yearly.
+  const annualDiscountPct = Math.round(ANNUAL_DISCOUNT * 100);
+
   return (
     <section
       id="pricing"
@@ -175,7 +181,7 @@ export default function PricingSection() {
             >
               Annual
               <span className="absolute -right-3 -top-3 rounded-full bg-brand-yellow px-1.5 py-0.5 text-[10px] font-black text-slate-950">
-                -20%
+                -{annualDiscountPct}%
               </span>
             </button>
           </div>
@@ -216,10 +222,9 @@ export default function PricingSection() {
               const isEnterprise = plan.plan_type === "enterprise";
               const isYearly =
                 billing === "yearly" && !isTrulyFree && !isEnterprise;
-              const yearlyTotal =
-                plan.price_yearly > 0
-                  ? plan.price_yearly
-                  : Math.round(plan.price_monthly * 12 * 0.8);
+              const yearlyTotal = Math.round(plan.price_monthly * 12 * (1 - ANNUAL_DISCOUNT));
+              const yearlySavings = plan.price_monthly * 12 - yearlyTotal;
+              const yearlyPct = annualDiscountPct;
               const fmtPrice = (n: number) =>
                 n % 1 === 0 ? String(Math.round(n)) : n.toFixed(2);
 
@@ -267,6 +272,12 @@ export default function PricingSection() {
                       </>
                     )}
                   </div>
+
+                  {isYearly && yearlySavings > 0 && (
+                    <p className="mt-1 text-xs font-semibold text-brand-teal">
+                      {yearlyPct}% off — saves £{yearlySavings}/yr vs monthly
+                    </p>
+                  )}
 
                   <p className="mt-4 text-sm leading-relaxed text-white/55">
                     {planDesc(plan)}
@@ -345,6 +356,7 @@ export default function PricingSection() {
                 state={effectiveCustomPlan}
                 onChange={setCustomPlan}
                 baseline={customPlanBaseline}
+                billingCycle={billing}
                 ctaLabel="Start 30 Days free trial"
                 onCtaClick={handleCustomPlanCta}
               />

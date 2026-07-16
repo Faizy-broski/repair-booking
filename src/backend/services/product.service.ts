@@ -12,7 +12,7 @@ export const ProductService = {
   async getCostLayers(productId: string, branchId?: string) {
     let q = db
       .from('inventory_cost_layers')
-      .select('id, quantity, unit_cost, received_at, source_type, branch_id')
+      .select('id, quantity, unit_cost, selling_price, received_at, source_type, branch_id, variant_id')
       .eq('product_id', productId)
       .order('received_at', { ascending: true })
     if (branchId) q = q.eq('branch_id', branchId)
@@ -21,31 +21,82 @@ export const ProductService = {
     return data ?? []
   },
 
+  // ── Stock batch CRUD (FIFO products only — see migration 146) ───────────
+  // Each wraps a SECURITY DEFINER RPC that atomically locks/updates
+  // `inventory`, writes the batch row, logs a stock_movements adjustment,
+  // and re-syncs the product's/variant's flat selling_price to the oldest
+  // remaining batch so POS/lists keep reading a single price column.
+  async createCostLayer(params: {
+    branchId: string; productId: string; variantId: string | null
+    quantity: number; unitCost: number; sellingPrice: number | null
+    note?: string; userId: string
+  }) {
+    const { data, error } = await (db.rpc as any)('add_cost_layer_batch', {
+      p_branch_id: params.branchId,
+      p_product_id: params.productId,
+      p_variant_id: params.variantId,
+      p_quantity: params.quantity,
+      p_unit_cost: params.unitCost,
+      p_selling_price: params.sellingPrice,
+      p_note: params.note ?? null,
+      p_user_id: params.userId,
+    })
+    if (error) throw error
+    return data
+  },
+
+  async updateCostLayer(params: {
+    layerId: string; quantity: number; unitCost: number
+    sellingPrice: number | null; userId: string
+  }) {
+    const { error } = await (db.rpc as any)('update_cost_layer_batch', {
+      p_layer_id: params.layerId,
+      p_quantity: params.quantity,
+      p_unit_cost: params.unitCost,
+      p_selling_price: params.sellingPrice,
+      p_user_id: params.userId,
+    })
+    if (error) throw error
+  },
+
+  async deleteCostLayer(layerId: string, userId: string) {
+    const { error } = await (db.rpc as any)('delete_cost_layer_batch', {
+      p_layer_id: layerId,
+      p_user_id: userId,
+    })
+    if (error) throw error
+  },
+
   // One query, one pass — the JS equivalent of a CTE + window function, since
   // the Supabase query builder can't express those directly. Rows come back
-  // ordered oldest-first per branch; the first row seen for a product is its
-  // oldest open batch, i.e. the one FIFO will consume next. Used everywhere a
-  // "stock value"/"unit cost" figure needs to reflect real batches instead of
-  // the single mutable products.cost_price scalar. Products with no rows here
-  // (never restocked since the FIFO rollout) simply won't appear in the map —
-  // callers fall back to products.cost_price for those, unchanged from before.
+  // ordered oldest-first per branch; the first row seen for a product+variant
+  // is its oldest open batch, i.e. the one FIFO will consume next. Used
+  // everywhere a "stock value"/"unit cost" figure needs to reflect real
+  // batches instead of the single mutable products.cost_price scalar.
+  // Keyed by `${product_id}::${variant_id ?? 'null'}` so each variant's
+  // batches are valued independently — a plain product_id key would blend
+  // every variant's cost into one figure. A product/variant with no rows
+  // here (never restocked since the FIFO rollout, or never variant-scoped)
+  // simply won't appear in the map — callers fall back to cost_price for
+  // those, unchanged from before.
   async getBatchValuationByBranch(branchId: string) {
     const { data, error } = await db
       .from('inventory_cost_layers')
-      .select('product_id, quantity, unit_cost')
+      .select('product_id, variant_id, quantity, unit_cost')
       .eq('branch_id', branchId)
       .order('received_at', { ascending: true })
     if (error) throw error
 
     const map = new Map<string, { totalValue: number; totalQty: number; nextUnitCost: number }>()
     for (const layer of (data ?? []) as any[]) {
+      const key = `${layer.product_id}::${layer.variant_id ?? 'null'}`
       const value = layer.quantity * layer.unit_cost
-      const existing = map.get(layer.product_id)
+      const existing = map.get(key)
       if (existing) {
         existing.totalValue += value
         existing.totalQty += layer.quantity
       } else {
-        map.set(layer.product_id, { totalValue: value, totalQty: layer.quantity, nextUnitCost: layer.unit_cost })
+        map.set(key, { totalValue: value, totalQty: layer.quantity, nextUnitCost: layer.unit_cost })
       }
     }
     return map
@@ -218,7 +269,7 @@ export const ProductService = {
         : false;
 
       const on_hand = branchInv?.quantity ?? 0
-      const batch = !p.has_variants ? batchValuation.get(p.id as string) : undefined
+      const batch = !p.has_variants ? batchValuation.get(`${p.id}::null`) : undefined
       const activeDiscount = !p.has_variants ? discountMap.get(p.id as string) : undefined
       return {
         ...p, on_hand, low_stock_alert: branchInv?.low_stock_alert ?? null, has_low_stock_variant: hasLowStockVariant,
@@ -498,7 +549,7 @@ export const ProductService = {
         if (p?.has_variants) return
         if (p?.is_active && !p?.is_service) {
           stockRetailValue += (p.selling_price ?? 0) * row.quantity
-          const batch = (batchValuation as Map<string, { totalValue: number }>).get(row.product_id)
+          const batch = (batchValuation as Map<string, { totalValue: number }>).get(`${row.product_id}::null`)
           stockCostValue += batch ? batch.totalValue : (p.cost_price ?? 0) * row.quantity
         }
         const threshold = row.low_stock_alert ?? 5

@@ -115,21 +115,17 @@ export const ReportService = {
     ])
 
     const { data: totalStock } = await db('inventory')
-      .select('quantity, product_id, variant_id, products(cost_price)')
+      .select('quantity, product_id, variant_id, products(cost_price), product_variants(cost_price)')
       .eq('branch_id', branchId)
 
     const totalItems = ((totalStock ?? []) as any[]).reduce((s: number, r: any) => s + (r.quantity ?? 0), 0)
     const totalValue = ((totalStock ?? []) as any[]).reduce((s: number, r: any) => {
-      // Batch totals are per-product for the whole branch — only apply them to
-      // the single base (non-variant) row per product, or a product with
-      // variants would have its full batch value added once per variant row.
-      // Variant rows keep the pre-existing parent-cost_price×qty calc (no
-      // per-variant cost layers exist — see plan's scope decision).
-      if (r.variant_id === null) {
-        const batch = batchValuation.get(r.product_id)
-        return s + (batch ? batch.totalValue : (r.quantity ?? 0) * (r.products?.cost_price ?? 0))
-      }
-      return s + (r.quantity ?? 0) * (r.products?.cost_price ?? 0)
+      // Batch valuation is keyed per (product_id, variant_id) — each variant's
+      // own batches are looked up independently, not blended with its siblings
+      // or the base product row.
+      const batch = batchValuation.get(`${r.product_id}::${r.variant_id ?? 'null'}`)
+      const fallbackCost = r.product_variants?.cost_price ?? r.products?.cost_price ?? 0
+      return s + (batch ? batch.totalValue : (r.quantity ?? 0) * fallbackCost)
     }, 0)
 
     return {
@@ -274,7 +270,7 @@ export const ReportService = {
 
     return ((data ?? []) as any[]).map((row: any) => {
       const p = row.products
-      const batch = batchValuation.get(p?.id)
+      const batch = batchValuation.get(`${p?.id}::null`)
       return {
         product_id: p?.id,
         product_name: p?.name,
@@ -385,7 +381,7 @@ export const ReportService = {
     const [{ data, error }, batchValuation] = await Promise.all([
       adminSupabase
         .from('inventory')
-        .select('quantity, low_stock_alert, product_id, products(id, name, sku, cost_price, selling_price)')
+        .select('quantity, low_stock_alert, product_id, variant_id, products(id, name, sku, cost_price, selling_price), product_variants(cost_price, selling_price)')
         .eq('branch_id', branchId),
       ProductService.getBatchValuationByBranch(branchId),
     ])
@@ -397,15 +393,18 @@ export const ReportService = {
         // batch that's about to run out (the next-to-sell cost), not a
         // blended total — this report is about "what will it cost to
         // restock/what's the cost of the unit sitting at the front."
-        const batch = batchValuation.get(r.product_id)
+        // Keyed per (product_id, variant_id) so a variant's own next-batch
+        // cost is used, not its product's blended figure.
+        const batch = batchValuation.get(`${r.product_id}::${r.variant_id ?? 'null'}`)
+        const fallbackCost = r.product_variants?.cost_price ?? r.products?.cost_price ?? 0
         return {
           product_id: r.products?.id,
           product_name: r.products?.name,
           sku: r.products?.sku,
           quantity: r.quantity,
           low_stock_alert: r.low_stock_alert ?? 5,
-          cost_price: batch ? batch.nextUnitCost : (r.products?.cost_price ?? 0),
-          selling_price: r.products?.selling_price ?? 0,
+          cost_price: batch ? batch.nextUnitCost : fallbackCost,
+          selling_price: r.product_variants?.selling_price ?? r.products?.selling_price ?? 0,
         }
       })
       .sort((a: any, b: any) => a.quantity - b.quantity)
