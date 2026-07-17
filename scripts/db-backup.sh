@@ -33,7 +33,7 @@
 set -euo pipefail
 
 BACKUP_DIR="/opt/backups/supabase-daily"
-RETENTION_DAYS=7
+RETENTION_DAYS=30
 DATE=$(date +%Y-%m-%d)
 FILENAME="full-backup-${DATE}.sql.gz"
 LOG_PREFIX="[$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
@@ -62,7 +62,7 @@ pg_dump \
 FILESIZE=$(du -sh "${BACKUP_DIR}/${FILENAME}" | cut -f1)
 echo "${LOG_PREFIX} Backup written: ${BACKUP_DIR}/${FILENAME} (${FILESIZE})"
 
-# 7-day rolling retention
+# 30-day rolling retention
 find "${BACKUP_DIR}" -name "full-backup-*.sql.gz" -mtime +"${RETENTION_DAYS}" -delete
 
 echo "${LOG_PREFIX} Retention cleanup done. Current backups:"

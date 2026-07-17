@@ -4,7 +4,7 @@
 # The endpoint's ?action=process only exports ONE pending business per call
 # (by design — keeps each HTTP request short). This script drives it to
 # completion: schedule today's rows, then call process repeatedly until it
-# reports nothing pending, then clean up backups older than 7 days.
+# reports nothing pending, then clean up backups older than 30 days.
 #
 # Usage (add to crontab, once a day, e.g. 2am server time):
 #   0 2 * * * BACKUP_APP_URL=https://yourapp.com CRON_SECRET=xxx /opt/repair-booking/scripts/run-daily-backups.sh >> /var/log/repair-backups.log 2>&1
@@ -66,7 +66,7 @@ while [ "$i" -lt "$MAX_ITERATIONS" ]; do
   fi
 done
 
-log "Cleaning up backups older than 7 days..."
+log "Cleaning up backups older than 30 days..."
 cleanup_resp="$(call cleanup)" || log "WARN: cleanup call failed: ${cleanup_resp}"
 log "Cleanup response: ${cleanup_resp}"
 
