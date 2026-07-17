@@ -64,14 +64,15 @@ export const ReportService = {
         db('sales').select('total, discount, tax').eq('branch_id', branchId).gte('created_at', from).lte('created_at', to),
         db('expenses').select('amount').eq('branch_id', branchId).gte('expense_date', from).lte('expense_date', to),
         db('salaries').select('amount').eq('branch_id', branchId).gte('pay_date', from).lte('pay_date', to),
-        db('cash_movements').select('type, amount').eq('branch_id', branchId).gte('created_at', from).lte('created_at', to),
+        db('cash_movements').select('type, amount, purpose').eq('branch_id', branchId).gte('created_at', from).lte('created_at', to),
       ])
       const revenue = ((salesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.total, 0)
       const expenses = ((expensesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.amount, 0)
       const salaries = ((salariesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.amount, 0)
-      // Cash In adds to Sales revenue, Cash Out subtracts.
+      // Cash In adds to Sales revenue, Cash Out subtracts — except 'expense'
+      // purpose cash-outs, already counted via the expenses table above.
       const cashNet = ((cashMovementsRes.data ?? []) as any[]).reduce(
-        (s: number, r: any) => s + (r.type === 'cash_in' ? r.amount : -r.amount), 0
+        (s: number, r: any) => s + (r.type === 'cash_in' ? r.amount : (r.purpose === 'expense' ? 0 : -r.amount)), 0
       )
       const totalRevenue = revenue + cashNet
       return { revenue, repair_revenue: 0, other_income: cashNet, total_revenue: totalRevenue, cogs: 0, expenses, salaries, total_costs: expenses + salaries, gross_profit: totalRevenue, net_profit: totalRevenue - expenses - salaries }
