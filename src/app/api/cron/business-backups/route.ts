@@ -7,7 +7,7 @@
  *   1. ?action=schedule  — seeds today's backup_registry rows for all active businesses
  *   2. ?action=process   — picks ONE pending row and exports it to Supabase Storage
  *      (call multiple times — once per business that needs backing up)
- *   3. ?action=cleanup   — deletes storage files and registry rows older than 7 days
+ *   3. ?action=cleanup   — deletes storage files and registry rows older than 30 days
  *
  * Security: requires CRON_SECRET env var match via x-cron-secret header or ?secret= param.
  */

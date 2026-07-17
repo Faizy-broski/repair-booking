@@ -442,9 +442,11 @@ export async function processNextPendingBackup(): Promise<{
   }
 }
 
+const BACKUP_RETENTION_DAYS = 30
+
 export async function cleanupOldBackups(): Promise<{ deleted: number }> {
   const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - 7)
+  cutoff.setDate(cutoff.getDate() - BACKUP_RETENTION_DAYS)
   const cutoffStr = cutoff.toISOString().split('T')[0]
 
   const { data: old } = await adminSupabase
