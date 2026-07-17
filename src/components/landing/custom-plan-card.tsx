@@ -221,11 +221,12 @@ export function CustomPlanCard({
   disabled,
   variant = "dark",
   billingCycle = "monthly",
+  hideCta = false,
 }: {
   state: CustomPlanState;
   onChange: (next: CustomPlanState) => void;
   baseline: CustomPlanBaseline;
-  ctaLabel: string;
+  ctaLabel?: string;
   ctaHref?: string;
   onCtaClick?: () => void;
   highlight?: boolean;
@@ -233,6 +234,8 @@ export function CustomPlanCard({
   /** 'light' renders on a white card for light-themed dashboard pages; 'dark' (default) is the glassmorphism look for the dark marketing hero. */
   variant?: "dark" | "light";
   billingCycle?: "monthly" | "yearly";
+  /** Hides the CTA button — for embedding this as an inline dimension editor (e.g. the superadmin Edit Subscription modal) rather than a marketing/upgrade card. */
+  hideCta?: boolean;
 }) {
   const light = variant === "light";
   const monthlyPrice = computeCustomPlanPrice(state, baseline);
@@ -351,23 +354,25 @@ export function CustomPlanCard({
         </div>
       </div>
 
-      <CtaTag
-        {...(ctaHref ? { href: ctaHref } : { type: "button" as const, onClick: onCtaClick, disabled })}
-        className={cn(
-          "mt-8 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full text-sm font-medium transition-colors",
-          light
-            ? highlight
-              ? "bg-brand-teal text-white hover:bg-brand-teal/90"
-              : "border border-gray-300 text-gray-700 hover:bg-gray-50"
-            : highlight
-              ? "bg-white text-slate-950 hover:bg-white/90"
-              : "border border-white/15 bg-transparent text-white hover:bg-white/10",
-          disabled && "cursor-not-allowed opacity-50"
-        )}
-      >
-        {ctaLabel}
-        <ChevronRight className="h-4 w-4" />
-      </CtaTag>
+      {!hideCta && (
+        <CtaTag
+          {...(ctaHref ? { href: ctaHref } : { type: "button" as const, onClick: onCtaClick, disabled })}
+          className={cn(
+            "mt-8 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full text-sm font-medium transition-colors",
+            light
+              ? highlight
+                ? "bg-brand-teal text-white hover:bg-brand-teal/90"
+                : "border border-gray-300 text-gray-700 hover:bg-gray-50"
+              : highlight
+                ? "bg-white text-slate-950 hover:bg-white/90"
+                : "border border-white/15 bg-transparent text-white hover:bg-white/10",
+            disabled && "cursor-not-allowed opacity-50"
+          )}
+        >
+          {ctaLabel}
+          <ChevronRight className="h-4 w-4" />
+        </CtaTag>
+      )}
     </div>
   );
 }

@@ -1,7 +1,14 @@
 'use client'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { X, RefreshCw, AlertCircle, TriangleAlert } from 'lucide-react'
 import type { SubscriptionRow } from '@/app/api/admin/subscriptions/route'
+import {
+  CustomPlanCard,
+  deriveCustomPlanBaseline,
+  makeDefaultCustomPlanState,
+  toCustomPlanPayload,
+  type CustomPlanState,
+} from '@/components/landing/custom-plan-card'
 
 export interface PlanOption {
   id: string
@@ -9,6 +16,8 @@ export interface PlanOption {
   price_monthly: number
   price_yearly: number
   is_active: boolean
+  plan_type?: string
+  limits?: Record<string, number | boolean | null> | null
 }
 
 const STATUSES = [
@@ -45,6 +54,23 @@ export function EditSubscriptionModal({
   const [saving, setSaving]             = useState(false)
   const [error, setError]               = useState<string | null>(null)
 
+  // ── Custom Plan dimensions ──────────────────────────────────────────────
+  // Base price/floors always derive from the current cheapest paid plan
+  // (never hardcoded) — same source of truth as the tenant-facing upgrade flow.
+  const customBaseline = useMemo(() => deriveCustomPlanBaseline(plans as any), [plans])
+  const [customState, setCustomState] = useState<CustomPlanState>(() => {
+    const defaults = makeDefaultCustomPlanState(customBaseline)
+    if (!row.is_custom) return defaults
+    return {
+      branches: row.custom_max_branches ?? defaults.branches,
+      staff: row.custom_max_users ?? defaults.staff,
+      inventoryLimit: row.custom_max_products ?? defaults.inventoryLimit,
+      inventoryUnlimited: row.custom_max_products == null,
+      repairLimit: row.custom_max_services ?? defaults.repairLimit,
+      repairUnlimited: row.custom_max_services == null,
+    }
+  })
+
   const modalRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const prevFocus = document.activeElement as HTMLElement | null
@@ -56,6 +82,9 @@ export function EditSubscriptionModal({
       prevFocus?.focus()
     }
   }, [onClose])
+
+  const selectedPlan = plans.find((p) => p.id === planId)
+  const isCustomPlan = selectedPlan?.plan_type === 'custom'
 
   async function handleSave() {
     if (!planId) { setError('Please select a plan'); return }
@@ -71,6 +100,7 @@ export function EditSubscriptionModal({
           billingCycle,
           currentPeriodEnd: periodEnd || null,
           trialEndsAt: status === 'trialing' ? (trialEndsAt || null) : null,
+          customDimensions: isCustomPlan ? toCustomPlanPayload(customState) : undefined,
         }),
       })
       const json = await res.json()
@@ -83,7 +113,6 @@ export function EditSubscriptionModal({
     }
   }
 
-  const selectedPlan = plans.find((p) => p.id === planId)
   const willDeactivate = status === 'canceled' || status === 'suspended'
 
   return (
@@ -97,10 +126,10 @@ export function EditSubscriptionModal({
         role="dialog"
         aria-modal="true"
         aria-label={`Edit subscription — ${row.business_name}`}
-        className="w-full max-w-lg rounded-2xl bg-white shadow-2xl outline-none"
+        className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl outline-none"
       >
         {/* Header */}
-        <div className="flex items-start justify-between border-b border-gray-100 px-6 py-5">
+        <div className="flex shrink-0 items-start justify-between border-b border-gray-100 px-6 py-5">
           <div>
             <h2 className="text-lg font-bold text-gray-900">Edit Subscription</h2>
             <p className="mt-0.5 text-sm text-gray-500 font-mono">{row.business_name}</p>
@@ -114,7 +143,7 @@ export function EditSubscriptionModal({
         </div>
 
         {/* Body */}
-        <div className="space-y-4 px-6 py-5">
+        <div className="space-y-4 overflow-y-auto px-6 py-5">
           {/* Plan */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-gray-700">Plan</label>
@@ -131,7 +160,7 @@ export function EditSubscriptionModal({
                 </option>
               ))}
             </select>
-            {selectedPlan && (
+            {selectedPlan && !isCustomPlan && (
               <p className="text-xs text-gray-400">
                 Monthly: £{selectedPlan.price_monthly} · Yearly: £{selectedPlan.price_yearly}
                 {billingCycle === 'yearly' && selectedPlan.price_yearly > 0 && (
@@ -142,6 +171,19 @@ export function EditSubscriptionModal({
               </p>
             )}
           </div>
+
+          {/* Custom Plan dimensions — branches/staff/inventory/repairs, priced
+              by the same formula as the tenant-facing upgrade flow. */}
+          {isCustomPlan && (
+            <CustomPlanCard
+              variant="light"
+              hideCta
+              state={customState}
+              onChange={setCustomState}
+              baseline={customBaseline}
+              billingCycle={billingCycle}
+            />
+          )}
 
           {/* Status */}
           <div className="space-y-1.5">
@@ -238,6 +280,7 @@ export function EditSubscriptionModal({
               your platform only. Stripe billing is <em>not</em> modified. If this
               business has an active Stripe subscription, manage it separately in the
               Stripe dashboard.
+              {isCustomPlan && ' Custom plan pricing shown here is what the business is billed manually — it is not pushed to Stripe.'}
             </p>
           </div>
 
@@ -251,7 +294,7 @@ export function EditSubscriptionModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
+        <div className="flex shrink-0 items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
           <button
             onClick={onClose}
             disabled={saving}
