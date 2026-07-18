@@ -17,6 +17,8 @@ interface Props {
   branchAddress?: string | null
   branchPhone?: string | null
   customerName: string
+  deviceImei?: string
+  faults?: string
   items: Array<{ description: string; quantity: number; unit_price: number }>
   subtotal: number
   discount?: number
@@ -32,7 +34,7 @@ function money(n: number, currency?: string) {
 
 export function RepairReceiptHtml({
   settings, invoiceNumber, status, issuedAt,
-  businessName, branchName, branchAddress, branchPhone, customerName,
+  businessName, branchName, branchAddress, branchPhone, customerName, deviceImei, faults,
   items, subtotal, discount = 0, tax = 0, total, amountPaid = 0, currency = 'GBP',
 }: Props) {
   const pc      = settings.primary_color ?? '#0f766e'
@@ -65,7 +67,7 @@ export function RepairReceiptHtml({
     lbl:      { fontSize: '9.5px', color: '#000', fontWeight: 600 },
     val:      { fontSize: '9.5px', fontWeight: 'bold' },
     itemRow:  { display: 'flex', alignItems: 'flex-start', marginBottom: '4px' } as React.CSSProperties,
-    itemDesc: { flex: 1, paddingRight: '4px', fontSize: '10px', wordBreak: 'break-word' as const },
+    itemDesc: { flex: 1, paddingRight: '4px', fontSize: '10px', wordBreak: 'break-word' as const, whiteSpace: 'pre-wrap' as const },
     itemAmt:  { fontSize: '10px', textAlign: 'right' as const, width: '52px', flexShrink: 0, fontWeight: 'bold' },
     totRow:   { display: 'flex', justifyContent: 'space-between', marginBottom: '1.5px' } as React.CSSProperties,
     totLbl:   { fontSize: '10px', color: '#000', fontWeight: 600 },
@@ -107,6 +109,8 @@ export function RepairReceiptHtml({
       <div style={s.row}><span style={s.lbl}>Date</span><span style={s.val}>{dateStr}</span></div>
       <div style={s.row}><span style={s.lbl}>Customer</span><span style={s.val}>{customerName}</span></div>
       <div style={s.row}><span style={s.lbl}>Status</span><span style={s.val}>{status}</span></div>
+      <div style={s.row}><span style={s.lbl}>IMEI/SN</span><span style={{...s.val, textAlign: 'right', marginLeft: '8px', wordBreak: 'break-all'}}>{deviceImei || 'N/A'}</span></div>
+      <div style={s.row}><span style={s.lbl}>Faults</span><span style={{...s.val, textAlign: 'right', marginLeft: '8px'}}>{faults || 'N/A'}</span></div>
 
       <hr style={s.divider} />
 

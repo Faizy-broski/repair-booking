@@ -48,6 +48,13 @@ async function getRepairInvoiceData(repairId: string, branchId: string | null, b
     adminSupabase.from('businesses').select('name, currency').eq('id', businessId).single().then((res) => res.data),
   ])
 
+  const cf = (r.custom_fields as Record<string, unknown>) ?? {}
+  const faultsArr: string[] = cf.faults
+    ? (Array.isArray(cf.faults) ? cf.faults : [String(cf.faults)])
+    : r.issue
+    ? [r.issue]
+    : []
+
   const repairItems: any[] = Array.isArray(r.repair_items) ? r.repair_items : []
   const items = repairItems.length > 0
     ? repairItems.map((item) => ({
@@ -56,7 +63,7 @@ async function getRepairInvoiceData(repairId: string, branchId: string | null, b
         unit_price:  Number(item.unit_price ?? 0),
       }))
     : [{
-        description: `${r.issue || 'Repair Service'} (${r.device_type} ${r.device_brand} ${r.device_model})`,
+        description: `Repair Service (${[r.device_brand, r.device_model].filter(Boolean).join(' ') || r.device_type || 'Device'})`,
         quantity:    1,
         unit_price:  Number(r.estimated_cost ?? 0),
       }]
@@ -69,7 +76,6 @@ async function getRepairInvoiceData(repairId: string, branchId: string | null, b
   const customerName = customer
     ? `${customer.first_name} ${customer.last_name ?? ''}`.trim()
     : 'Walk-In'
-  const cf = (r.custom_fields as Record<string, unknown>) ?? {}
 
   const mergedSettings = {
     ...DEFAULT_INVOICE_SETTINGS,
@@ -90,6 +96,8 @@ async function getRepairInvoiceData(repairId: string, branchId: string | null, b
     branchPhone:     branchRow?.phone ?? null,
     branchEmail:     branchRow?.email ?? null,
     customerName,
+    deviceImei:      r.serial_number || 'N/A',
+    faults:          faultsArr.length > 0 ? faultsArr.join(', ') : 'N/A',
     customerEmail:   customer?.email ?? null,
     customerPhone:   customer?.phone ?? null,
     customerAddress: customer?.address ?? null,

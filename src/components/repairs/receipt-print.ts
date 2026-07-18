@@ -29,6 +29,8 @@ export interface ReceiptPrintData {
   branchAddress?: string | null
   branchPhone?: string | null
   customerName: string
+  deviceImei?: string
+  faults?: string
   items: Array<{ description: string; quantity: number; unit_price: number; discount?: number; original_unit_price?: number | null }>
   subtotal: number
   discount?: number
@@ -46,7 +48,7 @@ export interface ReceiptPrintData {
 function buildHtml(d: ReceiptPrintData, debugMode = false): string {
   const {
     settings, invoiceNumber, status, issuedAt,
-    businessName, branchName, branchAddress, branchPhone, customerName,
+    businessName, branchName, branchAddress, branchPhone, customerName, deviceImei, faults,
     items, subtotal, discount = 0, tax = 0, total, amountPaid = 0, currency = 'GBP',
   } = d
 
@@ -104,7 +106,7 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
     .it  { width: 100%; border-collapse: collapse; margin: 0 }
     .it th { font-size: 10px; color: #000; font-weight: 700; padding: 0 2px 4px 2px; border-bottom: 1px solid #000 }
     .it td { font-size: 11px; padding: 4px 2px; vertical-align: top }
-    .it td.nm { font-weight: 700; color: #000; word-break: break-word }
+    .it td.nm { font-weight: 700; color: #000; word-break: break-word; white-space: pre-wrap }
     .it td.qt { text-align: center; white-space: nowrap; color: #000; font-weight: 600 }
     .it td.un { text-align: center; white-space: nowrap; color: #000; font-weight: 600 }
     .it td.dc { text-align: center; white-space: nowrap; color: #000; font-weight: 600 }
@@ -208,6 +210,8 @@ ${date.includes(',')
 }
 <div class="row"><span class="lbl">Customer</span><span class="val">${esc(customerName)}</span></div>
 <div class="row"><span class="lbl">Status</span><span class="val">${esc(status)}</span></div>
+<div class="row"><span class="lbl">IMEI/SN</span><span class="val" style="text-align:right;margin-left:8px;word-break:break-all">${esc(deviceImei || 'N/A')}</span></div>
+<div class="row"><span class="lbl">Faults</span><span class="val" style="text-align:right;margin-left:8px">${esc(faults || 'N/A')}</span></div>
 <hr>
 <table class="it">
   <thead><tr>
