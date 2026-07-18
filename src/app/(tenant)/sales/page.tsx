@@ -228,6 +228,11 @@ export default function SalesPage() {
       setDeleteConfirmId(null)
       queryClient.invalidateQueries({ queryKey: ['sales'] })
       queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
+      // Restore variant stock visibility: invalidate product/inventory caches
+      // so the product form re-fetches updated inventory after stock is restored.
+      queryClient.invalidateQueries({ queryKey: ['inv-product-variants'] })
+      queryClient.invalidateQueries({ queryKey: ['inv-product'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
     },
     onError: (err: Error) => {
       toast.error(err.message)
@@ -309,6 +314,10 @@ export default function SalesPage() {
       queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
       queryClient.invalidateQueries({ queryKey: ['sale-detail', detail?.id] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      // Keep product variant stock in sync after items are restocked via refund
+      queryClient.invalidateQueries({ queryKey: ['inv-product-variants'] })
+      queryClient.invalidateQueries({ queryKey: ['inv-product'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
     },
     onError: (err: Error) => { toast.error(err.message) },
   })
@@ -596,7 +605,7 @@ export default function SalesPage() {
       if (statusFilter) params.set('status', statusFilter)
       const res = await fetch(`/api/pos/sales/stats?${params}`)
       const json = await res.json()
-      return json.data as { sales_count: number; revenue: number; refund_count: number; refund_amount: number }
+      return json.data as { sales_count: number; revenue: number; refund_count: number; refund_amount: number; cash_total: number; card_total: number }
     },
     enabled: !!activeBranch,
     placeholderData: (prev) => prev,
@@ -617,6 +626,8 @@ export default function SalesPage() {
     totalRevenue: statsData?.revenue ?? 0,
     totalRefunds: statsData?.refund_amount ?? 0,
     refundCount: statsData?.refund_count ?? 0,
+    cashTotal: statsData?.cash_total ?? 0,
+    cardTotal: statsData?.card_total ?? 0,
   }
 
   function viewDetail(id: string) {
@@ -670,7 +681,14 @@ export default function SalesPage() {
       header: 'Sale #',
       cell: ({ getValue }) => {
         const id = getValue() as string
-        return <span className="font-mono text-xs">{id.slice(-8).toUpperCase()}</span>
+        return (
+          <button
+            onClick={() => viewDetail(id)}
+            className="cursor-pointer font-mono text-xs text-teal-700 underline-offset-2 hover:underline"
+          >
+            {id.slice(-8).toUpperCase()}
+          </button>
+        )
       },
     },
     {
@@ -863,11 +881,17 @@ export default function SalesPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className={`grid grid-cols-2 gap-4 ${isRetailTemplate ? 'sm:grid-cols-4 lg:grid-cols-6' : 'sm:grid-cols-4'}`}>
         <SummaryCard label="Total Sales" value={String(summary.totalSales)} />
         <SummaryCard label="Revenue" value={formatCurrency(summary.totalRevenue)} className="text-green-600" />
         <SummaryCard label="Refunds" value={String(summary.refundCount)} />
         <SummaryCard label="Refund Amount" value={formatCurrency(summary.totalRefunds)} className="text-red-600" />
+        {isRetailTemplate && (
+          <>
+            <SummaryCard label="Cash Sales" value={formatCurrency(summary.cashTotal)} />
+            <SummaryCard label="Card Sales" value={formatCurrency(summary.cardTotal)} />
+          </>
+        )}
       </div>
 
       {/* Quick date range */}
@@ -1431,7 +1455,8 @@ export default function SalesPage() {
                   onChange={e => setEditForm(f => f ? { ...f, payment_status: e.target.value } : f)}
                 >
                   <option value="paid">Paid</option>
-                  <option value="refunded">Refunded</option>
+                  {/* Refunded is intentionally not selectable here — use the Refund action
+                      so a proper refund record is created instead of just relabeling this sale. */}
                   {/* on_account / partial are computed by the system — not manually settable */}
                   {(editForm.payment_status === 'partial' || editForm.payment_status === 'on_account') && (
                     <option value={editForm.payment_status} disabled>

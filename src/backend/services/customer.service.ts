@@ -1,5 +1,6 @@
 import { adminSupabase } from '@/backend/config/supabase'
 import type { InsertTables, UpdateTables } from '@/types/database'
+import { escapeIlike } from '@/backend/utils/search'
 
 export const CustomerService = {
   async list(businessId: string, params: { page?: number; limit?: number; search?: string }) {
@@ -12,7 +13,8 @@ export const CustomerService = {
       .range((page - 1) * limit, page * limit - 1)
 
     if (search) {
-      q = q.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%,business_name.ilike.%${search}%`)
+      const term = `%${escapeIlike(search)}%`
+      q = q.or(`first_name.ilike.${term},last_name.ilike.${term},phone.ilike.${term},email.ilike.${term},business_name.ilike.${term}`)
     }
 
     const { data, error, count } = await q
@@ -45,9 +47,9 @@ export const CustomerService = {
         .eq('customer_id', id)
         .order('created_at', { ascending: false })
         .limit(50),
-      adminSupabase
+      (adminSupabase as any)
         .from('sales')
-        .select('id, total, payment_method, created_at, is_refund')
+        .select('id, sale_number, total, payment_method, payment_status, amount_paid, created_at, is_refund')
         .eq('customer_id', id)
         .eq('is_refund', false)
         .order('created_at', { ascending: false })
@@ -62,7 +64,7 @@ export const CustomerService = {
 
     if (customerRes.error) throw customerRes.error
 
-    const totalSpend = (salesRes.data ?? []).reduce((s, r) => s + (r.total ?? 0), 0)
+    const totalSpend = (salesRes.data ?? []).reduce((s: number, r: { total: number | null }) => s + (r.total ?? 0), 0)
 
     return {
       ...customerRes.data,

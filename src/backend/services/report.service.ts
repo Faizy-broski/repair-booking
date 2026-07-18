@@ -1,5 +1,6 @@
 ﻿import { adminSupabase } from '@/backend/config/supabase'
 import { InventoryService } from './inventory.service'
+import { ProductService } from './product.service'
 
 const db = (table: string): any => (adminSupabase as any).from(table)
 const rpc = (fn: string, args?: Record<string, unknown>): any => (adminSupabase as any).rpc(fn, args)
@@ -18,6 +19,20 @@ export const ReportService = {
   async getSalesReport(branchId: string, from: string, to: string) {
     const { data, error } = await db('sales')
       .select('id, total, discount, tax, payment_method, created_at, customers(first_name,last_name)')
+      .eq('branch_id', branchId)
+      .gte('created_at', from)
+      .lte('created_at', to)
+      .order('created_at')
+    if (error) throw error
+    return data
+  },
+
+  // Cash In/Out for the same window — Cash In adds to Sales revenue, Cash
+  // Out subtracts. Returned separately (not merged into `sales` rows) so
+  // the frontend can bucket them into the same daily groups.
+  async getCashMovementsReport(branchId: string, from: string, to: string) {
+    const { data, error } = await db('cash_movements')
+      .select('type, amount, created_at')
       .eq('branch_id', branchId)
       .gte('created_at', from)
       .lte('created_at', to)
@@ -45,15 +60,22 @@ export const ReportService = {
     })
     if (error) {
       // Fallback to JS aggregation if function not migrated yet
-      const [salesRes, expensesRes, salariesRes] = await Promise.all([
+      const [salesRes, expensesRes, salariesRes, cashMovementsRes] = await Promise.all([
         db('sales').select('total, discount, tax').eq('branch_id', branchId).gte('created_at', from).lte('created_at', to),
         db('expenses').select('amount').eq('branch_id', branchId).gte('expense_date', from).lte('expense_date', to),
         db('salaries').select('amount').eq('branch_id', branchId).gte('pay_date', from).lte('pay_date', to),
+        db('cash_movements').select('type, amount, purpose').eq('branch_id', branchId).gte('created_at', from).lte('created_at', to),
       ])
       const revenue = ((salesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.total, 0)
       const expenses = ((expensesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.amount, 0)
       const salaries = ((salariesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.amount, 0)
-      return { revenue, repair_revenue: 0, total_revenue: revenue, cogs: 0, expenses, salaries, total_costs: expenses + salaries, gross_profit: revenue, net_profit: revenue - expenses - salaries }
+      // Cash In adds to Sales revenue, Cash Out subtracts — except 'expense'
+      // purpose cash-outs, already counted via the expenses table above.
+      const cashNet = ((cashMovementsRes.data ?? []) as any[]).reduce(
+        (s: number, r: any) => s + (r.type === 'cash_in' ? r.amount : (r.purpose === 'expense' ? 0 : -r.amount)), 0
+      )
+      const totalRevenue = revenue + cashNet
+      return { revenue, repair_revenue: 0, other_income: cashNet, total_revenue: totalRevenue, cogs: 0, expenses, salaries, total_costs: expenses + salaries, gross_profit: totalRevenue, net_profit: totalRevenue - expenses - salaries }
     }
     return data
   },
@@ -88,16 +110,24 @@ export const ReportService = {
   },
 
   async getInventoryReport(branchId: string) {
-    const lowStockItems = await InventoryService.getLowStockAlerts(branchId)
+    const [lowStockItems, batchValuation] = await Promise.all([
+      InventoryService.getLowStockAlerts(branchId),
+      ProductService.getBatchValuationByBranch(branchId),
+    ])
 
     const { data: totalStock } = await db('inventory')
-      .select('quantity, products(cost_price)')
+      .select('quantity, product_id, variant_id, products(cost_price), product_variants(cost_price)')
       .eq('branch_id', branchId)
 
     const totalItems = ((totalStock ?? []) as any[]).reduce((s: number, r: any) => s + (r.quantity ?? 0), 0)
-    const totalValue = ((totalStock ?? []) as any[]).reduce(
-      (s: number, r: any) => s + (r.quantity ?? 0) * (r.products?.cost_price ?? 0), 0
-    )
+    const totalValue = ((totalStock ?? []) as any[]).reduce((s: number, r: any) => {
+      // Batch valuation is keyed per (product_id, variant_id) — each variant's
+      // own batches are looked up independently, not blended with its siblings
+      // or the base product row.
+      const batch = batchValuation.get(`${r.product_id}::${r.variant_id ?? 'null'}`)
+      const fallbackCost = r.product_variants?.cost_price ?? r.products?.cost_price ?? 0
+      return s + (batch ? batch.totalValue : (r.quantity ?? 0) * fallbackCost)
+    }, 0)
 
     return {
       low_stock_count: lowStockItems.length,
@@ -223,14 +253,25 @@ export const ReportService = {
   },
 
   async getInventorySummaryReport(branchId: string) {
-    const { data, error } = await db('inventory')
-      .select('quantity, products(id, name, sku, cost_price, selling_price, categories(name))')
-      .eq('branch_id', branchId)
-      .order('quantity')
+    const [{ data, error }, batchValuation] = await Promise.all([
+      db('inventory')
+        .select('quantity, products(id, name, sku, cost_price, selling_price, categories(name))')
+        // Fix: previously unfiltered, so a variant's inventory row leaked into
+        // this report and got priced with the PARENT product's cost/selling
+        // price regardless of which variant it actually was. Base rows only —
+        // matches how this report has always been described (per-product, not
+        // per-variant); also required for the batch-valuation lookup below,
+        // which is keyed per product and would double-count across variant rows.
+        .is('variant_id', null)
+        .eq('branch_id', branchId)
+        .order('quantity'),
+      ProductService.getBatchValuationByBranch(branchId),
+    ])
     if (error) throw error
 
     return ((data ?? []) as any[]).map((row: any) => {
       const p = row.products
+      const batch = batchValuation.get(`${p?.id}::null`)
       return {
         product_id: p?.id,
         product_name: p?.name,
@@ -239,7 +280,7 @@ export const ReportService = {
         quantity: row.quantity,
         cost_price: p?.cost_price ?? 0,
         sale_price: p?.selling_price ?? 0,
-        stock_value: (row.quantity ?? 0) * (p?.cost_price ?? 0),
+        stock_value: batch ? batch.totalValue : (row.quantity ?? 0) * (p?.cost_price ?? 0),
         retail_value: (row.quantity ?? 0) * (p?.selling_price ?? 0),
       }
     })
@@ -276,6 +317,54 @@ export const ReportService = {
     }))
   },
 
+  // Repairs still open (not in a terminal status) after `staleDays`, whose
+  // parts already left inventory (deducted at booking time — deduct_repair_parts,
+  // migration 098) but whose cost hasn't hit COGS yet (get_profit_loss only
+  // counts repair_items cost for terminal-status repairs, migration 131). This
+  // surfaces stock that's "in limbo": already gone from stock counts, but not
+  // yet reflected as a cost anywhere, for as long as the ticket stays open.
+  async getStaleRepairPartsReport(branchId: string, staleDays: number) {
+    const TERMINAL_NAMES      = new Set(['repaired', 'collected', 'unrepairable', 'refunded', 'completed', 'done', 'fixed', 'closed', 'picked_up', 'handover'])
+    const COMPLETION_KEYWORDS = ['complet', 'done', 'fixed', 'pick', 'closed', 'resolv', 'finish', 'collect', 'handover']
+    const isTerminal = (s: string) => {
+      const lo = (s ?? '').toLowerCase().trim()
+      return TERMINAL_NAMES.has(lo) || COMPLETION_KEYWORDS.some(kw => lo.includes(kw))
+    }
+
+    const cutoff = new Date(Date.now() - staleDays * 24 * 60 * 60 * 1000).toISOString()
+
+    const { data, error } = await db('repair_items')
+      .select('repair_id, quantity, unit_cost, repairs!inner(id, job_number, status, created_at, device_type, device_brand, customers(first_name, last_name))')
+      .eq('repairs.branch_id', branchId)
+      .lte('repairs.created_at', cutoff)
+      .not('product_id', 'is', null)
+    if (error) throw error
+
+    const byRepair: Record<string, { repair: any; parts_count: number; total_cost: number }> = {}
+    for (const item of data ?? []) {
+      const repair = (item as any).repairs
+      if (!repair || isTerminal(repair.status)) continue
+      if (!byRepair[item.repair_id]) byRepair[item.repair_id] = { repair, parts_count: 0, total_cost: 0 }
+      byRepair[item.repair_id].parts_count += item.quantity ?? 0
+      byRepair[item.repair_id].total_cost += (item.quantity ?? 0) * (item.unit_cost ?? 0)
+    }
+
+    const now = Date.now()
+    return Object.values(byRepair)
+      .map(({ repair, parts_count, total_cost }) => ({
+        repair_id: repair.id,
+        job_number: repair.job_number,
+        customer_name: repair.customers ? [repair.customers.first_name, repair.customers.last_name].filter(Boolean).join(' ') : null,
+        device: [repair.device_brand, repair.device_type].filter(Boolean).join(' ') || null,
+        status: repair.status,
+        created_at: repair.created_at,
+        days_open: Math.floor((now - new Date(repair.created_at).getTime()) / (24 * 60 * 60 * 1000)),
+        parts_count,
+        total_cost_at_risk: total_cost,
+      }))
+      .sort((a, b) => b.days_open - a.days_open)
+  },
+
   async getInventoryAdjustmentsReport(branchId: string, from: string, to: string) {
     const { data, error } = await adminSupabase
       .from('stock_movements')
@@ -290,22 +379,35 @@ export const ReportService = {
 
   async getLowStockReport(branchId: string) {
     // PostgREST can't compare two columns, so fetch all and filter in JS
-    const { data, error } = await adminSupabase
-      .from('inventory')
-      .select('quantity, low_stock_alert, products(id, name, sku, cost_price, selling_price)')
-      .eq('branch_id', branchId)
+    const [{ data, error }, batchValuation] = await Promise.all([
+      adminSupabase
+        .from('inventory')
+        .select('quantity, low_stock_alert, product_id, variant_id, products(id, name, sku, cost_price, selling_price), product_variants(cost_price, selling_price)')
+        .eq('branch_id', branchId),
+      ProductService.getBatchValuationByBranch(branchId),
+    ])
     if (error) throw error
     return ((data ?? []) as any[])
       .filter((r: any) => (r.quantity ?? 0) <= (r.low_stock_alert ?? 5))
-      .map((r: any) => ({
-        product_id: r.products?.id,
-        product_name: r.products?.name,
-        sku: r.products?.sku,
-        quantity: r.quantity,
-        low_stock_alert: r.low_stock_alert ?? 5,
-        cost_price: r.products?.cost_price ?? 0,
-        selling_price: r.products?.selling_price ?? 0,
-      }))
+      .map((r: any) => {
+        // "Value at risk" for a low-stock line is best represented by the
+        // batch that's about to run out (the next-to-sell cost), not a
+        // blended total — this report is about "what will it cost to
+        // restock/what's the cost of the unit sitting at the front."
+        // Keyed per (product_id, variant_id) so a variant's own next-batch
+        // cost is used, not its product's blended figure.
+        const batch = batchValuation.get(`${r.product_id}::${r.variant_id ?? 'null'}`)
+        const fallbackCost = r.product_variants?.cost_price ?? r.products?.cost_price ?? 0
+        return {
+          product_id: r.products?.id,
+          product_name: r.products?.name,
+          sku: r.products?.sku,
+          quantity: r.quantity,
+          low_stock_alert: r.low_stock_alert ?? 5,
+          cost_price: batch ? batch.nextUnitCost : fallbackCost,
+          selling_price: r.product_variants?.selling_price ?? r.products?.selling_price ?? 0,
+        }
+      })
       .sort((a: any, b: any) => a.quantity - b.quantity)
   },
 
@@ -367,6 +469,12 @@ export const ReportService = {
     return session
   },
 
+  async previewExpectedCash(sessionId: string) {
+    const { data, error } = await rpc('register_session_expected', { p_session_id: sessionId })
+    if (error) throw error
+    return data
+  },
+
   async closeSession(sessionId: string, closingCash: number, closingNote?: string) {
     const { data, error } = await (adminSupabase as any).rpc('close_register_session', {
       p_session_id: sessionId,
@@ -401,25 +509,37 @@ export const ReportService = {
     }
   },
 
+  // Records the cash movement and, when purpose is 'expense' or 'buyback', its
+  // offsetting expense/product-inventory entries — all inside a single Postgres
+  // transaction (record_cash_movement RPC), so a failure in the offsetting side
+  // (e.g. a duplicate barcode) rolls back the cash movement too, instead of
+  // leaving cash recorded as removed from the drawer with nothing to show for it.
   async addCashMovement(payload: {
     sessionId: string; branchId: string; businessId: string
     cashierId: string; type: 'cash_in' | 'cash_out'
     amount: number; paymentType?: string; notes?: string
+    purpose?: 'plain' | 'expense' | 'buyback'
+    expenseCategoryId?: string | null; expenseTitle?: string | null
+    buybackProductId?: string | null; buybackName?: string | null
+    buybackSellingPrice?: number | null; buybackBarcode?: string | null
   }) {
-    const { data, error } = await (adminSupabase as any)
-      .from('cash_movements')
-      .insert({
-        session_id: payload.sessionId,
-        branch_id: payload.branchId,
-        business_id: payload.businessId,
-        cashier_id: payload.cashierId,
-        type: payload.type,
-        amount: payload.amount,
-        payment_type: payload.paymentType ?? 'cash',
-        notes: payload.notes ?? null,
-      })
-      .select()
-      .single()
+    const { data, error } = await (adminSupabase as any).rpc('record_cash_movement', {
+      p_session_id: payload.sessionId,
+      p_branch_id: payload.branchId,
+      p_business_id: payload.businessId,
+      p_cashier_id: payload.cashierId,
+      p_type: payload.type,
+      p_amount: payload.amount,
+      p_payment_type: payload.paymentType ?? 'cash',
+      p_notes: payload.notes ?? null,
+      p_purpose: payload.purpose ?? 'plain',
+      p_expense_category_id: payload.expenseCategoryId ?? null,
+      p_expense_title: payload.expenseTitle ?? null,
+      p_buyback_product_id: payload.buybackProductId ?? null,
+      p_buyback_name: payload.buybackName ?? null,
+      p_buyback_selling_price: payload.buybackSellingPrice ?? null,
+      p_buyback_barcode: payload.buybackBarcode ?? null,
+    })
     if (error) throw error
     return data
   },

@@ -332,7 +332,7 @@ export const resourcePages: ResourcePage[] = [
     related: [
       { label: "Docs", href: "/resources/docs" },
       { label: "Support", href: "/resources/support" },
-      { label: "Why Repair Pilot?", href: "/features/why-repair-pilot" },
+      { label: "Why iRepairly?", href: "/features/why-irepairly" },
     ],
   },
   {

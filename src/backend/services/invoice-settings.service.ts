@@ -45,6 +45,7 @@ export const InvoiceSettingsService = {
       show_address: row.show_address ?? true,
       show_phone: row.show_phone ?? true,
       show_email: row.show_email ?? true,
+      footer_address: row.footer_address ?? null,
       footer_line_1: row.footer_line_1 ?? null,
       footer_line_2: row.footer_line_2 ?? null,
       footer_line_3: row.footer_line_3 ?? null,

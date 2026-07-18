@@ -129,7 +129,11 @@ export const PlanLimitService = {
     limits: PlanLimits
   } | null> {
     const { data, error } = await db('subscriptions')
-      .select('plans(name, max_branches, max_users, limits)')
+      .select(`
+        is_custom, custom_max_branches, custom_max_users,
+        custom_max_products, custom_max_services,
+        plans(name, max_branches, max_users, limits)
+      `)
       .eq('business_id', businessId)
       .in('status', ['active', 'trialing'])
       .order('created_at', { ascending: false })
@@ -137,6 +141,21 @@ export const PlanLimitService = {
       .single()
 
     if (error || !data?.plans) return null
+
+    // For is_custom = false (every plan today), this is identical to before —
+    // the override branch below is never taken.
+    if (data.is_custom) {
+      return {
+        plan_name: data.plans.name,
+        max_branches: data.custom_max_branches,
+        max_users: data.custom_max_users,
+        limits: {
+          ...(data.plans.limits ?? {}),
+          max_products: data.custom_max_products,
+          max_services: data.custom_max_services,
+        } as PlanLimits,
+      }
+    }
 
     return {
       plan_name: data.plans.name,

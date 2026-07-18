@@ -7,17 +7,24 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
+import { ProductVariantPicker } from '@/components/inventory/product-variant-picker'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 interface POItem {
   id: string; name: string; sku: string | null
   quantity_ordered: number; quantity_received: number; unit_cost: number
-  product_id?: string | null
+  product_id?: string | null; variant_id?: string | null
+  product_variants?: { name: string } | null
+}
+interface DraftItem {
+  product_id?: string; variant_id?: string; variant_name?: string
+  name: string; sku: string; quantity_ordered: number; unit_cost: number
 }
 interface Supplier { id: string; name: string; email: string | null; phone: string | null }
 interface PO {
   id: string; po_number: string; status: string; total: number
+  amount_paid: number; payment_status: string
   supplier_id: string
   notes: string | null; expected_delivery_date: string | null; created_at: string
   suppliers?: Supplier | null
@@ -45,9 +52,10 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
   const [editSupplier,  setEditSupplier]  = useState('')
   const [editDate,      setEditDate]      = useState('')
   const [editNotes,     setEditNotes]     = useState('')
-  const [editItems,     setEditItems]     = useState<Array<{ product_id?: string; name: string; sku: string; quantity_ordered: number; unit_cost: number }>>([])
+  const [editItems,     setEditItems]     = useState<DraftItem[]>([])
   const [suppliers,     setSuppliers]     = useState<Array<{ id: string; name: string }>>([])
   const [saving,        setSaving]        = useState(false)
+  const [editPickerOpen, setEditPickerOpen] = useState(false)
 
   async function fetchPO() {
     setLoading(true)
@@ -103,6 +111,8 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
     setEditNotes(po.notes ?? '')
     setEditItems(po.purchase_order_items.map((i) => ({
       product_id: i.product_id ?? undefined,
+      variant_id: i.variant_id ?? undefined,
+      variant_name: i.product_variants?.name,
       name: i.name,
       sku: i.sku ?? '',
       quantity_ordered: i.quantity_ordered,
@@ -198,15 +208,18 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {[
           { label: 'Total Value', value: formatCurrency(po.total) },
+          { label: 'Deposit Paid', value: formatCurrency(po.amount_paid ?? 0), className: 'text-emerald-600' },
+          { label: 'Outstanding', value: formatCurrency(Math.max(0, po.total - (po.amount_paid ?? 0))), className: (po.total - (po.amount_paid ?? 0)) > 0.01 ? 'text-red-600' : 'text-emerald-600' },
           { label: 'Expected Delivery', value: po.expected_delivery_date ? formatDate(po.expected_delivery_date) : '—' },
           { label: 'Supplier', value: po.suppliers?.name ?? '—' },
+          { label: 'Payment', value: po.payment_status, className: 'capitalize' },
         ].map((card) => (
           <div key={card.label} className="rounded-lg border border-gray-200 bg-white p-3">
             <p className="text-xs text-gray-400">{card.label}</p>
-            <p className="font-semibold text-gray-900">{card.value}</p>
+            <p className={`font-semibold ${card.className ?? 'text-gray-900'}`}>{card.value}</p>
           </div>
         ))}
       </div>
@@ -343,25 +356,36 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
           <div>
             <div className="mb-2 flex items-center justify-between">
               <label className="text-sm font-medium text-gray-700">Line Items</label>
-              <button
-                type="button"
-                onClick={() => setEditItems((l) => [...l, { name: '', sku: '', quantity_ordered: 1, unit_cost: 0 }])}
-                className="text-xs text-blue-600 hover:underline"
-              >
-                + Add row
-              </button>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setEditPickerOpen(true)} className="text-xs font-medium text-brand-teal hover:underline">
+                  + Add product
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditItems((l) => [...l, { name: '', sku: '', quantity_ordered: 1, unit_cost: 0 }])}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  + Add misc item
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               {editItems.map((item, idx) => (
                 <div key={idx} className="grid grid-cols-[1fr,3rem,4.5rem,1.5rem] gap-1.5 items-end">
-                  <input
-                    placeholder="Item name"
-                    value={item.name}
-                    onChange={(e) => {
-                      const u = [...editItems]; u[idx] = { ...u[idx], name: e.target.value }; setEditItems(u)
-                    }}
-                    className="h-8 rounded-md border border-gray-300 px-2 text-sm"
-                  />
+                  {item.product_id ? (
+                    <div className="flex h-8 items-center gap-1.5 rounded-md border border-brand-teal/30 bg-brand-teal-light/10 px-2 text-sm">
+                      <span className="truncate">{item.name}</span>
+                    </div>
+                  ) : (
+                    <input
+                      placeholder="Item name"
+                      value={item.name}
+                      onChange={(e) => {
+                        const u = [...editItems]; u[idx] = { ...u[idx], name: e.target.value }; setEditItems(u)
+                      }}
+                      className="h-8 rounded-md border border-gray-300 px-2 text-sm"
+                    />
+                  )}
                   <input
                     type="number" min="1" placeholder="Qty"
                     value={item.quantity_ordered}
@@ -378,17 +402,35 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
                     }}
                     className="h-8 rounded-md border border-gray-300 px-2 text-sm"
                   />
-                  {editItems.length > 1 && (
-                    <button
-                      onClick={() => setEditItems((l) => l.filter((_, i) => i !== idx))}
-                      className="text-gray-400 hover:text-red-500 text-sm"
-                    >
-                      ×
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setEditItems((l) => l.filter((_, i) => i !== idx))}
+                    className="text-gray-400 hover:text-red-500 text-sm"
+                  >
+                    ×
+                  </button>
                 </div>
               ))}
+              {editItems.length === 0 && (
+                <p className="py-3 text-center text-xs text-gray-400">Add a product or a misc item to get started</p>
+              )}
             </div>
+
+            <ProductVariantPicker
+              open={editPickerOpen}
+              onClose={() => setEditPickerOpen(false)}
+              branchId={activeBranch?.id}
+              onSelect={(product, variant) => {
+                setEditItems((l) => [...l, {
+                  product_id: product.id,
+                  variant_id: variant?.id,
+                  variant_name: variant?.name,
+                  name: variant ? `${product.name} – ${variant.name}` : product.name,
+                  sku: variant?.sku ?? '',
+                  quantity_ordered: 1,
+                  unit_cost: variant?.cost_price ?? product.cost_price ?? 0,
+                }])
+              }}
+            />
           </div>
 
           <div className="rounded-lg bg-gray-50 p-3 flex justify-between text-sm">

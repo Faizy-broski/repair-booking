@@ -11,10 +11,13 @@ import { Select } from '@/components/ui/select'
 import { CreatableCombobox } from '@/components/ui/creatable-combobox'
 import { Modal } from '@/components/ui/modal'
 import { ImageUpload } from '@/components/ui/image-upload'
-import { formatCurrency, getCurrencySymbol } from '@/lib/utils'
+import { SectionCard } from '@/components/ui/section-card'
+import { Toggle } from '@/components/ui/toggle'
+import { formatCurrency, getCurrencySymbol, formatDate } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import Link from 'next/link'
 import { BarcodeModal } from '@/components/inventory/barcode-modal'
+import { BatchManager } from '@/components/inventory/batch-manager'
 
 interface BranchAvailability {
   branch_id: string
@@ -26,6 +29,7 @@ interface BranchAvailability {
 interface Product {
   id: string; name: string; sku: string | null; barcode: string | null
   selling_price: number; cost_price: number | null; is_service: boolean
+  valuation_method?: string | null
   image_url: string | null; item_type?: string; part_type?: string | null
   physical_location?: string | null; has_variants?: boolean
   commission_enabled: boolean; commission_type: string; commission_rate: number
@@ -112,6 +116,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [deleteModal, setDeleteModal] = useState(false)
   const [barcodeModalOpen, setBarcodeModalOpen] = useState(false)
   const [variantBarcodeTarget, setVariantBarcodeTarget] = useState<{ id: string; name: string; barcode: string } | null>(null)
+  const [batchModalVariant, setBatchModalVariant] = useState<{ id: string; name: string } | null>(null)
 
   // ── Reference data ────────────────────────────────────────────────────────
   const { data: categories = [] } = useQuery<Category[]>({
@@ -202,6 +207,19 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       return json.data ?? []
     },
     staleTime: 30_000,
+    enabled: !!id,
+  })
+
+  // ── Cost batches fetch — lets FIFO/LIFO products show their live layers ────
+  const { data: costLayers } = useQuery<{ id: string; quantity: number; unit_cost: number; received_at: string; source_type: string; variant_id: string | null }[]>({
+    queryKey: ['inv-product-cost-layers', id, activeBranch?.id],
+    queryFn: async () => {
+      const branchParam = activeBranch ? `?branch_id=${activeBranch.id}` : ''
+      const res = await fetch(`/api/products/${id}/cost-layers${branchParam}`)
+      const json = await res.json()
+      return json.data ?? []
+    },
+    staleTime: 15_000,
     enabled: !!id,
   })
 
@@ -460,32 +478,47 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   // ── Save ──────────────────────────────────────────────────────────────────
   async function handleSave() {
+    if (!product) return
     if (!name.trim()) return
     setSaving(true)
 
     // 1. Save product
+    // Batch-managed FIFO products (no variants) own cost_price/selling_price/quantity
+    // via the Stock Batches panel now — those inputs are disabled on screen, but the
+    // underlying React state can still be stale relative to a batch add/edit/delete
+    // that hasn't finished refetching yet. Sending them here would silently overwrite
+    // whatever the batch RPCs just correctly wrote, so we simply don't send them.
+    const isBatchManaged = product.valuation_method === 'fifo' && existingVariants.length === 0
+
     const payload: Record<string, unknown> = {
       name: name.trim(), item_type: itemType,
       category_id: categoryId || null, brand_id: brandId || null, model_id: modelId || null,
       sku: sku || null, barcode: barcode || null, image_url: imageUrl || null,
       is_service: false, part_type: itemType === 'part' ? (partType || null) : null,
-      cost_price: parseFloat(costPrice) || 0, selling_price: parseFloat(sellingPrice) || 0,
       supplier_id: itemType === 'part' ? (supplierId || null) : null,
       is_trade_in: isTradeIn,
       low_stock_alert: parseInt(lowStockAlert) || 0,
-      initial_stock: parseInt(onHand) || 0,
       physical_location: physicalLocation || null, branch_id: activeBranch?.id ?? null,
       commission_enabled: commissionEnabled, commission_type: commissionType,
       commission_rate: parseFloat(commissionRate) || 0, loyalty_enabled: loyaltyEnabled,
       has_variants: hasVariants || existingVariants.length > 0 || newVariantRows.length > 0,
       is_draft: false,
     }
+    if (!isBatchManaged) {
+      payload.cost_price = parseFloat(costPrice) || 0
+      payload.selling_price = parseFloat(sellingPrice) || 0
+      payload.initial_stock = parseInt(onHand) || 0
+    }
 
     const productCacheKey = ['inv-product', id, activeBranch?.id]
     const prevProductData = qc.getQueryData(productCacheKey)
-    qc.setQueryData(productCacheKey, (old: any) =>
-      old ? { ...old, name: name.trim(), selling_price: parseFloat(sellingPrice) || old.selling_price, cost_price: parseFloat(costPrice) || old.cost_price } : old
-    )
+    if (!isBatchManaged) {
+      qc.setQueryData(productCacheKey, (old: any) =>
+        old ? { ...old, name: name.trim(), selling_price: parseFloat(sellingPrice) || old.selling_price, cost_price: parseFloat(costPrice) || old.cost_price } : old
+      )
+    } else {
+      qc.setQueryData(productCacheKey, (old: any) => old ? { ...old, name: name.trim() } : old)
+    }
 
     const res = await fetch(`/api/products/${id}`, {
       method: 'PATCH',
@@ -630,51 +663,46 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl px-6 py-6 space-y-8">
+        <div className="max-w-6xl px-6 py-6 space-y-6">
 
-          {/* Type Toggle */}
-          <section>
-            <div className="mb-4 border-b border-gray-200 pb-2">
-              <h2 className="text-base font-semibold text-gray-900">Item Type</h2>
-            </div>
-            <div className="flex rounded-lg border border-gray-200 p-0.5 max-w-xs">
-              <button type="button" onClick={() => setItemType('product')}
-                className={`flex-1 rounded py-2 text-sm font-medium transition-colors ${itemType === 'product' ? 'bg-brand-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                Product
-              </button>
-              <button type="button" onClick={() => setItemType('part')}
-                className={`flex-1 rounded py-2 text-sm font-medium transition-colors ${itemType === 'part' ? 'bg-brand-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-                Part
-              </button>
-            </div>
-          </section>
-
-          {/* Bought from Customer */}
-          <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-lg border-2 px-4 py-3 transition-colors ${isTradeIn ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}`}>
-            <div className="flex items-center gap-3 min-w-0">
-              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isTradeIn ? 'bg-purple-100' : 'bg-gray-100'}`}>
-                <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isTradeIn ? 'text-purple-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
-              </div>
-              <div>
-                <p className={`text-sm font-semibold ${isTradeIn ? 'text-purple-800' : 'text-gray-900'}`}>Bought from Customer</p>
-                <p className={`text-xs ${isTradeIn ? 'text-purple-600' : 'text-gray-500'}`}>Mark if this item was purchased directly from a customer</p>
+          {/* Type Toggle + Bought from Customer — compact, stacked */}
+          <div className="max-w-xl space-y-4">
+            <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <span className="text-sm font-medium text-gray-700 shrink-0">Item Type</span>
+              <div className="flex rounded-lg border border-gray-200 p-0.5 ml-auto">
+                <button type="button" onClick={() => setItemType('product')}
+                  className={`rounded px-4 py-1.5 text-sm font-medium transition-colors ${itemType === 'product' ? 'bg-brand-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                  Product
+                </button>
+                <button type="button" onClick={() => setItemType('part')}
+                  className={`rounded px-4 py-1.5 text-sm font-medium transition-colors ${itemType === 'part' ? 'bg-brand-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                  Part
+                </button>
               </div>
             </div>
-            <div className="shrink-0 flex items-center gap-2">
-              {isTradeIn && <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-semibold text-purple-700">Active</span>}
-              <input type="checkbox" className="sr-only" checked={isTradeIn} onChange={e => setIsTradeIn(e.target.checked)} />
-              <div className={`relative h-5 w-9 rounded-full transition-colors ${isTradeIn ? 'bg-purple-600' : 'bg-gray-200'}`}>
-                <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${isTradeIn ? 'translate-x-4' : 'translate-x-0'}`} />
-              </div>
-            </div>
-          </label>
 
-          {/* Item Details */}
-          <section>
-            <div className="mb-4 border-b border-gray-200 pb-2">
-              <h2 className="text-base font-semibold text-gray-900">{itemType === 'part' ? 'Part' : 'Product'} Details</h2>
-            </div>
-            <div className="space-y-4">
+            <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-lg border-2 px-4 py-3 transition-colors ${isTradeIn ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}`}>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isTradeIn ? 'bg-purple-100' : 'bg-gray-100'}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isTradeIn ? 'text-purple-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                </div>
+                <div>
+                  <p className={`text-sm font-semibold ${isTradeIn ? 'text-purple-800' : 'text-gray-900'}`}>Bought from Customer</p>
+                  <p className={`text-xs ${isTradeIn ? 'text-purple-600' : 'text-gray-500'}`}>Mark if this item was purchased directly from a customer</p>
+                </div>
+              </div>
+              <div className="shrink-0 flex items-center gap-2">
+                {isTradeIn && <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-semibold text-purple-700">Active</span>}
+                <Toggle checked={isTradeIn} onChange={setIsTradeIn} color="purple" />
+              </div>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div className="lg:col-span-2 space-y-6">
+
+              {/* Item Details */}
+              <SectionCard title={`${itemType === 'part' ? 'Part' : 'Product'} Details`}>
               <ImageUpload label={itemType === 'part' ? 'Part image' : 'Product image'} value={imageUrl} onChange={setImageUrl} />
               <Input label="Name *" required value={name} onChange={e => setName(e.target.value)} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -737,30 +765,29 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   </Button>
                 </div>
               </div>
-            </div>
-          </section>
+              </SectionCard>
 
-          {/* Variants */}
-          <section>
-            <div className="mb-4 border-b border-gray-200 pb-2 flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                  Variants
-                  {allVariants.length > 0 && (
-                    <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">{allVariants.length}</span>
-                  )}
-                </h2>
-                <p className="text-xs text-gray-500 mt-0.5">Manage sizes, colours, storage options, etc.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => { setShowAddVariants(v => !v); setNewVariantRows([]) }}
-                className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
+              {/* Variants */}
+              <SectionCard
+                title={
+                  <span className="flex items-center gap-2">
+                    Variants
+                    {allVariants.length > 0 && (
+                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">{allVariants.length}</span>
+                    )}
+                  </span>
+                }
+                description="Manage sizes, colours, storage options, etc."
+                action={
+                  <button
+                    type="button"
+                    onClick={() => { setShowAddVariants(v => !v); setNewVariantRows([]) }}
+                    className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add variants
+                  </button>
+                }
               >
-                <Plus className="h-3.5 w-3.5" /> Add variants
-              </button>
-            </div>
-
             {/* Existing variants table */}
             {allVariants.length > 0 && (
               <div className="mb-4 overflow-x-auto rounded-lg border border-gray-200">
@@ -772,8 +799,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">SKU</th>
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Barcode</th>
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Cost ({currSymbol})</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Price ({currSymbol})</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Selling Price ({currSymbol})</th>
                       <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Stock</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Batches</th>
                       <th className="px-3 py-2.5" />
                     </tr>
                   </thead>
@@ -809,13 +837,55 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                           </div>
                         </td>
                         <td className="px-3 py-2.5">
-                          <input type="number" min="0" step="0.01" value={row.costPrice} onChange={e => updateExistingVariant(row.id, 'costPrice', e.target.value)} placeholder="0.00" className="w-24 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
+                          {product?.valuation_method === 'fifo' ? (
+                            <span className="text-xs text-gray-600">{formatCurrency(Number(row.costPrice) || 0)}</span>
+                          ) : (
+                            <input type="number" min="0" step="0.01" value={row.costPrice} onChange={e => updateExistingVariant(row.id, 'costPrice', e.target.value)} placeholder="0.00" className="w-24 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
+                          )}
                         </td>
                         <td className="px-3 py-2.5">
-                          <input type="number" min="0" step="0.01" value={row.sellingPrice} onChange={e => updateExistingVariant(row.id, 'sellingPrice', e.target.value)} placeholder="0.00" className="w-24 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
+                          {product?.valuation_method === 'fifo' ? (
+                            <span className="text-xs text-gray-600">{formatCurrency(Number(row.sellingPrice) || 0)}</span>
+                          ) : (
+                            <input type="number" min="0" step="0.01" value={row.sellingPrice} onChange={e => updateExistingVariant(row.id, 'sellingPrice', e.target.value)} placeholder="0.00" className="w-24 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
+                          )}
                         </td>
                         <td className="px-3 py-2.5">
-                          <input type="number" min="0" value={row.stock} onChange={e => updateExistingVariant(row.id, 'stock', e.target.value)} className="w-20 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
+                          {product?.valuation_method === 'fifo' ? (
+                            <span className="text-xs text-gray-600">{row.stock}</span>
+                          ) : (
+                            <input type="number" min="0" value={row.stock} onChange={e => updateExistingVariant(row.id, 'stock', e.target.value)} className="w-20 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          {(() => {
+                            const layers = (costLayers ?? []).filter(l => l.variant_id === row.id)
+                            const totalQty = layers.reduce((s, l) => s + l.quantity, 0)
+                            const nextCost = layers[0]?.unit_cost
+                            const label = layers.length === 0 ? 'No batches' : `${totalQty} @ ${formatCurrency(nextCost)}`
+                            if (product?.valuation_method !== 'fifo') {
+                              return layers.length === 0 ? (
+                                <span className="text-xs text-gray-400">No batches yet</span>
+                              ) : (
+                                <span
+                                  title={layers.map(l => `${l.quantity} unit${l.quantity === 1 ? '' : 's'} @ ${formatCurrency(l.unit_cost)}, received ${formatDate(l.received_at)}`).join('\n')}
+                                  className="inline-flex items-center gap-1.5 rounded-full bg-brand-teal-light/40 px-2.5 py-1 text-xs font-medium text-brand-teal cursor-help"
+                                >
+                                  <Layers className="h-3 w-3" /> {label}
+                                </span>
+                              )
+                            }
+                            return (
+                              <button
+                                type="button"
+                                title="Manage this variant's stock batches"
+                                onClick={() => setBatchModalVariant({ id: row.id, name: row.name })}
+                                className="inline-flex items-center gap-1.5 rounded-full bg-brand-teal-light/40 px-2.5 py-1 text-xs font-medium text-brand-teal hover:bg-brand-teal-light/70 transition-colors"
+                              >
+                                <Layers className="h-3 w-3" /> {label}
+                              </button>
+                            )
+                          })()}
                         </td>
                         <td className="px-3 py-2.5">
                           <button
@@ -900,7 +970,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">SKU</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Barcode</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Cost ({currSymbol})</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Price ({currSymbol}) *</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Selling Price ({currSymbol}) *</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Stock</th>
                             <th className="px-3 py-2" />
                           </tr>
@@ -956,23 +1026,103 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 )}
               </div>
             )}
-          </section>
+          </SectionCard>
 
-          {/* Pricing */}
-          <section>
-            <div className="mb-4 border-b border-gray-200 pb-2">
-              <h2 className="text-base font-semibold text-gray-900">
-                {(allVariants.length > 0 || newVariantRows.length > 0) ? 'Base Pricing' : 'Pricing'}
-              </h2>
-              {(allVariants.length > 0 || newVariantRows.length > 0) && (
-                <p className="text-xs text-gray-500 mt-0.5">Used as default when adding new variants.</p>
-              )}
-            </div>
-            <div className="space-y-4">
+              {/* Pricing */}
+              <SectionCard
+                title={(allVariants.length > 0 || newVariantRows.length > 0) ? 'Base Pricing' : 'Pricing'}
+                description={(allVariants.length > 0 || newVariantRows.length > 0) ? 'Used as default when adding new variants.' : undefined}
+              >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input label={`Cost Price (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
-                <Input label={`Selling Price (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0.00" required value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
+                {allVariants.length === 0 && product.valuation_method === 'fifo' ? (
+                  <>
+                    <Input label={`Cost Price (${currSymbol})`} type="number" value={costPrice} disabled hint="Set per batch below." />
+                    <Input label={`Selling Price (${currSymbol})`} type="number" value={sellingPrice} disabled hint="Synced to the next batch to sell." />
+                  </>
+                ) : (
+                  <>
+                    <Input label={`Cost Price (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
+                    <Input label={`Selling Price (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0.00" required value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
+                  </>
+                )}
               </div>
+              {/* FIFO products manage stock through batches (quantity + cost + selling
+                  price per lot) instead of the flat fields above — each batch mutation
+                  keeps the flat Selling Price in sync with the oldest (next-to-sell) batch.
+                  Product-level panel only for non-variant products — a variant product
+                  manages its own batches via the "Batches" button in the variants table. */}
+              {allVariants.length === 0 && product.valuation_method === 'fifo' && (
+                <div>
+                  <p className="mb-2 text-sm font-semibold text-gray-800 flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-brand-teal" /> Stock Batches
+                  </p>
+                  <BatchManager productId={product.id} variantId={null} branchId={activeBranch?.id} />
+                </div>
+              )}
+              {allVariants.length === 0 && product.valuation_method !== 'fifo' && (() => {
+                const productLayers = (costLayers ?? []).filter(l => l.variant_id === null)
+                return (
+                  <div className="overflow-hidden rounded-xl border border-brand-teal/20 bg-brand-teal-light/20 shadow-sm">
+                    <div className="flex items-center gap-2 border-b border-brand-teal/10 px-4 py-2.5">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-teal-light">
+                        <Layers className="h-4 w-4 text-brand-teal" />
+                      </span>
+                      <p className="text-sm font-semibold text-gray-800">Stock Batches</p>
+                      <span className="ml-auto rounded-full bg-brand-teal-light px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-teal">FIFO</span>
+                    </div>
+                    <div className="p-4">
+                      {productLayers.length === 0 ? (
+                        <div className="flex items-center gap-3 rounded-lg bg-white/60 px-3 py-4 text-center">
+                          <p className="w-full text-sm text-gray-500">No open batches yet — the next sale of this product will seed one from the current cost price.</p>
+                        </div>
+                      ) : (() => {
+                        const totalQty = productLayers.reduce((s, l) => s + l.quantity, 0)
+                        const shades = [
+                          'bg-brand-teal',
+                          'bg-brand-teal/70',
+                          'bg-brand-teal/50',
+                          'bg-brand-teal/35',
+                          'bg-brand-teal/20',
+                        ]
+                        return (
+                          <>
+                            <div className="flex h-9 w-full overflow-hidden rounded-lg shadow-inner ring-1 ring-black/5" role="img" aria-label={`${productLayers.length} stock batches, oldest sells first`}>
+                              {productLayers.map((layer, i) => (
+                                <div
+                                  key={layer.id}
+                                  className={`${shades[Math.min(i, shades.length - 1)]} h-full border-r-2 border-white/80 transition-all last:border-r-0 hover:brightness-110`}
+                                  style={{ width: `${(layer.quantity / totalQty) * 100}%` }}
+                                  title={`${layer.quantity} unit${layer.quantity === 1 ? '' : 's'} @ ${formatCurrency(layer.unit_cost)}, received ${formatDate(layer.received_at)}`}
+                                />
+                              ))}
+                            </div>
+                            <div className="mt-3 space-y-2">
+                              {productLayers.map((layer, i) => (
+                                <div key={layer.id} className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-sm ${i === 0 ? 'bg-brand-teal-light/50' : ''}`}>
+                                  <span className="flex items-center gap-2 text-gray-600">
+                                    <span className={`inline-block h-3 w-3 rounded-sm shadow-sm ${shades[Math.min(i, shades.length - 1)]}`} />
+                                    <span>{layer.quantity} unit{layer.quantity === 1 ? '' : 's'} received {formatDate(layer.received_at)}</span>
+                                    {i === 0 && (
+                                      <span className="rounded-full bg-brand-teal px-2 py-0.5 text-[11px] font-semibold text-white">Next to sell</span>
+                                    )}
+                                  </span>
+                                  <span className="font-semibold text-gray-800">{formatCurrency(layer.unit_cost)} / unit</span>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )
+                      })()}
+                      <p className="mt-3 text-xs text-gray-400">Oldest batch is sold first — stock is consumed left to right.</p>
+                    </div>
+                  </div>
+                )
+              })()}
+              {allVariants.length > 0 && (costLayers ?? []).some(l => l.variant_id === null) && (
+                <div className="rounded-lg bg-amber-50 border border-amber-100 px-4 py-2.5 text-xs text-amber-700">
+                  Legacy pooled stock (pre-variant-tracking): {(costLayers ?? []).filter(l => l.variant_id === null).reduce((s, l) => s + l.quantity, 0)} units not yet attributed to a specific variant.
+                </div>
+              )}
               {hasMargin && (
                 <div className="rounded-lg bg-green-50 border border-green-100 px-4 py-2.5 flex items-center gap-4 text-sm">
                   <span className="text-gray-600">Margin:</span>
@@ -980,23 +1130,26 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   <span className="text-gray-500">({formatCurrency(sell - cost)} profit)</span>
                 </div>
               )}
-            </div>
-          </section>
+              </SectionCard>
 
-          {/* Stock */}
-          <section>
-            <div className="mb-4 border-b border-gray-200 pb-2">
-              <h2 className="text-base font-semibold text-gray-900">Stock</h2>
             </div>
-            <div className="space-y-4">
+
+            <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-[76px]">
+
+              {/* Stock */}
+              <SectionCard title="Stock">
               {allVariants.length === 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input label="Quantity" type="number" min="0" value={onHand} onChange={e => setOnHand(e.target.value)} />
+                <div className="grid grid-cols-1 gap-4">
+                  {product.valuation_method === 'fifo' ? (
+                    <Input label="Quantity" type="number" value={onHand} disabled hint="Driven by Stock Batches above — add/edit a batch to change this." />
+                  ) : (
+                    <Input label="Quantity" type="number" min="0" value={onHand} onChange={e => setOnHand(e.target.value)} />
+                  )}
                   <Input label="Low Stock Alert" type="number" min="0" value={lowStockAlert} onChange={e => setLowStockAlert(e.target.value)} />
                 </div>
               )}
               {allVariants.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   <Input label="Low Stock Alert" type="number" min="0" value={lowStockAlert} onChange={e => setLowStockAlert(e.target.value)} />
                 </div>
               )}
@@ -1018,16 +1171,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   <Select options={[{ value: '', label: 'Select Supplier...' }, ...suppliers.map(s => ({ value: s.id, label: s.name }))]} value={supplierId} onValueChange={setSupplierId} />
                 </div>
               )}
-            </div>
-          </section>
+              </SectionCard>
 
-          {/* Branch Availability */}
-          {branchAvailability.length > 1 && (
-            <section>
-              <div className="mb-4 border-b border-gray-200 pb-2">
-                <h2 className="text-base font-semibold text-gray-900">Branch Availability</h2>
-                <p className="text-xs text-gray-500 mt-0.5">Control which branches can see and sell this {itemType} in their inventory and POS.</p>
-              </div>
+              {/* Branch Availability */}
+              {branchAvailability.length > 1 && (
+                <SectionCard
+                  title="Branch Availability"
+                  description={`Control which branches can see and sell this ${itemType} in their inventory and POS.`}
+                  contentClassName="p-0"
+                >
               <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
                 {branchAvailability.map((b) => (
                   <div key={b.branch_id} className="flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 transition-colors">
@@ -1050,28 +1202,21 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   </div>
                 ))}
               </div>
-            </section>
-          )}
+                </SectionCard>
+              )}
 
-          {/* Pricing Options */}
-          <section>
-            <div className="mb-4 border-b border-gray-200 pb-2">
-              <h2 className="text-base font-semibold text-gray-900">Pricing Options</h2>
-            </div>
-            <div className="space-y-4">
+              {/* Pricing Options */}
+              <SectionCard title="Pricing Options">
               <div className="rounded-lg border border-gray-200">
                 <div className="flex items-center justify-between px-4 py-3">
                   <div>
                     <p className="text-sm font-medium text-gray-900">Commission</p>
                     <p className="text-xs text-gray-500">Enable employee commission for this {itemType}</p>
                   </div>
-                  <label className="relative inline-flex cursor-pointer items-center">
-                    <input type="checkbox" className="sr-only peer" checked={commissionEnabled} onChange={e => setCommissionEnabled(e.target.checked)} />
-                    <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full" />
-                  </label>
+                  <Toggle checked={commissionEnabled} onChange={setCommissionEnabled} color="blue" />
                 </div>
                 {commissionEnabled && (
-                  <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-1 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
                       <Select options={[{ value: 'percentage', label: 'Percentage (%)' }, { value: 'fixed', label: `Fixed Amount (${currSymbol})` }]} value={commissionType} onValueChange={setCommissionType} />
@@ -1085,13 +1230,12 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   <p className="text-sm font-medium text-gray-900">Loyalty Points</p>
                   <p className="text-xs text-gray-500">Earn / redeem loyalty points on this {itemType}</p>
                 </div>
-                <label className="relative inline-flex cursor-pointer items-center">
-                  <input type="checkbox" className="sr-only peer" checked={loyaltyEnabled} onChange={e => setLoyaltyEnabled(e.target.checked)} />
-                  <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full" />
-                </label>
+                <Toggle checked={loyaltyEnabled} onChange={setLoyaltyEnabled} color="blue" />
               </div>
+              </SectionCard>
+
             </div>
-          </section>
+          </div>
 
           {/* Bottom save */}
           <div className="flex items-center justify-end gap-3 py-6 border-t border-gray-200">
@@ -1114,6 +1258,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </Modal>
 
+      <Modal open={!!batchModalVariant} onClose={() => setBatchModalVariant(null)} title={`Stock Batches — ${batchModalVariant?.name ?? ''}`} size="lg">
+        {batchModalVariant && (
+          <BatchManager productId={product.id} variantId={batchModalVariant.id} branchId={activeBranch?.id} />
+        )}
+      </Modal>
 
       <Modal open={addingDevice} onClose={() => { setAddingDevice(false); setNewDeviceName('') }} title="Add Model" size="sm">
         <div className="space-y-4">

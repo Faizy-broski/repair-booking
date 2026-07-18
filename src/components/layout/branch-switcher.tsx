@@ -6,14 +6,24 @@ import { useModuleConfigStore } from '@/store/module-config.store'
 import { cn } from '@/lib/utils'
 import type { Branch } from '@/types/database'
 
+// Older branches were seeded as "{Business Name} - {Label}" (e.g. "Kokab Shoes - Main").
+// Once a business is renamed, that stored label no longer matches — strip the
+// "<anything> - " prefix so the sidebar shows just the label (e.g. "Main").
+function branchLabel(branchName: string): string {
+  const dashIndex = branchName.lastIndexOf(' - ')
+  return dashIndex === -1 ? branchName : branchName.slice(dashIndex + 3)
+}
+
 function BranchCard({
   logoUrl,
-  name,
+  businessName,
+  branchName,
   role,
   showChevron = false,
 }: {
   logoUrl?: string | null
-  name: string
+  businessName?: string | null
+  branchName: string
   role?: string | null
   showChevron?: boolean
 }) {
@@ -26,7 +36,7 @@ function BranchCard({
           {logoUrl ? (
             <img
               src={logoUrl}
-              alt={name}
+              alt={businessName ?? branchName}
               className="h-full w-full object-cover"
             />
           ) : (
@@ -36,11 +46,16 @@ function BranchCard({
           )}
         </div>
 
-        {/* Name & Role */}
+        {/* Business name / Branch name / Role */}
         <div className="flex w-full flex-col items-center">
-          <div className="flex items-center justify-center gap-1.5 w-full">
-            <p className="truncate text-[17px] font-bold text-white/95 leading-tight tracking-tight max-w-[160px]">
-              {name}
+          {businessName && (
+            <p className="text-center text-[16px] font-extrabold text-white leading-snug tracking-tight break-words max-w-[190px]">
+              {businessName}
+            </p>
+          )}
+          <div className="mt-0.5 flex items-center justify-center gap-1.5 w-full">
+            <p className="truncate text-[14px] font-bold text-white/80 leading-tight tracking-tight max-w-[160px]">
+              {branchLabel(branchName)}
             </p>
             <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
             {showChevron && (
@@ -59,7 +74,7 @@ function BranchCard({
 }
 
 export function BranchSwitcher({ collapsed = false }: { collapsed?: boolean }) {
-  const { activeBranch, branches, setActiveBranch, canAccessAllBranches, profile } = useAuthStore()
+  const { activeBranch, branches, setActiveBranch, canAccessAllBranches, profile, businessName } = useAuthStore()
   const { fetchConfigs } = useModuleConfigStore()
 
   function handleBranchSwitch(branch: Branch) {
@@ -94,7 +109,8 @@ export function BranchSwitcher({ collapsed = false }: { collapsed?: boolean }) {
       <div className="w-full border-b border-white/8">
         <BranchCard
           logoUrl={activeBranch.logo_url}
-          name={activeBranch.name}
+          businessName={businessName}
+          branchName={activeBranch.name}
           role={profile?.role}
         />
       </div>
@@ -107,7 +123,8 @@ export function BranchSwitcher({ collapsed = false }: { collapsed?: boolean }) {
       <DropdownMenu.Trigger className="w-full border-b border-white/8 text-left transition-opacity hover:opacity-90 focus:outline-none">
         <BranchCard
           logoUrl={activeBranch?.logo_url}
-          name={activeBranch?.name ?? 'Select Branch'}
+          businessName={businessName}
+          branchName={activeBranch?.name ?? 'Select Branch'}
           role={profile?.role}
           showChevron
         />

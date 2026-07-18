@@ -6,6 +6,7 @@ import { createAdminClient } from '@/backend/config/supabase'
 import { VerticalTemplateService } from '@/backend/services/vertical-template.service'
 import { created, conflict, serverError, badRequest } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
+import { customPlanDimensionsSchema, computeCustomPlanPricePence, getCustomPlanBaseline } from '@/backend/services/custom-plan-pricing'
 
 async function isEmailVerified(email: string): Promise<boolean> {
   try {
@@ -35,12 +36,22 @@ const schema = z.object({
   country:               z.string().optional().nullable(),
   city:                  z.string().optional().nullable(),
   address:               z.string().optional().nullable(),
+  mapsUrl:               z.string().optional().nullable(),
   fullName:              z.string().min(2),
   password:              z.string().min(8),
   mainBranchName:        z.string().min(2),
   planId:                z.string().optional(),  // UUID from plans table
   billingCycle:          z.enum(['monthly', 'yearly']).optional().default('monthly'),
   verticalTemplateSlug:  z.string().optional(),  // slug chosen during onboarding
+  // Present only when the customer built a Custom Plan instead of picking planId.
+  // Loose shape here — actual floors/steps depend on the current cheapest paid
+  // plan's live values, so the real validation happens in the handler once that's fetched.
+  customPlan: z.object({
+    branches: z.number().int(),
+    staff: z.number().int(),
+    inventoryLimit: z.number().int().nullable(),
+    repairLimit: z.number().int().nullable(),
+  }).optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -56,10 +67,38 @@ export async function POST(request: NextRequest) {
       return badRequest('Email address has not been verified. Please complete email verification first.', 'EMAIL_NOT_VERIFIED')
     }
 
-    // Look up plan type and name
+    // Look up plan type and name. A customPlan payload always wins over planId —
+    // the actual numbers are recomputed server-side and never trusted from the client.
     let planType: string | null = null
     let planName: string | null = null
-    if (data.planId) {
+    let resolvedPlanId: string | null = data.planId ?? null
+
+    let validatedCustomPlan: ReturnType<ReturnType<typeof customPlanDimensionsSchema>['parse']> | null = null
+    let customPricePence: number | null = null
+
+    if (data.customPlan) {
+      const { data: customPlanRow, error: customPlanErr } = await supabase
+        .from('plans')
+        .select('id, plan_type, name')
+        .eq('plan_type', 'custom')
+        .single()
+      if (customPlanErr || !customPlanRow) {
+        return serverError('Custom plan is not configured yet.', customPlanErr ?? new Error('missing custom plan placeholder row'))
+      }
+      resolvedPlanId = (customPlanRow as { id: string }).id
+      planType = 'custom'
+      planName = 'Custom Plan'
+
+      // Floors/steps depend on the current cheapest paid plan's live values —
+      // never trust the client's raw numbers without re-validating against them.
+      const baseline = await getCustomPlanBaseline(supabase)
+      const parsed = customPlanDimensionsSchema(baseline).safeParse(data.customPlan)
+      if (!parsed.success) {
+        return badRequest(parsed.error.issues[0]?.message ?? 'Invalid custom plan configuration', 'INVALID_CUSTOM_PLAN')
+      }
+      validatedCustomPlan = parsed.data
+      customPricePence = computeCustomPlanPricePence(parsed.data, baseline)
+    } else if (data.planId) {
       const { data: plan } = await supabase
         .from('plans')
         .select('plan_type, name')
@@ -79,17 +118,27 @@ export async function POST(request: NextRequest) {
     })
 
     // Create subscription row for ALL plans with a 30-day trial
-    if (data.planId && planType !== 'enterprise') {
+    if (resolvedPlanId && planType !== 'enterprise') {
       await (supabase as any)
         .from('subscriptions')
         .insert({
           business_id:          result.business.id,
-          plan_id:              data.planId,
+          plan_id:              resolvedPlanId,
           status:               'trialing',
           billing_cycle:        data.billingCycle,
           trial_ends_at:        trialEndsAt,
           current_period_start: new Date().toISOString(),
           current_period_end:   trialEndsAt,
+          ...(validatedCustomPlan
+            ? {
+                is_custom:            true,
+                custom_max_branches:  validatedCustomPlan.branches,
+                custom_max_users:     validatedCustomPlan.staff,
+                custom_max_products:  validatedCustomPlan.inventoryLimit,
+                custom_max_services:  validatedCustomPlan.repairLimit,
+                custom_price_monthly: customPricePence !== null ? customPricePence / 100 : null,
+              }
+            : {}),
         })
 
       // Set trial_ends_at on business too for quick middleware check
@@ -107,7 +156,7 @@ export async function POST(request: NextRequest) {
         businessName: data.businessName,
         subdomain:    data.subdomain,
         password:     data.password,
-        planName:     'Starter',
+        planName:     planName ?? 'Starter',
       }).catch((err) => console.error('[register] Welcome email failed:', err))
     }
 

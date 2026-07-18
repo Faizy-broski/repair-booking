@@ -24,7 +24,7 @@ export const GET = withMiddleware(async (req, ctx) => {
   }
 
   try {
-    const [allRepairsRes, periodRepairsRes, partsRes] = await Promise.all([
+    const [allRepairsRes, periodRepairsRes, partsRes, posSaleItemsRes] = await Promise.all([
       // ALL repairs — Open Jobs is a live operational count, not period-filtered
       db.from('repairs')
         .select('id, status, created_at, is_rush')
@@ -40,10 +40,28 @@ export const GET = withMiddleware(async (req, ctx) => {
         .select('quantity, unit_cost, repairs!inner(branch_id, created_at, status, deposit_paid)')
         .eq('repairs.branch_id', branchId)
         .gte('repairs.created_at', periodStart),
+
+      // Amounts actually charged through POS for repair-linked line items —
+      // takes priority over the repairs-table fallback below so POS-made
+      // repair sales show the real charged amount instead of a stale one.
+      db.from('sale_items')
+        .select('repair_id, total, sales!inner(is_refund, branch_id, created_at)')
+        .eq('sales.branch_id', branchId)
+        .gte('sales.created_at', periodStart)
+        .not('repair_id', 'is', null),
     ])
 
     const allRepairs:    any[] = allRepairsRes.data    ?? []
     const periodRepairs: any[] = periodRepairsRes.data ?? []
+
+    // Net amount actually charged through POS per repair (refund sales subtract)
+    const posRepairAmounts = new Map<string, number>()
+    for (const row of (posSaleItemsRes.data ?? []) as any[]) {
+      const rid = row.repair_id
+      if (!rid) continue
+      const amt = row.sales?.is_refund ? -(row.total ?? 0) : (row.total ?? 0)
+      posRepairAmounts.set(rid, (posRepairAmounts.get(rid) ?? 0) + amt)
+    }
 
     // Open Jobs — always all-time current state, never filtered by period
     const openJobs   = allRepairs.filter(r => !isTerminal(r.status ?? ''))
@@ -55,6 +73,9 @@ export const GET = withMiddleware(async (req, ctx) => {
     const completedJobs = periodRepairs.filter(r => isTerminal(r.status ?? ''))
 
     const revenue = periodRepairs.reduce((sum: number, r: any) => {
+      const posAmt = posRepairAmounts.get(r.id)
+      if (posAmt !== undefined) return sum + posAmt
+
       const s        = (r.status ?? '').toLowerCase().trim()
       const deposit  = r.deposit_paid  ?? 0
       const fullCost = r.actual_cost   ?? r.estimated_cost ?? 0

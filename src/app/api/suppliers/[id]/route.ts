@@ -1,6 +1,10 @@
 import { withMiddleware } from '@/backend/middleware'
 import { SupplierController } from '@/backend/controllers/supply-chain.controller'
 
+export const GET    = withMiddleware(
+  (req, ctx, { params }) => params.then((p) => SupplierController.getById(req, ctx, p.id)),
+  { requiredRole: 'staff' }
+)
 export const PUT    = withMiddleware(
   (req, ctx, { params }) => params.then((p) => SupplierController.update(req, ctx, p.id)),
   { requiredRole: 'branch_manager' }

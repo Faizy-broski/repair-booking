@@ -1,9 +1,11 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { StoreCreditService } from '@/backend/services/store-credit.service'
 import { LoyaltyService } from '@/backend/services/loyalty.service'
 import { CustomerGroupService } from '@/backend/services/customer-group.service'
 import { CustomerAssetService } from '@/backend/services/customer-asset.service'
+import { PosService } from '@/backend/services/pos.service'
+import { CustomerService } from '@/backend/services/customer.service'
 import { adminSupabase } from '@/backend/config/supabase'
 import { ok, created, serverError } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
@@ -13,6 +15,12 @@ import { z } from 'zod'
 
 const creditSchema  = z.object({ amount: z.number().positive(), note: z.string().optional() })
 const adjustSchema  = z.object({ balance: z.number().min(0), note: z.string().min(1) })
+const debitSchema   = z.object({
+  amount: z.number().positive(),
+  note: z.string().optional(),
+  reference_id: z.string().uuid().optional(),
+  reference_type: z.string().optional(),
+})
 
 export const StoreCreditController = {
   async getBalance(req: NextRequest, ctx: RequestContext, customerId: string) {
@@ -38,6 +46,22 @@ export const StoreCreditController = {
     }
   },
 
+  async debit(req: NextRequest, ctx: RequestContext, customerId: string) {
+    const { data, error } = await validateBody(req, debitSchema)
+    if (error) return error
+    try {
+      const balance = await StoreCreditService.debit(ctx.businessId, customerId, data.amount, {
+        note: data.note,
+        referenceId: data.reference_id,
+        referenceType: data.reference_type,
+        createdBy: ctx.auth.userId,
+      })
+      return ok({ balance })
+    } catch (err) {
+      return serverError('Failed to debit store credit', err)
+    }
+  },
+
   async adjust(req: NextRequest, ctx: RequestContext, customerId: string) {
     const { data, error } = await validateBody(req, adjustSchema)
     if (error) return error
@@ -46,6 +70,15 @@ export const StoreCreditController = {
       return ok({ balance })
     } catch (err) {
       return serverError('Failed to adjust store credit', err)
+    }
+  },
+
+  async listBusiness(req: NextRequest, ctx: RequestContext) {
+    try {
+      const transactions = await StoreCreditService.listBusinessTransactions(ctx.businessId)
+      return ok(transactions)
+    } catch (err) {
+      return serverError('Failed to fetch store credit activity', err)
     }
   },
 }
@@ -59,7 +92,11 @@ const loyaltySettingsSchema = z.object({
   is_enabled:         z.boolean(),
 })
 
-const redeemSchema = z.object({ points: z.number().int().positive() })
+const redeemSchema = z.object({
+  points: z.number().int().positive(),
+  reference_id: z.string().uuid().optional(),
+  reference_type: z.string().optional(),
+})
 
 export const LoyaltyController = {
   async getSettings(_req: NextRequest, ctx: RequestContext) {
@@ -105,7 +142,10 @@ export const LoyaltyController = {
     const { data, error } = await validateBody(req, redeemSchema)
     if (error) return error
     try {
-      const balance = await LoyaltyService.redeemPoints(ctx.businessId, customerId, data.points)
+      const balance = await LoyaltyService.redeemPoints(ctx.businessId, customerId, data.points, {
+        referenceId: data.reference_id,
+        referenceType: data.reference_type,
+      })
       return ok({ balance })
     } catch (err) {
       return serverError('Failed to redeem loyalty points', err)
@@ -191,6 +231,69 @@ export const CustomerAssetController = {
   async remove(_req: NextRequest, ctx: RequestContext, assetId: string) {
     try { await CustomerAssetService.remove(assetId, ctx.businessId); return ok({ id: assetId }) }
     catch (err) { return serverError('Failed to delete asset', err) }
+  },
+}
+
+// ── Customer Credit (on-account sale payments) ──────────────────────────────
+
+export const CreditPaymentsController = {
+  async getCustomerCreditPayments(req: NextRequest, ctx: RequestContext, customerId: string) {
+    const { searchParams } = req.nextUrl
+    try {
+      const sales = await PosService.getCustomerCreditPayments(customerId, {
+        from: searchParams.get('from') ?? undefined,
+        to: searchParams.get('to') ?? undefined,
+      })
+      return ok({ sales })
+    } catch (err) {
+      return serverError('Failed to fetch credit payment history', err)
+    }
+  },
+
+  async downloadStatement(req: NextRequest, ctx: RequestContext, customerId: string) {
+    const { searchParams } = req.nextUrl
+    const from = searchParams.get('from') ?? undefined
+    const to = searchParams.get('to') ?? undefined
+    try {
+      const [customer, sales, renderToBuffer, { CustomerStatementPdf }, { InvoiceSettingsService }, business, React] = await Promise.all([
+        CustomerService.getById(customerId, ctx.businessId),
+        PosService.getCustomerCreditPayments(customerId, { from, to }),
+        import('@react-pdf/renderer').then((m) => m.renderToBuffer),
+        import('@/components/pdf/customer-statement-pdf'),
+        import('@/backend/services/invoice-settings.service'),
+        adminSupabase.from('businesses').select('name, phone, email, currency').eq('id', ctx.businessId).single().then((r) => r.data),
+        import('react').then((m) => m.default),
+      ])
+
+      if (!customer) return serverError('Customer not found', null)
+
+      const settings = await InvoiceSettingsService.get(ctx.businessId, ctx.auth.branchId ?? null)
+
+      const doc = React.createElement(CustomerStatementPdf, {
+        customerName: `${(customer as any).first_name} ${(customer as any).last_name ?? ''}`.trim(),
+        from: from ?? null,
+        to: to ?? null,
+        sales: sales as any,
+        businessName: (business as any)?.name ?? '—',
+        businessPhone: (business as any)?.phone ?? null,
+        businessEmail: (business as any)?.email ?? null,
+        logoUrl: settings.logo_url,
+        currency: (business as any)?.currency ?? undefined,
+        settings,
+      })
+
+      const buffer = await renderToBuffer(doc as any)
+      const filename = `statement-${customerId.slice(-8)}.pdf`
+      return new NextResponse(buffer as unknown as BodyInit, {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+        },
+      })
+    } catch (err) {
+      return serverError('Failed to generate customer statement', err)
+    }
   },
 }
 

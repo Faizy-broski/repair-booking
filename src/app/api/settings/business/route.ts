@@ -10,6 +10,11 @@ const schema = z.object({
   email: z.string().email().optional().or(z.literal('')),
   phone: z.string().optional(),
   country: z.string().optional(),
+  city: z.string().optional(),
+  address: z.string().optional(),
+  website: z.string().optional(),
+  whatsapp: z.string().optional(),
+  mapsUrl: z.string().optional(),
   currency: z.string().optional(),
   timezone: z.string().optional(),
   reply_to_email: z.string().email().optional().or(z.literal('')).nullable(),
@@ -23,8 +28,8 @@ async function getHandler(_request: NextRequest, ctx: RequestContext) {
   try {
     const { data: business, error: err } = await supabase
       .from('businesses')
-      .select('id, name, email, phone, country, currency, timezone, reply_to_email, brand_color, logo_url, delete_pin')
-      .eq('id', ctx.auth.businessId)
+      .select('id, name, subdomain, email, phone, country, city, address, website, whatsapp, maps_url, currency, timezone, reply_to_email, brand_color, logo_url, delete_pin')
+      .eq('id', ctx.businessId)
       .single()
     if (err) throw err
     // Never expose the raw PIN to the client — return a boolean flag only
@@ -38,12 +43,13 @@ async function getHandler(_request: NextRequest, ctx: RequestContext) {
 async function patchHandler(request: NextRequest, ctx: RequestContext) {
   const { data, error } = await validateBody(request, schema)
   if (error) return error
+  const { mapsUrl, ...rest } = data
   const supabase = createAdminClient()
   try {
     const { data: business, error: err } = await supabase
       .from('businesses')
-      .update({ ...data, updated_at: new Date().toISOString() })
-      .eq('id', ctx.auth.businessId)
+      .update({ ...rest, ...(mapsUrl !== undefined ? { maps_url: mapsUrl } : {}), updated_at: new Date().toISOString() })
+      .eq('id', ctx.businessId)
       .select()
       .single()
     if (err) throw err
@@ -53,7 +59,7 @@ async function patchHandler(request: NextRequest, ctx: RequestContext) {
       await supabase
         .from('branches')
         .update({ logo_url: data.logo_url || null })
-        .eq('business_id', ctx.auth.businessId)
+        .eq('business_id', ctx.businessId)
         .eq('is_main', true)
     }
 
@@ -63,5 +69,5 @@ async function patchHandler(request: NextRequest, ctx: RequestContext) {
   }
 }
 
-export const GET = withMiddleware(getHandler, { requiredRole: 'business_owner' })
+export const GET = withMiddleware(getHandler, { requiredRole: 'cashier' })
 export const PATCH = withMiddleware(patchHandler, { requiredRole: 'business_owner' })

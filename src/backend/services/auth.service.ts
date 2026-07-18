@@ -11,6 +11,7 @@ interface RegisterPayload {
   country?: string | null
   city?: string | null
   address?: string | null
+  mapsUrl?: string | null
   fullName: string
   password: string
   mainBranchName: string
@@ -115,6 +116,7 @@ export const AuthService = {
         country: payload.country || null,
         city: payload.city || null,
         address: payload.address || null,
+        maps_url: payload.mapsUrl || null,
         is_active: payload.activateNow ?? false,
         ...(payload.trialEndsAt ? { trial_ends_at: payload.trialEndsAt } : {}),
       })

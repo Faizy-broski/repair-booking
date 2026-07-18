@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import Link from 'next/link'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Loader2, CreditCard, RefreshCw, Banknote, CheckCircle2, AlertCircle, Users, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -23,9 +24,19 @@ interface CreditSale {
   customers?: { first_name: string; last_name: string | null } | null
 }
 
+interface StoreCreditTxn {
+  id: string
+  customer_id: string
+  amount: number
+  type: string
+  note: string | null
+  created_at: string
+  customers?: { first_name: string; last_name: string | null } | null
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function customerName(c: CreditSale['customers']) {
+function customerName(c: { first_name: string; last_name: string | null } | null | undefined) {
   if (!c) return '—'
   return `${c.first_name} ${c.last_name ?? ''}`.trim()
 }
@@ -42,12 +53,27 @@ const STATUS_LABELS: Record<string, string> = {
   on_account: 'Unpaid',
 }
 
+const TXN_TYPE_COLORS: Record<string, string> = {
+  credit: 'bg-green-100 text-green-800',
+  debit: 'bg-red-100 text-red-700',
+  refund: 'bg-blue-100 text-blue-700',
+  adjustment: 'bg-gray-100 text-gray-700',
+}
+
+const TXN_TYPE_LABELS: Record<string, string> = {
+  credit: 'Credit',
+  debit: 'Debit',
+  refund: 'Refund',
+  adjustment: 'Adjustment',
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function CreditsPage() {
   const { activeBranch } = useAuthStore()
   const queryClient = useQueryClient()
 
+  const [view, setView] = useState<'sales' | 'store_credit'>('sales')
   const [showAll, setShowAll] = useState(false)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
@@ -100,6 +126,22 @@ export default function CreditsPage() {
     staleTime: 30_000,
   })
 
+  const {
+    data: storeCreditTxns = [],
+    isLoading: isLoadingStoreCredit,
+    isFetching: isFetchingStoreCredit,
+    refetch: refetchStoreCredit,
+  } = useQuery<StoreCreditTxn[]>({
+    queryKey: ['store-credit-activity'],
+    queryFn: async () => {
+      const res = await fetch('/api/store-credits')
+      if (!res.ok) return []
+      const json = await res.json()
+      return json.data ?? []
+    },
+    staleTime: 30_000,
+  })
+
   // ── Summary stats ────────────────────────────────────────────────────────
 
   const outstandingSales = sales.filter(s => s.payment_status !== 'paid')
@@ -142,7 +184,16 @@ export default function CreditsPage() {
     {
       header: 'Customer',
       cell: ({ row }) => (
-        <span className="font-medium text-gray-900">{customerName(row.original.customers)}</span>
+        row.original.customer_id ? (
+          <Link
+            href={`/customers/${row.original.customer_id}?tab=credits`}
+            className="font-medium text-purple-700 hover:underline"
+          >
+            {customerName(row.original.customers)}
+          </Link>
+        ) : (
+          <span className="font-medium text-gray-900">{customerName(row.original.customers)}</span>
+        )
       ),
     },
     {
@@ -221,6 +272,47 @@ export default function CreditsPage() {
     },
   ]
 
+  const storeCreditColumns: ColumnDef<StoreCreditTxn>[] = [
+    {
+      header: 'Customer',
+      cell: ({ row }) => (
+        <span className="font-medium text-gray-900">{customerName(row.original.customers)}</span>
+      ),
+    },
+    {
+      header: 'Type',
+      cell: ({ row }) => {
+        const t = row.original.type
+        return (
+          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TXN_TYPE_COLORS[t] ?? 'bg-gray-100 text-gray-700'}`}>
+            {TXN_TYPE_LABELS[t] ?? t}
+          </span>
+        )
+      },
+    },
+    {
+      header: 'Amount',
+      cell: ({ row }) => {
+        const amt = Number(row.original.amount)
+        return (
+          <span className={`font-semibold ${amt >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+            {amt >= 0 ? '+' : ''}{formatCurrency(amt)}
+          </span>
+        )
+      },
+    },
+    {
+      header: 'Note',
+      cell: ({ row }) => (
+        <span className="text-sm text-gray-600">{row.original.note ?? '—'}</span>
+      ),
+    },
+    {
+      header: 'Date',
+      cell: ({ row }) => <span className="text-sm text-gray-600">{formatDate(row.original.created_at)}</span>,
+    },
+  ]
+
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -232,87 +324,131 @@ export default function CreditsPage() {
           <p className="text-sm text-gray-500">On-account sales and outstanding balances</p>
         </div>
         <button
-          onClick={() => refetch()}
-          disabled={isFetching}
+          onClick={() => (view === 'sales' ? refetch() : refetchStoreCredit())}
+          disabled={view === 'sales' ? isFetching : isFetchingStoreCredit}
           className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 shadow-sm hover:bg-gray-50 disabled:opacity-50"
         >
-          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`h-4 w-4 ${(view === 'sales' ? isFetching : isFetchingStoreCredit) ? 'animate-spin' : ''}`} />
           Refresh
         </button>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100">
-              <Users className="h-5 w-5 text-purple-600" />
-            </span>
-            <div>
-              <p className="text-xs font-medium text-gray-500">Customers on Credit</p>
-              <p className="text-2xl font-bold text-gray-900">{uniqueCustomers}</p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
-              <AlertCircle className="h-5 w-5 text-red-600" />
-            </span>
-            <div>
-              <p className="text-xs font-medium text-gray-500">Total Outstanding</p>
-              <p className="text-2xl font-bold text-red-600">{formatCurrency(totalOutstanding)}</p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-            </span>
-            <div>
-              <p className="text-xs font-medium text-gray-500">Fully Cleared</p>
-              <p className="text-2xl font-bold text-green-600">{formatCurrency(totalCollected)}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter toggle */}
+      {/* View toggle — two unrelated data sources: on-account sales vs. the prepaid store-credit wallet ledger */}
       <div className="flex items-center gap-3">
         <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-sm">
           <button
-            onClick={() => setShowAll(false)}
-            className={`rounded-md px-3 py-1.5 font-medium transition-colors ${!showAll ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            onClick={() => setView('sales')}
+            className={`rounded-md px-3 py-1.5 font-medium transition-colors ${view === 'sales' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
           >
-            Outstanding
+            On-Account Sales
           </button>
           <button
-            onClick={() => setShowAll(true)}
-            className={`rounded-md px-3 py-1.5 font-medium transition-colors ${showAll ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            onClick={() => setView('store_credit')}
+            className={`rounded-md px-3 py-1.5 font-medium transition-colors ${view === 'store_credit' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
           >
-            All Credit Sales
+            Store Credit Activity
           </button>
         </div>
       </div>
 
-      {/* Table */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
-        </div>
-      ) : sales.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white py-16">
-          <CreditCard className="mb-3 h-10 w-10 text-gray-300" />
-          <p className="text-sm font-medium text-gray-500">
-            {showAll ? 'No credit sales found' : 'No outstanding credit balances'}
-          </p>
-          <p className="mt-1 text-xs text-gray-400">Credit sales will appear here after checkout</p>
-        </div>
-      ) : (
-        <div className="rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
-          <DataTable columns={columns} data={sales} />
-        </div>
+      {view === 'sales' && (
+        <>
+          {/* Summary cards */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100">
+                  <Users className="h-5 w-5 text-purple-600" />
+                </span>
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Customers on Credit</p>
+                  <p className="text-2xl font-bold text-gray-900">{uniqueCustomers}</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
+                  <AlertCircle className="h-5 w-5 text-red-600" />
+                </span>
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Total Outstanding</p>
+                  <p className="text-2xl font-bold text-red-600">{formatCurrency(totalOutstanding)}</p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                </span>
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Fully Cleared</p>
+                  <p className="text-2xl font-bold text-green-600">{formatCurrency(totalCollected)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Filter toggle */}
+          <div className="flex items-center gap-3">
+            <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-sm">
+              <button
+                onClick={() => setShowAll(false)}
+                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${!showAll ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                Outstanding
+              </button>
+              <button
+                onClick={() => setShowAll(true)}
+                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${showAll ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                All Credit Sales
+              </button>
+            </div>
+          </div>
+
+          {/* Table */}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            </div>
+          ) : sales.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white py-16">
+              <CreditCard className="mb-3 h-10 w-10 text-gray-300" />
+              <p className="text-sm font-medium text-gray-500">
+                {showAll ? 'No credit sales found' : 'No outstanding credit balances'}
+              </p>
+              <p className="mt-1 text-xs text-gray-400">Credit sales will appear here after checkout</p>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+              <DataTable columns={columns} data={sales} />
+            </div>
+          )}
+        </>
+      )}
+
+      {view === 'store_credit' && (
+        <>
+          {isLoadingStoreCredit ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            </div>
+          ) : storeCreditTxns.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white py-16">
+              <CreditCard className="mb-3 h-10 w-10 text-gray-300" />
+              <p className="text-sm font-medium text-gray-500">No store credit activity found</p>
+              <p className="mt-1 text-xs text-gray-400">
+                Wallet top-ups, spends, refunds and adjustments will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+              <DataTable columns={storeCreditColumns} data={storeCreditTxns} />
+            </div>
+          )}
+        </>
       )}
 
       {/* Record Payment Modal */}

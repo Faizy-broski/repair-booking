@@ -44,4 +44,5 @@ export const SUBSCRIPTION_STATUS_VARIANTS: Record<string, BadgeProps['variant']>
   past_due:  'warning',
   canceled:  'destructive',
   suspended: 'destructive',
+  expired:   'destructive',
 }

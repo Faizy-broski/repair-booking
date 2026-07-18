@@ -44,6 +44,8 @@ export const DashboardController = {
         salesCogsRes,
         repairsPartsRes,
         todaySalesRes,
+        posRepairAmountsRes,
+        cashMovementsRes,
       ] = await Promise.all([
         adminSupabase.from('sales').select('id, total, created_at').eq('branch_id', branchId).gte('created_at', periodStart),
         adminSupabase.from('expenses').select('amount').eq('branch_id', branchId).gte('expense_date', periodStart),
@@ -53,19 +55,36 @@ export const DashboardController = {
         adminSupabase.from('inventory').select('id, quantity, low_stock_alert, variant_id, products!inner(name, sku, is_active, is_service, has_variants)').eq('branch_id', branchId),
         adminSupabase.from('repairs').select('id, job_number, device_brand, device_model, issue, status, created_at, is_rush, customers(first_name,last_name)').eq('branch_id', branchId).order('created_at', { ascending: false }).limit(20),
         adminSupabase.from('repair_status_history').select('id, new_status, note, created_at, repairs!inner(id, job_number, device_brand, device_model), profiles!changed_by(full_name)').eq('repairs.branch_id', branchId).order('created_at', { ascending: false }).limit(20),
-        adminSupabase.from('repairs').select('status, deposit_paid, actual_cost, estimated_cost, refund_amount').eq('branch_id', branchId).gte('created_at', periodStart),
-        adminSupabase.from('sale_items').select('quantity, product_id, products!product_id(cost_price), sales!inner(branch_id, created_at)').eq('sales.branch_id', branchId).gte('sales.created_at', periodStart),
+        adminSupabase.from('repairs').select('id, status, deposit_paid, actual_cost, estimated_cost, refund_amount').eq('branch_id', branchId).gte('created_at', periodStart),
+        adminSupabase.from('sale_items').select('quantity, unit_cost, product_id, products!product_id(cost_price), sales!inner(branch_id, created_at)').eq('sales.branch_id', branchId).gte('sales.created_at', periodStart),
         adminSupabase.from('repair_items').select('quantity, unit_cost, repairs!inner(branch_id, created_at, status, deposit_paid)').eq('repairs.branch_id', branchId).gte('repairs.created_at', periodStart),
         adminSupabase.from('sales').select('total, payment_method, payment_splits').eq('branch_id', branchId).gte('created_at', todayStart),
+        // Amounts actually charged through POS for repair-linked line items —
+        // takes priority over the repairs-table fallback below.
+        (adminSupabase as any).from('sale_items').select('repair_id, total, sales!inner(is_refund, branch_id, created_at)').eq('sales.branch_id', branchId).gte('sales.created_at', periodStart).not('repair_id', 'is', null),
+        // Cash In adds to Sales revenue, Cash Out subtracts — except 'expense'
+        // purpose cash-outs, already counted via total_expenses below.
+        (adminSupabase as any).from('cash_movements').select('type, amount, purpose').eq('branch_id', branchId).gte('created_at', periodStart),
       ])
 
       const sales             = salesRes.data ?? []
       const expenses          = expensesRes.data ?? []
       const inventory         = inventoryRes.data ?? []
       const repairsRevenueRows = repairsRevenueRes.data ?? []
+      const cashNet = ((cashMovementsRes.data ?? []) as any[]).reduce(
+        (s, r) => s + (r.type === 'cash_in' ? (r.amount ?? 0) : (r.purpose === 'expense' ? 0 : -(r.amount ?? 0))), 0
+      )
+
+      const posRepairAmounts = new Map<string, number>()
+      for (const row of (posRepairAmountsRes.data ?? []) as any[]) {
+        const rid = row.repair_id
+        if (!rid) continue
+        const amt = row.sales?.is_refund ? -(row.total ?? 0) : (row.total ?? 0)
+        posRepairAmounts.set(rid, (posRepairAmounts.get(rid) ?? 0) + amt)
+      }
 
       const repairsCompleted = repairsRevenueRows.filter((r: any) => isTerminal((r.status ?? '').toLowerCase())).length
-      const salesCogs = ((salesCogsRes.data ?? []) as any[]).reduce((s, item) => s + (item.quantity ?? 0) * (item.products?.cost_price ?? 0), 0)
+      const salesCogs = ((salesCogsRes.data ?? []) as any[]).reduce((s, item) => s + (item.quantity ?? 0) * (item.unit_cost || item.products?.cost_price || 0), 0)
       const repairsPartsCost = ((repairsPartsRes.data ?? []) as any[]).reduce((s, item) => {
         const repairStatus = (item.repairs?.status ?? '').toLowerCase()
         const depositPaid  = item.repairs?.deposit_paid ?? 0
@@ -137,10 +156,16 @@ export const DashboardController = {
           low_stock_alert: i.low_stock_alert ?? 5,
         }))
       const lowStockCount = lowStockItems.length
-      const totalSales    = sales.reduce((s, r) => s + (r.total ?? 0), 0)
+      // Cash In adds to Sales revenue, Cash Out subtracts — baked directly
+      // into total_sales so every consumer of this stat (the "Sales Revenue"
+      // card, net_profit, sales_profit) reflects it automatically.
+      const totalSales    = sales.reduce((s, r) => s + (r.total ?? 0), 0) + cashNet
       const totalExpenses = expenses.reduce((s, r) => s + (r.amount ?? 0), 0)
       const repairsRevenue = repairsRevenueRows.reduce((s, r) => {
-        const row      = r as any
+        const row = r as any
+        const posAmt = posRepairAmounts.get(row.id)
+        if (posAmt !== undefined) return s + posAmt
+
         const status   = (row.status ?? '').toLowerCase()
         const deposit  = row.deposit_paid  ?? 0
         const fullCost = row.actual_cost   ?? row.estimated_cost ?? 0
@@ -236,6 +261,8 @@ export const DashboardController = {
         repairsRevenueRes,
         salesCogsRes,
         repairsPartsRes,
+        posRepairAmountsRes,
+        cashMovementsRes,
       ] = await Promise.all([
         // Sales in selected period
         adminSupabase
@@ -297,14 +324,14 @@ export const DashboardController = {
         // Repair revenue this month
         adminSupabase
           .from('repairs')
-          .select('status, deposit_paid, actual_cost, estimated_cost, refund_amount')
+          .select('id, status, deposit_paid, actual_cost, estimated_cost, refund_amount')
           .eq('branch_id', branchId)
           .gte('created_at', periodStart),
 
         // COGS: sale_items × product cost_price for this period/branch
         adminSupabase
           .from('sale_items')
-          .select('quantity, product_id, products!product_id(cost_price), sales!inner(branch_id, created_at)')
+          .select('quantity, unit_cost, product_id, products!product_id(cost_price), sales!inner(branch_id, created_at)')
           .eq('sales.branch_id', branchId)
           .gte('sales.created_at', periodStart),
 
@@ -314,16 +341,44 @@ export const DashboardController = {
           .select('quantity, unit_cost, repairs!inner(branch_id, created_at, status, deposit_paid)')
           .eq('repairs.branch_id', branchId)
           .gte('repairs.created_at', periodStart),
+
+        // Amounts actually charged through POS for repair-linked line items —
+        // takes priority over the repairs-table fallback below.
+        (adminSupabase as any)
+          .from('sale_items')
+          .select('repair_id, total, sales!inner(is_refund, branch_id, created_at)')
+          .eq('sales.branch_id', branchId)
+          .gte('sales.created_at', periodStart)
+          .not('repair_id', 'is', null),
+
+        // Cash In adds to Sales revenue, Cash Out subtracts — except 'expense'
+        // purpose cash-outs, already counted via total_expenses below.
+        (adminSupabase as any)
+          .from('cash_movements')
+          .select('type, amount, purpose')
+          .eq('branch_id', branchId)
+          .gte('created_at', periodStart),
       ])
 
       const sales              = salesRes.data ?? []
       const expenses           = expensesRes.data ?? []
       const inventory          = inventoryRes.data ?? []
       const repairsRevenueRows = repairsRevenueRes.data ?? []
+      const cashNet = ((cashMovementsRes.data ?? []) as any[]).reduce(
+        (s, r) => s + (r.type === 'cash_in' ? (r.amount ?? 0) : (r.purpose === 'expense' ? 0 : -(r.amount ?? 0))), 0
+      )
+
+      const posRepairAmounts = new Map<string, number>()
+      for (const row of (posRepairAmountsRes.data ?? []) as any[]) {
+        const rid = row.repair_id
+        if (!rid) continue
+        const amt = row.sales?.is_refund ? -(row.total ?? 0) : (row.total ?? 0)
+        posRepairAmounts.set(rid, (posRepairAmounts.get(rid) ?? 0) + amt)
+      }
 
       const repairsCompleted = repairsRevenueRows.filter((r: any) => isTerminal((r.status ?? '').toLowerCase())).length
       const salesCogs = ((salesCogsRes.data ?? []) as any[]).reduce((s, item) => {
-        return s + (item.quantity ?? 0) * (item.products?.cost_price ?? 0)
+        return s + (item.quantity ?? 0) * (item.unit_cost || item.products?.cost_price || 0)
       }, 0)
       const repairsPartsCost = ((repairsPartsRes.data ?? []) as any[]).reduce((s, item) => {
         const repairStatus = (item.repairs?.status ?? '').toLowerCase()
@@ -367,10 +422,13 @@ export const DashboardController = {
         return i.quantity <= (i.low_stock_alert ?? 5)
       }).length
 
-      const totalSales    = sales.reduce((s, r) => s + (r.total ?? 0), 0)
+      const totalSales    = sales.reduce((s, r) => s + (r.total ?? 0), 0) + cashNet
       const totalExpenses = expenses.reduce((s, r) => s + (r.amount ?? 0), 0)
       const repairsRevenue = repairsRevenueRows.reduce((s, r) => {
-          const row      = r as any
+          const row = r as any
+          const posAmt = posRepairAmounts.get(row.id)
+          if (posAmt !== undefined) return s + posAmt
+
           const status   = (row.status ?? '').toLowerCase()
           const deposit  = row.deposit_paid  ?? 0
           const fullCost = row.actual_cost   ?? row.estimated_cost ?? 0

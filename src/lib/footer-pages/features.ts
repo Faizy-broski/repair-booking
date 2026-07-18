@@ -41,8 +41,8 @@ import type { CapabilityPage } from "./types";
 
 export const featurePages: CapabilityPage[] = [
   {
-    slug: "why-repair-pilot",
-    name: "Why Repair Pilot?",
+    slug: "why-irepairly",
+    name: "Why iRepairly?",
     icon: Compass,
     kicker: "Platform Overview",
     tagline: "Built by people who understand repair workflows.",
@@ -105,7 +105,7 @@ export const featurePages: CapabilityPage[] = [
     related: [
       { label: "All Industries", href: "/industries" },
       { label: "Customization", href: "/features/customization" },
-      { label: "Why Repair Pilot?", href: "/features/why-repair-pilot" },
+      { label: "Why iRepairly?", href: "/features/why-irepairly" },
     ],
   },
   {

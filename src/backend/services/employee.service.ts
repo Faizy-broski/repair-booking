@@ -1,5 +1,6 @@
 import { adminSupabase } from '@/backend/config/supabase'
 import type { InsertTables, UpdateTables } from '@/types/database'
+import { escapeIlike } from '@/backend/utils/search'
 
 export const EmployeeService = {
   async list(branchId: string | null, page = 1, limit = 20) {
@@ -24,7 +25,7 @@ export const EmployeeService = {
       .order('first_name')
       .limit(limit)
     if (q.trim()) {
-      const term = `%${q.replace(/[%_]/g, '\\$&')}%`
+      const term = `%${escapeIlike(q)}%`
       query = query.or(`first_name.ilike.${term},last_name.ilike.${term}`) as typeof query
     }
     const { data, error } = await query

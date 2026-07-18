@@ -45,12 +45,7 @@ export default function Hero() {
             <ArrowRight className="h-4 w-4" />
           </Link>
 
-          <Link
-            href="#demo"
-            className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-9 py-4 text-base font-bold text-slate-950 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
-          >
-            Book a Demo
-          </Link>
+         
         </FadeIn>
 
         <FadeIn

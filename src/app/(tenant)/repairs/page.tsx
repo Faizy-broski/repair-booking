@@ -2,13 +2,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Plus, Search, LayoutGrid, List, Wrench, Banknote, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail, Send, RefreshCw, MoreHorizontal } from 'lucide-react'
+import { Plus, Search, LayoutGrid, List, Wrench, Banknote, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail, Send, RefreshCw, MoreHorizontal, Wallet, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
 import { AsyncEmployeeSelect } from '@/components/shared/async-employee-select'
 import { Modal } from '@/components/ui/modal'
 import { KanbanBoard } from '@/components/repairs/kanban-board'
 import { CreatableCombobox } from '@/components/ui/creatable-combobox'
+import { MultiComboInput } from '@/components/shared/multi-combo-input'
 import { useAuthStore } from '@/store/auth.store'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -63,7 +64,9 @@ const EMPTY_JOB = {
   lock_type: '' as '' | 'passcode' | 'pattern',
   passcode: '',
   price_pending: false,
-  payment_method: '' as '' | 'cash' | 'card',
+  payment_method: '' as '' | 'cash' | 'card' | 'store_credit' | 'loyalty_points',
+  credit_apply_input: '',
+  loyalty_apply_input: '',
 }
 
 function ActionsMenu({ onEdit, onSlip, onInvoice, onDelete, onMessage, onEmail, canEmail }: {
@@ -136,6 +139,7 @@ interface RepairLineItem {
   qty: number
   unit_price: number
   unit_cost: number
+  max_stock: number | null
 }
 
 function ComboInput({ value, onChange, options, placeholder }: {
@@ -180,84 +184,6 @@ function ComboInput({ value, onChange, options, placeholder }: {
           ))}
         </ul>
       )}
-    </div>
-  )
-}
-
-function MultiComboInput({ values, onAdd, onRemove, options, placeholder }: {
-  values: string[]
-  onAdd: (v: string) => void
-  onRemove: (v: string) => void
-  options: string[]
-  placeholder?: string
-}) {
-  const [value, setValue] = useState('')
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  const filtered = options.filter((o) => o.toLowerCase().includes(value.toLowerCase()) && !values.includes(o))
-
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  return (
-    <div ref={ref} className="relative">
-      <div className="mb-1.5 flex flex-wrap gap-1.5">
-        {values.map((v) => (
-          <span key={v} className="inline-flex items-center gap-1 rounded bg-brand-teal/10 px-2 py-0.5 text-xs font-semibold text-brand-teal">
-            {v}
-            <button type="button" onClick={() => onRemove(v)} className="hover:text-brand-teal-dark transition-colors">
-              <X className="h-3 w-3" />
-            </button>
-          </span>
-        ))}
-      </div>
-      <div className="relative">
-        <input
-          value={value}
-          onChange={(e) => { setValue(e.target.value); setOpen(true) }}
-          onFocus={() => setOpen(true)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && value.trim()) {
-              e.preventDefault()
-              if (!values.includes(value.trim())) onAdd(value.trim())
-              setValue('')
-            }
-          }}
-          placeholder={placeholder}
-          className="h-8 w-full rounded-md border border-gray-200 bg-white px-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
-        />
-        {open && (value || filtered.length > 0) && (
-          <ul className="absolute z-50 mt-1 max-h-44 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-            {filtered.map((o) => (
-              <li key={o}>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
-                  onMouseDown={(e) => { e.preventDefault(); onAdd(o); setValue(''); setOpen(false) }}
-                >
-                  <span className="text-gray-700">{o}</span>
-                </button>
-              </li>
-            ))}
-            {value.trim() && !options.some(o => o.toLowerCase() === value.trim().toLowerCase()) && (
-              <li>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 border-t border-gray-100 transition-colors"
-                  onMouseDown={(e) => { e.preventDefault(); onAdd(value.trim()); setValue(''); setOpen(false) }}
-                >
-                  <span className="text-gray-500 italic">Add "{value.trim()}"...</span>
-                </button>
-              </li>
-            )}
-          </ul>
-        )}
-      </div>
     </div>
   )
 }
@@ -354,6 +280,10 @@ export default function RepairsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [step1Error, setStep1Error] = useState('')
   const [chargesError, setChargesError] = useState('')
+  // Store credit / loyalty balances for the attached customer (job creation)
+  const [creditBalance, setCreditBalance] = useState<number | null>(null)
+  const [loyaltyBalance, setLoyaltyBalance] = useState<number | null>(null)
+  const [loyaltyRate, setLoyaltyRate] = useState(0.01)
   // Customer autocomplete
   const [custSuggestions, setCustSuggestions] = useState<SelectedCustomer[]>([])
   const [showSuggestions, setShowSuggestions] = useState<'name' | 'phone' | 'email' | null>(null)
@@ -364,7 +294,7 @@ export default function RepairsPage() {
   // Repair parts state
   const [repairParts, setRepairParts] = useState<RepairLineItem[]>([])
   const [partQuery, setPartQuery] = useState('')
-  const [partResults, setPartResults] = useState<Array<{ id: string; name: string; selling_price: number | null; cost_price: number | null }>>([])
+  const [partResults, setPartResults] = useState<Array<{ id: string; name: string; selling_price: number | null; cost_price: number | null; on_hand?: number; is_service?: boolean }>>([])
   const [showPartDrop, setShowPartDrop] = useState(false)
   const [partSearchLoading, setPartSearchLoading] = useState(false)
   const partSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -392,9 +322,13 @@ export default function RepairsPage() {
   // Edit Job Sheet modal
   const [editOpen, setEditOpen] = useState(false)
   const [editRepair, setEditRepair] = useState<RepairRow | null>(null)
-  const [editData, setEditData] = useState({ due_date: '', estimated_cost: '', deposit_paid: '', payment_method: '' as '' | 'cash' | 'card', status: '' })
+  const [editData, setEditData] = useState({ due_date: '', estimated_cost: '', deposit_paid: '', payment_method: '' as '' | 'cash' | 'card' | 'store_credit' | 'loyalty_points', status: '', credit_apply_input: '', loyalty_apply_input: '' })
   const [editSaving, setEditSaving] = useState(false)
   const [editErrors, setEditErrors] = useState<{ due_date?: string; estimated_cost?: string; deposit_paid?: string }>({})
+  // Store credit / loyalty balances for the repair's customer (editing)
+  const [editCreditBalance, setEditCreditBalance] = useState<number | null>(null)
+  const [editLoyaltyBalance, setEditLoyaltyBalance] = useState<number | null>(null)
+  const [editLoyaltyRate, setEditLoyaltyRate] = useState(0.01)
 
   // Declare before the lazy queries that use them as enabled guards
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false)
@@ -439,6 +373,36 @@ export default function RepairsPage() {
         setItemAttributes({})
       })
   }, [isRetail, retailCategoryId])
+
+  // Fetch store credit / loyalty balance for the customer attached to a new job
+  useEffect(() => {
+    if (!modalOpen || !selectedCustomer) {
+      setCreditBalance(null)
+      setLoyaltyBalance(null)
+      return
+    }
+    const id = selectedCustomer.id
+    fetch(`/api/customers/${id}/store-credits`).then(r => r.json()).then(j => setCreditBalance(j.data?.balance ?? 0)).catch(() => {})
+    fetch(`/api/customers/${id}/loyalty`).then(r => r.json()).then(j => {
+      setLoyaltyBalance(j.data?.balance ?? 0)
+      setLoyaltyRate(j.data?.redeem_rate ?? 0.01)
+    }).catch(() => {})
+  }, [modalOpen, selectedCustomer])
+
+  // Fetch store credit / loyalty balance for the repair's customer when editing
+  useEffect(() => {
+    if (!editOpen || !editRepair?.customer_id) {
+      setEditCreditBalance(null)
+      setEditLoyaltyBalance(null)
+      return
+    }
+    const id = editRepair.customer_id
+    fetch(`/api/customers/${id}/store-credits`).then(r => r.json()).then(j => setEditCreditBalance(j.data?.balance ?? 0)).catch(() => {})
+    fetch(`/api/customers/${id}/loyalty`).then(r => r.json()).then(j => {
+      setEditLoyaltyBalance(j.data?.balance ?? 0)
+      setEditLoyaltyRate(j.data?.redeem_rate ?? 0.01)
+    }).catch(() => {})
+  }, [editOpen, editRepair])
 
   const queryClient = useQueryClient()
   const repairsQueryKey     = ['repairs', activeBranch?.id, page, pageSize, search, statusFilter, view] as const
@@ -625,8 +589,10 @@ export default function RepairsPage() {
       due_date: cf.due_date ?? '',
       estimated_cost: r.estimated_cost != null ? String(r.estimated_cost) : '',
       deposit_paid: r.deposit_paid != null ? String(r.deposit_paid) : '',
-      payment_method: (cf.payment_method as '' | 'cash' | 'card') ?? '',
+      payment_method: (cf.payment_method as '' | 'cash' | 'card' | 'store_credit' | 'loyalty_points') ?? '',
       status: r.status ?? '',
+      credit_apply_input: '',
+      loyalty_apply_input: '',
     })
     setEditErrors({})
     setEditOpen(true)
@@ -656,11 +622,13 @@ export default function RepairsPage() {
           estimated_cost: editData.estimated_cost === '' ? null : parseFloat(editData.estimated_cost),
           deposit_paid: editData.deposit_paid === '' ? 0 : parseFloat(editData.deposit_paid),
           status: editData.status || undefined,
-          custom_fields: { 
-            ...cf, 
-            due_date: editData.due_date || null, 
-            payment_method: editData.payment_method || null 
+          custom_fields: {
+            ...cf,
+            due_date: editData.due_date || null,
+            payment_method: editData.payment_method || null
           },
+          store_credit_applied: editData.payment_method === 'store_credit' ? (parseFloat(editData.credit_apply_input) || 0) : undefined,
+          loyalty_points_applied: editData.payment_method === 'loyalty_points' ? (parseInt(editData.loyalty_apply_input) || 0) : undefined,
         }),
       })
       
@@ -669,7 +637,9 @@ export default function RepairsPage() {
         throw new Error(errorData.error?.message || 'Failed to update repair')
       }
 
+      const j = await res.json().catch(() => ({}))
       toast.success('Repair job updated successfully.')
+      if (j.data?.credit_apply_warning) toast.error(j.data.credit_apply_warning)
       setEditOpen(false)
       fetchRepairs()
       invalidateStats()
@@ -797,10 +767,22 @@ export default function RepairsPage() {
     }, 300)
   }
 
-  function addPartFromInventory(p: { id: string; name: string; selling_price: number | null; cost_price: number | null }) {
+  function addPartFromInventory(p: { id: string; name: string; selling_price: number | null; cost_price: number | null; on_hand?: number; is_service?: boolean }) {
+    const maxStock = p.is_service ? null : (p.on_hand ?? 0)
     setRepairParts((prev) => {
       const existing = prev.find((r) => r.product_id === p.id)
-      if (existing) return prev.map((r) => r.product_id === p.id ? { ...r, qty: r.qty + 1 } : r)
+      if (existing) {
+        const cap = existing.max_stock ?? Infinity
+        if (existing.qty >= cap) {
+          toast.error(`Only ${cap} in stock for "${existing.name}"`)
+          return prev
+        }
+        return prev.map((r) => r.product_id === p.id ? { ...r, qty: Math.min(r.qty + 1, cap) } : r)
+      }
+      if (maxStock !== null && maxStock <= 0) {
+        toast.error(`"${p.name}" is out of stock`)
+        return prev
+      }
       return [...prev, {
         tempId: Math.random().toString(36).slice(2),
         product_id: p.id,
@@ -808,6 +790,7 @@ export default function RepairsPage() {
         qty: 1,
         unit_price: p.selling_price ?? 0,
         unit_cost: p.cost_price ?? 0,
+        max_stock: maxStock,
       }]
     })
     setPartQuery('')
@@ -827,6 +810,7 @@ export default function RepairsPage() {
       qty: 1,
       unit_price: price,
       unit_cost: cost,
+      max_stock: null,
     }])
     setPartQuery('')
     setQuickPartPrice('')
@@ -922,6 +906,8 @@ export default function RepairsPage() {
         status: jobData.status || undefined,
         lock_type: jobData.lock_type || null,
         passcode: jobData.passcode.trim() || null,
+        store_credit_applied: jobData.payment_method === 'store_credit' ? (parseFloat(jobData.credit_apply_input) || 0) : undefined,
+        loyalty_points_applied: jobData.payment_method === 'loyalty_points' ? (parseInt(jobData.loyalty_apply_input) || 0) : undefined,
         custom_fields: {
           imei: jobData.imei || null,
           due_date: jobData.due_date || null,
@@ -942,10 +928,19 @@ export default function RepairsPage() {
     })
 
     if (res.ok) {
+      const j = await res.json().catch(() => ({}))
       setModalOpen(false)
-      fetchRepairs()
+      setPage(0)
+      queryClient.invalidateQueries({ queryKey: repairsBaseKey })
       invalidateStats()
+      if (repairParts.length > 0) {
+        // Repair creation deducts part stock server-side (deduct_repair_parts RPC);
+        // refresh inventory so the stock cards reflect the new quantities.
+        queryClient.invalidateQueries({ queryKey: ['inventory-stats'] })
+        queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      }
       toast.success('Repair job created.')
+      if (j.data?.credit_apply_warning) toast.error(j.data.credit_apply_warning)
     } else {
       const j = await res.json().catch(() => ({}))
       const errMsg = typeof j.error === 'string' ? j.error : (j.error?.message ?? 'Failed to create repair. Please try again.')
@@ -1050,6 +1045,133 @@ export default function RepairsPage() {
         }).catch(() => {})
       }
     }
+  }
+
+  // ── Rename/Delete for Device Catalogue (Type/Brand/Model) ──────────────────
+  async function renameDeviceType(oldName: string, newName: string) {
+    if (!activeBranch) return false
+    const id = (deviceData.typeIdMap ?? {})[oldName]
+    if (!id) { toast.error('Could not find this type to rename.'); return false }
+    const res = await fetch(`/api/services/categories/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName }),
+    })
+    if (!res.ok) {
+      toast.error(res.status === 403 ? "You don't have permission to rename this (requires manager access)." : 'Failed to rename type. Please try again.')
+      return false
+    }
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
+      if (!old) return old
+      return {
+        ...old,
+        types: old.types.map(v => v === oldName ? newName : v),
+        raw: old.raw.map(r => r.device_type === oldName ? { ...r, device_type: newName } : r),
+      }
+    })
+    if (jobData.device_type === oldName) setJobData((p) => ({ ...p, device_type: newName }))
+    toast.success('Type renamed.')
+  }
+
+  async function deleteDeviceType(name: string) {
+    if (!activeBranch) return false
+    const id = (deviceData.typeIdMap ?? {})[name]
+    if (!id) { toast.error('Could not find this type to delete.'); return false }
+    const res = await fetch(`/api/services/categories/${id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      toast.error(res.status === 403 ? "You don't have permission to delete this (requires manager access)." : 'Failed to delete type. It may still be in use.')
+      return false
+    }
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
+      if (!old) return old
+      return { ...old, types: old.types.filter(v => v !== name) }
+    })
+    if (jobData.device_type === name) setJobData((p) => ({ ...p, device_type: '', device_brand: '', device_model: '' }))
+    toast.success('Type deleted.')
+  }
+
+  async function renameDeviceBrand(oldName: string, newName: string) {
+    if (!activeBranch) return false
+    const id = (deviceData.brandIdMap ?? {})[oldName]
+    if (!id) { toast.error('Could not find this brand to rename.'); return false }
+    const res = await fetch(`/api/services/manufacturers/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName }),
+    })
+    if (!res.ok) {
+      toast.error(res.status === 403 ? "You don't have permission to rename this (requires manager access)." : 'Failed to rename brand. Please try again.')
+      return false
+    }
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
+      if (!old) return old
+      return {
+        ...old,
+        brands: old.brands.map(v => v === oldName ? newName : v),
+        raw: old.raw.map(r => r.device_brand === oldName ? { ...r, device_brand: newName } : r),
+      }
+    })
+    if (jobData.device_brand === oldName) setJobData((p) => ({ ...p, device_brand: newName }))
+    toast.success('Brand renamed.')
+  }
+
+  async function deleteDeviceBrand(name: string) {
+    if (!activeBranch) return false
+    const id = (deviceData.brandIdMap ?? {})[name]
+    if (!id) { toast.error('Could not find this brand to delete.'); return false }
+    const res = await fetch(`/api/services/manufacturers/${id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      toast.error(res.status === 403 ? "You don't have permission to delete this (requires manager access)." : 'Failed to delete brand. It may still be in use.')
+      return false
+    }
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
+      if (!old) return old
+      return { ...old, brands: old.brands.filter(v => v !== name) }
+    })
+    if (jobData.device_brand === name) setJobData((p) => ({ ...p, device_brand: '', device_model: '' }))
+    toast.success('Brand deleted.')
+  }
+
+  async function renameDeviceModel(oldName: string, newName: string) {
+    if (!activeBranch) return false
+    const id = (deviceData.modelIdMap ?? {})[oldName]
+    if (!id) { toast.error('Could not find this model to rename.'); return false }
+    const res = await fetch(`/api/services/devices/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName }),
+    })
+    if (!res.ok) {
+      toast.error(res.status === 403 ? "You don't have permission to rename this (requires manager access)." : 'Failed to rename model. Please try again.')
+      return false
+    }
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
+      if (!old) return old
+      return {
+        ...old,
+        models: old.models.map(v => v === oldName ? newName : v),
+        raw: old.raw.map(r => r.device_model === oldName ? { ...r, device_model: newName } : r),
+      }
+    })
+    if (jobData.device_model === oldName) setJobData((p) => ({ ...p, device_model: newName }))
+    toast.success('Model renamed.')
+  }
+
+  async function deleteDeviceModel(name: string) {
+    if (!activeBranch) return false
+    const id = (deviceData.modelIdMap ?? {})[name]
+    if (!id) { toast.error('Could not find this model to delete.'); return false }
+    const res = await fetch(`/api/services/devices/${id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      toast.error(res.status === 403 ? "You don't have permission to delete this (requires manager access)." : 'Failed to delete model. It may still be in use.')
+      return false
+    }
+    queryClient.setQueryData<DeviceData>(['device-data', activeBranch.id], (old) => {
+      if (!old) return old
+      return { ...old, models: old.models.filter(v => v !== name) }
+    })
+    if (jobData.device_model === name) setJobData((p) => ({ ...p, device_model: '' }))
+    toast.success('Model deleted.')
   }
 
   // All statuses come from DB — no hardcoded fallbacks
@@ -1924,7 +2046,7 @@ export default function RepairsPage() {
                   </div>
                 ) : (
                   /* ── Repair shop: Type → Brand → Model → IMEI ── */
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {/* TYPE */}
                     <div>
                       <label className={lbl}>Type <span className="text-red-400">*</span></label>
@@ -1933,6 +2055,8 @@ export default function RepairsPage() {
                         value={jobData.device_type}
                         onChange={(v) => setJobData((p) => ({ ...p, device_type: v, device_brand: '', device_model: '' }))}
                         onCreate={createDeviceType}
+                        onEdit={renameDeviceType}
+                        onDelete={deleteDeviceType}
                         placeholder="Phone…"
                         createLabel="Add type"
                       />
@@ -1950,6 +2074,8 @@ export default function RepairsPage() {
                           value={jobData.device_brand}
                           onChange={(v) => setJobData((p) => ({ ...p, device_brand: v, device_model: '' }))}
                           onCreate={createDeviceBrand}
+                          onEdit={renameDeviceBrand}
+                          onDelete={deleteDeviceBrand}
                           placeholder="Apple…"
                           createLabel="Add brand"
                         />
@@ -1973,6 +2099,8 @@ export default function RepairsPage() {
                           value={jobData.device_model}
                           onChange={(v) => setJobData((p) => ({ ...p, device_model: v }))}
                           onCreate={createDeviceModel}
+                          onEdit={renameDeviceModel}
+                          onDelete={deleteDeviceModel}
                           placeholder="iPhone 15…"
                           createLabel="Add model"
                         />
@@ -2040,8 +2168,13 @@ export default function RepairsPage() {
                               className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
                               onMouseDown={(e) => { e.preventDefault(); addPartFromInventory(p) }}
                             >
-                              <span className="text-gray-700">{p.name}</span>
-                              <span className="text-xs font-semibold text-teal-700">{formatCurrency(p.selling_price ?? 0)}</span>
+                              <span className="min-w-0 flex-1 truncate text-gray-700">{p.name}</span>
+                              {!p.is_service && (
+                                <span className={`shrink-0 text-xs font-medium ${(p.on_hand ?? 0) > 0 ? 'text-gray-400' : 'text-red-500'}`}>
+                                  {(p.on_hand ?? 0) > 0 ? `${p.on_hand} in stock` : 'Out of stock'}
+                                </span>
+                              )}
+                              <span className="shrink-0 text-xs font-semibold text-teal-700">{formatCurrency(p.selling_price ?? 0)}</span>
                             </button>
                           </li>
                         ))}
@@ -2119,8 +2252,15 @@ export default function RepairsPage() {
                               <input
                                 type="number"
                                 min="1"
+                                max={p.max_stock ?? undefined}
                                 value={p.qty}
-                                onChange={(e) => setRepairParts((prev) => prev.map((r) => r.tempId === p.tempId ? { ...r, qty: Math.max(1, parseInt(e.target.value) || 1) } : r))}
+                                onChange={(e) => setRepairParts((prev) => prev.map((r) => {
+                                  if (r.tempId !== p.tempId) return r
+                                  const cap = r.max_stock ?? Infinity
+                                  const requested = Math.max(1, parseInt(e.target.value) || 1)
+                                  if (requested > cap) toast.error(`Only ${cap} in stock for "${r.name}"`)
+                                  return { ...r, qty: Math.min(requested, cap) }
+                                }))}
                                 className="h-6 w-12 rounded border border-gray-200 px-1 text-center text-xs"
                               />
                             </td>
@@ -2178,7 +2318,7 @@ export default function RepairsPage() {
                 <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
                   <Wrench className="h-2.5 w-2.5" /> Fault & Assignment
                 </p>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <div className="col-span-2">
                     <label className={lbl}>Fault <span className="text-red-400">*</span></label>
                     <MultiComboInput
@@ -2246,7 +2386,7 @@ export default function RepairsPage() {
                     ) : 'No fault found / Price TBD'}
                   </span>
                 </label>
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                   {/* Job Fee (labour) */}
                   <div>
                     <label className={lbl}>Job Fee (Labour)</label>
@@ -2333,18 +2473,76 @@ export default function RepairsPage() {
                 </div>
                 <div className="mt-2">
                   <label className={lbl}>Payment Method <span className="font-normal normal-case text-gray-300">(opt)</span></label>
-                  <div className="flex gap-2">
-                    {(['cash', 'card'] as const).map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => setJobData((p) => ({ ...p, payment_method: p.payment_method === m ? '' : m }))}
-                        className={`rounded-md border px-3 py-1 text-xs font-medium capitalize transition-colors ${jobData.payment_method === m ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
-                      >
-                        {m}
-                      </button>
-                    ))}
+                  <div className="flex flex-wrap gap-2">
+                    {(['cash', 'card', 'store_credit', 'loyalty_points'] as const).map((m) => {
+                      const disabled = (m === 'store_credit' || m === 'loyalty_points') && !selectedCustomer
+                      return (
+                        <button
+                          key={m}
+                          type="button"
+                          disabled={disabled}
+                          title={disabled ? 'Select an existing customer first' : undefined}
+                          onClick={() => !disabled && setJobData((p) => ({ ...p, payment_method: p.payment_method === m ? '' : m }))}
+                          className={`flex items-center gap-1 rounded-md border px-3 py-1 text-xs font-medium capitalize transition-colors ${
+                            jobData.payment_method === m
+                              ? 'border-gray-900 bg-gray-900 text-white'
+                              : disabled
+                                ? 'border-gray-100 text-gray-300 cursor-not-allowed'
+                                : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          {m === 'store_credit' && <Wallet className="h-3 w-3" />}
+                          {m === 'loyalty_points' && <Star className="h-3 w-3" />}
+                          {m.replace('_', ' ')}
+                        </button>
+                      )
+                    })}
                   </div>
+
+                  {jobData.payment_method === 'store_credit' && (
+                    <div className="mt-2 space-y-1.5">
+                      {creditBalance !== null && (
+                        <p className="text-xs text-gray-500">Available balance: <span className="font-semibold text-gray-800">£{creditBalance.toFixed(2)}</span></p>
+                      )}
+                      <div className="flex gap-2">
+                        <input
+                          type="number" min="0" step="0.01" placeholder="Amount to use"
+                          value={jobData.credit_apply_input}
+                          onChange={(e) => setJobData((p) => ({ ...p, credit_apply_input: e.target.value }))}
+                          className={`${inp} flex-1`}
+                        />
+                        <Button variant="outline" size="sm" onClick={() => {
+                          const due = parseFloat(jobData.deposit_paid) || 0
+                          const amount = Math.min(parseFloat(jobData.credit_apply_input) || 0, creditBalance ?? 0, due)
+                          setJobData((p) => ({ ...p, credit_apply_input: String(amount) }))
+                        }}>Apply</Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {jobData.payment_method === 'loyalty_points' && (
+                    <div className="mt-2 space-y-1.5">
+                      {loyaltyBalance !== null && (
+                        <p className="text-xs text-gray-500">
+                          Points balance: <span className="font-semibold text-gray-800">{loyaltyBalance} pts</span> (≈ £{(loyaltyBalance * loyaltyRate).toFixed(2)})
+                        </p>
+                      )}
+                      <div className="flex gap-2">
+                        <input
+                          type="number" min="0" step="1" placeholder="Points to redeem"
+                          value={jobData.loyalty_apply_input}
+                          onChange={(e) => setJobData((p) => ({ ...p, loyalty_apply_input: e.target.value }))}
+                          className={`${inp} flex-1`}
+                        />
+                        <Button variant="outline" size="sm" onClick={() => {
+                          const due = parseFloat(jobData.deposit_paid) || 0
+                          const pts = Math.min(parseInt(jobData.loyalty_apply_input) || 0, loyaltyBalance ?? 0)
+                          const capped = Math.min(pts * loyaltyRate, due)
+                          setJobData((p) => ({ ...p, loyalty_apply_input: String(Math.round(capped / loyaltyRate)) }))
+                        }}>Apply</Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2542,17 +2740,80 @@ export default function RepairsPage() {
               <div>
                 <label className={lbl}>Payment Method :</label>
                 <div className="flex gap-2">
-                  {(['cash', 'card'] as const).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setEditData((p) => ({ ...p, payment_method: p.payment_method === m ? '' : m }))}
-                      className={`rounded-lg border px-6 py-2 text-sm font-medium capitalize transition-colors ${editData.payment_method === m ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}
-                    >
-                      {m.charAt(0).toUpperCase() + m.slice(1)}
-                    </button>
-                  ))}
+                  {(['cash', 'card', 'store_credit', 'loyalty_points'] as const).map((m) => {
+                    const disabled = (m === 'store_credit' || m === 'loyalty_points') && !editRepair?.customer_id
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        disabled={disabled}
+                        title={disabled ? 'This repair has no customer attached' : undefined}
+                        onClick={() => !disabled && setEditData((p) => ({ ...p, payment_method: p.payment_method === m ? '' : m }))}
+                        className={`flex items-center gap-1.5 rounded-lg border px-6 py-2 text-sm font-medium capitalize transition-colors ${
+                          editData.payment_method === m
+                            ? 'border-gray-900 bg-gray-900 text-white'
+                            : disabled
+                              ? 'border-gray-100 text-gray-300 cursor-not-allowed'
+                              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        {m === 'store_credit' && <Wallet className="h-3.5 w-3.5" />}
+                        {m === 'loyalty_points' && <Star className="h-3.5 w-3.5" />}
+                        {m.replace('_', ' ')}
+                      </button>
+                    )
+                  })}
                 </div>
+
+                {(() => {
+                  const editDelta = Math.max(0, (parseFloat(editData.deposit_paid) || 0) - (editRepair?.deposit_paid ?? 0))
+                  return (
+                    <>
+                      {editData.payment_method === 'store_credit' && (
+                        <div className="mt-2 space-y-1.5">
+                          {editCreditBalance !== null && (
+                            <p className="text-xs text-gray-500">Available balance: <span className="font-semibold text-gray-800">£{editCreditBalance.toFixed(2)}</span> · applying to new payment of £{editDelta.toFixed(2)}</p>
+                          )}
+                          <div className="flex gap-2">
+                            <input
+                              type="number" min="0" step="0.01" placeholder="Amount to use"
+                              value={editData.credit_apply_input}
+                              onChange={(e) => setEditData((p) => ({ ...p, credit_apply_input: e.target.value }))}
+                              className={`${inp} flex-1`}
+                            />
+                            <Button variant="outline" size="sm" onClick={() => {
+                              const amount = Math.min(parseFloat(editData.credit_apply_input) || 0, editCreditBalance ?? 0, editDelta)
+                              setEditData((p) => ({ ...p, credit_apply_input: String(amount) }))
+                            }}>Apply</Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {editData.payment_method === 'loyalty_points' && (
+                        <div className="mt-2 space-y-1.5">
+                          {editLoyaltyBalance !== null && (
+                            <p className="text-xs text-gray-500">
+                              Points balance: <span className="font-semibold text-gray-800">{editLoyaltyBalance} pts</span> (≈ £{(editLoyaltyBalance * editLoyaltyRate).toFixed(2)}) · applying to new payment of £{editDelta.toFixed(2)}
+                            </p>
+                          )}
+                          <div className="flex gap-2">
+                            <input
+                              type="number" min="0" step="1" placeholder="Points to redeem"
+                              value={editData.loyalty_apply_input}
+                              onChange={(e) => setEditData((p) => ({ ...p, loyalty_apply_input: e.target.value }))}
+                              className={`${inp} flex-1`}
+                            />
+                            <Button variant="outline" size="sm" onClick={() => {
+                              const pts = Math.min(parseInt(editData.loyalty_apply_input) || 0, editLoyaltyBalance ?? 0)
+                              const capped = Math.min(pts * editLoyaltyRate, editDelta)
+                              setEditData((p) => ({ ...p, loyalty_apply_input: String(Math.round(capped / editLoyaltyRate)) }))
+                            }}>Apply</Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
 
               {/* Repairing Status */}

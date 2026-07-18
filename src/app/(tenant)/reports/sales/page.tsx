@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { exportExcel } from '@/lib/export-excel'
 import { DateRangeBar } from '../_components/date-range-bar'
 import Link from 'next/link'
 import {
@@ -17,12 +18,6 @@ interface SalesRow { date: string; total_sales: number; transaction_count: numbe
 
 function firstOfMonth() { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] }
 function today() { return new Date().toISOString().split('T')[0] }
-function exportCsv<T extends Record<string, unknown>>(rows: T[], filename: string) {
-  if (!rows.length) return
-  const h = Object.keys(rows[0])
-  const csv = [h.join(','), ...rows.map((r) => h.map((k) => JSON.stringify(r[k] ?? '')).join(','))].join('\n')
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = filename; a.click()
-}
 
 export default function SalesReportPage() {
   const { activeBranch } = useAuthStore()
@@ -35,11 +30,18 @@ export default function SalesReportPage() {
       const res = await fetch(`/api/reports?${params}`)
       const json = await res.json()
       const grouped: Record<string, { total: number; count: number }> = {}
-      for (const s of json.data ?? []) {
+      for (const s of json.data?.sales ?? []) {
         const d = s.created_at?.split('T')[0] ?? ''
         if (!grouped[d]) grouped[d] = { total: 0, count: 0 }
         grouped[d].total += s.total ?? 0
         grouped[d].count += 1
+      }
+      // Cash In adds to Sales revenue, Cash Out subtracts — folded into the
+      // same daily buckets (no transaction-count change, revenue-only).
+      for (const m of json.data?.cash_movements ?? []) {
+        const d = m.created_at?.split('T')[0] ?? ''
+        if (!grouped[d]) grouped[d] = { total: 0, count: 0 }
+        grouped[d].total += m.type === 'cash_in' ? (m.amount ?? 0) : -(m.amount ?? 0)
       }
       return Object.entries(grouped).map(([date, { total, count }]) => ({
         date, total_sales: total, transaction_count: count, avg_order_value: count ? total / count : 0,
@@ -74,8 +76,8 @@ export default function SalesReportPage() {
             <p className="text-sm text-on-surface-variant mt-0.5">Daily transaction and revenue breakdown</p>
           </div>
         </div>
-        <Button size="sm" className="w-full sm:w-auto" onClick={() => exportCsv(data as unknown as Record<string, unknown>[], `sales-${dateFrom}-${dateTo}.csv`)}>
-          <Download className="h-4 w-4" /> Export CSV
+        <Button size="sm" className="w-full sm:w-auto" onClick={() => exportExcel(data as unknown as Record<string, unknown>[], `sales-${dateFrom}-${dateTo}.xlsx`)}>
+          <Download className="h-4 w-4" /> Export Excel
         </Button>
       </div>
 

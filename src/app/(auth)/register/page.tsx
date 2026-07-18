@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
@@ -13,10 +13,20 @@ import { COUNTRIES } from '@/lib/countries'
 import {
   CheckCircle, Building2, User, CreditCard, Check, Zap, Mail,
   ChevronRight, ArrowLeft, Sparkles, Store, Wrench, ShoppingBag,
-  Scissors, Coffee, Monitor, Package, ShieldCheck, RotateCcw, Gift, Globe, MapPin,
+  Scissors, Coffee, Monitor, Package, ShieldCheck, RotateCcw, Gift, Globe, MapPin, Link2,
 } from 'lucide-react'
 
 import validations from '@/components/layout/number-validations.json'
+import { parseGoogleMapsLink } from '@/lib/maps-link'
+import {
+  CustomPlanCard,
+  deriveCustomPlanBaseline,
+  makeDefaultCustomPlanState,
+  computeCustomPlanPrice,
+  toCustomPlanPayload,
+  type CustomPlanState,
+} from '@/components/landing/custom-plan-card'
+import { ANNUAL_DISCOUNT } from '@/lib/pricing'
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
@@ -30,6 +40,7 @@ const step1Schema = z.object({
   country: z.string().min(1, 'Country is required'),
   city: z.string().min(1, 'City is required'),
   address: z.string().min(1, 'Address is required'),
+  mapsUrl: z.string().optional(),
 }).refine((data) => {
   if (!data.phone.startsWith('+')) return true // Basic validation already handled by min(5)
 
@@ -77,6 +88,7 @@ type Step2Data = z.infer<typeof step2Schema>
 interface DbPlan {
   id: string; name: string; price_monthly: number; price_yearly: number
   max_branches: number; max_users: number; features: string[]
+  limits?: Record<string, number | boolean | null> | null
   stripe_price_id_monthly: string | null; plan_type: 'free' | 'paid' | 'enterprise'
 }
 
@@ -160,6 +172,8 @@ export default function RegisterPage() {
   const [resendCountdown, setResendCountdown] = useState(0)
   const [resendCount, setResendCount] = useState(0)
   const [selectedPlan, setSelectedPlan] = useState<DbPlan | null>(null)
+  const [isCustomSelected, setIsCustomSelected] = useState(false)
+  const [customPlan, setCustomPlan] = useState<CustomPlanState | null>(null)
   const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null)
   const [checkingSubdomain, setCheckingSubdomain] = useState(false)
   const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null)
@@ -171,8 +185,13 @@ export default function RegisterPage() {
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly')
   const [noWebsite, setNoWebsite] = useState(false)
 
+  const customPlanBaseline = useMemo(() => deriveCustomPlanBaseline(plans), [plans])
+  const effectiveCustomPlan = customPlan ?? makeDefaultCustomPlanState(customPlanBaseline)
+
   const form1 = useForm<Step1Data>({ resolver: zodResolver(step1Schema) })
   const form2 = useForm<Step2Data>({ resolver: zodResolver(step2Schema) })
+  const mapsUrlValue = form1.watch('mapsUrl')
+  const mapsEmbedSrc = useMemo(() => parseGoogleMapsLink(mapsUrlValue ?? ''), [mapsUrlValue]).embedSrc
 
   // ── Fetch templates (public, cached at edge) ──────────────────────────────
   /*
@@ -196,6 +215,21 @@ export default function RegisterPage() {
         .finally(() => setPlansLoading(false))
     }
   }, [step, plans.length])
+
+  // Marketing pricing page's "Custom Plan" CTA stashes the chosen config here
+  // before redirecting to /register — pick it up once and pre-select Custom.
+  useEffect(() => {
+    if (step !== 4) return
+    const pending = sessionStorage.getItem('pendingCustomPlan')
+    if (!pending) return
+    try {
+      const parsed = JSON.parse(pending) as CustomPlanState
+      setCustomPlan(parsed)
+      setIsCustomSelected(true)
+      setSelectedPlan(null)
+    } catch { /* ignore malformed value */ }
+    sessionStorage.removeItem('pendingCustomPlan')
+  }, [step])
 
   const isFreePlan = selectedPlan?.price_monthly === 0
   const isEnterprisePlan = selectedPlan?.plan_type === 'enterprise'
@@ -399,14 +433,17 @@ export default function RegisterPage() {
   }
 
   async function handleProceedToPayment() {
-    if (!step1Data || !step2Data || !selectedPlan) return
+    if (!step1Data || !step2Data || (!selectedPlan && !isCustomSelected)) return
     setServerError('')
     setProceeding(true)
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...step1Data, ...step2Data, planId: selectedPlan.id,
+          ...step1Data, ...step2Data,
+          ...(isCustomSelected
+            ? { customPlan: toCustomPlanPayload(effectiveCustomPlan) }
+            : { planId: selectedPlan!.id }),
           ...(selectedTemplate ? { verticalTemplateSlug: selectedTemplate.slug } : {}),
         }),
       })
@@ -750,6 +787,40 @@ export default function RegisterPage() {
                   )}
                 </div>
 
+                {/* Row 6: Google Maps Link */}
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-on-surface">
+                    Google Maps Link <span className="font-normal text-gray-400">(optional)</span>
+                  </label>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <Link2 className="h-4 w-4" />
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="https://maps.google.com/... or https://maps.app.goo.gl/..."
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 pl-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      {...form1.register('mapsUrl')}
+                    />
+                  </div>
+                  {mapsUrlValue && (
+                    mapsEmbedSrc ? (
+                      <iframe
+                        src={mapsEmbedSrc}
+                        loading="lazy"
+                        className="mt-2 h-48 w-full rounded-lg border border-gray-200"
+                      />
+                    ) : (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Can&apos;t preview shortened links — it&apos;ll still be saved and linked on your profile.{' '}
+                        <a href={mapsUrlValue} target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                          Open link
+                        </a>
+                      </p>
+                    )
+                  )}
+                </div>
+
                 <div className="flex gap-2">
                   {/* <Button type="button" variant="outline" onClick={() => setStep(0)}>
                     <ArrowLeft className="h-4 w-4" /> Back
@@ -938,7 +1009,7 @@ export default function RegisterPage() {
               >
                 Annual
                 <span className="absolute -top-3 -right-3 rounded-full bg-brand-yellow px-1.5 py-0.5 text-[10px] font-black text-slate-900 shadow">
-                  -20%
+                  -{Math.round(ANNUAL_DISCOUNT * 100)}%
                 </span>
               </button>
             </div>
@@ -947,24 +1018,24 @@ export default function RegisterPage() {
           {plansLoading ? (
             <div className="flex items-center justify-center py-20 text-on-surface-variant">Loading plans...</div>
           ) : (
-            <div className={`grid gap-8 items-stretch ${plans.length === 3 ? 'grid-cols-1 md:grid-cols-3' :
-              plans.length === 2 ? 'grid-cols-1 md:grid-cols-2 max-w-3xl mx-auto' :
-                'max-w-sm mx-auto'
+            <div className={`grid gap-8 items-stretch ${plans.length + 1 === 4 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4' :
+              plans.length + 1 === 3 ? 'grid-cols-1 md:grid-cols-3' :
+                'grid-cols-1 md:grid-cols-2 max-w-3xl mx-auto'
               }`}>
               {plans.map((plan, index) => {
                 const highlighted = isPlanHighlighted(plans, index)
-                const isSelected = selectedPlan?.id === plan.id
+                const isSelected = !isCustomSelected && selectedPlan?.id === plan.id
                 const isTrulyFree = plan.price_monthly === 0
                 const isEnterprise = plan.plan_type === 'enterprise'
                 const isYearly = billing === 'yearly' && !isTrulyFree && !isEnterprise
-                const yearlyTotal = plan.price_yearly > 0 ? plan.price_yearly : Math.round(plan.price_monthly * 12 * 0.8)
+                const yearlyTotal = Math.round(plan.price_monthly * 12 * (1 - ANNUAL_DISCOUNT))
                 const fmtPrice = (n: number) => n % 1 === 0 ? String(Math.round(n)) : n.toFixed(2)
 
                 return (
                   <button
                     key={plan.id}
                     type="button"
-                    onClick={() => setSelectedPlan(plan)}
+                    onClick={() => { setSelectedPlan(plan); setIsCustomSelected(false) }}
                     className={`relative flex flex-col rounded-3xl border-2 p-8 text-left transition-all duration-200 ${highlighted
                       ? 'bg-primary text-on-primary border-transparent shadow-2xl shadow-primary/30 scale-[1.04]'
                       : isSelected
@@ -1061,6 +1132,14 @@ export default function RegisterPage() {
                   </button>
                 )
               })}
+              <CustomPlanCard
+                state={effectiveCustomPlan}
+                onChange={(next) => { setCustomPlan(next); setIsCustomSelected(true); setSelectedPlan(null) }}
+                baseline={customPlanBaseline}
+                highlight={isCustomSelected}
+                ctaLabel={isCustomSelected ? 'Selected' : 'Select Custom Plan'}
+                onCtaClick={() => { setIsCustomSelected(true); setSelectedPlan(null) }}
+              />
             </div>
           )}
 
@@ -1077,20 +1156,22 @@ export default function RegisterPage() {
                 <Mail className="h-4 w-4" /> Contact sales team
               </Button>
             ) : (
-              <Button className="flex-1" loading={proceeding} disabled={!selectedPlan} onClick={handleProceedToPayment}>
+              <Button className="flex-1" loading={proceeding} disabled={!selectedPlan && !isCustomSelected} onClick={handleProceedToPayment}>
                 <Zap className="h-4 w-4" />
-                {selectedPlan
-                  ? isFreePlan
-                    ? 'Start 30-day free trial'
-                    : (() => {
-                        const isYearly = billing === 'yearly'
-                        const price = isYearly 
-                          ? (selectedPlan.price_yearly > 0 ? selectedPlan.price_yearly : Math.round(selectedPlan.price_monthly * 12 * 0.8))
-                          : selectedPlan.price_monthly
-                        const fmt = (n: number) => n % 1 === 0 ? String(Math.round(n)) : n.toFixed(2)
-                        return `Start free trial — £${fmt(price)}${isYearly ? '/year' : '/mo'}`
-                      })()
-                  : 'Select a plan to continue'}
+                {isCustomSelected
+                  ? `Start free trial — £${computeCustomPlanPrice(effectiveCustomPlan, customPlanBaseline)}/mo`
+                  : selectedPlan
+                    ? isFreePlan
+                      ? 'Start 30-day free trial'
+                      : (() => {
+                          const isYearly = billing === 'yearly'
+                          const price = isYearly
+                            ? Math.round(selectedPlan.price_monthly * 12 * (1 - ANNUAL_DISCOUNT))
+                            : selectedPlan.price_monthly
+                          const fmt = (n: number) => n % 1 === 0 ? String(Math.round(n)) : n.toFixed(2)
+                          return `Start free trial — £${fmt(price)}${isYearly ? '/year' : '/mo'}`
+                        })()
+                    : 'Select a plan to continue'}
               </Button>
             )}
           </div>

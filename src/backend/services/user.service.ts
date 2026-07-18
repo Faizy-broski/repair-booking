@@ -1,4 +1,6 @@
+import { createClient } from '@supabase/supabase-js'
 import { adminSupabase, createAdminClient } from '@/backend/config/supabase'
+import type { Database } from '@/types/database'
 import type { UpdateTables } from '@/types/database'
 
 export const UserService = {
@@ -102,6 +104,41 @@ export const UserService = {
       targetUserId,
       { password: newPassword }
     )
+    if (updateError) throw updateError
+  },
+
+  /**
+   * Self-service password change (any role, including business_owner) —
+   * requires the caller's current password to be verified before writing
+   * a new one. Distinct from `resetPassword` above, which is the owner's
+   * admin "force reset" of a team member and never touches the caller's
+   * own credentials.
+   */
+  async changeOwnPassword(userId: string, currentPassword: string, newPassword: string) {
+    const { data: profile, error: profileError } = await adminSupabase
+      .from('profiles')
+      .select('email')
+      .eq('id', userId)
+      .single()
+    if (profileError) throw profileError
+    if (!profile?.email) throw new Error('Could not verify account email')
+
+    // Throwaway anon client used purely to verify the current password via a
+    // real sign-in attempt — no cookies/session are persisted from this call,
+    // so it cannot affect the caller's actual active session.
+    const verifyClient = createClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+    const { error: signInError } = await verifyClient.auth.signInWithPassword({
+      email: profile.email,
+      password: currentPassword,
+    })
+    if (signInError) throw new Error('Current password is incorrect')
+
+    const supabase = createAdminClient()
+    const { error: updateError } = await supabase.auth.admin.updateUserById(userId, { password: newPassword })
     if (updateError) throw updateError
   },
 }

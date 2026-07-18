@@ -9,7 +9,7 @@ import { z } from 'zod'
 import { adminSupabase } from '@/backend/config/supabase'
 
 // ── Shared receipt PDF generator (used by both on-demand and background warm) ──
-async function buildReceiptBuffer(saleId: string, branchId: string | null, businessId: string | null) {
+async function buildReceiptBuffer(saleId: string, branchId: string | null, businessId: string | null, paymentId?: string) {
   const [sale, renderToBuffer, { SaleReceiptPdf }, { InvoiceSettingsService }, { getCurrencySymbol }, React] = await Promise.all([
     PosService.getSaleById(saleId, branchId),
     import('@react-pdf/renderer').then((m) => m.renderToBuffer),
@@ -23,10 +23,28 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
 
   const s = sale as any
 
+  // For a single-payment receipt, resolve this payment's own amount and the
+  // running total paid through (and including) it — not the sale's all-time total.
+  let depositLabelAmount: number | undefined
+  let amountPaidOverride: number | undefined
+  if (paymentId) {
+    const { data: payments } = await adminSupabase
+      .from('sale_payments')
+      .select('id, amount, created_at')
+      .eq('sale_id', saleId)
+      .order('created_at', { ascending: true })
+    const ordered = (payments ?? []) as { id: string; amount: number; created_at: string }[]
+    const idx = ordered.findIndex((p) => p.id === paymentId)
+    if (idx !== -1) {
+      depositLabelAmount = Number(ordered[idx].amount)
+      amountPaidOverride = ordered.slice(0, idx + 1).reduce((sum, p) => sum + Number(p.amount), 0)
+    }
+  }
+
   const [settings, businessRow] = await Promise.all([
     businessId ? InvoiceSettingsService.get(businessId, s.branch_id ?? null) : Promise.resolve(null),
     businessId
-      ? adminSupabase.from('businesses').select('currency').eq('id', businessId).single().then(r => r.data)
+      ? adminSupabase.from('businesses').select('name, currency').eq('id', businessId).single().then(r => r.data)
       : Promise.resolve(null),
   ])
 
@@ -55,11 +73,31 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
     }
   }
 
+  // Gross subtotal / total discount (not the sale's stored net subtotal/
+  // order-level discount) so the summary reconciles with each line's own
+  // UNIT/DISC — a sale-priced line's frozen original_unit_price means its
+  // real discount isn't captured by the stale sale.discount total alone.
+  let grossSubtotal = 0
+  let totalDiscount = 0
+  for (const i of (s.sale_items ?? []) as any[]) {
+    const unitPrice = Number(i.unit_price)
+    const discount = Number(i.discount ?? 0)
+    const original = i.original_unit_price != null ? Number(i.original_unit_price) : null
+    const hasOriginal = original != null && original > unitPrice
+    grossSubtotal += (hasOriginal ? original! : unitPrice) * i.quantity
+    // Additive — a line can carry both a frozen sale-price discount AND a
+    // manual per-line discount; dropping either one understates the total.
+    totalDiscount += (hasOriginal ? (original! - unitPrice + discount) : discount) * i.quantity
+  }
+  totalDiscount += Number(s.discount ?? 0)
+
   const doc = React.createElement(SaleReceiptPdf, {
     saleId: s.id,
     date: new Date(s.created_at).toLocaleString('en-GB'),
-    customerName: s.customer_name ?? '—',
-    cashierName: s.cashier_name ?? '—',
+    customerName: s.customers
+      ? [s.customers.first_name, s.customers.last_name].filter(Boolean).join(' ')
+      : (s.customer_name ?? '—'),
+    cashierName: s.profiles?.full_name ?? s.cashier_name ?? '—',
     paymentMethod: s.payment_method ?? 'cash',
     paymentStatus: s.payment_status ?? 'paid',
     items: (s.sale_items ?? []).map((i: any) => ({
@@ -68,12 +106,14 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
       unit_price: Number(i.unit_price),
       discount: Number(i.discount ?? 0),
       total: Number(i.total),
+      original_unit_price: i.original_unit_price != null ? Number(i.original_unit_price) : undefined,
     })),
-    subtotal: Number(s.subtotal ?? 0),
-    discount: Number(s.discount ?? 0),
+    subtotal: grossSubtotal,
+    discount: totalDiscount,
     tax: Number(s.tax ?? 0),
     total: Number(s.total ?? 0),
-    amountPaid: Number(s.amount_paid ?? 0),
+    amountPaid: amountPaidOverride ?? Number(s.amount_paid ?? 0),
+    depositLabelAmount,
     isRefund: s.is_refund ?? false,
     isExchange: s.is_exchange ?? false,
     exchangeReturnedItems,
@@ -84,11 +124,12 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
       ? s.notes.replace(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi,
           (uuid: string) => `#${uuid.slice(-8).toUpperCase()}`)
       : null,
-    branchName: s.branch_name ?? null,
-    branchAddress: s.branch_address ?? null,
-    branchPhone: s.branch_phone ?? null,
-    branchEmail: s.branch_email ?? null,
-    logoUrl: s.branch_logo_url ?? null,
+    businessName: businessRow?.name ?? null,
+    branchName: s.branches?.name ?? s.branch_name ?? null,
+    branchAddress: s.branches?.address ?? s.branch_address ?? null,
+    branchPhone: s.branches?.phone ?? s.branch_phone ?? null,
+    branchEmail: s.branches?.email ?? s.branch_email ?? null,
+    logoUrl: s.branches?.logo_url ?? s.branch_logo_url ?? null,
     currency: businessRow?.currency ?? undefined,
     settings: settings ?? undefined,
   })
@@ -98,6 +139,7 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
 
 const saleItemSchema = z.object({
   product_id: z.string().uuid().optional().nullable(),
+  repair_id: z.string().uuid().optional().nullable(),
   variant_id: z.string().uuid().optional().nullable(),
   name: z.string().min(1),
   quantity: z.number().int().positive(),
@@ -105,6 +147,11 @@ const saleItemSchema = z.object({
   discount: z.number().min(0).default(0),
   total: z.number().min(0),
   is_service: z.boolean().default(false),
+  // Quantity-scoped discount picker (retail-store template) — true when this
+  // line was added at the discount price, so process_sale knows to consume
+  // from the product's active discount allocation instead of/alongside the
+  // normal reservation check.
+  is_discount: z.boolean().optional().default(false),
 })
 
 const paymentSplitSchema = z.object({
@@ -120,11 +167,13 @@ const createSaleSchema = z.object({
   discount: z.number().min(0).default(0),
   tax: z.number().min(0).default(0),
   total: z.number().min(0),
-  payment_method: z.enum(['cash', 'card', 'gift_card', 'split', 'on_account', 'ebay', 'deliveroo', 'website']),
+  payment_method: z.enum(['cash', 'card', 'gift_card', 'split', 'on_account', 'ebay', 'deliveroo', 'website', 'store_credit', 'loyalty_points']),
   amount_paid: z.number().min(0).default(0),
   payment_splits: z.array(paymentSplitSchema).optional(),
   gift_card_id: z.string().uuid().optional().nullable(),
   gift_card_amount: z.number().min(0).optional(),
+  store_credit_amount: z.number().min(0).optional(),
+  loyalty_points_used: z.number().int().min(0).optional(),
   notes: z.string().optional().nullable(),
   employee_id: z.string().uuid().optional().nullable(),
   served_by_employee_id: z.string().uuid().optional().nullable(),
@@ -179,7 +228,7 @@ export const PosController = {
     }
   },
 
-  async recordCreditPayment(request: NextRequest, _ctx: RequestContext, saleId: string) {
+  async recordCreditPayment(request: NextRequest, ctx: RequestContext, saleId: string) {
     const schema = z.object({
       amount: z.number().positive(),
       payment_method: z.enum(['cash', 'card']),
@@ -187,7 +236,7 @@ export const PosController = {
     const { data, error } = await validateBody(request, schema)
     if (error) return error
     try {
-      await PosService.recordCreditPayment(saleId, data.amount, data.payment_method)
+      await PosService.recordCreditPayment(saleId, data.amount, data.payment_method, ctx.businessId, ctx.auth.userId)
       return ok({})
     } catch (err: any) {
       return badRequest(err?.message ?? 'Failed to record payment')
@@ -220,14 +269,16 @@ export const PosController = {
     }
   },
 
-  async generateReceiptPdf(_request: NextRequest, ctx: RequestContext, id: string) {
+  async generateReceiptPdf(_request: NextRequest, ctx: RequestContext, id: string, paymentId?: string) {
     try {
       // Always regenerate — PDF content depends on invoice design settings which can
       // change at any time, so a cached copy would silently ignore setting updates.
-      const result = await buildReceiptBuffer(id, ctx.auth.branchId ?? null, ctx.businessId)
+      const result = await buildReceiptBuffer(id, ctx.auth.branchId ?? null, ctx.businessId, paymentId)
       if (!result) return notFound()
 
-      const filename = `receipt-${id.slice(-8)}.pdf`
+      const filename = paymentId
+        ? `receipt-${id.slice(-8)}-payment-${paymentId.slice(-6)}.pdf`
+        : `receipt-${id.slice(-8)}.pdf`
       return new NextResponse(result.buffer as unknown as BodyInit, {
         status: 200,
         headers: {
@@ -244,7 +295,13 @@ export const PosController = {
     const updateSaleSchema = z.object({
       customer_id: z.string().uuid().optional().nullable(),
       payment_method: z.enum(['cash', 'card', 'gift_card', 'split']).optional(),
-      payment_status: z.enum(['paid', 'partial', 'refunded']).optional(),
+      // 'refunded' is intentionally excluded — it must only be set by the
+      // dedicated refund flow (PosController.processRefund), which creates a
+      // proper negative refund sale record and reverses inventory. Allowing it
+      // here let staff mark a sale "Refunded" without any of that happening,
+      // producing a second, disconnected refund entry when the real refund was
+      // then also processed.
+      payment_status: z.enum(['paid', 'partial']).optional(),
       notes: z.string().optional().nullable(),
       discount: z.number().min(0).optional(),
       tax: z.number().min(0).optional(),

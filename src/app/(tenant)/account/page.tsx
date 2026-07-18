@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import { Button } from '@/components/ui/button'
 import { useTour } from '@/hooks/use-tour'
+import { ANNUAL_DISCOUNT } from '@/lib/pricing'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -480,7 +481,17 @@ function AccountPageInner() {
               <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6">
                 <div className="flex items-start justify-between gap-4 mb-5">
                   <h2 className="text-base font-semibold text-on-surface">Current plan</h2>
-                  {sub && <StatusBadge status={isExpired ? 'canceled' : sub.status} />}
+                  {/* Substitute 'canceled' only when sub.status is stale and would otherwise
+                      mislabel a lost-access account as fine — e.g. a manual subscription stuck
+                      on 'active' after its period ended, or a no-card free trial stuck on
+                      'trialing' after expiry (nothing ever updates it, since no Stripe
+                      subscription exists to drive a webhook). past_due/canceled/suspended
+                      already carry their own correct, specific status — leave those alone. */}
+                  {sub && (
+                    <StatusBadge
+                      status={isExpired && !['past_due', 'canceled', 'suspended'].includes(sub.status) ? 'canceled' : sub.status}
+                    />
+                  )}
                 </div>
 
                 {sub ? (
@@ -490,7 +501,9 @@ function AccountPageInner() {
                       isTrialing
                         ? 'Free trial'
                         : plan?.price_monthly
-                          ? `£${plan.price_monthly}/month`
+                          ? sub.billing_cycle === 'yearly'
+                            ? `£${Math.round(plan.price_monthly * 12 * (1 - ANNUAL_DISCOUNT))}/year, billed annually`
+                            : `£${plan.price_monthly}/month`
                           : '—'
                     } />
                     {isTrialing && <InfoRow label="Trial ends"  value={formatDate(sub.trial_ends_at)} />}
@@ -500,8 +513,8 @@ function AccountPageInner() {
                         value={sub.current_period_end ? formatDate(sub.current_period_end) : 'Manual / no expiry'}
                       />
                     )}
-                    {isPastDue && sub.current_period_end && (
-                      <InfoRow label="Next retry by" value={formatDate(sub.current_period_end)} />
+                    {isPastDue && sub.current_period_start && (
+                      <InfoRow label="Due" value={formatDate(sub.current_period_start)} />
                     )}
                     {isCanceled && sub.current_period_end && (
                       <InfoRow label="Expired on" value={formatDate(sub.current_period_end)} />

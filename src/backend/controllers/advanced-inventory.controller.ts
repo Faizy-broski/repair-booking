@@ -190,6 +190,7 @@ export const TradeInController = {
       business_id:     z.string().uuid(),
       branch_id:       z.string().uuid(),
       product_id:      z.string().uuid(),
+      variant_id:      z.string().uuid().optional().nullable(),
       condition_grade: z.string().min(1),
       trade_in_value:  z.number().min(0),
       serial_number:   z.string().optional(),

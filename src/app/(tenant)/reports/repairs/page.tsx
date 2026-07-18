@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency } from '@/lib/utils'
+import { exportExcel } from '@/lib/export-excel'
 import { DateRangeBar } from '../_components/date-range-bar'
 import Link from 'next/link'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
@@ -51,16 +52,6 @@ function getColor(key: string, index: number) {
 
 function firstOfMonth() { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] }
 function today() { return new Date().toISOString().split('T')[0] }
-
-function exportCsv<T extends Record<string, unknown>>(rows: T[], filename: string) {
-  if (!rows.length) return
-  const h = Object.keys(rows[0])
-  const csv = [h.join(','), ...rows.map((r) => h.map((k) => JSON.stringify(r[k] ?? '')).join(','))].join('\n')
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-  a.download = filename
-  a.click()
-}
 
 export default function RepairsReportPage() {
   const { activeBranch } = useAuthStore()
@@ -138,12 +129,12 @@ export default function RepairsReportPage() {
         <Button
           size="sm"
           className="w-full sm:w-auto"
-          onClick={() => exportCsv(
+          onClick={() => exportExcel(
             data.map((r) => ({ Status: r.name, Count: r.count, 'Total Value': r.total_value })),
-            `repairs-${dateFrom}-${dateTo}.csv`,
+            `repairs-${dateFrom}-${dateTo}.xlsx`,
           )}
         >
-          <Download className="h-4 w-4" /> Export CSV
+          <Download className="h-4 w-4" /> Export Excel
         </Button>
       </div>
 

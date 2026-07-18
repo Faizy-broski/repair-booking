@@ -1,6 +1,7 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'next/navigation'
 import { Download, ArrowLeft, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -9,25 +10,68 @@ import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { DateRangeBar } from '../_components/date-range-bar'
 import Link from 'next/link'
+import type { ZReport } from '../../pos/_types'
 
 interface RegisterSession {
   id: string; cashier_id: string; opening_float: number; closing_cash: number | null
   expected_cash: number | null; variance: number | null; total_sales: number | null
   total_refunds: number | null; cash_sales: number | null; card_sales: number | null
   other_sales: number | null; transaction_count: number | null
+  repair_sales: number | null; repair_refunds: number | null; repair_transaction_count: number | null
+  repair_cash_sales: number | null; repair_card_sales: number | null; repair_other_sales: number | null
   opened_at: string; closed_at: string | null; status: string
 }
 
 function firstOfMonth() { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] }
 function today() { return new Date().toISOString().split('T')[0] }
-function exportCsv<T extends Record<string, unknown>>(rows: T[], filename: string) {
-  if (!rows.length) return
-  const h = Object.keys(rows[0])
-  const csv = [h.join(','), ...rows.map((r) => h.map((k) => JSON.stringify(r[k] ?? '')).join(','))].join('\n')
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = filename; a.click()
+
+async function exportZReportExcel(sessions: RegisterSession[], filename: string) {
+  if (!sessions.length) return
+  const XLSX = await import('xlsx')
+
+  const rows = sessions.map((s) => ({
+    'Opened':                s.opened_at ? new Date(s.opened_at).toLocaleString('en-GB') : '',
+    'Closed':                s.closed_at ? new Date(s.closed_at).toLocaleString('en-GB') : 'Still open',
+    'Status':                s.status,
+    'Opening Float':         s.opening_float ?? 0,
+    'Product Sales':         s.total_sales ?? 0,
+    'Product Cash Sales':    s.cash_sales ?? 0,
+    'Product Card Sales':    s.card_sales ?? 0,
+    'Product Other Sales':   s.other_sales ?? 0,
+    'Product Refunds':       s.total_refunds ?? 0,
+    'Product Transactions':  s.transaction_count ?? 0,
+    'Repair Sales':          s.repair_sales ?? 0,
+    'Repair Cash Sales':     s.repair_cash_sales ?? 0,
+    'Repair Card Sales':     s.repair_card_sales ?? 0,
+    'Repair Other Sales':    s.repair_other_sales ?? 0,
+    'Repair Refunds':        s.repair_refunds ?? 0,
+    'Repair Transactions':   s.repair_transaction_count ?? 0,
+    'Grand Total':           (s.total_sales ?? 0) + (s.repair_sales ?? 0) - (s.repair_refunds ?? 0),
+    'Expected Cash':         s.expected_cash ?? 0,
+    'Closing Cash':          s.closing_cash ?? 0,
+    'Variance (Over/Short)': s.variance ?? 0,
+  }))
+
+  const ws = XLSX.utils.json_to_sheet(rows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Z-Report')
+
+  const keys = Object.keys(rows[0])
+  ws['!cols'] = keys.map((key) => ({
+    wch: Math.max(key.length, ...rows.map((r: any) => String(r[key] ?? '').length)) + 2,
+  }))
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 }
+
+  const buffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(a.href)
 }
 
-export default function ZReportPage() {
+function ZReportPageInner() {
   const { activeBranch } = useAuthStore()
   const queryClient = useQueryClient()
   const [dateFrom, setDateFrom] = useState(firstOfMonth)
@@ -37,8 +81,9 @@ export default function ZReportPage() {
   const [openingFloat, setOpeningFloat] = useState('')
   const [closingCash, setClosingCash] = useState('')
   const [sessionLoading, setSessionLoading] = useState(false)
-  const [zReportData, setZReportData] = useState<Record<string, unknown> | null>(null)
+  const [zReportData, setZReportData] = useState<ZReport | null>(null)
   const [detailSession, setDetailSession] = useState<RegisterSession | null>(null)
+  const searchParams = useSearchParams()
 
   const { data: cashMovements = [], isLoading: movementsLoading } = useQuery<any[]>({
     queryKey: ['session-movements', detailSession?.id],
@@ -51,7 +96,7 @@ export default function ZReportPage() {
     staleTime: 0,
   })
 
-  const zReportSessionId = (zReportData?.id ?? zReportData?.session_id) as string | undefined
+  const zReportSessionId = zReportData?.session_id
   const { data: zReportMovements = [] } = useQuery<any[]>({
     queryKey: ['session-movements', zReportSessionId],
     queryFn: async () => {
@@ -74,6 +119,14 @@ export default function ZReportPage() {
     enabled: !!activeBranch,
     staleTime: 30_000,
   })
+
+  // Deep link from the POS close-register modal's "View Full Z-Report" button
+  useEffect(() => {
+    const sessionId = searchParams.get('session')
+    if (!sessionId || sessions.length === 0) return
+    const match = sessions.find((s) => s.id === sessionId)
+    if (match) setDetailSession(match)
+  }, [searchParams, sessions])
 
   const { data: currentSession = null } = useQuery<RegisterSession | null>({
     queryKey: ['report-pos-session', activeBranch?.id],
@@ -132,8 +185,8 @@ export default function ZReportPage() {
             <p className="text-sm text-on-surface-variant mt-0.5">Daily register sessions and cash variance</p>
           </div>
         </div>
-        <Button size="sm" className="w-full sm:w-auto" onClick={() => exportCsv(sessions as unknown as Record<string, unknown>[], `z-report-${dateFrom}-${dateTo}.csv`)}>
-          <Download className="h-4 w-4" /> Export CSV
+        <Button size="sm" className="w-full sm:w-auto" onClick={() => exportZReportExcel(sessions, `z-report-${dateFrom}-${dateTo}.xlsx`)}>
+          <Download className="h-4 w-4" /> Export Excel
         </Button>
       </div>
 
@@ -164,26 +217,35 @@ export default function ZReportPage() {
             <h3 className="text-lg font-semibold text-blue-900">Z-Report — Register Closed</h3>
             <Button size="sm" variant="outline" onClick={() => setZReportData(null)}>Dismiss</Button>
           </div>
+          <div className="mb-3 rounded-lg border border-blue-200 bg-white p-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Sales Breakdown</p>
+            <div className="grid grid-cols-3 gap-2 text-sm">
+              <div><p className="text-xs text-gray-500">Product Sales</p><p className="font-semibold text-gray-900">{formatCurrency(zReportData.total_sales ?? 0)}</p></div>
+              <div><p className="text-xs text-gray-500">Repair Sales</p><p className="font-semibold text-gray-900">{formatCurrency(zReportData.repair_sales ?? 0)}</p></div>
+              <div><p className="text-xs text-gray-500">Total</p><p className="font-semibold text-blue-900">{formatCurrency(zReportData.grand_total ?? (zReportData.total_sales ?? 0) + (zReportData.repair_sales ?? 0) - (zReportData.repair_refunds ?? 0))}</p></div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
             {([
-              { label: 'Opening Float',  key: 'opening_float' },
-              { label: 'Total Sales',    key: 'total_sales' },
-              { label: 'Total Refunds',  key: 'total_refunds' },
-              { label: 'Cash Sales',     key: 'cash_sales' },
-              { label: 'Card Sales',     key: 'card_sales' },
-              { label: 'Transactions',   key: 'transaction_count', isCurrency: false },
-              { label: 'Expected Cash',  key: 'expected_cash' },
-              { label: 'Closing Cash',   key: 'closing_cash' },
-              { label: 'Variance',       key: 'variance', highlight: true },
-            ] as { label: string; key: string; isCurrency?: boolean; highlight?: boolean }[]).map(({ label, key, isCurrency = true, highlight }) => (
-              <div key={label} className={`rounded-lg border bg-white p-3 ${highlight && (zReportData[key] as number) !== 0 ? 'border-red-300' : 'border-gray-200'}`}>
+              { label: 'Opening Float',  value: zReportData.opening_float },
+              { label: 'Total Refunds',  value: zReportData.total_refunds },
+              { label: 'Cash Sales',     value: zReportData.cash_sales },
+              { label: 'Card Sales',     value: zReportData.card_sales },
+              { label: 'Transactions',   value: zReportData.transaction_count, isCurrency: false },
+              { label: 'Expected Cash',  value: zReportData.expected_cash },
+              { label: 'Closing Cash',   value: zReportData.closing_cash },
+              { label: 'Variance',       value: zReportData.variance, highlight: true },
+            ] as { label: string; value: number | undefined; isCurrency?: boolean; highlight?: boolean }[]).map(({ label, value, isCurrency = true, highlight }) => (
+              <div key={label} className={`rounded-lg border bg-white p-3 ${highlight && (value ?? 0) !== 0 ? 'border-red-300' : 'border-gray-200'}`}>
                 <p className="text-xs text-gray-500">{label}</p>
-                <p className={`mt-0.5 font-semibold ${highlight && (zReportData[key] as number) !== 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                  {isCurrency ? formatCurrency(zReportData[key] as number) : String(zReportData[key] ?? 0)}
+                <p className={`mt-0.5 font-semibold ${highlight && (value ?? 0) !== 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                  {isCurrency ? formatCurrency(value ?? 0) : String(value ?? 0)}
                 </p>
               </div>
             ))}
           </div>
+          <p className="mt-2 text-[11px] text-gray-400 italic">Variance reflects cash-drawer (product, cash-paid) transactions only — Repair Sales above are informational and not included in this reconciliation.</p>
 
           {zReportMovements.length > 0 && (
             <div className="mt-4 rounded-lg border border-blue-200 bg-white p-3">
@@ -260,52 +322,96 @@ export default function ZReportPage() {
       </div>
 
       {/* Session Detail Modal */}
-      <Modal open={!!detailSession} onClose={() => setDetailSession(null)} title="Session Z-Report" size="sm">
+      <Modal open={!!detailSession} onClose={() => setDetailSession(null)} title="Session Z-Report" size="xl">
         {detailSession && (
-          <div className="space-y-4 text-sm">
+          <div className="space-y-5 text-sm">
             <div className="flex justify-between text-xs text-on-surface-variant">
               <span>Opened: {new Date(detailSession.opened_at).toLocaleString()}</span>
               <span>{detailSession.closed_at ? `Closed: ${new Date(detailSession.closed_at).toLocaleString()}` : 'Still open'}</span>
             </div>
 
-            <div className="rounded-xl bg-surface-container-low p-4 space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant mb-3">Sales</p>
-              {([
-                ['Total Sales',  detailSession.total_sales,  false],
-                ['Cash Sales',   detailSession.cash_sales,   false],
-                ['Card Sales',   detailSession.card_sales,   false],
-                ['Other Sales',  detailSession.other_sales,  false],
-                ['Refunds',      detailSession.total_refunds, true],
-              ] as [string, number | null, boolean][]).map(([label, val, isNeg]) => (
-                <div key={label} className="flex justify-between">
-                  <span className="text-on-surface-variant">{label}</span>
-                  <span className={isNeg && (val ?? 0) > 0 ? 'text-red-600' : 'text-on-surface'}>
-                    {isNeg && (val ?? 0) > 0 ? '-' : ''}{formatCurrency(val ?? 0)}
-                  </span>
+            {/* Sales breakdown: product vs repair */}
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Sales Breakdown</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-outline-variant bg-surface p-4">
+                  <p className="text-xs font-medium text-on-surface-variant">Product Sales</p>
+                  <p className="mt-1 text-xl font-semibold text-on-surface">{formatCurrency(detailSession.total_sales ?? 0)}</p>
+                  <p className="mt-0.5 text-xs text-on-surface-variant">{detailSession.transaction_count ?? 0} transactions</p>
                 </div>
-              ))}
-              <div className="flex justify-between text-xs text-on-surface-variant border-t border-outline-variant pt-2 mt-1">
-                <span>Transactions</span><span>{detailSession.transaction_count ?? 0}</span>
+                <div className="rounded-xl border border-outline-variant bg-surface p-4">
+                  <p className="text-xs font-medium text-on-surface-variant">Repair Sales</p>
+                  <p className="mt-1 text-xl font-semibold text-on-surface">{formatCurrency(detailSession.repair_sales ?? 0)}</p>
+                  <p className="mt-0.5 text-xs text-on-surface-variant">{detailSession.repair_transaction_count ?? 0} transactions</p>
+                  {(detailSession.repair_refunds ?? 0) > 0 && (
+                    <p className="mt-0.5 text-xs text-red-600">-{formatCurrency(detailSession.repair_refunds ?? 0)} refunded</p>
+                  )}
+                </div>
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                  <p className="text-xs font-medium text-blue-700">Grand Total</p>
+                  <p className="mt-1 text-xl font-semibold text-blue-900">
+                    {formatCurrency((detailSession.total_sales ?? 0) + (detailSession.repair_sales ?? 0) - (detailSession.repair_refunds ?? 0))}
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="rounded-xl bg-surface-container-low p-4 space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant mb-3">Cash Reconciliation</p>
-              {([
-                ['Opening Float',  detailSession.opening_float, false],
-                ['Expected Cash',  detailSession.expected_cash, false],
-                ['Closing Cash',   detailSession.closing_cash,  false],
-              ] as [string, number | null, boolean][]).map(([label, val]) => (
-                <div key={label} className="flex justify-between">
-                  <span className="text-on-surface-variant">{label}</span>
-                  <span className="text-on-surface">{val != null ? formatCurrency(val) : '—'}</span>
+            {/* Product sales detail + repair sales detail + cash reconciliation */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-xl bg-surface-container-low p-4 space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant mb-3">Product Sales Detail</p>
+                {([
+                  ['Cash Sales',   detailSession.cash_sales,   false],
+                  ['Card Sales',   detailSession.card_sales,   false],
+                  ['Other Sales',  detailSession.other_sales,  false],
+                  ['Refunds',      detailSession.total_refunds, true],
+                ] as [string, number | null, boolean][]).map(([label, val, isNeg]) => (
+                  <div key={label} className="flex justify-between">
+                    <span className="text-on-surface-variant">{label}</span>
+                    <span className={isNeg && (val ?? 0) > 0 ? 'text-red-600' : 'text-on-surface'}>
+                      {isNeg && (val ?? 0) > 0 ? '-' : ''}{formatCurrency(val ?? 0)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-xl bg-surface-container-low p-4 space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant mb-3">Repair Sales Detail</p>
+                {([
+                  ['Cash Sales',        detailSession.repair_cash_sales,  false],
+                  ['Card Sales',        detailSession.repair_card_sales,  false],
+                  ['Other (pickup etc)', detailSession.repair_other_sales, false],
+                  ['Refunds',           detailSession.repair_refunds,     true],
+                ] as [string, number | null, boolean][]).map(([label, val, isNeg]) => (
+                  <div key={label} className="flex justify-between">
+                    <span className="text-on-surface-variant">{label}</span>
+                    <span className={isNeg && (val ?? 0) > 0 ? 'text-red-600' : 'text-on-surface'}>
+                      {isNeg && (val ?? 0) > 0 ? '-' : ''}{formatCurrency(val ?? 0)}
+                    </span>
+                  </div>
+                ))}
+                <p className="pt-1 text-[10px] text-on-surface-variant italic">Cash/Card reflects deposits only — pickup payments have no recorded tender yet.</p>
+              </div>
+
+              <div className="rounded-xl bg-surface-container-low p-4 space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant mb-3">Cash Reconciliation</p>
+                {([
+                  ['Opening Float',  detailSession.opening_float, false],
+                  ['Expected Cash',  detailSession.expected_cash, false],
+                  ['Closing Cash',   detailSession.closing_cash,  false],
+                ] as [string, number | null, boolean][]).map(([label, val]) => (
+                  <div key={label} className="flex justify-between">
+                    <span className="text-on-surface-variant">{label}</span>
+                    <span className="text-on-surface">{val != null ? formatCurrency(val) : '—'}</span>
+                  </div>
+                ))}
+                <div className={`flex justify-between font-semibold border-t border-outline-variant pt-2 mt-1 ${(detailSession.variance ?? 0) !== 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  <span>Variance (Over/Short)</span>
+                  <span>{detailSession.variance != null ? formatCurrency(detailSession.variance) : '—'}</span>
                 </div>
-              ))}
-              <div className={`flex justify-between font-semibold border-t border-outline-variant pt-2 mt-1 ${(detailSession.variance ?? 0) !== 0 ? 'text-red-600' : 'text-green-600'}`}>
-                <span>Variance (Over/Short)</span>
-                <span>{detailSession.variance != null ? formatCurrency(detailSession.variance) : '—'}</span>
               </div>
             </div>
+            <p className="-mt-3 text-xs text-on-surface-variant italic">Cash Reconciliation reflects product (cash-paid) transactions only — Repair Sales above are informational and excluded from this reconciliation.</p>
 
             <div className="rounded-xl bg-surface-container-low p-4 space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant mb-3">Cash Movements</p>
@@ -339,7 +445,7 @@ export default function ZReportPage() {
               )}
             </div>
 
-            <Button variant="outline" className="w-full" onClick={() => setDetailSession(null)}>Close</Button>
+            <Button className="w-full" onClick={() => setDetailSession(null)}>Close</Button>
           </div>
         )}
       </Modal>
@@ -369,5 +475,13 @@ export default function ZReportPage() {
         </div>
       </Modal>
     </div>
+  )
+}
+
+export default function ZReportPage() {
+  return (
+    <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-gray-400">Loading...</div>}>
+      <ZReportPageInner />
+    </Suspense>
   )
 }

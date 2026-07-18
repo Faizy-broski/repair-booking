@@ -21,10 +21,12 @@ interface DataTableProps<T> {
   onPageChange?: (page: number) => void
   onPageSizeChange?: (size: number) => void
   emptyMessage?: string
+  onRowClick?: (row: T) => void
 }
 
 export function DataTable<T>({
   data, columns, isLoading, totalCount, pageIndex = 0, pageSize = 20, onPageChange, onPageSizeChange, emptyMessage = 'No records found.',
+  onRowClick,
 }: DataTableProps<T>) {
   const [sorting, setSorting] = useState<SortingState>([])
 
@@ -109,7 +111,8 @@ export function DataTable<T>({
               rows.map((row, i) => (
                 <tr
                   key={row.id}
-                  className={`border-t border-gray-100 transition-colors hover:bg-teal-50 ${
+                  onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                  className={`border-t border-gray-100 transition-colors hover:bg-teal-50 ${onRowClick ? 'cursor-pointer' : ''} ${
                     i % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                   }`}
                 >

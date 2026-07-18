@@ -489,6 +489,7 @@ export function InvoicePdf(props: InvoicePdfProps) {
           {settings.thank_you_message && (
             <Text style={s.thankYou}>{settings.thank_you_message}</Text>
           )}
+          {settings.footer_address && <Text style={s.footerLine}>{settings.footer_address}</Text>}
           {settings.footer_line_1 && <Text style={s.footerLine}>{settings.footer_line_1}</Text>}
           {settings.footer_line_2 && <Text style={s.footerLine}>{settings.footer_line_2}</Text>}
           {settings.footer_line_3 && <Text style={s.footerLine}>{settings.footer_line_3}</Text>}
@@ -640,6 +641,7 @@ function ReceiptPdf({
         {settings.thank_you_message && (
           <Text style={s.thankYou}>{settings.thank_you_message}</Text>
         )}
+        {settings.footer_address && <Text style={s.footerText}>{settings.footer_address}</Text>}
         {uniqueFooterLines.map((line, i) => (
           <Text key={i} style={s.footerText}>{line}</Text>
         ))}
