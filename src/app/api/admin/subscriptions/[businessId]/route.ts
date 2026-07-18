@@ -3,6 +3,11 @@ import { withMiddleware } from '@/backend/middleware'
 import type { RequestContext } from '@/backend/middleware'
 import { createAdminClient } from '@/backend/config/supabase'
 import { invalidateBusinessCache } from '@/backend/services/module-config.service'
+import {
+  getCustomPlanBaseline,
+  customPlanDimensionsSchema,
+  computeCustomPlanPricePence,
+} from '@/backend/services/custom-plan-pricing'
 
 const VALID_STATUSES  = ['active', 'trialing', 'past_due', 'canceled', 'suspended'] as const
 const VALID_CYCLES    = ['monthly', 'yearly'] as const
@@ -30,7 +35,7 @@ async function handler(
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { planId, status, billingCycle, currentPeriodEnd, trialEndsAt } = body ?? {}
+  const { planId, status, billingCycle, currentPeriodEnd, trialEndsAt, customDimensions } = body ?? {}
 
   // ── Validation ─────────────────────────────────────────────────────────────
   if (!planId || typeof planId !== 'string') {
@@ -69,12 +74,50 @@ async function handler(
   // ── Verify plan exists ─────────────────────────────────────────────────────
   const { data: plan, error: planErr } = await (supabase as any)
     .from('plans')
-    .select('id, name')
+    .select('id, name, plan_type')
     .eq('id', planId)
     .single()
 
   if (planErr || !plan) {
     return NextResponse.json({ error: 'Plan not found' }, { status: 404 })
+  }
+
+  // ── Custom Plan dimensions ──────────────────────────────────────────────────
+  // The "Custom Plan" catalog row is a shared placeholder (see migration 111) —
+  // the real branches/staff/inventory/repair numbers and price live on the
+  // subscription row itself, never trusted from the client without recomputing.
+  const isCustomPlan = plan.plan_type === 'custom'
+  let customFields: Record<string, unknown> = {
+    is_custom:            false,
+    custom_max_branches:  null,
+    custom_max_users:     null,
+    custom_max_products:  null,
+    custom_max_services:  null,
+    custom_price_monthly: null,
+  }
+
+  if (isCustomPlan) {
+    if (!customDimensions || typeof customDimensions !== 'object') {
+      return NextResponse.json({ error: 'customDimensions is required for the Custom Plan' }, { status: 400 })
+    }
+    const baseline = await getCustomPlanBaseline(supabase)
+    const parsed = customPlanDimensionsSchema(baseline).safeParse(customDimensions)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? 'Invalid custom plan dimensions' },
+        { status: 400 }
+      )
+    }
+    const dims = parsed.data
+    const pricePence = computeCustomPlanPricePence(dims, baseline)
+    customFields = {
+      is_custom:            true,
+      custom_max_branches:  dims.branches,
+      custom_max_users:     dims.staff,
+      custom_max_products:  dims.inventoryLimit,
+      custom_max_services:  dims.repairLimit,
+      custom_price_monthly: pricePence / 100,
+    }
   }
 
   // ── Read existing subscription to preserve Stripe IDs ──────────────────────
@@ -106,6 +149,7 @@ async function handler(
         stripe_sub_id:        existingSub?.stripe_sub_id        ?? null,
         stripe_customer_id:   existingSub?.stripe_customer_id   ?? null,
         livemode:             existingSub?.livemode              ?? false,
+        ...customFields,
       },
       { onConflict: 'business_id' }
     )
