@@ -92,7 +92,7 @@ export const footerLinkGroups: FooterLinkGroup[] = [
     ],
   },
   {
-    title: "Product",
+    title: "Features",
     links: [
       { label: "Why iRepairly?", href: "/features/why-irepairly" },
       { label: "Business Types", href: "/features/business-types" },

@@ -12,7 +12,6 @@ import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
 import { formatDate } from '@/lib/utils'
 import type { ColumnDef } from '@tanstack/react-table'
 import { MODULES } from '@/backend/config/constants'
-import { effectiveMonthlyPrice, CUSTOM_PLAN_YEARLY_DISCOUNT } from '@/backend/services/custom-plan-pricing'
 import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
@@ -55,12 +54,6 @@ interface BusinessRow {
     plan_id: string | null
     current_period_end: string | null
     trial_ends_at: string | null
-    is_custom?: boolean | null
-    custom_max_branches?: number | null
-    custom_max_users?: number | null
-    custom_max_products?: number | null
-    custom_max_services?: number | null
-    custom_price_monthly?: number | null
     plans?: { id: string; name: string; features: string[]; price_monthly: number; price_yearly: number } | null
   }> | null
   stats?: BusinessStats
@@ -529,7 +522,6 @@ export default function BusinessesPage() {
 
   function openEditSubscription(biz: BusinessRow) {
     const sub = biz.subscriptions?.[0]
-    const effectiveMonthly = sub ? effectiveMonthlyPrice(sub as any) : null
     const row: SubscriptionRow = {
       business_id:        biz.id,
       business_name:      biz.name,
@@ -540,18 +532,8 @@ export default function BusinessesPage() {
       billing_cycle:      sub?.billing_cycle ?? 'monthly',
       plan_id:            sub?.plan_id ?? sub?.plans?.id ?? null,
       plan_name:          sub?.plans?.name ?? null,
-      // For a custom subscription these reflect the real negotiated price, not
-      // the shared "Custom Plan" placeholder row's catalog price.
-      plan_price_monthly: sub?.is_custom ? effectiveMonthly : (sub?.plans?.price_monthly ?? null),
-      plan_price_yearly:  sub?.is_custom && effectiveMonthly != null
-        ? Math.round(effectiveMonthly * 12 * (1 - CUSTOM_PLAN_YEARLY_DISCOUNT))
-        : (sub?.plans?.price_yearly ?? null),
-      is_custom:            sub?.is_custom ?? false,
-      custom_max_branches:  sub?.custom_max_branches ?? null,
-      custom_max_users:     sub?.custom_max_users ?? null,
-      custom_max_products:  sub?.custom_max_products ?? null,
-      custom_max_services:  sub?.custom_max_services ?? null,
-      custom_price_monthly: sub?.custom_price_monthly ?? null,
+      plan_price_monthly: sub?.plans?.price_monthly ?? null,
+      plan_price_yearly:  sub?.plans?.price_yearly ?? null,
       current_period_end: sub?.current_period_end ?? null,
       trial_ends_at:      sub?.trial_ends_at ?? null,
       canceled_at:        null,

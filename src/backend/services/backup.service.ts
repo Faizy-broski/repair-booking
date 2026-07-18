@@ -6,59 +6,94 @@ import nodemailer from 'nodemailer'
 const BUCKET = 'business-backups'
 const PAGE_SIZE = 500
 
-// Bump this whenever a table is added to or removed from the backup scope,
-// or when the discovery/child-map logic itself changes shape.
-export const BACKUP_SCHEMA_VERSION = 88
+// Bump this whenever a table is added to or removed from the backup scope.
+export const BACKUP_SCHEMA_VERSION = 86
 
 // ── Table manifest ─────────────────────────────────────────────────────────────
-// Top-level business/branch-scoped tables are discovered at export time via
-// get_backup_table_manifest() (migration 147) — it queries information_schema
-// for every table with a business_id or branch_id column, so a new migration
-// that adds one is picked up automatically with zero code change. This is
-// what a hand-maintained array can never guarantee (15 real tables — messages,
-// sale_payments, employee_activity_log, ...— had silently drifted out of the
-// old list before this rewrite).
-//
-// Pure child tables (no business_id/branch_id of their own, e.g. sale_items
-// keyed only by sale_id) can't be safely auto-detected — misidentifying a
-// child relationship risks exporting the wrong rows — so CHILD_TABLE_MAP
-// below stays a manually curated list. It changes far less often than "a new
-// top-level business table exists."
-//
-// FALLBACK_MANIFEST is used only if the RPC call itself fails (e.g. migration
-// 147 not yet applied) — better to back up a known-good subset than fail the
-// whole export.
-const FALLBACK_MANIFEST: { table_name: string; scope_column: 'business_id' | 'branch_id' }[] = [
-  { table_name: 'subscriptions', scope_column: 'business_id' },
-  { table_name: 'branches', scope_column: 'business_id' },
-  { table_name: 'profiles', scope_column: 'business_id' },
-  { table_name: 'customers', scope_column: 'business_id' },
-  { table_name: 'products', scope_column: 'business_id' },
-  { table_name: 'product_variants', scope_column: 'business_id' },
-  { table_name: 'suppliers', scope_column: 'business_id' },
-  { table_name: 'employees', scope_column: 'business_id' },
-  { table_name: 'expenses', scope_column: 'business_id' },
-  { table_name: 'invoices', scope_column: 'business_id' },
-  { table_name: 'inventory', scope_column: 'branch_id' },
-  { table_name: 'stock_movements', scope_column: 'branch_id' },
-  { table_name: 'sales', scope_column: 'branch_id' },
-  { table_name: 'repairs', scope_column: 'branch_id' },
-  { table_name: 'purchase_orders', scope_column: 'branch_id' },
-  { table_name: 'appointments', scope_column: 'branch_id' },
-]
+// All tables are in FK-safe order (parents before children) for safe restore.
 
-// Tables intentionally excluded from the "did we miss anything?" warning
-// check even though they aren't in the discovered manifest or CHILD_TABLE_MAP —
-// global/reference/system tables that are seed data (recreated by migrations,
-// not business data) or handled specially, not an oversight.
-const MANUAL_EXCLUDE_TABLES = new Set([
-  'businesses',                    // root table, handled specially (keyed by id)
-  'backup_registry',                // metadata about backups, not business data
-  'impersonation_sessions',         // superadmin security audit trail
-  'plans', 'module_config_templates', 'business_vertical_templates',
-  'vertical_template_apply_log', 'system_broadcasts', 'broadcast_reads',
-  'email_verifications', 'pending_registrations', '_migration_id_map',
-])
+// Queried via .eq('business_id', businessId)
+const BUSINESS_TABLES = [
+  // Core tenant
+  'businesses',
+  'subscriptions',
+  'branches',
+  'profiles',
+  'module_settings',
+  'invoice_settings',
+  'role_permissions',
+  // Customer management
+  'customer_groups',
+  'customers',
+  'store_credits',
+  'store_credit_transactions',
+  'loyalty_settings',
+  'loyalty_points',
+  'loyalty_transactions',
+  'custom_field_definitions',
+  // Product catalog
+  'brands',
+  'categories',
+  'part_types',
+  'product_attributes',
+  'products',
+  'product_variants',
+  'product_bundles',
+  'suppliers',
+  // Service catalog (Category → Manufacturer → Device → Problem)
+  'service_categories',
+  'service_manufacturers',
+  'service_devices',
+  'service_problems',
+  // Employees
+  'employees',
+  'commission_rules',
+  'employee_commissions',
+  // Repair configuration
+  'repair_custom_statuses',
+  'repair_faults',
+  'ticket_workflows',
+  'canned_responses',
+  'notification_templates',
+  // Financial
+  'expense_categories',
+  'gift_cards',
+  'invoices',
+  'expenses',
+  // Misc
+  'trade_in_transactions',
+] as const
+
+// Queried via .in('branch_id', branchIds)
+const BRANCH_TABLES = [
+  // Inventory
+  'inventory',
+  'inventory_serials',
+  'inventory_cost_layers',
+  'inventory_counts',
+  'stock_movements',
+  'branch_products',
+  // Sales & POS
+  'sales',
+  'register_sessions',
+  'cash_movements',
+  // Repairs
+  'repairs',
+  // Employee time tracking
+  'shifts',
+  'time_clocks',
+  'salaries',
+  'payroll_periods',
+  // Supply chain
+  'purchase_orders',
+  // Appointments & booking
+  'appointments',
+  'business_hours',
+  'booking_settings',
+  'blocked_dates',
+  // Google Reviews
+  'google_reviews',
+] as const
 
 // Child tables exported after their parents. Key = parent table name.
 // 'fk' is the column on the child table that references the parent's 'id'.
@@ -69,7 +104,6 @@ const CHILD_TABLE_MAP: Record<string, { fk: string; tables: string[] }> = {
   ticket_workflows:      { fk: 'workflow_id',      tables: ['ticket_workflow_steps'] },
   product_bundles:       { fk: 'bundle_id',         tables: ['product_bundle_items'] },
   service_problems:      { fk: 'problem_id',        tables: ['service_problem_parts'] },
-  product_attributes:    { fk: 'attribute_id',      tables: ['product_attribute_values'] },
   // Branch-scoped parents
   repairs:               { fk: 'repair_id',         tables: ['repair_items', 'repair_status_history', 'repair_estimates'] },
   sales:                 { fk: 'sale_id',           tables: ['sale_items'] },
@@ -79,50 +113,6 @@ const CHILD_TABLE_MAP: Record<string, { fk: string; tables: string[] }> = {
   register_sessions:     { fk: 'session_id',        tables: ['register_session_members'] },
   // goods_receiving_notes itself is a child of purchase_orders; its children are handled
   // in the two-level phase below — do NOT add grn_items here.
-}
-
-/** Discovers the top-level table manifest via the DB, falling back to a known-good subset on RPC failure. */
-async function discoverBackupManifest(): Promise<{ table_name: string; scope_column: 'business_id' | 'branch_id' }[]> {
-  const { data, error } = await (adminSupabase as any).rpc('get_backup_table_manifest')
-  if (error || !data?.length) {
-    console.error('[BackupService] get_backup_table_manifest RPC failed, using FALLBACK_MANIFEST:', error?.message)
-    return FALLBACK_MANIFEST
-  }
-  return data
-}
-
-/**
- * Best-effort: warns (does not throw) about any `public` table that has
- * neither a business_id/branch_id column nor a CHILD_TABLE_MAP entry nor a
- * manual exclusion — i.e. a genuinely new child table an operator should
- * look at, instead of it silently going unbacked-up the way the last 15 did.
- */
-async function warnAboutUnaccountedTables(manifest: { table_name: string }[]): Promise<void> {
-  try {
-    const { data: allTables, error } = await (adminSupabase as any).rpc('get_all_public_tables')
-    if (error || !allTables) return
-
-    const accounted = new Set<string>(MANUAL_EXCLUDE_TABLES)
-    for (const m of manifest) accounted.add(m.table_name)
-    for (const [parent, { tables }] of Object.entries(CHILD_TABLE_MAP)) {
-      accounted.add(parent)
-      for (const t of tables) accounted.add(t)
-    }
-    accounted.add('grn_items')
-
-    const unaccounted = (allTables as { table_name: string }[])
-      .map(r => r.table_name)
-      .filter(t => !accounted.has(t))
-
-    if (unaccounted.length > 0) {
-      console.warn(
-        `[BackupService] ${unaccounted.length} table(s) have no business_id/branch_id column and no ` +
-        `CHILD_TABLE_MAP entry — verify whether they need one and aren't silently unbacked-up: ${unaccounted.join(', ')}`
-      )
-    }
-  } catch (err) {
-    console.error('[BackupService] warnAboutUnaccountedTables failed (non-fatal):', err)
-  }
 }
 
 // ── Pagination helper ──────────────────────────────────────────────────────────
@@ -215,13 +205,6 @@ export async function exportBusinessToStorage(
     .eq('business_id', businessId)
   const branchIds = (branchRows ?? []).map(r => r.id as string)
 
-  const manifest = await discoverBackupManifest()
-  // Non-fatal, non-blocking — logs a warning if it finds something, doesn't
-  // delay or fail the export itself.
-  void warnAboutUnaccountedTables(manifest)
-  const businessTables = manifest.filter(m => m.scope_column === 'business_id').map(m => m.table_name)
-  const branchTables    = manifest.filter(m => m.scope_column === 'branch_id').map(m => m.table_name)
-
   // ── Streaming pipeline setup ────────────────────────────────────────────────
   // PassThrough → gzip Transform → Buffer chunks collected in memory.
   // Data is written page-by-page so peak RAM = one compressed page at a time,
@@ -251,28 +234,19 @@ export async function exportBusinessToStorage(
   try {
     write(`{"schemaVersion":${BACKUP_SCHEMA_VERSION},"businessId":"${businessId}","exportedAt":"${new Date().toISOString()}","tables":{`)
 
-    // 0. The business's own root row — keyed by 'id', NOT 'business_id' (that
-    // column doesn't exist on this table). Every export before this fix
-    // silently skipped this row entirely: filtering "businesses" by a
-    // business_id column that table doesn't have made every page query error
-    // out immediately, caught by paginateByIn's error handler, yielding zero
-    // rows with no visible failure anywhere in the pipeline.
-    {
-      const { count } = await streamTable(write, 'businesses', 'id', [businessId])
-      recordCounts['businesses'] = count
-    }
-
-    // 1. Business-scoped tables (discovered)
-    for (const table of businessTables) {
-      write(',')
+    // 1. Business-scoped tables
+    let firstTable = true
+    for (const table of BUSINESS_TABLES) {
+      if (!firstTable) write(',')
       const { count, ids } = await streamTable(write, table, 'business_id', [businessId])
       recordCounts[table] = count
       if (CHILD_TABLE_MAP[table]) businessParentIds[table] = ids
+      firstTable = false
     }
 
-    // 2. Branch-scoped tables (discovered)
+    // 2. Branch-scoped tables
     if (branchIds.length > 0) {
-      for (const table of branchTables) {
+      for (const table of BRANCH_TABLES) {
         write(',')
         const { count, ids } = await streamTable(write, table, 'branch_id', branchIds)
         recordCounts[table] = count
@@ -312,7 +286,7 @@ export async function exportBusinessToStorage(
       }
     } else {
       // No branches — write empty arrays so the restore script has consistent keys
-      for (const table of branchTables) {
+      for (const table of BRANCH_TABLES) {
         write(`,"${table}":[]`)
         recordCounts[table] = 0
       }
@@ -442,11 +416,9 @@ export async function processNextPendingBackup(): Promise<{
   }
 }
 
-const BACKUP_RETENTION_DAYS = 30
-
 export async function cleanupOldBackups(): Promise<{ deleted: number }> {
   const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - BACKUP_RETENTION_DAYS)
+  cutoff.setDate(cutoff.getDate() - 7)
   const cutoffStr = cutoff.toISOString().split('T')[0]
 
   const { data: old } = await adminSupabase

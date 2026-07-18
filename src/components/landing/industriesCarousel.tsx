@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Stagger, StaggerItem } from "@/components/landing/motion";
 
 const slides = [
   [
@@ -144,51 +145,55 @@ export default function IndustriesCarousel() {
           >
             {slides.map((items, index) => (
               <div key={index} className="min-w-full">
-                <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-                  {items.map((item) => (
-                    <IndustryCard key={item.title} {...item} />
+                <Stagger className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+                  {items.map(({ className, ...item }) => (
+                    <StaggerItem key={item.title} className={className}>
+                      <IndustryCard {...item} />
+                    </StaggerItem>
                   ))}
-                </div>
+                </Stagger>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="mt-12 flex items-center justify-center gap-3">
-          {/* <Button
-            variant="ghost"
-            size="icon"
-            onClick={prevSlide}
-            className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button> */}
+        {slides.length > 1 && (
+          <div className="mt-12 flex items-center justify-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={prevSlide}
+              className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-500 transition-all duration-300 hover:-translate-x-0.5 hover:bg-slate-50"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
 
-          <div className="flex items-center gap-2">
-            {slides.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setActive(index)}
-                className={cn(
-                  "h-1.5 rounded-full transition-all duration-300",
-                  active === index
-                    ? "h-2 w-16 bg-teal-600"
-                    : "w-2 h-2 bg-teal-200 hover:bg-teal-400"
-                )}
-                aria-label={`Go to slide ${index + 1}`}
-              />
-            ))}
+            <div className="flex items-center gap-2">
+              {slides.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setActive(index)}
+                  className={cn(
+                    "h-1.5 rounded-full transition-all duration-300",
+                    active === index
+                      ? "h-2 w-16 bg-teal-600"
+                      : "w-2 h-2 bg-teal-200 hover:bg-teal-400"
+                  )}
+                  aria-label={`Go to slide ${index + 1}`}
+                />
+              ))}
+            </div>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={nextSlide}
+              className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-500 transition-all duration-300 hover:translate-x-0.5 hover:bg-slate-50"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
-
-          {/* <Button
-            variant="ghost"
-            size="icon"
-            onClick={nextSlide}
-            className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button> */}
-        </div>
+        )}
       </div>
     </section>
   );
@@ -199,35 +204,28 @@ function IndustryCard({
   desc,
   badge,
   image,
-  className,
 }: {
   title: string;
   desc: string;
   badge: string;
   image: string;
-  className: string;
 }) {
   return (
-    <article
-      className={cn(
-        "group relative h-[230px] lg:h-[300px] overflow-hidden rounded-2xl bg-slate-900 shadow-sm",
-        className
-      )}
-    >
+    <article className="group relative h-[230px] w-full overflow-hidden rounded-2xl bg-slate-900 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_45px_rgba(15,23,42,0.25)] lg:h-[300px]">
       <img
         src={image}
         alt={title}
         className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
       />
 
-      {/* <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 to-slate-950/5" /> */}
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
-      <div className="absolute left-5 top-5 rounded-full bg-white/90 px-3 py-1 text-[10px] font-medium text-slate-700 shadow-sm backdrop-blur">
+      <div className="absolute left-5 top-5 rounded-full bg-white/90 px-3 py-1 text-[10px] font-medium text-slate-700 shadow-sm backdrop-blur transition-transform duration-300 group-hover:-translate-y-0.5">
         {badge}
       </div>
 
       <div className="absolute bottom-6 left-6 right-6">
-        <h3 className="text-2xl font-medium tracking-[-0.03em] text-white">
+        <h3 className="text-2xl font-medium tracking-normal text-white">
           {title}
         </h3>
         <p className="mt-2 max-w-md text-xs leading-5 text-white/75">

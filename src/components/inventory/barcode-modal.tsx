@@ -121,10 +121,10 @@ export function BarcodeModal({ product, onClose }: Props) {
               <div style={{ textAlign: 'center' }}>
                 <svg ref={barcodeRef} style={{ maxWidth: '100%' }} />
                 <div style={{
-                  fontSize: '18px',
+                  fontSize: '14px',
                   fontWeight: '600',
                   color: '#000',
-                  marginTop: '6px',
+                  marginTop: '4px',
                   fontFamily: 'system-ui, -apple-system, sans-serif',
                   whiteSpace: 'nowrap',
                   textOverflow: 'ellipsis',

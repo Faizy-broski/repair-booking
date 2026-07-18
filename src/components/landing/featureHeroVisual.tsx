@@ -1,23 +1,57 @@
+"use client";
+
 import Image from 'next/image'
+import { motion } from 'framer-motion'
 import { FadeIn } from '@/components/landing/motion'
+
+function FloatingCard({
+  src,
+  alt,
+  width,
+  height,
+  className,
+  delay = 0,
+  duration = 3.4,
+}: {
+  src: string
+  alt: string
+  width: number
+  height: number
+  className: string
+  delay?: number
+  duration?: number
+}) {
+  return (
+    <motion.div
+      className={className}
+      animate={{ y: [0, -10, 0] }}
+      transition={{ duration, repeat: Infinity, ease: 'easeInOut', delay }}
+    >
+      <Image src={src} alt={alt} width={width} height={height} className="h-auto w-full drop-shadow-xl" />
+    </motion.div>
+  )
+}
 
 export default function FeatureHeroVisual() {
   return (
     <FadeIn
       delay={0.15}
-      className="relative mx-auto h-[280px] w-full max-w-7xl overflow-hidden bg-white sm:h-[420px] md:h-[560px] lg:h-[700px]"
+      className="relative mx-auto h-[260px] w-full max-w-7xl overflow-hidden bg-white sm:h-[360px] md:h-[460px] lg:h-[600px]"
     >
-      {/* radial lines svg */}
-      <Image
-        src="/images/radiallines.svg"
-        alt=""
-        fill
-        priority
-        className="pointer-events-none select-none object-cover"
-      />
+      {/* radial lines svg — kept behind and contained so it fans out tightly
+          from the dashboard instead of stretching full-bleed across the section */}
+      <div className="absolute inset-0 -z-10 mx-auto max-w-[1000px]">
+        <Image
+          src="/images/radiallines.svg"
+          alt=""
+          fill
+          priority
+          className="pointer-events-none select-none object-contain"
+        />
+      </div>
 
       {/* main dashboard */}
-      <div className="absolute left-1/2 top-[24px] z-10 w-[92%] max-w-[890px] -translate-x-1/2 sm:top-[50px] lg:top-[95px] lg:w-[72%]">
+      <div className="absolute left-1/2 top-[16px] z-10 w-[94%] max-w-[950px] -translate-x-1/2 sm:top-[30px] lg:top-[55px] lg:w-[78%]">
         <Image
           src="/images/dashboard.svg"
           alt="Repair shop dashboard"
@@ -29,39 +63,43 @@ export default function FeatureHeroVisual() {
       </div>
 
       {/* sms card */}
-      <Image
+      <FloatingCard
         src="/images/smscard.svg"
         alt=""
         width={235}
         height={76}
-        className="absolute left-[6%] top-[60px] z-20 hidden w-[150px] md:block lg:left-[13%] lg:top-[70px] lg:w-[235px]"
+        delay={0}
+        className="absolute left-[4%] top-[45px] z-20 hidden w-[150px] md:block lg:left-[15%] lg:top-[38px] lg:w-[225px]"
       />
 
       {/* revenue KPI */}
-      <Image
+      <FloatingCard
         src="/images/revenuecard.svg"
         alt=""
         width={260}
         height={180}
-        className="absolute right-[6%] top-[0px] z-20 hidden w-[170px] md:block lg:right-[10%] lg:w-[260px]"
+        delay={0.4}
+        className="absolute right-[4%] -top-[6px] z-20 hidden w-[170px] md:block lg:right-[12%] lg:top-[-10px] lg:w-[245px]"
       />
 
       {/* queue card */}
-      <Image
+      <FloatingCard
         src="/images/queuecard.svg"
         alt=""
         width={260}
         height={230}
-        className="absolute bottom-[25px] left-[4%] z-20 hidden w-[170px] md:block lg:bottom-[35px] lg:left-[8%] lg:w-[260px]"
+        delay={0.8}
+        className="absolute bottom-[10px] left-[2%] z-20 hidden w-[170px] md:block lg:bottom-[10px] lg:left-[10%] lg:w-[245px]"
       />
 
       {/* pixel battery chip */}
-      <Image
+      <FloatingCard
         src="/images/batterychip.svg"
         alt=""
         width={250}
         height={90}
-        className="absolute bottom-[35px] right-[4%] z-20 hidden w-[160px] md:block lg:bottom-[50px] lg:right-[8%] lg:w-[250px]"
+        delay={1.2}
+        className="absolute bottom-[18px] right-[2%] z-20 hidden w-[160px] md:block lg:bottom-[18px] lg:right-[10%] lg:w-[235px]"
       />
     </FadeIn>
   )

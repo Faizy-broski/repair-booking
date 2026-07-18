@@ -52,7 +52,8 @@ const modules = [
 
 export default function ModulesSection() {
   return (
-    <section id="modules" className="relative overflow-hidden py-16 text-white bg-[url('/images/moduleHero.svg')] bg-cover">
+    <section id="modules" className="relative overflow-hidden py-20 text-white bg-[url('/images/moduleHero.svg')] bg-cover sm:py-24 lg:py-28">
+      <div className="pointer-events-none absolute left-1/2 top-1/3 -z-10 h-[400px] w-[80vw] max-w-[900px] -translate-x-1/2 rounded-full bg-teal-500/20 blur-[140px]" />
       {/* SVG background lines */}
       {/* <div className="pointer-events-none absolute inset-0"> */}
         {/* <svg
@@ -129,7 +130,7 @@ export default function ModulesSection() {
         >
           {modules.map(({ label, icon: Icon }) => (
             <StaggerItem key={label}>
-              <div className="flex h-12 items-center gap-3 rounded-xl border border-white/10 bg-white/25 px-4 text-sm text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_12px_28px_rgba(0,0,0,0.22)] backdrop-blur-md transition hover:-translate-y-0.5 hover:bg-white/30">
+              <div className="flex h-14 items-center gap-3 rounded-xl border border-white/15 bg-white/10 px-4 text-sm text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_12px_28px_rgba(0,0,0,0.28)] backdrop-blur-lg transition-all duration-300 hover:-translate-y-1 hover:border-white/25 hover:bg-white/20 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_16px_36px_rgba(0,0,0,0.32)]">
                 <Icon className="h-4 w-4 shrink-0 text-white/90" strokeWidth={1.7} />
                 <span className="truncate">{label}</span>
               </div>

@@ -38,11 +38,15 @@ export interface InvoiceSettings {
 
   // Footer
   footer_address: string | null
+  footer_phone: string | null
   footer_line_1: string | null
   footer_line_2: string | null
   footer_line_3: string | null
   thank_you_message: string | null
   policy_text: string | null
+  since_year: string | null
+  guarantee_line_1: string | null
+  guarantee_line_2: string | null
 
   // Social links
   social_links: SocialLinks
@@ -70,11 +74,15 @@ export const DEFAULT_INVOICE_SETTINGS: InvoiceSettings = {
   show_phone: true,
   show_email: true,
   footer_address: null,
+  footer_phone: null,
   footer_line_1: null,
   footer_line_2: null,
   footer_line_3: null,
   thank_you_message: 'Thank you for your business!',
   policy_text: null,
+  since_year: null,
+  guarantee_line_1: null,
+  guarantee_line_2: null,
   social_links: {},
   show_tax_breakdown: true,
   show_payment_method: false,
