@@ -132,6 +132,7 @@ function InvoicePreview({ s, businessName, branchName }: {
       <div style={{ fontFamily: fontStyle, width: `${width * 0.75}px`, backgroundColor: '#fff', margin: '0 auto', padding: '12px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 9 }}>
         {s.show_logo && s.logo_url && <img src={s.logo_url} alt="" style={{ width: 40, height: 40, objectFit: 'contain', display: 'block', margin: '0 auto 6px' }} />}
         {s.show_business_name && <p style={{ textAlign: 'center', fontWeight: 700, fontSize: 11, margin: '0 0 1px' }}>{businessName}</p>}
+        {s.since_year && <p style={{ textAlign: 'center', fontWeight: 700, margin: '0 0 1px' }}>Since {s.since_year}</p>}
         {s.show_branch_name && <p style={{ textAlign: 'center', color: '#6b7280', margin: '0 0 4px' }}>{branchName}</p>}
         <hr style={{ border: 'none', borderTop: '1px dashed #d1d5db', margin: '6px 0' }} />
         <p style={{ fontWeight: 700, textAlign: 'center', margin: '0 0 4px' }}>INV-2024-0042</p>
@@ -160,9 +161,36 @@ function InvoicePreview({ s, businessName, branchName }: {
         </div>
         <hr style={{ border: 'none', borderTop: '1px dashed #d1d5db', margin: '6px 0' }} />
         {s.thank_you_message && <p style={{ textAlign: 'center', fontWeight: 700, color: s.primary_color, margin: '0 0 2px' }}>{s.thank_you_message}</p>}
-        {s.footer_address && <p style={{ textAlign: 'center', color: '#9ca3af', margin: '1px 0' }}>{s.footer_address}</p>}
+        {s.guarantee_line_1 && <p style={{ textAlign: 'center', fontWeight: 700, margin: '2px 0' }}>• {s.guarantee_line_1}</p>}
+        {s.guarantee_line_2 && <p style={{ textAlign: 'center', fontWeight: 700, margin: '2px 0' }}>• {s.guarantee_line_2}</p>}
         {footerLines.map((l, i) => <p key={i} style={{ textAlign: 'center', color: '#9ca3af', margin: '1px 0' }}>{l}</p>)}
-        {socials.map(([k, v]) => <p key={k} style={{ textAlign: 'center', color: '#9ca3af', margin: '1px 0' }}>{k}: {v as string}</p>)}
+        {s.footer_address && (
+          <>
+            <hr style={{ border: 'none', borderTop: '1px dashed #d1d5db', margin: '6px 0' }} />
+            <p style={{ textAlign: 'center', fontWeight: 700, fontSize: 7, letterSpacing: 0.5, margin: '4px 0 1px' }}>ADDRESS</p>
+            <p style={{ textAlign: 'center', color: '#9ca3af', margin: '1px 0' }}>{s.footer_address}</p>
+          </>
+        )}
+        {s.footer_phone && (
+          <>
+            <hr style={{ border: 'none', borderTop: '1px dashed #d1d5db', margin: '6px 0' }} />
+            <p style={{ textAlign: 'center', fontWeight: 700, fontSize: 7, letterSpacing: 0.5, margin: '4px 0 1px' }}>PH</p>
+            <p style={{ textAlign: 'center', color: '#9ca3af', margin: '1px 0' }}>{s.footer_phone}</p>
+          </>
+        )}
+        {socials.length > 0 && (
+          <>
+            <hr style={{ border: 'none', borderTop: '2px solid #d1d5db', margin: '6px 0' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px', marginTop: 4 }}>
+              {socials.map(([k, v]) => (
+                <div key={k} style={{ textAlign: 'center' }}>
+                  <p style={{ fontWeight: 700, margin: 0, textTransform: 'capitalize' }}>{k}</p>
+                  <p style={{ color: '#9ca3af', margin: 0 }}>{v as string}</p>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
         {s.policy_text && <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: 6.5, marginTop: 6, borderTop: '1px solid #e5e7eb', paddingTop: 5 }}>{s.policy_text}</p>}
       </div>
     )
@@ -533,6 +561,12 @@ export function InvoiceDesignTab() {
                 <Toggle label="Show Phone Number"  checked={settings.show_phone}          onChange={(v) => patch({ show_phone: v })} />
                 <Toggle label="Show Email"         checked={settings.show_email}          onChange={(v) => patch({ show_email: v })} />
               </div>
+              <Input
+                label="Since (Year)"
+                placeholder="e.g. 1971"
+                value={settings.since_year ?? ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ since_year: e.target.value || null })}
+              />
             </Section>
 
             {/* Footer Content */}
@@ -544,10 +578,28 @@ export function InvoiceDesignTab() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ thank_you_message: e.target.value || null })}
               />
               <Input
+                label="Guarantee Line 1"
+                placeholder="e.g. 1 Month Free Repair Guarantee"
+                value={settings.guarantee_line_1 ?? ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ guarantee_line_1: e.target.value || null })}
+              />
+              <Input
+                label="Guarantee Line 2"
+                placeholder="e.g. Size change within 15 Days"
+                value={settings.guarantee_line_2 ?? ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ guarantee_line_2: e.target.value || null })}
+              />
+              <Input
                 label="Address"
                 placeholder="e.g. 164-Bukhsi Market Bano Bazar Anarkali Lahore, Pakistan"
                 value={settings.footer_address ?? ''}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ footer_address: e.target.value || null })}
+              />
+              <Input
+                label="Phone"
+                placeholder="e.g. 042-37731463, 0337-2244476"
+                value={settings.footer_phone ?? ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ footer_phone: e.target.value || null })}
               />
               <Input
                 label="Footer Line 1"

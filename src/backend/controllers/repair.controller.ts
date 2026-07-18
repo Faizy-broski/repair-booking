@@ -55,22 +55,28 @@ async function getRepairInvoiceData(repairId: string, branchId: string | null, b
     ? [r.issue]
     : []
 
-  const repairItems: any[] = Array.isArray(r.repair_items) ? r.repair_items : []
-  const items = repairItems.length > 0
-    ? repairItems.map((item) => ({
-        description: item.name,
-        quantity:    item.quantity ?? 1,
-        unit_price:  Number(item.unit_price ?? 0),
-      }))
-    : [{
-        description: `Repair Service (${[r.device_brand, r.device_model].filter(Boolean).join(' ') || r.device_type || 'Device'})`,
-        quantity:    1,
-        unit_price:  Number(r.estimated_cost ?? 0),
-      }]
+  const deviceName = [r.device_brand, r.device_model].filter(Boolean).join(' ') || r.device_type || 'Device'
 
-  const invoiceTotal = repairItems.length > 0
-    ? items.reduce((s, it) => s + it.quantity * it.unit_price, 0)
-    : Number(r.estimated_cost ?? 0)
+  const repairItems: any[] = Array.isArray(r.repair_items) ? r.repair_items : []
+  const sumOfParts = repairItems.reduce((s: number, it: any) => s + (it.quantity ?? 1) * Number(it.unit_price ?? 0), 0)
+  const laborFee = Math.max(0, Number(r.estimated_cost ?? 0) - sumOfParts)
+  
+  const items: any[] = []
+  if (laborFee > 0 || repairItems.length === 0) {
+    items.push({
+      description: `Repair Fee`,
+      quantity:    1,
+      unit_price:  laborFee,
+    })
+  }
+
+  items.push(...repairItems.map((item) => ({
+    description: item.quantity > 1 ? `${item.quantity}x ${item.name}` : item.name,
+    quantity:    item.quantity ?? 1,
+    unit_price:  Number(item.unit_price ?? 0),
+  })))
+
+  const invoiceTotal = items.reduce((s, it) => s + it.quantity * it.unit_price, 0)
 
   const customer     = r.customers
   const customerName = customer
@@ -96,6 +102,7 @@ async function getRepairInvoiceData(repairId: string, branchId: string | null, b
     branchPhone:     branchRow?.phone ?? null,
     branchEmail:     branchRow?.email ?? null,
     customerName,
+    deviceName,
     deviceImei:      r.serial_number || 'N/A',
     faults:          faultsArr.length > 0 ? faultsArr.join(', ') : 'N/A',
     customerEmail:   customer?.email ?? null,
@@ -163,9 +170,9 @@ async function getRepairSlipData(repairId: string, branchId: string | null, busi
 
   // Charges: use repair_items if present, otherwise estimated_cost
   const repairItems: any[] = Array.isArray(r.repair_items) ? r.repair_items : []
-  const totalRepairCharges = repairItems.length > 0
-    ? repairItems.reduce((s: number, it: any) => s + (it.quantity ?? 1) * Number(it.unit_price ?? 0), 0)
-    : Number(r.estimated_cost ?? 0)
+  let totalRepairCharges = Number(r.estimated_cost ?? 0)
+  const sumOfParts = repairItems.reduce((s: number, it: any) => s + (it.quantity ?? 1) * Number(it.unit_price ?? 0), 0)
+  totalRepairCharges = Math.max(totalRepairCharges, sumOfParts)
   const deposit = Number(r.deposit_paid ?? 0)
   const remaining = Math.max(0, totalRepairCharges - deposit)
 

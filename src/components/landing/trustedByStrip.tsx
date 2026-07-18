@@ -5,7 +5,7 @@ const TRUSTED_LOGOS = ["REPAIRLY", "TEK-PRO", "iFIX-IT", "NEXT-GEN"];
 export default function TrustedByStrip() {
   return (
     <section className="relative overflow-hidden bg-white px-4 sm:px-6">
-      <FadeIn className="relative mx-auto max-w-5xl py-8 mt-6 bg-white text-center sm:py-10 sm:mt-10">
+      <FadeIn className="relative mx-auto max-w-5xl py-12 mt-10 bg-white text-center sm:py-16 sm:mt-16">
         {/* top/bottom borders */}
 
         <div className="absolute left-1/2 top-0 h-px w-[90%] -translate-x-1/2 bg-gradient-to-r from-transparent via-gray-200 to-transparent" />

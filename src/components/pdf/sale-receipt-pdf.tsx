@@ -1,7 +1,8 @@
+import React from 'react'
 import {
-  Document, Page, Text, View, StyleSheet, Image,
+  Document, Page, Text, View, StyleSheet, Image, Svg, Path, Circle, Rect, Line
 } from '@react-pdf/renderer'
-import type { InvoiceSettings } from '@/types/invoice-settings'
+import type { InvoiceSettings, SocialLinks } from '@/types/invoice-settings'
 import { DEFAULT_INVOICE_SETTINGS } from '@/types/invoice-settings'
 import { formatCurrency } from '@/lib/utils'
 
@@ -20,6 +21,43 @@ const C = {
   green: '#16a34a',
   orange: '#f97316',
   amber: '#d97706',
+}
+
+const PDFSocialIcons: Record<string, React.FC<{ color: string }>> = {
+  website: ({ color }) => (
+    <Svg viewBox="0 0 24 24" width={10} height={10}>
+      <Circle cx={12} cy={12} r={10} fill="none" stroke={color} strokeWidth={2} />
+      <Path d="M2 12h20" fill="none" stroke={color} strokeWidth={2} />
+      <Path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" fill="none" stroke={color} strokeWidth={2} />
+    </Svg>
+  ),
+  facebook: ({ color }) => (
+    <Svg viewBox="0 0 24 24" width={10} height={10}>
+      <Path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" fill="none" stroke={color} strokeWidth={2} />
+    </Svg>
+  ),
+  instagram: ({ color }) => (
+    <Svg viewBox="0 0 24 24" width={10} height={10}>
+      <Rect x={2} y={2} width={20} height={20} rx={5} ry={5} fill="none" stroke={color} strokeWidth={2} />
+      <Path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" fill="none" stroke={color} strokeWidth={2} />
+      <Line x1={17.5} y1={6.5} x2={17.51} y2={6.5} stroke={color} strokeWidth={2} />
+    </Svg>
+  ),
+  twitter: ({ color }) => (
+    <Svg viewBox="0 0 24 24" width={10} height={10}>
+      <Path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z" fill="none" stroke={color} strokeWidth={2} />
+    </Svg>
+  ),
+  whatsapp: ({ color }) => (
+    <Svg viewBox="0 0 24 24" width={10} height={10}>
+      <Path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.39 1.26 4.81L2 22l5.42-1.36a9.85 9.85 0 0 0 4.62 1.17h.01c5.46 0 9.9-4.45 9.9-9.91 0-2.64-1.03-5.13-2.9-7C17.17 3.03 14.68 2 12.04 2zm5.86 14.11c-.25.7-1.45 1.34-2 1.43-.5.08-1.14.11-1.84-.12-.42-.14-.96-.31-1.65-.61-2.9-1.26-4.8-4.17-4.94-4.37-.14-.2-1.18-1.57-1.18-3 0-1.42.75-2.12 1.02-2.41.27-.29.58-.36.77-.36.2 0 .39 0 .56.01.18.01.42-.07.66.5.25.6.85 2.07.92 2.22.07.15.12.33.02.53-.1.2-.15.32-.3.49-.15.17-.31.38-.44.51-.15.15-.3.31-.13.61.17.3.76 1.25 1.63 2.02 1.12 1 2.06 1.31 2.36 1.46.3.15.47.13.65-.08.18-.2.75-.87.95-1.17.2-.3.4-.25.66-.15.27.1 1.72.81 2.02.96.3.15.5.22.57.35.07.13.07.75-.18 1.45z" fill={color} />
+    </Svg>
+  ),
+  tiktok: ({ color }) => (
+    <Svg viewBox="0 0 24 24" width={10} height={10}>
+      <Path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.76a4.85 4.85 0 0 1-1.01-.07z" fill={color} />
+    </Svg>
+  ),
 }
 
 const PAPER_SIZES: Record<string, any> = {
@@ -690,8 +728,8 @@ export function SaleReceiptPdf({
               </View>
               {discount > 0 && (
                 <View style={s.rctTotalRow}>
-                  <Text style={[s.rctTotalLabel, { color: '#10b981' }]}>Discount</Text>
-                  <Text style={[s.rctTotalVal, { color: '#10b981' }]}>-{fmt(discount)}</Text>
+                  <Text style={s.rctTotalLabel}>Discount</Text>
+                  <Text style={s.rctTotalVal}>-{fmt(discount)}</Text>
                 </View>
               )}
               {settings.show_tax_breakdown && tax > 0 && (
@@ -713,8 +751,8 @@ export function SaleReceiptPdf({
               </View>
               {discount > 0 && (
                 <View style={s.totalRow}>
-                  <Text style={[s.totalLabel, { color: '#10b981' }]}>Discount</Text>
-                  <Text style={[s.totalVal, { color: '#10b981' }]}>-{fmt(discount)}</Text>
+                  <Text style={s.totalLabel}>Discount</Text>
+                  <Text style={s.totalVal}>-{fmt(discount)}</Text>
                 </View>
               )}
               {settings.show_tax_breakdown && tax > 0 && (
@@ -742,7 +780,7 @@ export function SaleReceiptPdf({
                 <Text style={{ fontSize: 9, color: C.mid }}>
                   {displayDepositAmount > 0 ? `Deposit Paid${paymentSplits?.[0]?.method ? ` (${PAYMENT_LABELS[paymentSplits[0].method] ?? paymentSplits[0].method})` : ''}` : 'Deposit Paid'}
                 </Text>
-                <Text style={{ fontSize: 9, color: displayDepositAmount > 0 ? C.green : C.mid, fontFamily: bold }}>{fmt(displayDepositAmount)}</Text>
+                <Text style={{ fontSize: 9, color: tc, fontFamily: bold }}>{fmt(displayDepositAmount)}</Text>
               </View>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 5, borderTopWidth: 0.5, borderTopColor: '#e9d5ff' }}>
                 <Text style={{ fontSize: 10, color: '#7c3aed', fontFamily: bold }}>Outstanding Balance</Text>
@@ -790,13 +828,27 @@ export function SaleReceiptPdf({
             ))}
 
             {settings.social_links && Object.entries(settings.social_links).filter(([_, v]) => v).length > 0 && (
-              <View style={{ flexDirection: 'column', alignItems: 'center', marginTop: 5, gap: 2 }}>
-                {Object.entries(settings.social_links).filter(([_, v]) => v).map(([k, v]) => (
-                  <Text key={k} style={{ fontSize: 7, color: C.faint, textAlign: 'center' }}>
-                    {k.charAt(0).toUpperCase() + k.slice(1)}: {String(v).replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
-                  </Text>
-                ))}
-              </View>
+              <>
+                <View style={{ width: '100%', height: 1, backgroundColor: C.border, marginVertical: 8 }} />
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', width: '100%', maxWidth: 300 }}>
+                  {Object.entries(settings.social_links).filter(([_, v]) => v).map(([k, v]) => {
+                    const IconComponent = PDFSocialIcons[k]
+                    return (
+                      <View key={k} style={{ width: '50%', alignItems: 'center', marginBottom: 6 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 1 }}>
+                          {IconComponent && <View style={{ marginRight: 4, marginTop: 1 }}><IconComponent color={C.mid} /></View>}
+                          <Text style={{ fontSize: 7.5, color: C.mid, fontFamily: bold }}>
+                            {k.charAt(0).toUpperCase() + k.slice(1)}
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 7, color: tc }}>
+                          {String(v).replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
+                        </Text>
+                      </View>
+                    )
+                  })}
+                </View>
+              </>
             )}
 
             {settings.policy_text && (

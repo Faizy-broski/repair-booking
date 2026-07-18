@@ -373,8 +373,7 @@ export function CartPanel({ mobileView }: Props) {
     // Capture receipt items and open print window NOW, while still in the
     // user-gesture handler and before any await — prevents popup blocker.
     const receiptItems = pos.cart.map(item => ({
-      description: (item.variant ? `${item.product.name} – ${item.variant.name}` : item.product.name) +
-        (item.imei || item.faults ? `\n${[item.imei ? `IMEI: ${item.imei}` : null, item.faults ? `Faults: ${item.faults}` : null].filter(Boolean).join(' | ')}` : ''),
+      description: item.variant ? `${item.product.name} – ${item.variant.name}` : item.product.name,
       quantity: item.quantity,
       unit_price: item.unitPrice,
       discount: item.discount,
@@ -403,8 +402,7 @@ export function CartPanel({ mobileView }: Props) {
         product_id: (item.product as any).repair_id ? null : item.product.id,
         repair_id: (item.product as any).repair_id ?? null,
         variant_id: item.variant?.id ?? null,
-        name: (item.variant ? `${item.product.name} – ${item.variant.name}` : item.product.name) +
-          (item.imei || item.faults ? ` - ${[item.imei ? `IMEI: ${item.imei}` : null, item.faults ? `Faults: ${item.faults}` : null].filter(Boolean).join(' | ')}` : ''),
+        name: item.variant ? `${item.product.name} – ${item.variant.name}` : item.product.name,
         quantity: item.quantity, unit_price: item.unitPrice,
         discount: item.discount, total: (item.unitPrice - item.discount) * item.quantity,
         is_service: item.product.is_service,
@@ -453,8 +451,7 @@ export function CartPanel({ mobileView }: Props) {
     setProcessing(true)
 
     const receiptItemsCash = pos.cart.map(item => ({
-      description: (item.variant ? `${item.product.name} – ${item.variant.name}` : item.product.name) +
-        (item.imei || item.faults ? `\n${[item.imei ? `IMEI: ${item.imei}` : null, item.faults ? `Faults: ${item.faults}` : null].filter(Boolean).join(' | ')}` : ''),
+      description: item.product.name,
       quantity: item.quantity,
       unit_price: item.unitPrice,
       discount: item.discount,
@@ -467,9 +464,7 @@ export function CartPanel({ mobileView }: Props) {
       product_id: (item.product as any).repair_id ? null : item.product.id,
       repair_id: (item.product as any).repair_id ?? null,
       variant_id: item.variant?.id ?? null,
-      name: (item.product.name) +
-        (item.imei || item.faults ? ` - ${[item.imei ? `IMEI: ${item.imei}` : null, item.faults ? `Faults: ${item.faults}` : null].filter(Boolean).join(' | ')}` : ''),
-      quantity: item.quantity, unit_price: item.unitPrice,
+      name: item.product.name, quantity: item.quantity, unit_price: item.unitPrice,
       discount: item.discount, total: (item.unitPrice - item.discount) * item.quantity,
       is_service: item.product.is_service,
       is_discount: item.isDiscount ?? false,
@@ -551,8 +546,7 @@ export function CartPanel({ mobileView }: Props) {
     setProcessing(true)
 
     const receiptItemsCredit = pos.cart.map(item => ({
-      description: (item.variant ? `${item.product.name} – ${item.variant.name}` : item.product.name) +
-        (item.imei || item.faults ? `\n${[item.imei ? `IMEI: ${item.imei}` : null, item.faults ? `Faults: ${item.faults}` : null].filter(Boolean).join(' | ')}` : ''),
+      description: item.variant ? `${item.product.name} – ${item.variant.name}` : item.product.name,
       quantity: item.quantity,
       unit_price: item.unitPrice,
       discount: item.discount,
@@ -565,8 +559,7 @@ export function CartPanel({ mobileView }: Props) {
       product_id: (item.product as any).repair_id ? null : item.product.id,
       repair_id: (item.product as any).repair_id ?? null,
       variant_id: item.variant?.id ?? null,
-      name: (item.variant ? `${item.product.name} – ${item.variant.name}` : item.product.name) +
-        (item.imei || item.faults ? ` - ${[item.imei ? `IMEI: ${item.imei}` : null, item.faults ? `Faults: ${item.faults}` : null].filter(Boolean).join(' | ')}` : ''),
+      name: item.variant ? `${item.product.name} – ${item.variant.name}` : item.product.name,
       quantity: item.quantity, unit_price: item.unitPrice,
       discount: item.discount, total: (item.unitPrice - item.discount) * item.quantity,
       is_service: item.product.is_service,
@@ -815,24 +808,8 @@ export function CartPanel({ mobileView }: Props) {
                         )}
                       </p>
                       {(item.variant?.sku ?? item.product.sku) && (
-                        <p className="text-gray-400 text-xs truncate mb-1">#{item.variant?.sku ?? item.product.sku}</p>
+                        <p className="text-gray-400 text-xs truncate">#{item.variant?.sku ?? item.product.sku}</p>
                       )}
-                      <div className="mt-1 flex flex-col gap-1 pr-1">
-                        <input
-                          type="text"
-                          placeholder="IMEI / S/N (optional)"
-                          value={item.imei || ''}
-                          onChange={e => pos.setItemImei(item.product.id, item.variant?.id ?? null, e.target.value, isDiscount)}
-                          className="w-full text-[11px] rounded border border-gray-200 px-1.5 py-0.5 focus:border-brand-teal focus:outline-none placeholder:text-gray-300"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Faults (optional)"
-                          value={item.faults || ''}
-                          onChange={e => pos.setItemFaults(item.product.id, item.variant?.id ?? null, e.target.value, isDiscount)}
-                          className="w-full text-[11px] rounded border border-gray-200 px-1.5 py-0.5 focus:border-brand-teal focus:outline-none placeholder:text-gray-300"
-                        />
-                      </div>
                     </td>
                     {/* Unit price cell — shows original crossed out + sale price for discount items */}
                     <td className="px-2 py-2.5 align-middle text-right">

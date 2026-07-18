@@ -39,11 +39,15 @@ const schema = z.object({
 
   // Footer
   footer_address:    z.string().nullable().optional(),
+  footer_phone:      z.string().nullable().optional(),
   footer_line_1:     z.string().nullable().optional(),
   footer_line_2:     z.string().nullable().optional(),
   footer_line_3:     z.string().nullable().optional(),
   thank_you_message: z.string().nullable().optional(),
   policy_text:       z.string().nullable().optional(),
+  since_year:        z.string().nullable().optional(),
+  guarantee_line_1:  z.string().nullable().optional(),
+  guarantee_line_2:  z.string().nullable().optional(),
 
   // Social links
   social_links: socialLinksSchema,
@@ -62,6 +66,7 @@ export const InvoiceSettingsController = {
       const settings = await InvoiceSettingsService.get(ctx.businessId!, branchId)
       return ok(settings)
     } catch (err) {
+      console.error('===== INVOICE SETTINGS ERROR =====', err)
       return serverError('Failed to fetch invoice settings', err)
     }
   },

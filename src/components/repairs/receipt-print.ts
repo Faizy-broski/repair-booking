@@ -1,17 +1,26 @@
 import type { InvoiceSettings, SocialLinks } from '@/types/invoice-settings'
 import { formatCurrency } from '@/lib/utils'
 
-const SOCIAL_LABELS: Record<keyof SocialLinks, string> = {
-  website: 'Web', facebook: 'FB', instagram: 'IG',
-  twitter: 'TW', whatsapp: 'WA', tiktok: 'TT',
+// Full names used for the side-by-side social header row on the receipt
+// (e.g. "Instagram   TikTok" with handles below).
+const SOCIAL_LABELS_FULL: Record<keyof SocialLinks, string> = {
+  website: 'Website', facebook: 'Facebook', instagram: 'Instagram',
+  twitter: 'Twitter', whatsapp: 'WhatsApp', tiktok: 'TikTok',
+}
+
+// Small monochrome icon markup (uses currentColor so it prints black),
+// shown next to each platform name in the social grid.
+const SOCIAL_ICONS: Record<keyof SocialLinks, string> = {
+  website: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+  facebook: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>',
+  instagram: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>',
+  twitter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z"/></svg>',
+  whatsapp: '<svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.39 1.26 4.81L2 22l5.42-1.36a9.85 9.85 0 0 0 4.62 1.17h.01c5.46 0 9.9-4.45 9.9-9.91 0-2.64-1.03-5.13-2.9-7C17.17 3.03 14.68 2 12.04 2zm5.86 14.11c-.25.7-1.45 1.34-2 1.43-.5.08-1.14.11-1.84-.12-.42-.14-.96-.31-1.65-.61-2.9-1.26-4.8-4.17-4.94-4.37-.14-.2-1.18-1.57-1.18-3 0-1.42.75-2.12 1.02-2.41.27-.29.58-.36.77-.36.2 0 .39 0 .56.01.18.01.42-.07.66.5.25.6.85 2.07.92 2.22.07.15.12.33.02.53-.1.2-.15.32-.3.49-.15.17-.31.38-.44.51-.15.15-.3.31-.13.61.17.3.76 1.25 1.63 2.02 1.12 1 2.06 1.31 2.36 1.46.3.15.47.13.65-.08.18-.2.75-.87.95-1.17.2-.3.4-.25.66-.15.27.1 1.72.81 2.02.96.3.15.5.22.57.35.07.13.07.75-.18 1.45z"/></svg>',
+  tiktok: '<svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.76a4.85 4.85 0 0 1-1.01-.07z"/></svg>',
 }
 
 function money(n: number, currency?: string) {
   return formatCurrency(n, currency)
-}
-
-function num(n: number) {
-  return new Intl.NumberFormat('en-GB', { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 }).format(n)
 }
 
 function esc(s: string | null | undefined): string {
@@ -24,11 +33,13 @@ export interface ReceiptPrintData {
   invoiceNumber: string
   status: string
   issuedAt: string
+  dueAt?: string | null
   businessName: string
   branchName?: string | null
   branchAddress?: string | null
   branchPhone?: string | null
   customerName: string
+  deviceName?: string
   deviceImei?: string
   faults?: string
   items: Array<{ description: string; quantity: number; unit_price: number; discount?: number; original_unit_price?: number | null }>
@@ -47,8 +58,8 @@ export interface ReceiptPrintData {
 
 function buildHtml(d: ReceiptPrintData, debugMode = false): string {
   const {
-    settings, invoiceNumber, status, issuedAt,
-    businessName, branchName, branchAddress, branchPhone, customerName, deviceImei, faults,
+    settings, invoiceNumber, status, issuedAt, dueAt,
+    businessName, branchName, branchAddress, branchPhone, customerName, deviceName, deviceImei, faults,
     items, subtotal, discount = 0, tax = 0, total, amountPaid = 0, currency = 'GBP',
   } = d
 
@@ -67,7 +78,8 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
   const socials = Object.entries(settings.social_links ?? {})
     .filter(([, v]) => !!v)
     .map(([k, v]) => ({
-      label: SOCIAL_LABELS[k as keyof SocialLinks],
+      label: SOCIAL_LABELS_FULL[k as keyof SocialLinks],
+      icon: SOCIAL_ICONS[k as keyof SocialLinks],
       val: String(v).replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''),
     }))
 
@@ -87,14 +99,19 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
       background: #fff;
       font-family: Arial, Helvetica, sans-serif;
       font-size: 12px;
+      font-weight: 700;
       color: #000;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
+    /* Thermal print heads render thin (normal-weight) strokes as faint/grey —
+       bold is the fix, so every element defaults to bold via inheritance
+       above and nothing in this file overrides it back down to normal. */
     body { padding: 10px 10px 20px 10px }
     .c  { text-align: center }
     .logo { display: block; margin: 0 auto 6px; width: 48px; height: 48px; object-fit: contain }
     .bn { font-size: 15px; font-weight: bold; text-align: center; margin-bottom: 2px }
+    .since { font-size: 11px; font-weight: bold; color: #000; text-align: center; margin-bottom: 2px }
     .br { font-size: 11px; color: #000; text-align: center; margin-bottom: 2px }
     .dt { font-size: 11px; color: #000; text-align: center; margin-bottom: 2px }
     hr  { border: none; border-top: 1px dashed #000; margin: 6px 0 }
@@ -102,18 +119,11 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
     .row { display: flex; justify-content: space-between; margin-bottom: 2px }
     .lbl { font-size: 11px; color: #000; font-weight: 700 }
     .val { font-size: 11px; font-weight: bold; color: #000 }
-    /* ── Items table ── */
-    .it  { width: 100%; border-collapse: collapse; margin: 0 }
-    .it th { font-size: 10px; color: #000; font-weight: 700; padding: 0 2px 4px 2px; border-bottom: 1px solid #000 }
-    .it td { font-size: 11px; padding: 4px 2px; vertical-align: top }
-    .it td.nm { font-weight: 700; color: #000; word-break: break-word; white-space: pre-wrap }
-    .it td.qt { text-align: center; white-space: nowrap; color: #000; font-weight: 600 }
-    .it td.un { text-align: center; white-space: nowrap; color: #000; font-weight: 600 }
-    .it td.dc { text-align: center; white-space: nowrap; color: #000; font-weight: 600 }
-    .it td.am { text-align: right; font-weight: bold; color: #000; white-space: nowrap }
-    .it th.qt, .it th.un, .it th.dc, .it th.am { width: 1%; white-space: nowrap; text-align: center; padding-left: 6px }
-    .it th.am { text-align: right }
-    .it td.qt, .it td.un, .it td.dc, .it td.am { padding-left: 6px }
+    /* ── Item rows (single line per item, no per-item pricing columns) ── */
+    .irow { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px }
+    .ival { font-size: 11px; font-weight: bold; color: #000; text-align: right; max-width: 65%; word-break: break-word }
+    .itm { display: flex; justify-content: space-between; margin-bottom: 2px }
+    .itv { font-size: 11px; font-weight: bold; color: #000; text-align: right; max-width: 65% }
     .tr  { display: flex; justify-content: space-between; margin-bottom: 2px }
     .tl  { font-size: 11px; color: #000; font-weight: 700 }
     .tv  { font-size: 11px; font-weight: bold; color: #000 }
@@ -130,10 +140,18 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
     /* Footer — kept together, never orphaned onto a new page */
     .ft { page-break-inside: avoid; break-inside: avoid; page-break-before: avoid }
     .ty { font-size: 12px; font-weight: bold; color: #000; text-align: center; margin-top: 6px }
+    .gt { font-size: 11px; font-weight: bold; color: #000; text-align: center; margin-top: 3px }
     .fl { font-size: 11px; color: #000; text-align: center; margin-top: 2px; word-break: break-word }
+    .lh { font-size: 10px; font-weight: 700; color: #000; text-align: center; letter-spacing: 0.5px; margin-top: 4px }
+    .hr2 { border: none; border-top: 2px solid #000; margin: 6px 0 }
     .pl { font-size: 10px; color: #000; text-align: center; margin-top: 5px;
           border-top: 1px solid #000; padding-top: 4px }
     .grn { color: #1a7a3a }
+    /* ── Social grid: fixed 2 columns so pairing never shifts with content length ── */
+    .soc { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; margin-top: 4px }
+    .socc { text-align: center }
+    .socl { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 10px; font-weight: 700; color: #000 }
+    .socv { font-size: 10px; color: #000; word-break: break-word }
 
     /* Debug panel — visible on screen, hidden when printing */
     #dbg {
@@ -195,68 +213,85 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
 ${debugMode ? debugPanel : '<div id="dbg" style="display:none"></div>'}
 ${L(settings.show_logo && settings.logo_url, `<img src="${esc(settings.logo_url)}" class="logo" alt="">`)}
 ${L(settings.show_business_name !== false, `<div class="bn">${esc(mainBn || businessName)}</div>`)}
+${L(settings.since_year, `<div class="since">Since ${esc(settings.since_year)}</div>`)}
 ${L(settings.show_business_name !== false && !!tagline, `<div class="br" style="font-weight:bold;font-size:11px;margin-top:2px;margin-bottom:2px">${esc(tagline)}</div>`)}
 ${L(settings.show_branch_name && branchName, `<div class="br">${esc(branchName)}</div>`)}
 ${L(settings.show_address && branchAddress, `<div class="dt">${esc(branchAddress)}</div>`)}
 ${L(settings.show_phone && branchPhone, `<div class="dt">${esc(branchPhone)}</div>`)}
 <hr>
 <div class="ino">${esc(invoiceNumber)}</div>
-${date.includes(',') 
+${date.includes(',')
   ? `<div style="display:flex;justify-content:space-between;margin-bottom:2px">
        <span style="font-size:9px"><span class="lbl">Date</span><span style="font-weight:bold">${esc(date.split(',')[0].trim())}</span></span>
        <span style="font-size:9px"><span class="lbl">Time</span><span style="font-weight:bold">${esc(date.split(',')[1].trim())}</span></span>
      </div>`
-  : `<div class="row"><span class="lbl">Date</span><span class="val">${esc(date)}</span></div>`
+  : ''
 }
+<hr>
+${(deviceName !== undefined || deviceImei !== undefined || faults !== undefined) ? `
+<div class="row"><span class="lbl">Order No.</span><span class="val">${esc(invoiceNumber)}</span></div>
+<div class="row"><span class="lbl">Order Date</span><span class="val">${new Date(issuedAt).toLocaleDateString('en-GB')}</span></div>
+${dueAt ? `<div class="row"><span class="lbl">Due Date</span><span class="val">${new Date(dueAt).toLocaleDateString('en-GB')}</span></div>` : ''}
+` : `
+<div class="row"><span class="lbl">Date</span><span class="val">${new Date(issuedAt).toLocaleDateString('en-GB')}</span></div>
+`}
 <div class="row"><span class="lbl">Customer</span><span class="val">${esc(customerName)}</span></div>
 <div class="row"><span class="lbl">Status</span><span class="val">${esc(status)}</span></div>
-<div class="row"><span class="lbl">IMEI/SN</span><span class="val" style="text-align:right;margin-left:8px;word-break:break-all">${esc(deviceImei || 'N/A')}</span></div>
-<div class="row"><span class="lbl">Faults</span><span class="val" style="text-align:right;margin-left:8px">${esc(faults || 'N/A')}</span></div>
-<hr>
-<table class="it">
-  <thead><tr>
-    <th style="text-align:left">ITEM</th>
-    <th class="qt">QTY</th>
-    <th class="un">UNIT PRICE</th>
-    <th class="dc">DISC</th>
-    <th class="am">AMT</th>
-  </tr></thead>
-  <tbody>
-${items.map(i => {
-  const manualDisc = i.discount ?? 0
-  const hasOriginal = i.original_unit_price != null && i.original_unit_price > i.unit_price
-  const saleDisc = hasOriginal ? (i.original_unit_price! - i.unit_price) : 0
-  const totalDiscDisplay = saleDisc + manualDisc
-  const lineAmt = (i.unit_price - manualDisc) * i.quantity
-  
-  const unitHtml = hasOriginal 
-    ? num(i.original_unit_price!)
-    : num(i.unit_price)
 
-  return `  <tr>
-    <td class="nm">${esc(i.description)}</td>
-    <td class="qt">${i.quantity}</td>
-    <td class="un">${unitHtml}</td>
-    <td class="dc${totalDiscDisplay > 0 ? ' grn' : ''}">${totalDiscDisplay > 0 ? '-' + num(totalDiscDisplay) : '0'}</td>
-    <td class="am">${num(lineAmt)}</td>
-  </tr>`
-}).join('\n')}
-  </tbody>
-</table>
+${(deviceName !== undefined || deviceImei !== undefined || faults !== undefined) ? `
+<div style="margin-top:8px; border:1px solid #000;">
+  <div style="text-align:center; font-weight:bold; border-bottom:1px solid #000; padding:2px 0; font-size:11px; background-color:#f9f9f9;">
+    Order Detail
+  </div>
+  <div style="padding:4px;">
+    ${deviceName ? `<div style="margin-bottom:2px; font-weight:bold; font-size:11px; text-transform:uppercase;">${esc(deviceName)}</div>` : ''}
+    <div style="margin-bottom:2px;"><span class="lbl">Serial No.: </span><span style="font-weight:bold; word-break:break-all;">${esc(deviceImei || 'N/A')}</span></div>
+    <div style="margin-bottom:4px;"><span class="lbl">Faults: </span><span style="font-weight:bold;">${esc(faults || 'N/A')}</span></div>
+    
+    <div style="border-bottom:1px dashed #000; margin:4px 0;"></div>
+    
+    ${items.map(i => `
+    <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+      <span style="font-weight:bold; font-size:11px; flex:1; padding-right:8px; word-break:break-word;">${esc(i.description)}</span>
+      <span style="font-weight:bold; font-size:11px;">${money(i.quantity * i.unit_price, currency)}</span>
+    </div>
+    `).join('')}
+    <div style="border-bottom:1px dashed #000; margin:4px 0;"></div>
+    <div class="tr"><span class="tl">Discount</span><span class="tv">${discount > 0 ? '-' + money(discount, currency) : money(0, currency)}</span></div>
+    <div class="tr"><span class="tl">Subtotal</span><span class="tv">${money(subtotal, currency)}</span></div>
+    ${L(settings.show_tax_breakdown && tax > 0, `<div class="tr"><span class="tl">Tax</span><span class="tv">${money(tax, currency)}</span></div>`)}
+    <hr>
+    <div class="gr"><span class="gl">Total Charges</span><span class="gv">${money(total, currency)}</span></div>
+    <div class="tr"><span class="tl">Deposit / Paid</span><span class="tv">${money(amountPaid, currency)}</span></div>
+    ${L(bal > 0, `<div class="bar"><span class="bl">Remaining</span><span class="bv">${money(bal, currency)}</span></div>`)}
+  </div>
+</div>
+` : `
 <hr>
+${items.map(i => `
+<div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+  <span style="font-weight:bold; font-size:11px; flex:1; padding-right:8px; word-break:break-word;">${i.quantity > 1 ? i.quantity + 'x ' : ''}${esc(i.description)}</span>
+  <span style="font-weight:bold; font-size:11px;">${money(i.quantity * i.unit_price, currency)}</span>
+</div>
+`).join('')}
+<hr>
+<div class="tr"><span class="tl">Discount</span><span class="tv">${discount > 0 ? '-' + money(discount, currency) : money(0, currency)}</span></div>
 <div class="tr"><span class="tl">Subtotal</span><span class="tv">${money(subtotal, currency)}</span></div>
-<div class="tr"><span class="tl">Discount</span><span class="tv${discount > 0 ? ' grn' : ''}">${discount > 0 ? '-' + money(discount, currency) : money(0, currency)}</span></div>
 ${L(settings.show_tax_breakdown && tax > 0, `<div class="tr"><span class="tl">Tax</span><span class="tv">${money(tax, currency)}</span></div>`)}
 <hr>
-<div class="gr"><span class="gl">Total</span><span class="gv">${money(total, currency)}</span></div>
-${L(amountPaid > 0, `<div class="tr"><span class="tl">Paid</span><span class="tv grn">${money(amountPaid, currency)}</span></div>`)}
+<div class="gr"><span class="gl">Total Charges</span><span class="gv">${money(total, currency)}</span></div>
+<div class="tr"><span class="tl">Amount Paid</span><span class="tv">${money(amountPaid, currency)}</span></div>
 ${L(bal > 0, `<div class="bar"><span class="bl">Balance Due</span><span class="bv">${money(bal, currency)}</span></div>`)}
+`}
 <div class="ft">
   <hr>
   <div class="ty">${esc(thankYou)}</div>
-  ${L(settings.footer_address, `<div class="fl">${esc(settings.footer_address)}</div>`)}
+  ${L(settings.guarantee_line_1, `<div class="gt">• ${esc(settings.guarantee_line_1)}</div>`)}
+  ${L(settings.guarantee_line_2, `<div class="gt">• ${esc(settings.guarantee_line_2)}</div>`)}
   ${footerLines.map(l => `<div class="fl">${esc(l)}</div>`).join('')}
-  ${socials.map(s => `<div class="fl">${esc(s.label)}: ${esc(s.val)}</div>`).join('')}
+  ${L(settings.footer_address, `<hr><div class="lh">ADDRESS</div><div class="fl">${esc(settings.footer_address)}</div>`)}
+  ${L(settings.footer_phone, `<hr><div class="lh">PH</div><div class="fl">${esc(settings.footer_phone)}</div>`)}
+  ${L(socials.length > 0, `<hr class="hr2"><div class="soc">${socials.map(s => `<div class="socc"><div class="socl">${s.icon}<span>${esc(s.label)}</span></div><div class="socv">${esc(s.val)}</div></div>`).join('')}</div>`)}
   ${L(settings.policy_text, `<div class="pl">${esc(settings.policy_text)}</div>`)}
 </div>
 </body></html>`

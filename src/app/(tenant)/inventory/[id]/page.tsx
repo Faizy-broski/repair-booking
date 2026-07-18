@@ -767,80 +767,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               </div>
               </SectionCard>
 
-            </div>
-
-            <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-[76px]">
-
-              {/* Stock */}
-              <SectionCard title="Stock">
-              {allVariants.length === 0 && (
-                <div className="grid grid-cols-1 gap-4">
-                  {product.valuation_method === 'fifo' ? (
-                    <Input label="Quantity" type="number" value={onHand} disabled hint="Driven by Stock Batches above — add/edit a batch to change this." />
-                  ) : (
-                    <Input label="Quantity" type="number" min="0" value={onHand} onChange={e => setOnHand(e.target.value)} />
-                  )}
-                  <Input label="Low Stock Alert" type="number" min="0" value={lowStockAlert} onChange={e => setLowStockAlert(e.target.value)} />
-                </div>
-              )}
-              {allVariants.length > 0 && (
-                <div className="grid grid-cols-1 gap-4">
-                  <Input label="Low Stock Alert" type="number" min="0" value={lowStockAlert} onChange={e => setLowStockAlert(e.target.value)} />
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Stock Location</label>
-                <Select
-                  options={[
-                    { value: '', label: 'Select location...' },
-                    { value: 'warehouse', label: 'Warehouse (Main Stock)' },
-                    ...branches.map(b => ({ value: b.name, label: b.name + (b.is_main ? ' (Main Branch)' : '') })),
-                  ]}
-                  value={physicalLocation}
-                  onValueChange={setPhysicalLocation}
-                />
-              </div>
-              {itemType === 'part' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier (optional)</label>
-                  <Select options={[{ value: '', label: 'Select Supplier...' }, ...suppliers.map(s => ({ value: s.id, label: s.name }))]} value={supplierId} onValueChange={setSupplierId} />
-                </div>
-              )}
-              </SectionCard>
-
-              {/* Pricing Options */}
-              <SectionCard title="Pricing Options">
-              <div className="rounded-lg border border-gray-200">
-                <div className="flex items-center justify-between px-4 py-3">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Commission</p>
-                    <p className="text-xs text-gray-500">Enable employee commission for this {itemType}</p>
-                  </div>
-                  <Toggle checked={commissionEnabled} onChange={setCommissionEnabled} color="blue" />
-                </div>
-                {commissionEnabled && (
-                  <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-1 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
-                      <Select options={[{ value: 'percentage', label: 'Percentage (%)' }, { value: 'fixed', label: `Fixed Amount (${currSymbol})` }]} value={commissionType} onValueChange={setCommissionType} />
-                    </div>
-                    <Input label={commissionType === 'percentage' ? 'Rate (%)' : `Amount (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0" value={commissionRate} onChange={e => setCommissionRate(e.target.value)} />
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Loyalty Points</p>
-                  <p className="text-xs text-gray-500">Earn / redeem loyalty points on this {itemType}</p>
-                </div>
-                <Toggle checked={loyaltyEnabled} onChange={setLoyaltyEnabled} color="blue" />
-              </div>
-              </SectionCard>
-
-            </div>
-          </div>
-
-          {/* Variants — full width so the table has room before it needs to scroll */}
+              {/* Variants */}
               <SectionCard
                 title={
                   <span className="flex items-center gap-2">
@@ -1101,9 +1028,6 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             )}
           </SectionCard>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            <div className="lg:col-span-2 space-y-6">
-
               {/* Pricing */}
               <SectionCard
                 title={(allVariants.length > 0 || newVariantRows.length > 0) ? 'Base Pricing' : 'Pricing'}
@@ -1212,6 +1136,43 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
             <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-[76px]">
 
+              {/* Stock */}
+              <SectionCard title="Stock">
+              {allVariants.length === 0 && (
+                <div className="grid grid-cols-1 gap-4">
+                  {product.valuation_method === 'fifo' ? (
+                    <Input label="Quantity" type="number" value={onHand} disabled hint="Driven by Stock Batches above — add/edit a batch to change this." />
+                  ) : (
+                    <Input label="Quantity" type="number" min="0" value={onHand} onChange={e => setOnHand(e.target.value)} />
+                  )}
+                  <Input label="Low Stock Alert" type="number" min="0" value={lowStockAlert} onChange={e => setLowStockAlert(e.target.value)} />
+                </div>
+              )}
+              {allVariants.length > 0 && (
+                <div className="grid grid-cols-1 gap-4">
+                  <Input label="Low Stock Alert" type="number" min="0" value={lowStockAlert} onChange={e => setLowStockAlert(e.target.value)} />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Stock Location</label>
+                <Select
+                  options={[
+                    { value: '', label: 'Select location...' },
+                    { value: 'warehouse', label: 'Warehouse (Main Stock)' },
+                    ...branches.map(b => ({ value: b.name, label: b.name + (b.is_main ? ' (Main Branch)' : '') })),
+                  ]}
+                  value={physicalLocation}
+                  onValueChange={setPhysicalLocation}
+                />
+              </div>
+              {itemType === 'part' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier (optional)</label>
+                  <Select options={[{ value: '', label: 'Select Supplier...' }, ...suppliers.map(s => ({ value: s.id, label: s.name }))]} value={supplierId} onValueChange={setSupplierId} />
+                </div>
+              )}
+              </SectionCard>
+
               {/* Branch Availability */}
               {branchAvailability.length > 1 && (
                 <SectionCard
@@ -1243,6 +1204,35 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               </div>
                 </SectionCard>
               )}
+
+              {/* Pricing Options */}
+              <SectionCard title="Pricing Options">
+              <div className="rounded-lg border border-gray-200">
+                <div className="flex items-center justify-between px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Commission</p>
+                    <p className="text-xs text-gray-500">Enable employee commission for this {itemType}</p>
+                  </div>
+                  <Toggle checked={commissionEnabled} onChange={setCommissionEnabled} color="blue" />
+                </div>
+                {commissionEnabled && (
+                  <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-1 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
+                      <Select options={[{ value: 'percentage', label: 'Percentage (%)' }, { value: 'fixed', label: `Fixed Amount (${currSymbol})` }]} value={commissionType} onValueChange={setCommissionType} />
+                    </div>
+                    <Input label={commissionType === 'percentage' ? 'Rate (%)' : `Amount (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0" value={commissionRate} onChange={e => setCommissionRate(e.target.value)} />
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Loyalty Points</p>
+                  <p className="text-xs text-gray-500">Earn / redeem loyalty points on this {itemType}</p>
+                </div>
+                <Toggle checked={loyaltyEnabled} onChange={setLoyaltyEnabled} color="blue" />
+              </div>
+              </SectionCard>
 
             </div>
           </div>

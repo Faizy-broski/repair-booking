@@ -33,7 +33,7 @@ export async function GET() {
     // ── Load subscription row from DB ─────────────────────────────────────────
     let { data: sub } = await (supabase as any)
       .from('subscriptions')
-      .select('status, trial_ends_at, current_period_start, current_period_end, billing_cycle, stripe_customer_id, stripe_sub_id, plan_id, is_custom, custom_max_branches, custom_max_users, custom_max_products, custom_max_services, custom_price_monthly, plans(id, name, price_monthly, plan_type, features, max_branches, max_users)')
+      .select('status, trial_ends_at, current_period_start, current_period_end, billing_cycle, stripe_customer_id, stripe_sub_id, plan_id, plans(id, name, price_monthly, plan_type, features, max_branches, max_users)')
       .eq('business_id', profile.business_id)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -182,19 +182,6 @@ export async function GET() {
         .eq('id', sub.plan_id)
         .maybeSingle()
       planData = directPlan
-    }
-
-    // For a custom subscription, the shared "Custom Plan" catalog row is only
-    // a placeholder for FK integrity — the real branches/staff/price this
-    // business negotiated live on the subscription row's custom_* columns.
-    // Never show the placeholder's numbers if an override is present.
-    if (planData && sub?.is_custom) {
-      planData = {
-        ...planData,
-        price_monthly: sub.custom_price_monthly ?? planData.price_monthly,
-        max_branches:  sub.custom_max_branches  ?? planData.max_branches,
-        max_users:     sub.custom_max_users     ?? planData.max_users,
-      }
     }
 
     // Resolve effective stripe_customer_id (business row takes precedence)

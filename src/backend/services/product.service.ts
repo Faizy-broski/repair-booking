@@ -682,21 +682,6 @@ export const ProductService = {
             low_stock_alert: 5,
           }))
         )
-
-        // Seed the first FIFO batch for variants with opening stock, same as
-        // ProductController.create does for simple products — otherwise the
-        // variant never has a cost layer to sell against.
-        const layers = toInsert
-          .map(d => ({ d, v: variants[data.indexOf(d)] }))
-          .filter(({ v }) => (v.stock ?? 0) > 0)
-          .map(({ d, v }) => ({
-            branch_id: branchId, product_id: productId, variant_id: d.id,
-            quantity: v.stock, unit_cost: v.cost_price ?? 0, selling_price: v.selling_price ?? null,
-            source_type: 'adjustment',
-          }))
-        if (layers.length > 0) {
-          await adminSupabase.from('inventory_cost_layers').insert(layers)
-        }
       }
     }
 
@@ -724,28 +709,11 @@ export const ProductService = {
     // Handle stock
     if (stock !== undefined && branchId) {
       const { data: existingInv } = await adminSupabase.from('inventory')
-        .select('id, quantity').eq('branch_id', branchId).eq('product_id', productId).eq('variant_id', variantId).maybeSingle()
-      const unitCost = variantPayload.cost_price ?? (data as any)?.cost_price ?? 0
-      const sellingPrice = variantPayload.selling_price ?? (data as any)?.selling_price ?? null
+        .select('id').eq('branch_id', branchId).eq('product_id', productId).eq('variant_id', variantId).maybeSingle()
       if (existingInv) {
         await adminSupabase.from('inventory').update({ quantity: stock }).eq('id', existingInv.id)
-        // Only a net increase gets a new batch — an absolute-quantity edit
-        // downward is a correction, not a new purchase.
-        const delta = stock - (existingInv.quantity ?? 0)
-        if (delta > 0) {
-          await adminSupabase.from('inventory_cost_layers').insert({
-            branch_id: branchId, product_id: productId, variant_id: variantId,
-            quantity: delta, unit_cost: unitCost, selling_price: sellingPrice, source_type: 'adjustment',
-          })
-        }
       } else {
         await adminSupabase.from('inventory').insert({ branch_id: branchId, product_id: productId, variant_id: variantId, quantity: stock, low_stock_alert: 5 })
-        if (stock > 0) {
-          await adminSupabase.from('inventory_cost_layers').insert({
-            branch_id: branchId, product_id: productId, variant_id: variantId,
-            quantity: stock, unit_cost: unitCost, selling_price: sellingPrice, source_type: 'adjustment',
-          })
-        }
       }
     }
 

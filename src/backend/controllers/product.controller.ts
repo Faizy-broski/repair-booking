@@ -504,13 +504,12 @@ export const ProductController = {
         stock: z.number().optional(),
         image_url: z.string().optional().nullable(),
       })).min(1),
-      branch_id: z.string().optional().nullable()
+      branch_id: z.string().optional()
     })
     const { data, error } = await validateBody(request, variantSchema)
     if (error) return error
     try {
-      const targetBranch = data.branch_id ?? ctx.auth.branchId ?? undefined
-      const result = await ProductService.createVariants(productId, ctx.businessId, data.variants, targetBranch)
+      const result = await ProductService.createVariants(productId, ctx.businessId, data.variants, data.branch_id)
       return created(result)
     } catch (err) {
       return serverError('Failed to create variants', err)
@@ -527,14 +526,13 @@ export const ProductController = {
       attributes: z.record(z.string(), z.string()).optional(),
       stock: z.number().optional(),
       image_url: z.string().optional().nullable(),
-      branch_id: z.string().optional().nullable()
+      branch_id: z.string().optional()
     })
     const { data, error } = await validateBody(request, updateVariantSchema)
     if (error) return error
     try {
       const { branch_id, ...payload } = data
-      const targetBranch = branch_id ?? ctx.auth.branchId ?? undefined
-      const result = await ProductService.updateVariant(variantId, productId, ctx.businessId, payload, targetBranch)
+      const result = await ProductService.updateVariant(variantId, productId, ctx.businessId, payload, branch_id)
       return ok(result)
     } catch (err) {
       return serverError('Failed to update variant', err)

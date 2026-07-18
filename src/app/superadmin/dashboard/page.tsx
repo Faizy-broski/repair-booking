@@ -1,5 +1,4 @@
 import { createAdminClient } from '@/backend/config/supabase'
-import { effectiveMonthlyPrice } from '@/backend/services/custom-plan-pricing'
 import { formatCurrencyCompact } from '@/lib/utils'
 import { Building2, Users, CreditCard, TrendingUp, LifeBuoy } from 'lucide-react'
 import { StatsCard } from '@/components/dashboard/stats-card'
@@ -31,11 +30,18 @@ async function getDashboardStats() {
     supabase.from('businesses').select('*', { count: 'exact', head: true }),
     supabase.from('businesses').select('*', { count: 'exact', head: true }).eq('is_active', true),
     supabase.from('profiles').select('*', { count: 'exact', head: true }),
-    supabase.from('subscriptions').select('plan_id, billing_cycle, is_custom, custom_price_monthly, plans(price_monthly, price_yearly)').eq('status', 'active').eq('livemode', true),
+    supabase.from('subscriptions').select('plan_id, billing_cycle, plans(price_monthly, price_yearly)').eq('status', 'active').eq('livemode', true),
     supabase.from('helpdesk_tickets').select('*', { count: 'exact', head: true }).eq('status', 'open'),
   ])
 
-  const mrr = (subscriptions ?? []).reduce((sum: number, sub: any) => sum + effectiveMonthlyPrice(sub), 0)
+  const mrr = (subscriptions ?? []).reduce((sum: number, sub: any) => {
+    const plan = sub.plans
+    if (!plan) return sum
+    const amount = sub.billing_cycle === 'yearly'
+      ? (plan.price_yearly ?? plan.price_monthly * 12) / 12
+      : Number(plan.price_monthly ?? 0)
+    return sum + amount
+  }, 0)
 
   return { totalBusinesses, activeBusinesses, totalUsers, mrr, openTickets }
 }

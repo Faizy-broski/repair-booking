@@ -62,9 +62,8 @@ export const DashboardController = {
         // Amounts actually charged through POS for repair-linked line items —
         // takes priority over the repairs-table fallback below.
         (adminSupabase as any).from('sale_items').select('repair_id, total, sales!inner(is_refund, branch_id, created_at)').eq('sales.branch_id', branchId).gte('sales.created_at', periodStart).not('repair_id', 'is', null),
-        // Cash In adds to Sales revenue, Cash Out subtracts — except 'expense'
-        // purpose cash-outs, already counted via total_expenses below.
-        (adminSupabase as any).from('cash_movements').select('type, amount, purpose').eq('branch_id', branchId).gte('created_at', periodStart),
+        // Cash In adds to Sales revenue, Cash Out subtracts.
+        (adminSupabase as any).from('cash_movements').select('type, amount').eq('branch_id', branchId).gte('created_at', periodStart),
       ])
 
       const sales             = salesRes.data ?? []
@@ -72,7 +71,7 @@ export const DashboardController = {
       const inventory         = inventoryRes.data ?? []
       const repairsRevenueRows = repairsRevenueRes.data ?? []
       const cashNet = ((cashMovementsRes.data ?? []) as any[]).reduce(
-        (s, r) => s + (r.type === 'cash_in' ? (r.amount ?? 0) : (r.purpose === 'expense' ? 0 : -(r.amount ?? 0))), 0
+        (s, r) => s + (r.type === 'cash_in' ? (r.amount ?? 0) : -(r.amount ?? 0)), 0
       )
 
       const posRepairAmounts = new Map<string, number>()
@@ -351,11 +350,10 @@ export const DashboardController = {
           .gte('sales.created_at', periodStart)
           .not('repair_id', 'is', null),
 
-        // Cash In adds to Sales revenue, Cash Out subtracts — except 'expense'
-        // purpose cash-outs, already counted via total_expenses below.
+        // Cash In adds to Sales revenue, Cash Out subtracts.
         (adminSupabase as any)
           .from('cash_movements')
-          .select('type, amount, purpose')
+          .select('type, amount')
           .eq('branch_id', branchId)
           .gte('created_at', periodStart),
       ])
@@ -365,7 +363,7 @@ export const DashboardController = {
       const inventory          = inventoryRes.data ?? []
       const repairsRevenueRows = repairsRevenueRes.data ?? []
       const cashNet = ((cashMovementsRes.data ?? []) as any[]).reduce(
-        (s, r) => s + (r.type === 'cash_in' ? (r.amount ?? 0) : (r.purpose === 'expense' ? 0 : -(r.amount ?? 0))), 0
+        (s, r) => s + (r.type === 'cash_in' ? (r.amount ?? 0) : -(r.amount ?? 0)), 0
       )
 
       const posRepairAmounts = new Map<string, number>()
