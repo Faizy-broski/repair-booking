@@ -339,14 +339,14 @@ export default function PricingSection() {
 
                   <Link
                     href={planCtaHref(plan)}
-                    className={`group mt-8 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full text-sm font-medium transition-all duration-300 hover:scale-[1.02] ${
+                    className={`mt-8 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full text-sm font-medium transition-colors ${
                       highlight
-                        ? "bg-white text-slate-950 hover:bg-white/90 hover:shadow-[0_10px_28px_rgba(255,255,255,0.25)]"
+                        ? "bg-white text-slate-950 hover:bg-white/90"
                         : "border border-white/15 bg-transparent text-white hover:bg-white/10"
                     }`}
                   >
                     {planCta(plan)}
-                    <ChevronRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                    <ChevronRight className="h-4 w-4" />
                   </Link>
                 </StaggerItem>
               );

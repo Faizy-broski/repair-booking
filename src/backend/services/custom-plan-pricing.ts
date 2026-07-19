@@ -120,3 +120,25 @@ export function computeCustomPlanTotalPence(
   if (billingCycle !== 'yearly') return monthlyPence
   return Math.round(monthlyPence * 12 * (1 - CUSTOM_PLAN_YEARLY_DISCOUNT))
 }
+
+/**
+ * Resolves the real £/month a subscription is worth for revenue displays
+ * (MRR, dashboard, analytics, subscriptions list). Every custom subscription's
+ * plan_id points at the shared "Custom Plan" placeholder row (price_monthly
+ * £19 today) purely for FK integrity — the actual negotiated price lives on
+ * the subscription row itself in custom_price_monthly. Reading plan.price_monthly
+ * directly for an is_custom subscription would silently under/over-report revenue.
+ */
+export function effectiveMonthlyPrice(sub: {
+  is_custom?: boolean | null
+  custom_price_monthly?: number | null
+  billing_cycle?: string | null
+  plans?: { price_monthly: number; price_yearly: number | null } | null
+}): number {
+  if (sub.is_custom) return sub.custom_price_monthly ?? 0
+  const plan = sub.plans
+  if (!plan) return 0
+  return sub.billing_cycle === 'yearly'
+    ? (plan.price_yearly ?? plan.price_monthly * 12) / 12
+    : plan.price_monthly
+}

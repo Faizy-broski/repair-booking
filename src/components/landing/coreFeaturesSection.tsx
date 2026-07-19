@@ -53,7 +53,7 @@ export default function CoreFeaturesSection() {
     <section className="bg-white py-14 sm:py-20 lg:py-24">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-2 lg:items-start lg:gap-16 lg:px-8">
         {/* Left */}
-        <FadeIn className="lg:sticky lg:top-16">
+        <FadeIn className="lg:sticky lg:top-24">
           <Badge
               variant="secondary"
               className="mb-4 rounded-full bg-transparent border border-gray-200 px-4 py-1 text-[10px] font-medium tracking-[0.25em] text-muted-foreground sm:mb-6"
@@ -69,19 +69,19 @@ export default function CoreFeaturesSection() {
             needs
           </h2>
 
-          <p className="mt-3 max-w-md text-sm leading-7 text-slate-500 sm:mt-4">
+          <p className="mt-4 max-w-md text-sm leading-7 text-slate-500 sm:mt-6">
             From the first repair booking to the final sales report — iRepairly
             handles every part of your daily operation.
           </p>
 
-          <Button asChild className="group mt-5 rounded-full bg-[linear-gradient(90deg,_#008080_0%,_#008080_37%,_#18E3CD_100%)] px-6 py-6 text-sm font-bold text-white transition-all duration-300 hover:scale-[1.03] hover:shadow-[0_14px_36px_rgba(0,128,128,0.35)] sm:mt-6">
+          <Button asChild className="mt-6 rounded-full bg-[linear-gradient(90deg,_#008080_0%,_#008080_37%,_#18E3CD_100%)] px-6 py-6 text-sm font-bold text-white hover:bg-teal-700 sm:mt-8">
             <Link href="#pricing">
               See pricing
-              <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
 
-          <div className="relative mt-8 hidden max-w-md lg:mt-10 lg:block">
+          <div className="relative mt-12 hidden max-w-lg lg:mt-20 lg:block">
             <Image
               src="/images/dashboardpreview.svg"
               alt="iRepairly dashboard preview"

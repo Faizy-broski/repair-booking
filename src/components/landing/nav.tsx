@@ -29,16 +29,16 @@ export default function Nav() {
   return (
     <>
       <header className="fixed left-0 top-0 z-50 w-full px-3 py-3 sm:px-4 sm:py-5">
-        <nav className="mx-auto flex h-[64px] max-w-7xl items-center justify-between rounded-full border border-brand-teal-light bg-white/90 py-0 pl-4 pr-3 shadow-[0_18px_40px_rgba(15,118,110,0.14)] backdrop-blur-xl sm:h-[76px] sm:pl-8 sm:pr-5">
+        <nav className="mx-auto flex h-[64px] max-w-7xl items-center justify-between rounded-full border border-brand-teal-light bg-white/90 px-4 shadow-[0_18px_40px_rgba(15,118,110,0.14)] backdrop-blur-xl sm:h-[76px] sm:px-8">
           <Link href="/" className="flex items-center gap-2 flex-shrink-0">
             <img
               src="/images/logo.svg"
               alt="iRepairly"
-              className="h-6 w-auto sm:h-8"
+              className="h-8 w-auto sm:h-11"
             />
           </Link>
 
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-700">
+          <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-700">
             {NAV_LINKS.map(({ label, href }) => (
               <Link key={label} href={href} className="hover:text-primary transition-colors">
                 {label}
@@ -56,9 +56,9 @@ export default function Nav() {
 
             <Link
               href="/register"
-              className="group inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,_#008080_0%,_#008080_37%,_#18E3CD_100%)] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-all duration-300 hover:scale-[1.04] hover:shadow-[0_10px_30px_rgba(0,128,128,0.35)] sm:px-6 sm:py-3 sm:text-sm"
+              className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,_#008080_0%,_#008080_37%,_#18E3CD_100%)] px-4 py-3 text-xs font-bold text-white shadow-sm transition-transform hover:scale-[1.02] sm:px-7 sm:py-4 sm:text-sm"
             >
-              <Sparkles className="h-4 w-4 transition-transform duration-300 group-hover:rotate-12" />
+              <Sparkles className="h-4 w-4" />
               <span className="hidden sm:inline">Start Free Trial</span>
               <span className="sm:hidden">Trial</span>
             </Link>
@@ -114,17 +114,17 @@ export default function Nav() {
             <div className="mt-auto border-t border-white/10 px-4 py-5 flex flex-col gap-3">
               <Link
                 href="/login"
-                className="inline-flex items-center justify-center rounded-xl border border-white/40 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:scale-[1.02] hover:bg-white/10"
+                className="inline-flex items-center justify-center rounded-xl border border-white/40 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
                 onClick={() => setMobileNavOpen(false)}
               >
                 Sign in
               </Link>
               <Link
                 href="/register"
-                className="group inline-flex items-center justify-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-brand-teal shadow-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-brand-teal transition-colors shadow-sm"
                 onClick={() => setMobileNavOpen(false)}
               >
-                Get started free <ChevronRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
+                Get started free <ChevronRight className="h-3.5 w-3.5" />
               </Link>
             </div>
           </div>

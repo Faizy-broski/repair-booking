@@ -9,7 +9,7 @@ export default function Footer() {
     <footer className="relative overflow-hidden bg-white text-slate-800">
       <div className="absolute left-1/2 top-0 h-[1.5px] w-[90%] -translate-x-1/2 bg-gradient-to-r from-transparent via-brand-teal-light to-transparent" />
       <div className="mx-auto max-w-[1600px] px-4 pt-14 sm:px-6 sm:pt-24 lg:px-24">
-        <FadeIn className="grid gap-10 lg:grid-cols-[1fr_2.5fr] lg:gap-12">
+        <FadeIn className="grid gap-10 lg:grid-cols-[1.5fr_2fr] lg:gap-16">
           <div>
             <Link href="/" className="inline-flex">
               <Image
@@ -21,13 +21,13 @@ export default function Footer() {
               />
             </Link>
 
-            <p className="mt-4 max-w-[380px] text-sm leading-5 text-slate-500 sm:mt-5">
+            <p className="mt-5 max-w-[560px] text-sm leading-6 text-slate-500 sm:mt-7">
               The operating system for repair businesses that take their craft
               seriously. Designed in Lisbon. Built worldwide.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 sm:gap-8 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 sm:gap-12">
             {footerLinkGroups.map((group, groupIndex) => (
               <div key={`${group.title}-${groupIndex}`}>
                 <h3 className="mb-5 text-xs font-light uppercase text-slate-500 sm:mb-7">
@@ -60,6 +60,17 @@ export default function Footer() {
             Worldwide
           </p>
         </div>
+      </div>
+
+      <div className="-mt-2">
+        <Image
+          src="/images/irepairly.svg"
+          alt="iRepairly"
+          width={2400}
+          height={520}
+          priority
+          className="w-full select-none object-cover object-left"
+        />
       </div>
     </footer>
   );

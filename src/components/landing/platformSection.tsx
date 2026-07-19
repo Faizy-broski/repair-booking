@@ -22,10 +22,10 @@ const avatarColors = [
 
 export default function PlatformSection() {
   return (
-    <section className="bg-white py-10 sm:py-14 lg:py-16">
+    <section className="bg-white py-14 sm:py-20 lg:py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <FadeIn className="mb-8 grid gap-6 lg:mb-12 lg:grid-cols-2 lg:items-start lg:gap-8">
+        <FadeIn className="mb-12 grid gap-6 lg:mb-20 lg:grid-cols-2 lg:items-start lg:gap-8">
           <div>
             <Badge
               variant="secondary"
@@ -223,7 +223,7 @@ function FeatureCard({
 }) {
   return (
     <StaggerItem className={className}>
-      <Card className="h-full rounded-[2rem] border-0 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.14)] sm:p-6">
+      <Card className="h-full rounded-[2rem] border-0 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.08)] sm:p-6">
         {children}
       </Card>
     </StaggerItem>

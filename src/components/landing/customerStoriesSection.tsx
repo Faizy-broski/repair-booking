@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
-import { Star, ChevronLeft, ChevronRight } from "lucide-react";
+import { Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FadeIn } from "@/components/landing/motion";
 
@@ -47,9 +46,6 @@ export default function CustomerStoriesCarousel() {
     setSelectedIndex(emblaApi.selectedScrollSnap());
   }, [emblaApi]);
 
-  const scrollPrev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
-  const scrollNext = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
-
   useEffect(() => {
     if (!emblaApi) return;
 
@@ -83,38 +79,15 @@ export default function CustomerStoriesCarousel() {
             </h2>
           </div>
 
-          <div className="flex items-center justify-between gap-3 lg:justify-end lg:pb-2">
-            <div className="flex items-center gap-3">
-              <div className="flex text-amber-400">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} className="h-4 w-4 fill-current" />
-                ))}
-              </div>
-              <p className="text-xs text-slate-500">
-                4.9 average from 2,800+ reviews
-              </p>
+          <div className="flex items-center gap-3 lg:justify-end lg:pb-2">
+            <div className="flex text-amber-400">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star key={i} className="h-4 w-4 fill-current" />
+              ))}
             </div>
-
-            <div className="flex items-center gap-2 lg:ml-6">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={scrollPrev}
-                aria-label="Previous testimonial"
-                className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-500 transition-all duration-300 hover:-translate-x-0.5 hover:bg-slate-50"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={scrollNext}
-                aria-label="Next testimonial"
-                className="h-9 w-9 rounded-full border border-slate-200 bg-white text-slate-500 transition-all duration-300 hover:translate-x-0.5 hover:bg-slate-50"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
+            <p className="text-xs text-slate-500">
+              4.9 average from 2,800+ reviews
+            </p>
           </div>
         </FadeIn>
       </div>
@@ -130,12 +103,11 @@ export default function CustomerStoriesCarousel() {
                 className="min-w-0 flex-[0_0_92%] px-3 sm:flex-[0_0_86%] sm:px-4 md:flex-[0_0_70%] lg:flex-[0_0_58%]"
               >
                 <Card
-                  className={`relative flex h-full min-h-[300px] cursor-pointer rounded-[2rem] border-0 bg-white p-6 transition-all duration-500 sm:min-h-[350px] sm:p-10 md:p-16 ${
+                  className={`relative flex h-full min-h-[300px] rounded-[2rem] border-0 bg-white p-6 transition-all duration-500 sm:min-h-[350px] sm:p-10 md:p-16 ${
                     isActive
                       ? "scale-100 opacity-100 blur-0 shadow-[0_1px_8px_rgba(15,23,42,0.10)]"
-                      : "scale-95 opacity-35 blur-[1.5px] shadow-[0_18px_50px_rgba(15,23,42,0.06)] hover:scale-[0.97] hover:opacity-60"
+                      : "scale-95 opacity-35 blur-[1.5px] shadow-[0_18px_50px_rgba(15,23,42,0.06)]"
                   }`}
-                  onClick={() => !isActive && emblaApi?.scrollTo(index)}
                 >
                   {/* <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-[url('/images/testimonial-pattern.svg')] bg-cover bg-center opacity-30" /> */}
 
