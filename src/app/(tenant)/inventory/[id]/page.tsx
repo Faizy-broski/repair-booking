@@ -910,9 +910,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                           </div>
                         </td>
                         <td className="px-3 py-2.5">
-                          {product?.valuation_method === 'fifo' ? (
-                            <span className="text-xs text-gray-600">{formatCurrency(Number(row.costPrice) || 0)}</span>
-                          ) : (
+                          {product?.valuation_method === 'fifo' ? (() => {
+                            const nextCost = (costLayers ?? []).filter(l => l.variant_id === row.id)[0]?.unit_cost
+                            return <span className="text-xs text-gray-600">{nextCost != null ? formatCurrency(nextCost) : '—'}</span>
+                          })() : (
                             <input type="number" min="0" step="0.01" value={row.costPrice} onChange={e => updateExistingVariant(row.id, 'costPrice', e.target.value)} placeholder="0.00" className="w-24 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
                           )}
                         </td>
@@ -1112,7 +1113,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {allVariants.length === 0 && product.valuation_method === 'fifo' ? (
                   <>
-                    <Input label={`Cost Price (${currSymbol})`} type="number" value={costPrice} disabled hint="Set per batch below." />
+                    <Input
+                      label={`Cost Price (${currSymbol})`}
+                      type="number"
+                      value={(costLayers ?? []).filter(l => l.variant_id === null)[0]?.unit_cost ?? ''}
+                      disabled
+                      hint={(costLayers ?? []).some(l => l.variant_id === null) ? 'Cost of the next batch to sell.' : 'Set per batch below.'}
+                    />
                     <Input label={`Selling Price (${currSymbol})`} type="number" value={sellingPrice} disabled hint="Synced to the next batch to sell." />
                   </>
                 ) : (
