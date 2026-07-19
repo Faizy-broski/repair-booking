@@ -817,22 +817,24 @@ export function CartPanel({ mobileView }: Props) {
                       {(item.variant?.sku ?? item.product.sku) && (
                         <p className="text-gray-400 text-xs truncate mb-1">#{item.variant?.sku ?? item.product.sku}</p>
                       )}
-                      <div className="mt-1 flex flex-col gap-1 pr-1">
-                        <input
-                          type="text"
-                          placeholder="IMEI / S/N (optional)"
-                          value={item.imei || ''}
-                          onChange={e => pos.setItemImei(item.product.id, item.variant?.id ?? null, e.target.value, isDiscount)}
-                          className="w-full text-[11px] rounded border border-gray-200 px-1.5 py-0.5 focus:border-brand-teal focus:outline-none placeholder:text-gray-300"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Faults (optional)"
-                          value={item.faults || ''}
-                          onChange={e => pos.setItemFaults(item.product.id, item.variant?.id ?? null, e.target.value, isDiscount)}
-                          className="w-full text-[11px] rounded border border-gray-200 px-1.5 py-0.5 focus:border-brand-teal focus:outline-none placeholder:text-gray-300"
-                        />
-                      </div>
+                      {item.product.is_serialized && (
+                        <div className="mt-1 flex flex-col gap-1 pr-1">
+                          <input
+                            type="text"
+                            placeholder="IMEI / S/N (optional)"
+                            value={item.imei || ''}
+                            onChange={e => pos.setItemImei(item.product.id, item.variant?.id ?? null, e.target.value, isDiscount)}
+                            className="w-full text-[11px] rounded border border-gray-200 px-1.5 py-0.5 focus:border-brand-teal focus:outline-none placeholder:text-gray-300"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Faults (optional)"
+                            value={item.faults || ''}
+                            onChange={e => pos.setItemFaults(item.product.id, item.variant?.id ?? null, e.target.value, isDiscount)}
+                            className="w-full text-[11px] rounded border border-gray-200 px-1.5 py-0.5 focus:border-brand-teal focus:outline-none placeholder:text-gray-300"
+                          />
+                        </div>
+                      )}
                     </td>
                     {/* Unit price cell — shows original crossed out + sale price for discount items */}
                     <td className="px-2 py-2.5 align-middle text-right">

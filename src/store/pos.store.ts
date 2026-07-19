@@ -14,6 +14,8 @@ export interface CartItem {
   // priced line of the SAME product from merging into one cart row, since
   // they draw from two separate stock pools server-side.
   isDiscount?: boolean
+  imei?: string
+  faults?: string
 }
 
 export interface PaymentSplit {
@@ -49,6 +51,8 @@ interface PosState {
   removeFromCart: (productId: string, variantId?: string | null, isDiscount?: boolean) => void
   updateQuantity: (productId: string, variantId: string | null, quantity: number, isDiscount?: boolean) => void
   setItemDiscount: (productId: string, variantId: string | null, discount: number, isDiscount?: boolean) => void
+  setItemImei: (productId: string, variantId: string | null, imei: string, isDiscount?: boolean) => void
+  setItemFaults: (productId: string, variantId: string | null, faults: string, isDiscount?: boolean) => void
   setCustomer: (customer: Customer | null) => void
   setDiscount: (discount: number) => void
   setTaxRate: (rate: number) => void
@@ -137,6 +141,26 @@ export const usePosStore = create<PosState>((set, get) => ({
       cart: get().cart.map((i) =>
         i.product.id === productId && (i.variant?.id ?? null) === variantId && (i.isDiscount ?? false) === isDiscount
           ? { ...i, discount }
+          : i
+      ),
+    })
+  },
+
+  setItemImei: (productId, variantId, imei, isDiscount = false) => {
+    set({
+      cart: get().cart.map((i) =>
+        i.product.id === productId && (i.variant?.id ?? null) === variantId && (i.isDiscount ?? false) === isDiscount
+          ? { ...i, imei }
+          : i
+      ),
+    })
+  },
+
+  setItemFaults: (productId, variantId, faults, isDiscount = false) => {
+    set({
+      cart: get().cart.map((i) =>
+        i.product.id === productId && (i.variant?.id ?? null) === variantId && (i.isDiscount ?? false) === isDiscount
+          ? { ...i, faults }
           : i
       ),
     })
