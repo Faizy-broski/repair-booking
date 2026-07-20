@@ -250,12 +250,17 @@ ${(deviceName !== undefined || deviceImei !== undefined || faults !== undefined)
     
     <div style="border-bottom:1px dashed #000; margin:4px 0;"></div>
     
-    ${items.map(i => `
+    ${items.map(i => {
+      const gross = i.quantity * i.unit_price
+      const itemDiscount = i.discount ?? 0
+      const net = gross - itemDiscount
+      return `
     <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
       <span style="font-weight:bold; font-size:11px; flex:1; padding-right:8px; word-break:break-word;">${esc(i.description)}</span>
-      <span style="font-weight:bold; font-size:11px;">${money(i.quantity * i.unit_price, currency)}</span>
+      <span style="font-size:11px; text-align:right;">${itemDiscount > 0 ? `<span style="text-decoration:line-through; color:#888; font-weight:normal; margin-right:4px;">${money(gross, currency)}</span>` : ''}<span style="font-weight:bold;">${money(net, currency)}</span></span>
     </div>
-    `).join('')}
+    `
+    }).join('')}
     <div style="border-bottom:1px dashed #000; margin:4px 0;"></div>
     <div class="tr"><span class="tl">Discount</span><span class="tv">${discount > 0 ? '-' + money(discount, currency) : money(0, currency)}</span></div>
     <div class="tr"><span class="tl">Subtotal</span><span class="tv">${money(subtotal, currency)}</span></div>
@@ -268,12 +273,17 @@ ${(deviceName !== undefined || deviceImei !== undefined || faults !== undefined)
 </div>
 ` : `
 <hr>
-${items.map(i => `
+${items.map(i => {
+  const gross = i.quantity * i.unit_price
+  const itemDiscount = i.discount ?? 0
+  const net = gross - itemDiscount
+  return `
 <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
   <span style="font-weight:bold; font-size:11px; flex:1; padding-right:8px; word-break:break-word;">${i.quantity > 1 ? i.quantity + 'x ' : ''}${esc(i.description)}</span>
-  <span style="font-weight:bold; font-size:11px;">${money(i.quantity * i.unit_price, currency)}</span>
+  <span style="font-size:11px; text-align:right;">${itemDiscount > 0 ? `<span style="text-decoration:line-through; color:#888; font-weight:normal; margin-right:4px;">${money(gross, currency)}</span>` : ''}<span style="font-weight:bold;">${money(net, currency)}</span></span>
 </div>
-`).join('')}
+`
+}).join('')}
 <hr>
 <div class="tr"><span class="tl">Discount</span><span class="tv">${discount > 0 ? '-' + money(discount, currency) : money(0, currency)}</span></div>
 <div class="tr"><span class="tl">Subtotal</span><span class="tv">${money(subtotal, currency)}</span></div>

@@ -6,7 +6,7 @@ import { LoyaltyService } from '@/backend/services/loyalty.service'
 import { CommissionService } from '@/backend/services/payroll.service'
 import { NotificationEngine } from '@/backend/services/notification-engine.service'
 import { adminSupabase } from '@/backend/config/supabase'
-import { ok, created, notFound, serverError } from '@/backend/utils/api-response'
+import { ok, created, notFound, serverError, badRequest } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
 import { z } from 'zod'
@@ -58,9 +58,12 @@ async function getRepairInvoiceData(repairId: string, branchId: string | null, b
   const deviceName = [r.device_brand, r.device_model].filter(Boolean).join(' ') || r.device_type || 'Device'
 
   const repairItems: any[] = Array.isArray(r.repair_items) ? r.repair_items : []
-  const sumOfParts = repairItems.reduce((s: number, it: any) => s + (it.quantity ?? 1) * Number(it.unit_price ?? 0), 0)
-  const laborFee = Math.max(0, Number(r.estimated_cost ?? 0) - sumOfParts)
-  
+  const sumOfPartsGross = repairItems.reduce((s: number, it: any) => s + (it.quantity ?? 1) * Number(it.unit_price ?? 0), 0)
+  const partsDiscount = repairItems.reduce((s: number, it: any) => s + Number(it.discount_amount ?? 0), 0)
+  const repairDiscount = Number(r.discount_amount ?? 0)
+  const netPartsTotal = sumOfPartsGross - partsDiscount
+  const laborFee = Math.max(0, Number(r.estimated_cost ?? 0) + repairDiscount - netPartsTotal)
+
   const items: any[] = []
   if (laborFee > 0 || repairItems.length === 0) {
     items.push({
@@ -70,13 +73,19 @@ async function getRepairInvoiceData(repairId: string, branchId: string | null, b
     })
   }
 
-  items.push(...repairItems.map((item) => ({
-    description: item.quantity > 1 ? `${item.quantity}x ${item.name}` : item.name,
-    quantity:    item.quantity ?? 1,
-    unit_price:  Number(item.unit_price ?? 0),
-  })))
+  items.push(...repairItems.map((item) => {
+    const discount = Number(item.discount_amount ?? 0)
+    return {
+      description: item.quantity > 1 ? `${item.quantity}x ${item.name}` : item.name,
+      quantity:    item.quantity ?? 1,
+      unit_price:  Number(item.unit_price ?? 0),
+      discount:    discount > 0 ? discount : undefined,
+    }
+  }))
 
-  const invoiceTotal = items.reduce((s, it) => s + it.quantity * it.unit_price, 0)
+  const invoiceSubtotal = laborFee + sumOfPartsGross
+  const invoiceDiscount = partsDiscount + repairDiscount
+  const invoiceTotal = Math.max(0, invoiceSubtotal - invoiceDiscount)
 
   const customer     = r.customers
   const customerName = customer
@@ -109,8 +118,8 @@ async function getRepairInvoiceData(repairId: string, branchId: string | null, b
     customerPhone:   customer?.phone ?? null,
     customerAddress: customer?.address ?? null,
     items,
-    subtotal:        invoiceTotal,
-    discount:        0,
+    subtotal:        invoiceSubtotal,
+    discount:        invoiceDiscount,
     tax:             0,
     total:           invoiceTotal,
     amountPaid:      Number(r.deposit_paid ?? 0),
@@ -229,12 +238,22 @@ const createSchema = z.object({
   asset_id: z.string().uuid().optional().nullable(),
   store_credit_applied: z.number().min(0).optional(),
   loyalty_points_applied: z.number().int().min(0).optional(),
+  discount_type: z.enum(['fixed', 'percent']).default('fixed'),
+  discount_value: z.number().min(0).default(0),
+  discount_amount: z.number().min(0).default(0),
+  payment_splits: z.array(z.object({
+    method: z.enum(['cash', 'card', 'store_credit', 'loyalty_points']),
+    amount: z.number().positive(),
+  })).optional().default([]),
   parts: z.array(z.object({
     product_id: z.string().uuid().optional().nullable(),
     name: z.string(),
     quantity: z.number().int().min(1).default(1),
     unit_cost: z.number().min(0).default(0),
     unit_price: z.number().min(0).default(0),
+    discount_type: z.enum(['fixed', 'percent']).default('fixed'),
+    discount_value: z.number().min(0).default(0),
+    discount_amount: z.number().min(0).default(0),
   })).optional().default([]),
 })
 
@@ -284,6 +303,49 @@ async function applyRepairCreditLoyalty(
   return warnings.length > 0 ? warnings.join('; ') : null
 }
 
+type PaymentSplit = { method: 'cash' | 'card' | 'store_credit' | 'loyalty_points'; amount: number }
+
+// Split amounts must add up to the amount actually due for this payment event
+// (the full deposit on create; just the top-up delta on update) — arithmetic
+// integrity, not a completion gate.
+function validatePaymentSplits(splits: PaymentSplit[], due: number): string | null {
+  if (splits.length === 0) return null
+  const sum = splits.reduce((s, x) => s + x.amount, 0)
+  if (Math.abs(sum - due) > 0.01) {
+    return `Payment split amounts (£${sum.toFixed(2)}) must add up to the amount due (£${due.toFixed(2)}).`
+  }
+  return null
+}
+
+// Appends this payment event's splits to the cumulative repairs.payment_splits
+// snapshot and records one repair_payments ledger row per split — mirrors
+// record_credit_payment()'s two-tier write for POS on-account payments.
+async function persistRepairPaymentSplits(
+  businessId: string,
+  repairId: string,
+  customerId: string | null,
+  createdBy: string | null,
+  existingSplits: unknown,
+  newSplits: PaymentSplit[]
+) {
+  if (newSplits.length === 0) return
+  const prior = Array.isArray(existingSplits) ? existingSplits : []
+  await adminSupabase
+    .from('repairs')
+    .update({ payment_splits: [...prior, ...newSplits] })
+    .eq('id', repairId)
+  await adminSupabase.from('repair_payments').insert(
+    newSplits.map((s) => ({
+      business_id: businessId,
+      repair_id: repairId,
+      customer_id: customerId,
+      amount: s.amount,
+      method: s.method,
+      created_by: createdBy,
+    }))
+  )
+}
+
 export const RepairController = {
   async list(request: NextRequest, ctx: RequestContext) {
     const { searchParams } = request.nextUrl
@@ -318,9 +380,15 @@ export const RepairController = {
   async create(request: NextRequest, ctx: RequestContext) {
     const { data, error } = await validateBody(request, createSchema)
     if (error) return error
+    const splitError = validatePaymentSplits(data.payment_splits, data.deposit_paid ?? 0)
+    if (splitError) return badRequest(splitError)
     try {
-      const { parts, store_credit_applied, loyalty_points_applied, ...repairPayload } = data
+      const { parts, store_credit_applied, loyalty_points_applied, payment_splits, ...repairPayload } = data
       const repair = await RepairService.create(repairPayload)
+
+      if (repair && payment_splits.length > 0) {
+        await persistRepairPaymentSplits(ctx.businessId, repair.id, data.customer_id ?? null, ctx.auth.userId, [], payment_splits)
+      }
 
       // Save repair items (parts) if any
       if (parts && parts.length > 0 && repair) {
@@ -396,12 +464,15 @@ export const RepairController = {
 
         const allResolved = [...knownParts, ...resolvedQuickAdd]
         const items = allResolved.map(p => ({
-          repair_id:  repair.id,
-          product_id: p.product_id,
-          name:       p.name,
-          quantity:   p.quantity,
-          unit_cost:  p.unit_cost,
-          unit_price: p.unit_price,
+          repair_id:      repair.id,
+          product_id:     p.product_id,
+          name:           p.name,
+          quantity:       p.quantity,
+          unit_cost:      p.unit_cost,
+          unit_price:     p.unit_price,
+          discount_type:  p.discount_type ?? 'fixed',
+          discount_value: p.discount_value ?? 0,
+          discount_amount: p.discount_amount ?? 0,
         }))
         await adminSupabase.from('repair_items').insert(items)
 
@@ -466,8 +537,26 @@ export const RepairController = {
     if (error) return error
     const branchId = ctx.auth.branchId ?? undefined
     try {
-      const { parts, store_credit_applied, loyalty_points_applied, ...repairPayload } = data
+      const { data: existing } = await adminSupabase
+        .from('repairs')
+        .select('deposit_paid, payment_splits')
+        .eq('id', id)
+        .single()
+
+      const priorDeposit = (existing as any)?.deposit_paid ?? 0
+      const paymentDue = (data.deposit_paid ?? priorDeposit) - priorDeposit
+      const splitError = validatePaymentSplits(data.payment_splits, paymentDue)
+      if (splitError) return badRequest(splitError)
+
+      const { parts, store_credit_applied, loyalty_points_applied, payment_splits, ...repairPayload } = data
       const repair = await RepairService.update(id, branchId, repairPayload)
+
+      if (repair && payment_splits.length > 0) {
+        await persistRepairPaymentSplits(
+          ctx.businessId, id, (repair as any).customer_id ?? null, ctx.auth.userId,
+          (existing as any)?.payment_splits, payment_splits
+        )
+      }
 
       const customerId = repair && (repair as any).customer_id
       const credit_apply_warning = repair && customerId

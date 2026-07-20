@@ -58,7 +58,7 @@ interface Props {
   deviceName?: string
   deviceImei?: string
   faults?: string
-  items: Array<{ description: string; quantity: number; unit_price: number }>
+  items: Array<{ description: string; quantity: number; unit_price: number; discount?: number }>
   subtotal: number
   discount?: number
   tax?: number
@@ -179,12 +179,22 @@ export function RepairReceiptHtml({
           
           <div style={{ borderBottom: '1px dashed #000', margin: '4px 0' }} />
           
-          {items.map((item, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-              <span style={{ fontWeight: 'bold', fontSize: '10px', flex: 1, paddingRight: '8px', wordBreak: 'break-word' }}>{item.description}</span>
-              <span style={{ fontWeight: 'bold', fontSize: '10px' }}>{money(item.quantity * item.unit_price, currency)}</span>
-            </div>
-          ))}
+          {items.map((item, i) => {
+            const gross = item.quantity * item.unit_price
+            const itemDiscount = item.discount ?? 0
+            const net = gross - itemDiscount
+            return (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                <span style={{ fontWeight: 'bold', fontSize: '10px', flex: 1, paddingRight: '8px', wordBreak: 'break-word' }}>{item.description}</span>
+                <span style={{ fontSize: '10px', textAlign: 'right' }}>
+                  {itemDiscount > 0 && (
+                    <span style={{ textDecoration: 'line-through', color: '#888', fontWeight: 'normal', marginRight: '4px' }}>{money(gross, currency)}</span>
+                  )}
+                  <span style={{ fontWeight: 'bold' }}>{money(net, currency)}</span>
+                </span>
+              </div>
+            )
+          })}
           <div style={{ borderBottom: '1px dashed #000', margin: '4px 0' }} />
 
       <div style={s.totRow}>

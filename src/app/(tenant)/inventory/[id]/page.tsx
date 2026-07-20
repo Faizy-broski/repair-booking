@@ -1310,7 +1310,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       {variantBarcodeTarget && (
         <BarcodeModal
           product={{ id: variantBarcodeTarget.id, name: variantBarcodeTarget.name, barcode: variantBarcodeTarget.barcode }}
-          onClose={() => setVariantBarcodeTarget(null)}
+          productId={id}
+          onClose={() => {
+            setVariantBarcodeTarget(null)
+            qc.invalidateQueries({ queryKey: ['inv-product-variants', id] })
+          }}
         />
       )}
     </div>

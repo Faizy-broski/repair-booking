@@ -176,6 +176,12 @@ export function CashMovementModal({
               ))}
             </div>
 
+            {purpose === 'none' && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+                ⚠ Plain cash out will not be reflected in your reports.
+              </p>
+            )}
+
             {purpose === 'expense' && (
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">

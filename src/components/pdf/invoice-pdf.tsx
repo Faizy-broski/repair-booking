@@ -128,6 +128,7 @@ export interface InvoiceLineItem {
   quantity: number
   unit_price: number
   tax_rate?: number
+  discount?: number
 }
 
 export interface InvoicePdfProps {
@@ -422,17 +423,27 @@ export function InvoicePdf(props: InvoicePdfProps) {
             <Text style={[s.thText, s.colUnit, { textAlign: 'right' }]}>Unit Price</Text>
             <Text style={[s.thText, s.colTotal, { textAlign: 'right' }]}>Amount</Text>
           </View>
-          {items.map((item, i) => (
-            <View key={i} style={[s.tableRow, i % 2 !== 0 ? s.tableRowAlt : {}]}>
-              <Text style={[s.tdText, s.colNum, { color: '#9ca3af' }]}>{i + 1}</Text>
-              <View style={s.colDesc}>
-                <Text style={s.tdText}>{item.description}</Text>
+          {items.map((item, i) => {
+            const gross = item.quantity * item.unit_price
+            const itemDiscount = item.discount ?? 0
+            const net = gross - itemDiscount
+            return (
+              <View key={i} style={[s.tableRow, i % 2 !== 0 ? s.tableRowAlt : {}]}>
+                <Text style={[s.tdText, s.colNum, { color: '#9ca3af' }]}>{i + 1}</Text>
+                <View style={s.colDesc}>
+                  <Text style={s.tdText}>{item.description}</Text>
+                </View>
+                <Text style={[s.tdText, s.colQty, { textAlign: 'center' }]}>{item.quantity}</Text>
+                <Text style={[s.tdText, s.colUnit, { textAlign: 'right' }]}>{fmt(item.unit_price, currency)}</Text>
+                <View style={[s.colTotal, { alignItems: 'flex-end' }]}>
+                  {itemDiscount > 0 && (
+                    <Text style={[s.tdText, { color: '#9ca3af', textDecoration: 'line-through', fontSize: 8 }]}>{fmt(gross, currency)}</Text>
+                  )}
+                  <Text style={[s.tdText, { textAlign: 'right', fontFamily: bold }]}>{fmt(net, currency)}</Text>
+                </View>
               </View>
-              <Text style={[s.tdText, s.colQty, { textAlign: 'center' }]}>{item.quantity}</Text>
-              <Text style={[s.tdText, s.colUnit, { textAlign: 'right' }]}>{fmt(item.unit_price, currency)}</Text>
-              <Text style={[s.tdText, s.colTotal, { textAlign: 'right', fontFamily: bold }]}>{fmt(item.quantity * item.unit_price, currency)}</Text>
-            </View>
-          ))}
+            )
+          })}
         </View>
 
         {/* ── Totals ── */}
@@ -614,14 +625,24 @@ function ReceiptPdf({
         </View>
 
         <View style={s.divider} />
-        {items.map((item, i) => (
-          <View key={i} style={s.itemRow}>
-            <View style={{ flex: 1, paddingRight: 4 }}>
-              <Text style={s.itemDesc}>{item.description}</Text>
+        {items.map((item, i) => {
+          const gross = item.quantity * item.unit_price
+          const itemDiscount = item.discount ?? 0
+          const net = gross - itemDiscount
+          return (
+            <View key={i} style={s.itemRow}>
+              <View style={{ flex: 1, paddingRight: 4 }}>
+                <Text style={s.itemDesc}>{item.description}</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                {itemDiscount > 0 && (
+                  <Text style={[s.itemAmt, { color: '#9ca3af', textDecoration: 'line-through', fontSize: 8 }]}>{fmt(gross)}</Text>
+                )}
+                <Text style={s.itemAmt}>{fmt(net)}</Text>
+              </View>
             </View>
-            <Text style={s.itemAmt}>{fmt(item.quantity * item.unit_price)}</Text>
-          </View>
-        ))}
+          )
+        })}
 
         <View style={s.divider} />
         <View style={s.totalRow}><Text style={s.totalLabel}>Subtotal</Text><Text style={s.totalValue}>{fmt(subtotal)}</Text></View>

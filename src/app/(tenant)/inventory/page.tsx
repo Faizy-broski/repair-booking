@@ -1162,7 +1162,10 @@ export default function InventoryPage() {
 
       <BarcodeModal
         product={barcodeTarget}
-        onClose={() => setBarcodeTarget(null)}
+        onClose={() => {
+          setBarcodeTarget(null)
+          queryClient.invalidateQueries({ queryKey: ['inventory'] })
+        }}
       />
 
       <DiscountModal

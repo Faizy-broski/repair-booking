@@ -44,6 +44,9 @@ interface RepairDetail {
   passcode: string | null
   estimated_cost: number | null
   actual_cost: number | null
+  discount_type: 'fixed' | 'percent'
+  discount_value: number
+  discount_amount: number
   deposit_paid: number
   notify_customer: boolean
   created_at: string
@@ -57,8 +60,15 @@ interface RepairDetail {
     name: string
     quantity: number
     unit_price: number
+    discount_amount: number
     warranty_days: number
     warranty_starts_at: string | null
+  }[]
+  repair_payments: {
+    id: string
+    amount: number
+    method: string
+    created_at: string
   }[]
   repair_status_history: {
     id: string
@@ -387,7 +397,32 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
             <hr className="border-gray-100" />
             <InfoRow label="Estimated" value={repair.estimated_cost ? formatCurrency(repair.estimated_cost) : null} />
             <InfoRow label="Actual cost" value={repair.actual_cost ? formatCurrency(repair.actual_cost) : null} />
+            {(() => {
+              const partsDiscount = repair.repair_items.reduce((s, i) => s + (i.discount_amount || 0), 0)
+              const totalDiscount = (repair.discount_amount || 0) + partsDiscount
+              if (!totalDiscount) return null
+              return (
+                <InfoRow
+                  label="Discount"
+                  value={`-${formatCurrency(totalDiscount)}${repair.discount_type === 'percent' && repair.discount_amount > 0 ? ` (incl. ${repair.discount_value}% overall)` : ''}`}
+                />
+              )
+            })()}
             <InfoRow label="Deposit paid" value={formatCurrency(repair.deposit_paid)} />
+            {repair.repair_payments && repair.repair_payments.length > 0 && (
+              <div className="flex flex-wrap items-start gap-x-2 gap-y-1 py-0.5">
+                <span className="w-24 shrink-0 text-gray-400">Payments</span>
+                <div className="flex-1 space-y-0.5">
+                  {repair.repair_payments.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between text-xs text-gray-600">
+                      <span className="capitalize">{p.method.replace('_', ' ')}</span>
+                      <span className="text-gray-400">{formatDate(p.created_at)}</span>
+                      <span className="font-medium text-gray-800">{formatCurrency(p.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {!!creditLoyaltyApplied?.creditAmount && (
               <InfoRow label="Store credit used" value={formatCurrency(creditLoyaltyApplied.creditAmount)} />
             )}
@@ -471,13 +506,22 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
                 </tr>
               </thead>
               <tbody>
-                {repair.repair_items.map((item) => (
-                  <tr key={item.id} className="border-b border-gray-50">
-                    <td className="py-1.5">{item.name}</td>
-                    <td className="py-1.5 text-right">{item.quantity}</td>
-                    <td className="py-1.5 text-right">{formatCurrency(item.unit_price)}</td>
-                  </tr>
-                ))}
+                {repair.repair_items.map((item) => {
+                  const itemDiscount = item.discount_amount || 0
+                  const netUnitPrice = item.unit_price - (item.quantity > 0 ? itemDiscount / item.quantity : itemDiscount)
+                  return (
+                    <tr key={item.id} className="border-b border-gray-50">
+                      <td className="py-1.5">{item.name}</td>
+                      <td className="py-1.5 text-right">{item.quantity}</td>
+                      <td className="py-1.5 text-right">
+                        {itemDiscount > 0 && (
+                          <span className="mr-1.5 text-gray-400 line-through">{formatCurrency(item.unit_price)}</span>
+                        )}
+                        {formatCurrency(netUnitPrice)}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </CardContent>

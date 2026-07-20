@@ -60,7 +60,7 @@ export const RepairService = {
       .select(
         // customers(*) is intentional — detail view shows full customer profile
         // repair_status_history: exclude sms_sent and repair_id (redundant noise)
-        '*, customers(*), repair_items(*), repair_status_history(id,new_status,old_status,note,created_at,email_sent,profiles!changed_by(full_name))'
+        '*, customers(*), repair_items(*), repair_payments(id,amount,method,created_at), repair_status_history(id,new_status,old_status,note,created_at,email_sent,profiles!changed_by(full_name))'
       )
       .eq('id', id)
     // branchId is null/empty for business owners who have access to all branches

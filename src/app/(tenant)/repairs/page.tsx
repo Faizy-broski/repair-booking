@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Plus, Search, LayoutGrid, List, Wrench, Banknote, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail, Send, RefreshCw, MoreHorizontal, Wallet, Star } from 'lucide-react'
+import { Plus, Search, LayoutGrid, List, Wrench, Banknote, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail, Send, RefreshCw, MoreHorizontal, Wallet, Star, CreditCard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
 import { AsyncEmployeeSelect } from '@/components/shared/async-employee-select'
@@ -64,9 +64,12 @@ const EMPTY_JOB = {
   lock_type: '' as '' | 'passcode' | 'pattern',
   passcode: '',
   price_pending: false,
-  payment_method: '' as '' | 'cash' | 'card' | 'store_credit' | 'loyalty_points',
+  payment_methods: [] as ('cash' | 'card' | 'store_credit' | 'loyalty_points')[],
+  payment_amounts: { cash: '', card: '' },
   credit_apply_input: '',
   loyalty_apply_input: '',
+  discount_type: 'fixed' as 'fixed' | 'percent',
+  discount_value: '',
 }
 
 function ActionsMenu({ onEdit, onSlip, onInvoice, onDelete, onMessage, onEmail, canEmail }: {
@@ -140,6 +143,57 @@ interface RepairLineItem {
   unit_price: number
   unit_cost: number
   max_stock: number | null
+  discount_type: 'fixed' | 'percent'
+  discount_value: number
+}
+
+function lineDiscountAmount(qty: number, unitPrice: number, discountType: 'fixed' | 'percent', discountValue: number) {
+  const gross = qty * unitPrice
+  const amt = discountType === 'percent' ? gross * (discountValue / 100) : discountValue
+  return Math.max(0, Math.min(gross, amt || 0))
+}
+
+function lineNetTotal(qty: number, unitPrice: number, discountType: 'fixed' | 'percent', discountValue: number) {
+  return qty * unitPrice - lineDiscountAmount(qty, unitPrice, discountType, discountValue)
+}
+
+type PaymentSplit = { method: 'cash' | 'card' | 'store_credit' | 'loyalty_points'; amount: number }
+
+function buildPaymentSplits(
+  paymentMethods: string[],
+  paymentAmounts: { cash: string; card: string },
+  creditApplyInput: string,
+  loyaltyApplyInput: string,
+  loyaltyRate: number
+): PaymentSplit[] {
+  const splits: PaymentSplit[] = []
+  if (paymentMethods.includes('cash') && (parseFloat(paymentAmounts.cash) || 0) > 0) {
+    splits.push({ method: 'cash', amount: parseFloat(paymentAmounts.cash) })
+  }
+  if (paymentMethods.includes('card') && (parseFloat(paymentAmounts.card) || 0) > 0) {
+    splits.push({ method: 'card', amount: parseFloat(paymentAmounts.card) })
+  }
+  if (paymentMethods.includes('store_credit') && (parseFloat(creditApplyInput) || 0) > 0) {
+    splits.push({ method: 'store_credit', amount: parseFloat(creditApplyInput) })
+  }
+  if (paymentMethods.includes('loyalty_points') && (parseFloat(loyaltyApplyInput) || 0) > 0) {
+    splits.push({ method: 'loyalty_points', amount: (parseFloat(loyaltyApplyInput) || 0) * loyaltyRate })
+  }
+  return splits
+}
+
+function paymentSplitTotal(splits: PaymentSplit[]) {
+  return splits.reduce((s, x) => s + x.amount, 0)
+}
+
+// Job Fee (labour) + net parts total (after per-line discounts), minus the overall
+// job discount — mirrors the estimated_cost composition already used for job_fee/parts.
+function computeJobTotal(jobFee: number, parts: RepairLineItem[], discountType: 'fixed' | 'percent', discountValue: number) {
+  const partsNet = parts.reduce((s, p) => s + lineNetTotal(p.qty, p.unit_price, p.discount_type, p.discount_value), 0)
+  const subtotal = jobFee + partsNet
+  const discountAmount = discountType === 'percent' ? subtotal * (discountValue / 100) : discountValue
+  const total = Math.max(0, subtotal - Math.max(0, discountAmount || 0))
+  return { partsNet, subtotal, discountAmount: Math.max(0, Math.min(subtotal, discountAmount || 0)), total }
 }
 
 function ComboInput({ value, onChange, options, placeholder }: {
@@ -280,6 +334,7 @@ export default function RepairsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [step1Error, setStep1Error] = useState('')
   const [chargesError, setChargesError] = useState('')
+  const [paymentSplitError, setPaymentSplitError] = useState('')
   // Store credit / loyalty balances for the attached customer (job creation)
   const [creditBalance, setCreditBalance] = useState<number | null>(null)
   const [loyaltyBalance, setLoyaltyBalance] = useState<number | null>(null)
@@ -322,7 +377,8 @@ export default function RepairsPage() {
   // Edit Job Sheet modal
   const [editOpen, setEditOpen] = useState(false)
   const [editRepair, setEditRepair] = useState<RepairRow | null>(null)
-  const [editData, setEditData] = useState({ due_date: '', estimated_cost: '', deposit_paid: '', payment_method: '' as '' | 'cash' | 'card' | 'store_credit' | 'loyalty_points', status: '', credit_apply_input: '', loyalty_apply_input: '' })
+  const [editData, setEditData] = useState({ due_date: '', estimated_cost: '', deposit_paid: '', payment_methods: [] as ('cash' | 'card' | 'store_credit' | 'loyalty_points')[], payment_amounts: { cash: '', card: '' }, status: '', credit_apply_input: '', loyalty_apply_input: '', discount_type: 'fixed' as 'fixed' | 'percent', discount_value: '', subtotal: 0 })
+  const [editPaymentSplitError, setEditPaymentSplitError] = useState('')
   const [editSaving, setEditSaving] = useState(false)
   const [editErrors, setEditErrors] = useState<{ due_date?: string; estimated_cost?: string; deposit_paid?: string }>({})
   // Store credit / loyalty balances for the repair's customer (editing)
@@ -483,6 +539,9 @@ export default function RepairsPage() {
         repairs_urgent:    d.repairs_urgent,
         total_sales:       d.repairs_revenue ?? 0,
         repairs_profit:    d.repairs_profit  ?? 0,
+        cash_deposits:     d.repairs_cash_deposits  ?? 0,
+        card_deposits:     d.repairs_card_deposits  ?? 0,
+        other_deposits:    d.repairs_other_deposits ?? 0,
       }
     },
   })
@@ -492,12 +551,13 @@ export default function RepairsPage() {
     queryClient.invalidateQueries({ queryKey: ['dashboard'] })
   }
 
-  // Auto-populate total charges = job fee + parts retail total
+  // Auto-populate total charges = job fee + net parts total - overall discount
   useEffect(() => {
     setJobData((prev) => {
-      const partsTotal = repairParts.reduce((s, p) => s + p.unit_price * p.qty, 0)
       const fee = parseFloat(prev.job_fee) || 0
-      return { ...prev, estimated_cost: (fee + partsTotal).toFixed(2) }
+      const discountValue = parseFloat(prev.discount_value) || 0
+      const { total } = computeJobTotal(fee, repairParts, prev.discount_type, discountValue)
+      return { ...prev, estimated_cost: total.toFixed(2) }
     })
   }, [repairParts])
 
@@ -585,16 +645,25 @@ export default function RepairsPage() {
   function openEdit(r: RepairRow) {
     setEditRepair(r)
     const cf = (r.custom_fields as any) ?? {}
+    const rAny = r as any
+    // Reconstruct the pre-discount subtotal from the persisted net total + previous
+    // discount, so re-entering a discount here recomputes off the same base.
+    const subtotal = (r.estimated_cost ?? 0) + (rAny.discount_amount ?? 0)
     setEditData({
       due_date: cf.due_date ?? '',
       estimated_cost: r.estimated_cost != null ? String(r.estimated_cost) : '',
       deposit_paid: r.deposit_paid != null ? String(r.deposit_paid) : '',
-      payment_method: (cf.payment_method as '' | 'cash' | 'card' | 'store_credit' | 'loyalty_points') ?? '',
+      payment_methods: [],
+      payment_amounts: { cash: '', card: '' },
       status: r.status ?? '',
       credit_apply_input: '',
       loyalty_apply_input: '',
+      discount_type: (rAny.discount_type as 'fixed' | 'percent') ?? 'fixed',
+      discount_value: rAny.discount_value != null ? String(rAny.discount_value) : '',
+      subtotal,
     })
     setEditErrors({})
+    setEditPaymentSplitError('')
     setEditOpen(true)
   }
 
@@ -612,6 +681,14 @@ export default function RepairsPage() {
       errs.deposit_paid = 'Deposit is required and must be a valid amount.'
     if (Object.keys(errs).length > 0) { setEditErrors(errs); return }
     setEditErrors({})
+
+    const editDelta = Math.max(0, depositVal - (editRepair.deposit_paid ?? 0))
+    const editSplits = buildPaymentSplits(editData.payment_methods, editData.payment_amounts, editData.credit_apply_input, editData.loyalty_apply_input, editLoyaltyRate)
+    if (editSplits.length > 0 && Math.abs(paymentSplitTotal(editSplits) - editDelta) >= 0.01) {
+      setEditPaymentSplitError(`Payment split amounts (£${paymentSplitTotal(editSplits).toFixed(2)}) must add up to the new payment (£${editDelta.toFixed(2)}).`)
+      return
+    }
+    setEditPaymentSplitError('')
     setEditSaving(true)
     try {
       const cf = (editRepair.custom_fields as any) ?? {}
@@ -621,14 +698,18 @@ export default function RepairsPage() {
         body: JSON.stringify({
           estimated_cost: editData.estimated_cost === '' ? null : parseFloat(editData.estimated_cost),
           deposit_paid: editData.deposit_paid === '' ? 0 : parseFloat(editData.deposit_paid),
+          discount_type: editData.discount_type,
+          discount_value: parseFloat(editData.discount_value) || 0,
+          discount_amount: Math.max(0, Math.min(editData.subtotal, editData.discount_type === 'percent' ? editData.subtotal * ((parseFloat(editData.discount_value) || 0) / 100) : (parseFloat(editData.discount_value) || 0))),
           status: editData.status || undefined,
           custom_fields: {
             ...cf,
             due_date: editData.due_date || null,
-            payment_method: editData.payment_method || null
+            payment_method: editData.payment_methods.length === 1 ? editData.payment_methods[0] : editData.payment_methods.length > 1 ? 'split' : (cf.payment_method ?? null),
           },
-          store_credit_applied: editData.payment_method === 'store_credit' ? (parseFloat(editData.credit_apply_input) || 0) : undefined,
-          loyalty_points_applied: editData.payment_method === 'loyalty_points' ? (parseInt(editData.loyalty_apply_input) || 0) : undefined,
+          store_credit_applied: editData.payment_methods.includes('store_credit') ? (parseFloat(editData.credit_apply_input) || 0) : undefined,
+          loyalty_points_applied: editData.payment_methods.includes('loyalty_points') ? (parseInt(editData.loyalty_apply_input) || 0) : undefined,
+          payment_splits: editSplits,
         }),
       })
       
@@ -659,6 +740,7 @@ export default function RepairsPage() {
     setStep1Error('')
     setPhoneError('')
     setChargesError('')
+    setPaymentSplitError('')
     setDeviceError('')
     setCustSuggestions([])
     setShowSuggestions(null)
@@ -791,6 +873,8 @@ export default function RepairsPage() {
         unit_price: p.selling_price ?? 0,
         unit_cost: p.cost_price ?? 0,
         max_stock: maxStock,
+        discount_type: 'fixed',
+        discount_value: 0,
       }]
     })
     setPartQuery('')
@@ -811,6 +895,8 @@ export default function RepairsPage() {
       unit_price: price,
       unit_cost: cost,
       max_stock: null,
+      discount_type: 'fixed',
+      discount_value: 0,
     }])
     setPartQuery('')
     setQuickPartPrice('')
@@ -856,6 +942,14 @@ export default function RepairsPage() {
       }
     }
     setChargesError('')
+
+    const depositVal = parseFloat(jobData.deposit_paid) || 0
+    const splits = buildPaymentSplits(jobData.payment_methods, jobData.payment_amounts, jobData.credit_apply_input, jobData.loyalty_apply_input, loyaltyRate)
+    if (splits.length > 0 && Math.abs(paymentSplitTotal(splits) - depositVal) >= 0.01) {
+      setPaymentSplitError(`Payment split amounts (£${paymentSplitTotal(splits).toFixed(2)}) must add up to the deposit (£${depositVal.toFixed(2)}).`)
+      return
+    }
+    setPaymentSplitError('')
     setSubmitting(true)
 
     let customerId = selectedCustomer?.id ?? null
@@ -888,6 +982,9 @@ export default function RepairsPage() {
     const total = parseFloat(jobData.estimated_cost) || 0
     const deposit = parseFloat(jobData.deposit_paid) || 0
     const faultText = jobData.faults.join(', ')
+    const jobFeeVal = parseFloat(jobData.job_fee) || 0
+    const discountValueVal = parseFloat(jobData.discount_value) || 0
+    const { discountAmount } = computeJobTotal(jobFeeVal, repairParts, jobData.discount_type, discountValueVal)
 
     const res = await fetch('/api/repairs', {
       method: 'POST',
@@ -902,19 +999,23 @@ export default function RepairsPage() {
         serial_number: jobData.imei || null,
         estimated_cost: total || null,
         deposit_paid: deposit,
+        discount_type: jobData.discount_type,
+        discount_value: discountValueVal,
+        discount_amount: discountAmount,
         assigned_to: jobData.assigned_to || null,
         status: jobData.status || undefined,
         lock_type: jobData.lock_type || null,
         passcode: jobData.passcode.trim() || null,
-        store_credit_applied: jobData.payment_method === 'store_credit' ? (parseFloat(jobData.credit_apply_input) || 0) : undefined,
-        loyalty_points_applied: jobData.payment_method === 'loyalty_points' ? (parseInt(jobData.loyalty_apply_input) || 0) : undefined,
+        store_credit_applied: jobData.payment_methods.includes('store_credit') ? (parseFloat(jobData.credit_apply_input) || 0) : undefined,
+        loyalty_points_applied: jobData.payment_methods.includes('loyalty_points') ? (parseInt(jobData.loyalty_apply_input) || 0) : undefined,
+        payment_splits: splits,
         custom_fields: {
           imei: jobData.imei || null,
           due_date: jobData.due_date || null,
           customer_note: jobData.customer_note || null,
           staff_note: jobData.staff_note || null,
           price_pending: jobData.price_pending || undefined,
-          payment_method: jobData.payment_method || null,
+          payment_method: jobData.payment_methods.length === 1 ? jobData.payment_methods[0] : jobData.payment_methods.length > 1 ? 'split' : null,
           ...(isRetail && Object.keys(itemAttributes).length > 0 ? { item_attributes: itemAttributes } : {}),
         },
         parts: repairParts.map((p) => ({
@@ -923,6 +1024,9 @@ export default function RepairsPage() {
           quantity: p.qty,
           unit_cost: p.unit_cost,
           unit_price: p.unit_price,
+          discount_type: p.discount_type,
+          discount_value: p.discount_value,
+          discount_amount: lineDiscountAmount(p.qty, p.unit_price, p.discount_type, p.discount_value),
         })),
       }),
     })
@@ -1381,7 +1485,7 @@ export default function RepairsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {/* Total Repairs */}
         <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm">
           <div className="flex items-start justify-between gap-2 sm:gap-3">
@@ -1511,6 +1615,41 @@ export default function RepairsPage() {
             <div className="mt-3 h-4 w-28 rounded bg-surface-container animate-pulse" />
           )}
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />
+        </div>
+
+        {/* Cash vs Card Deposits */}
+        <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm">
+          <div className="flex items-start justify-between gap-2 sm:gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Deposits by Method</p>
+              {repairStats ? (
+                <div className="mt-2 space-y-0.5">
+                  <p className="flex items-center justify-between text-xs sm:text-sm">
+                    <span className="text-on-surface-variant">Cash</span>
+                    <span className="font-bold text-on-surface">{formatCurrency(repairStats.cash_deposits)}</span>
+                  </p>
+                  <p className="flex items-center justify-between text-xs sm:text-sm">
+                    <span className="text-on-surface-variant">Card</span>
+                    <span className="font-bold text-on-surface">{formatCurrency(repairStats.card_deposits)}</span>
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-2 h-8 w-24 rounded bg-surface-container animate-pulse" />
+              )}
+            </div>
+            <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl bg-tertiary-container/40">
+              <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-tertiary" />
+            </div>
+          </div>
+          {repairStats ? (
+            <p className="mt-3 flex items-center gap-1 text-xs font-medium text-tertiary">
+              <TrendingUp className="h-3 w-3" />
+              this period
+            </p>
+          ) : (
+            <div className="mt-3 h-4 w-20 rounded bg-surface-container animate-pulse" />
+          )}
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-tertiary" />
         </div>
       </div>
 
@@ -2240,6 +2379,7 @@ export default function RepairsPage() {
                           <th className="w-16 px-2 py-1.5 text-center">Qty</th>
                           <th className="w-20 px-2 py-1.5 text-right text-gray-400">Cost {getCurrencySymbol()}</th>
                           <th className="w-20 px-2 py-1.5 text-right">Price {getCurrencySymbol()}</th>
+                          <th className="w-24 px-2 py-1.5 text-right">Discount</th>
                           <th className="w-20 px-2 py-1.5 text-right">Total</th>
                           <th className="w-8" />
                         </tr>
@@ -2284,7 +2424,27 @@ export default function RepairsPage() {
                                 className="h-6 w-16 rounded border border-gray-200 px-1 text-right text-xs"
                               />
                             </td>
-                            <td className="px-2 py-1.5 text-right font-semibold text-gray-700">{formatCurrency(p.unit_price * p.qty)}</td>
+                            <td className="px-2 py-1.5 text-right">
+                              <div className="flex items-center justify-end gap-0.5">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={p.discount_value}
+                                  onChange={(e) => setRepairParts((prev) => prev.map((r) => r.tempId === p.tempId ? { ...r, discount_value: parseFloat(e.target.value) || 0 } : r))}
+                                  className="h-6 w-14 rounded border border-gray-200 px-1 text-right text-xs"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setRepairParts((prev) => prev.map((r) => r.tempId === p.tempId ? { ...r, discount_type: r.discount_type === 'percent' ? 'fixed' : 'percent' } : r))}
+                                  title={p.discount_type === 'percent' ? 'Switch to fixed amount' : 'Switch to percentage'}
+                                  className="h-6 w-6 shrink-0 rounded border border-gray-200 text-[10px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                                >
+                                  {p.discount_type === 'percent' ? '%' : getCurrencySymbol()}
+                                </button>
+                              </div>
+                            </td>
+                            <td className="px-2 py-1.5 text-right font-semibold text-gray-700">{formatCurrency(lineNetTotal(p.qty, p.unit_price, p.discount_type, p.discount_value))}</td>
                             <td className="px-1 py-1.5 text-center">
                               <button
                                 type="button"
@@ -2299,9 +2459,9 @@ export default function RepairsPage() {
                       </tbody>
                       <tfoot>
                         <tr className="border-t border-gray-200 bg-gray-50">
-                          <td colSpan={4} className="px-3 py-1.5 text-right text-xs font-bold text-gray-600">Parts Total:</td>
+                          <td colSpan={5} className="px-3 py-1.5 text-right text-xs font-bold text-gray-600">Parts Total:</td>
                           <td className="px-2 py-1.5 text-right text-xs font-bold text-gray-900">
-                            {formatCurrency(repairParts.reduce((s, p) => s + p.unit_price * p.qty, 0))}
+                            {formatCurrency(repairParts.reduce((s, p) => s + lineNetTotal(p.qty, p.unit_price, p.discount_type, p.discount_value), 0))}
                           </td>
                           <td />
                         </tr>
@@ -2386,7 +2546,7 @@ export default function RepairsPage() {
                     ) : 'No fault found / Price TBD'}
                   </span>
                 </label>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                   {/* Job Fee (labour) */}
                   <div>
                     <label className={lbl}>Job Fee (Labour)</label>
@@ -2400,8 +2560,8 @@ export default function RepairsPage() {
                         value={jobData.job_fee}
                         onChange={(e) => {
                           const fee = e.target.value
-                          const partsTotal = repairParts.reduce((s, p) => s + p.unit_price * p.qty, 0)
-                          const total = (parseFloat(fee) || 0) + partsTotal
+                          const discountValue = parseFloat(jobData.discount_value) || 0
+                          const { total } = computeJobTotal(parseFloat(fee) || 0, repairParts, jobData.discount_type, discountValue)
                           setJobData((p) => ({ ...p, job_fee: fee, estimated_cost: total.toFixed(2) }))
                         }}
                         placeholder="0.00"
@@ -2409,7 +2569,48 @@ export default function RepairsPage() {
                       />
                     </div>
                   </div>
-                  {/* Total Charges = job fee + parts */}
+                  {/* Overall Discount */}
+                  <div>
+                    <label className={lbl}>Discount</label>
+                    <div className="flex gap-1">
+                      <div className="relative flex-1">
+                        <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                          {jobData.discount_type === 'percent' ? '%' : '£'}
+                        </span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          disabled={pricePending}
+                          value={jobData.discount_value}
+                          onChange={(e) => {
+                            const discountValue = e.target.value
+                            const fee = parseFloat(jobData.job_fee) || 0
+                            const { total } = computeJobTotal(fee, repairParts, jobData.discount_type, parseFloat(discountValue) || 0)
+                            setJobData((p) => ({ ...p, discount_value: discountValue, estimated_cost: total.toFixed(2) }))
+                          }}
+                          placeholder="0.00"
+                          className={`${inp} pl-6 ${pricePending ? 'opacity-40 cursor-not-allowed' : ''}`}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        disabled={pricePending}
+                        onClick={() => {
+                          const nextType = jobData.discount_type === 'percent' ? 'fixed' : 'percent'
+                          const fee = parseFloat(jobData.job_fee) || 0
+                          const discountValue = parseFloat(jobData.discount_value) || 0
+                          const { total } = computeJobTotal(fee, repairParts, nextType, discountValue)
+                          setJobData((p) => ({ ...p, discount_type: nextType, estimated_cost: total.toFixed(2) }))
+                        }}
+                        title={jobData.discount_type === 'percent' ? 'Switch to fixed amount' : 'Switch to percentage'}
+                        className={`h-8 w-8 shrink-0 rounded-md border text-xs font-semibold transition-colors ${pricePending ? 'opacity-40 cursor-not-allowed border-gray-200 text-gray-300' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+                      >
+                        {jobData.discount_type === 'percent' ? '%' : '£'}
+                      </button>
+                    </div>
+                  </div>
+                  {/* Total Charges = job fee + parts - discount */}
                   <div>
                     <label className={lbl}>Total Charges {!pricePending && <span className="text-red-400">*</span>}</label>
                     <div className="relative">
@@ -2472,19 +2673,27 @@ export default function RepairsPage() {
                   </div>
                 </div>
                 <div className="mt-2">
-                  <label className={lbl}>Payment Method <span className="font-normal normal-case text-gray-300">(opt)</span></label>
+                  <label className={lbl}>Payment Method <span className="font-normal normal-case text-gray-300">(opt, select multiple to split)</span></label>
                   <div className="flex flex-wrap gap-2">
                     {(['cash', 'card', 'store_credit', 'loyalty_points'] as const).map((m) => {
                       const disabled = (m === 'store_credit' || m === 'loyalty_points') && !selectedCustomer
+                      const active = jobData.payment_methods.includes(m)
                       return (
                         <button
                           key={m}
                           type="button"
                           disabled={disabled}
                           title={disabled ? 'Select an existing customer first' : undefined}
-                          onClick={() => !disabled && setJobData((p) => ({ ...p, payment_method: p.payment_method === m ? '' : m }))}
+                          onClick={() => !disabled && setJobData((p) => {
+                            const active = p.payment_methods.includes(m)
+                            const payment_methods = active ? p.payment_methods.filter((x) => x !== m) : [...p.payment_methods, m]
+                            const payment_amounts = m === 'cash' || m === 'card' ? { ...p.payment_amounts, [m]: active ? '' : p.payment_amounts[m] } : p.payment_amounts
+                            const credit_apply_input = m === 'store_credit' && active ? '' : p.credit_apply_input
+                            const loyalty_apply_input = m === 'loyalty_points' && active ? '' : p.loyalty_apply_input
+                            return { ...p, payment_methods, payment_amounts, credit_apply_input, loyalty_apply_input }
+                          })}
                           className={`flex items-center gap-1 rounded-md border px-3 py-1 text-xs font-medium capitalize transition-colors ${
-                            jobData.payment_method === m
+                            active
                               ? 'border-gray-900 bg-gray-900 text-white'
                               : disabled
                                 ? 'border-gray-100 text-gray-300 cursor-not-allowed'
@@ -2499,7 +2708,29 @@ export default function RepairsPage() {
                     })}
                   </div>
 
-                  {jobData.payment_method === 'store_credit' && (
+                  {jobData.payment_methods.includes('cash') && (
+                    <div className="mt-2">
+                      <input
+                        type="number" min="0" step="0.01" placeholder="Cash amount"
+                        value={jobData.payment_amounts.cash}
+                        onChange={(e) => setJobData((p) => ({ ...p, payment_amounts: { ...p.payment_amounts, cash: e.target.value } }))}
+                        className={inp}
+                      />
+                    </div>
+                  )}
+
+                  {jobData.payment_methods.includes('card') && (
+                    <div className="mt-2">
+                      <input
+                        type="number" min="0" step="0.01" placeholder="Card amount"
+                        value={jobData.payment_amounts.card}
+                        onChange={(e) => setJobData((p) => ({ ...p, payment_amounts: { ...p.payment_amounts, card: e.target.value } }))}
+                        className={inp}
+                      />
+                    </div>
+                  )}
+
+                  {jobData.payment_methods.includes('store_credit') && (
                     <div className="mt-2 space-y-1.5">
                       {creditBalance !== null && (
                         <p className="text-xs text-gray-500">Available balance: <span className="font-semibold text-gray-800">£{creditBalance.toFixed(2)}</span></p>
@@ -2520,7 +2751,7 @@ export default function RepairsPage() {
                     </div>
                   )}
 
-                  {jobData.payment_method === 'loyalty_points' && (
+                  {jobData.payment_methods.includes('loyalty_points') && (
                     <div className="mt-2 space-y-1.5">
                       {loyaltyBalance !== null && (
                         <p className="text-xs text-gray-500">
@@ -2543,6 +2774,19 @@ export default function RepairsPage() {
                       </div>
                     </div>
                   )}
+
+                  {jobData.payment_methods.length > 0 && (() => {
+                    const splits = buildPaymentSplits(jobData.payment_methods, jobData.payment_amounts, jobData.credit_apply_input, jobData.loyalty_apply_input, loyaltyRate)
+                    const applied = paymentSplitTotal(splits)
+                    const due = parseFloat(jobData.deposit_paid) || 0
+                    const remaining = due - applied
+                    return (
+                      <p className={`mt-2 text-xs font-medium ${Math.abs(remaining) < 0.01 ? 'text-green-600' : 'text-amber-600'}`}>
+                        Applied £{applied.toFixed(2)} / £{due.toFixed(2)} {Math.abs(remaining) >= 0.01 && `· Remaining £${remaining.toFixed(2)}`}
+                      </p>
+                    )
+                  })()}
+                  {paymentSplitError && <p className="mt-1 text-xs text-red-500">{paymentSplitError}</p>}
                 </div>
               </div>
 
@@ -2696,6 +2940,46 @@ export default function RepairsPage() {
                 {editErrors.estimated_cost && <p className="mt-1 text-xs text-red-500">{editErrors.estimated_cost}</p>}
               </div>
 
+              {/* Discount */}
+              <div>
+                <label className={lbl}>Discount</label>
+                <div className="flex gap-1">
+                  <div className="relative flex-1">
+                    <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                      {editData.discount_type === 'percent' ? '%' : '£'}
+                    </span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editData.discount_value}
+                      onChange={(e) => {
+                        const discountValue = parseFloat(e.target.value) || 0
+                        const amt = editData.discount_type === 'percent' ? editData.subtotal * (discountValue / 100) : discountValue
+                        const total = Math.max(0, editData.subtotal - Math.max(0, Math.min(editData.subtotal, amt)))
+                        setEditData((p) => ({ ...p, discount_value: e.target.value, estimated_cost: total.toFixed(2) }))
+                      }}
+                      placeholder="0.00"
+                      className={`${inp} pl-6`}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextType = editData.discount_type === 'percent' ? 'fixed' : 'percent'
+                      const discountValue = parseFloat(editData.discount_value) || 0
+                      const amt = nextType === 'percent' ? editData.subtotal * (discountValue / 100) : discountValue
+                      const total = Math.max(0, editData.subtotal - Math.max(0, Math.min(editData.subtotal, amt)))
+                      setEditData((p) => ({ ...p, discount_type: nextType, estimated_cost: total.toFixed(2) }))
+                    }}
+                    title={editData.discount_type === 'percent' ? 'Switch to fixed amount' : 'Switch to percentage'}
+                    className="h-10 w-10 shrink-0 rounded-lg border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    {editData.discount_type === 'percent' ? '%' : '£'}
+                  </button>
+                </div>
+              </div>
+
               {/* Deposit */}
               <div>
                 <label className={lbl}>Deposit <span className="text-red-500">*</span></label>
@@ -2738,19 +3022,27 @@ export default function RepairsPage() {
 
               {/* Payment Method */}
               <div>
-                <label className={lbl}>Payment Method :</label>
+                <label className={lbl}>Payment Method <span className="font-normal normal-case text-gray-300">(select multiple to split the new payment)</span> :</label>
                 <div className="flex gap-2">
                   {(['cash', 'card', 'store_credit', 'loyalty_points'] as const).map((m) => {
                     const disabled = (m === 'store_credit' || m === 'loyalty_points') && !editRepair?.customer_id
+                    const active = editData.payment_methods.includes(m)
                     return (
                       <button
                         key={m}
                         type="button"
                         disabled={disabled}
                         title={disabled ? 'This repair has no customer attached' : undefined}
-                        onClick={() => !disabled && setEditData((p) => ({ ...p, payment_method: p.payment_method === m ? '' : m }))}
+                        onClick={() => !disabled && setEditData((p) => {
+                          const active = p.payment_methods.includes(m)
+                          const payment_methods = active ? p.payment_methods.filter((x) => x !== m) : [...p.payment_methods, m]
+                          const payment_amounts = m === 'cash' || m === 'card' ? { ...p.payment_amounts, [m]: active ? '' : p.payment_amounts[m] } : p.payment_amounts
+                          const credit_apply_input = m === 'store_credit' && active ? '' : p.credit_apply_input
+                          const loyalty_apply_input = m === 'loyalty_points' && active ? '' : p.loyalty_apply_input
+                          return { ...p, payment_methods, payment_amounts, credit_apply_input, loyalty_apply_input }
+                        })}
                         className={`flex items-center gap-1.5 rounded-lg border px-6 py-2 text-sm font-medium capitalize transition-colors ${
-                          editData.payment_method === m
+                          active
                             ? 'border-gray-900 bg-gray-900 text-white'
                             : disabled
                               ? 'border-gray-100 text-gray-300 cursor-not-allowed'
@@ -2769,7 +3061,29 @@ export default function RepairsPage() {
                   const editDelta = Math.max(0, (parseFloat(editData.deposit_paid) || 0) - (editRepair?.deposit_paid ?? 0))
                   return (
                     <>
-                      {editData.payment_method === 'store_credit' && (
+                      {editData.payment_methods.includes('cash') && (
+                        <div className="mt-2">
+                          <input
+                            type="number" min="0" step="0.01" placeholder="Cash amount"
+                            value={editData.payment_amounts.cash}
+                            onChange={(e) => setEditData((p) => ({ ...p, payment_amounts: { ...p.payment_amounts, cash: e.target.value } }))}
+                            className={inp}
+                          />
+                        </div>
+                      )}
+
+                      {editData.payment_methods.includes('card') && (
+                        <div className="mt-2">
+                          <input
+                            type="number" min="0" step="0.01" placeholder="Card amount"
+                            value={editData.payment_amounts.card}
+                            onChange={(e) => setEditData((p) => ({ ...p, payment_amounts: { ...p.payment_amounts, card: e.target.value } }))}
+                            className={inp}
+                          />
+                        </div>
+                      )}
+
+                      {editData.payment_methods.includes('store_credit') && (
                         <div className="mt-2 space-y-1.5">
                           {editCreditBalance !== null && (
                             <p className="text-xs text-gray-500">Available balance: <span className="font-semibold text-gray-800">£{editCreditBalance.toFixed(2)}</span> · applying to new payment of £{editDelta.toFixed(2)}</p>
@@ -2789,7 +3103,7 @@ export default function RepairsPage() {
                         </div>
                       )}
 
-                      {editData.payment_method === 'loyalty_points' && (
+                      {editData.payment_methods.includes('loyalty_points') && (
                         <div className="mt-2 space-y-1.5">
                           {editLoyaltyBalance !== null && (
                             <p className="text-xs text-gray-500">
@@ -2811,6 +3125,18 @@ export default function RepairsPage() {
                           </div>
                         </div>
                       )}
+
+                      {editData.payment_methods.length > 0 && (() => {
+                        const splits = buildPaymentSplits(editData.payment_methods, editData.payment_amounts, editData.credit_apply_input, editData.loyalty_apply_input, editLoyaltyRate)
+                        const applied = paymentSplitTotal(splits)
+                        const remaining = editDelta - applied
+                        return (
+                          <p className={`mt-2 text-xs font-medium ${Math.abs(remaining) < 0.01 ? 'text-green-600' : 'text-amber-600'}`}>
+                            Applied £{applied.toFixed(2)} / £{editDelta.toFixed(2)} {Math.abs(remaining) >= 0.01 && `· Remaining £${remaining.toFixed(2)}`}
+                          </p>
+                        )
+                      })()}
+                      {editPaymentSplitError && <p className="mt-1 text-xs text-red-500">{editPaymentSplitError}</p>}
                     </>
                   )
                 })()}

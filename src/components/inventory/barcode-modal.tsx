@@ -16,9 +16,12 @@ interface ProductRow {
 interface Props {
   product: ProductRow | null
   onClose: () => void
+  /** Parent product id — when present, `product` refers to a variant and the
+   * barcode is saved via the variant endpoint instead of the product one. */
+  productId?: string
 }
 
-export function BarcodeModal({ product, onClose }: Props) {
+export function BarcodeModal({ product, onClose, productId }: Props) {
   const [generating, setGenerating] = useState(false)
   const [currentBarcode, setCurrentBarcode] = useState<string | null>(null)
   const queryClient = useQueryClient()
@@ -50,7 +53,10 @@ export function BarcodeModal({ product, onClose }: Props) {
     try {
       // Generate a 12 digit random number for the barcode
       const generated = Math.floor(100000000000 + Math.random() * 900000000000).toString()
-      const res = await fetch(`/api/products/${product.id}`, {
+      const url = productId
+        ? `/api/products/${productId}/variants/${product.id}`
+        : `/api/products/${product.id}`
+      const res = await fetch(url, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ barcode: generated })

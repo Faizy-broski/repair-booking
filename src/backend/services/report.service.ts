@@ -32,7 +32,7 @@ export const ReportService = {
   // the frontend can bucket them into the same daily groups.
   async getCashMovementsReport(branchId: string, from: string, to: string) {
     const { data, error } = await db('cash_movements')
-      .select('type, amount, created_at')
+      .select('type, amount, purpose, notes, created_at, profiles!cashier_id(full_name)')
       .eq('branch_id', branchId)
       .gte('created_at', from)
       .lte('created_at', to)

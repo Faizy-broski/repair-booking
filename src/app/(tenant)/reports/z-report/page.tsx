@@ -252,12 +252,19 @@ function ZReportPageInner() {
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Cash Movements</p>
               <div className="space-y-1.5">
                 {zReportMovements.map((m: any) => (
-                  <div key={m.id} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className={`text-xs font-semibold ${m.type === 'cash_in' ? 'text-green-600' : 'text-orange-600'}`}>
-                        {m.type === 'cash_in' ? '+ Cash In' : '− Cash Out'}
-                      </span>
+                  <div key={m.id} className="flex items-start justify-between text-sm">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-semibold ${m.type === 'cash_in' ? 'text-green-600' : 'text-orange-600'}`}>
+                          {m.type === 'cash_in' ? '+ Cash In' : '− Cash Out'}
+                        </span>
+                        {m.purpose && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium capitalize text-gray-500">{m.purpose}</span>}
+                        {m.purpose === 'plain' && <span className="text-[10px] italic text-amber-600">(not in reports)</span>}
+                      </div>
                       {m.notes && <span className="text-xs text-gray-400 truncate">{m.notes}</span>}
+                      <p className="text-[10px] text-gray-400">
+                        {new Date(m.created_at).toLocaleString('en-GB')} · {m.profiles?.full_name ?? 'Unknown'}
+                      </p>
                     </div>
                     <span className={`font-semibold shrink-0 ${m.type === 'cash_in' ? 'text-green-600' : 'text-orange-600'}`}>
                       {m.type === 'cash_in' ? '+' : '−'}{formatCurrency(m.amount)}
@@ -424,11 +431,17 @@ function ZReportPageInner() {
                   {cashMovements.map((m: any) => (
                     <div key={m.id} className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <span className={`text-xs font-semibold ${m.type === 'cash_in' ? 'text-green-600' : 'text-orange-600'}`}>
-                          {m.type === 'cash_in' ? '+ Cash In' : '− Cash Out'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-xs font-semibold ${m.type === 'cash_in' ? 'text-green-600' : 'text-orange-600'}`}>
+                            {m.type === 'cash_in' ? '+ Cash In' : '− Cash Out'}
+                          </span>
+                          {m.purpose && <span className="rounded-full bg-surface-container px-2 py-0.5 text-[10px] font-medium capitalize text-on-surface-variant">{m.purpose}</span>}
+                          {m.purpose === 'plain' && <span className="text-[10px] italic text-amber-600">(not in reports)</span>}
+                        </div>
                         {m.notes && <p className="text-xs text-on-surface-variant truncate">{m.notes}</p>}
-                        <p className="text-[10px] text-on-surface-variant">{new Date(m.created_at).toLocaleTimeString()}</p>
+                        <p className="text-[10px] text-on-surface-variant">
+                          {new Date(m.created_at).toLocaleTimeString()} · {m.profiles?.full_name ?? 'Unknown'}
+                        </p>
                       </div>
                       <span className={`text-sm font-semibold shrink-0 ${m.type === 'cash_in' ? 'text-green-600' : 'text-orange-600'}`}>
                         {m.type === 'cash_in' ? '+' : '−'}{formatCurrency(m.amount)}

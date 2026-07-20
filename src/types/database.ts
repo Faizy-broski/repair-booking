@@ -3201,6 +3201,9 @@ export type Database = {
       }
       repair_items: {
         Row: {
+          discount_amount: number
+          discount_type: string
+          discount_value: number
           id: string
           name: string
           problem_id: string | null
@@ -3214,6 +3217,9 @@ export type Database = {
           warranty_starts_at: string | null
         }
         Insert: {
+          discount_amount?: number
+          discount_type?: string
+          discount_value?: number
           id?: string
           name: string
           problem_id?: string | null
@@ -3227,6 +3233,9 @@ export type Database = {
           warranty_starts_at?: string | null
         }
         Update: {
+          discount_amount?: number
+          discount_type?: string
+          discount_value?: number
           id?: string
           name?: string
           problem_id?: string | null
@@ -3302,6 +3311,64 @@ export type Database = {
           },
         ]
       }
+      repair_payments: {
+        Row: {
+          amount: number
+          business_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          id: string
+          is_backfilled: boolean
+          method: string
+          repair_id: string
+        }
+        Insert: {
+          amount: number
+          business_id: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string
+          is_backfilled?: boolean
+          method: string
+          repair_id: string
+        }
+        Update: {
+          amount?: number
+          business_id?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          id?: string
+          is_backfilled?: boolean
+          method?: string
+          repair_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repair_payments_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repair_payments_repair_id_fkey"
+            columns: ["repair_id"]
+            isOneToOne: false
+            referencedRelation: "repairs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repair_payments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       repair_status_history: {
         Row: {
           changed_by: string | null
@@ -3369,12 +3436,16 @@ export type Database = {
           device_model: string | null
           device_type: string | null
           diagnosis: string | null
+          discount_amount: number
+          discount_type: string
+          discount_value: number
           estimated_cost: number | null
           id: string
           issue: string
           job_number: string
           label_ids: string[] | null
           notify_customer: boolean | null
+          payment_splits: Json
           serial_number: string | null
           status: string
           updated_at: string | null
@@ -3395,12 +3466,16 @@ export type Database = {
           device_model?: string | null
           device_type?: string | null
           diagnosis?: string | null
+          discount_amount?: number
+          discount_type?: string
+          discount_value?: number
           estimated_cost?: number | null
           id?: string
           issue: string
           job_number: string
           label_ids?: string[] | null
           notify_customer?: boolean | null
+          payment_splits?: Json
           serial_number?: string | null
           status?: string
           updated_at?: string | null
@@ -3421,12 +3496,16 @@ export type Database = {
           device_model?: string | null
           device_type?: string | null
           diagnosis?: string | null
+          discount_amount?: number
+          discount_type?: string
+          discount_value?: number
           estimated_cost?: number | null
           id?: string
           issue?: string
           job_number?: string
           label_ids?: string[] | null
           notify_customer?: boolean | null
+          payment_splits?: Json
           serial_number?: string | null
           status?: string
           updated_at?: string | null

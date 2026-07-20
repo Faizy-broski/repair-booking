@@ -24,7 +24,7 @@ export const GET = withMiddleware(async (req, ctx) => {
   }
 
   try {
-    const [allRepairsRes, periodRepairsRes, partsRes, posSaleItemsRes] = await Promise.all([
+    const [allRepairsRes, periodRepairsRes, partsRes, posSaleItemsRes, repairPaymentsRes] = await Promise.all([
       // ALL repairs — Open Jobs is a live operational count, not period-filtered
       db.from('repairs')
         .select('id, status, created_at, is_rush')
@@ -49,10 +49,26 @@ export const GET = withMiddleware(async (req, ctx) => {
         .eq('sales.branch_id', branchId)
         .gte('sales.created_at', periodStart)
         .not('repair_id', 'is', null),
+
+      // Per-payment-event tender breakdown for the Cash vs Card stat tile
+      db.from('repair_payments')
+        .select('amount, method, repairs!inner(branch_id)')
+        .eq('repairs.branch_id', branchId)
+        .gte('created_at', periodStart),
     ])
 
     const allRepairs:    any[] = allRepairsRes.data    ?? []
     const periodRepairs: any[] = periodRepairsRes.data ?? []
+
+    let cashDeposits = 0
+    let cardDeposits = 0
+    let otherDeposits = 0
+    for (const row of (repairPaymentsRes.data ?? []) as any[]) {
+      const amt = row.amount ?? 0
+      if (row.method === 'cash') cashDeposits += amt
+      else if (row.method === 'card') cardDeposits += amt
+      else otherDeposits += amt
+    }
 
     // Net amount actually charged through POS per repair (refund sales subtract)
     const posRepairAmounts = new Map<string, number>()
@@ -101,6 +117,9 @@ export const GET = withMiddleware(async (req, ctx) => {
       repairs_urgent:    urgentJobs.length,
       repairs_revenue:   revenue,
       repairs_profit:    revenue - partsCost,
+      repairs_cash_deposits:  cashDeposits,
+      repairs_card_deposits:  cardDeposits,
+      repairs_other_deposits: otherDeposits,
     })
   } catch (err) {
     return serverError('Failed to fetch repair stats', err)
