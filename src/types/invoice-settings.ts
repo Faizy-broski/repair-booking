@@ -9,6 +9,7 @@ export interface SocialLinks {
 
 export type PaperSize = 'A4' | 'A5' | 'Letter' | 'Receipt80' | 'Receipt58' | 'Custom'
 export type Orientation = 'portrait' | 'landscape'
+export type FooterLineScope = 'both' | 'repair' | 'pos'
 
 export interface InvoiceSettings {
   id?: string
@@ -38,11 +39,18 @@ export interface InvoiceSettings {
 
   // Footer
   footer_address: string | null
+  footer_phone: string | null
   footer_line_1: string | null
   footer_line_2: string | null
   footer_line_3: string | null
+  footer_line_1_scope: FooterLineScope
+  footer_line_2_scope: FooterLineScope
+  footer_line_3_scope: FooterLineScope
   thank_you_message: string | null
   policy_text: string | null
+  guarantee_line_1: string | null
+  guarantee_line_2: string | null
+  since_year: string | null
 
   // Social links
   social_links: SocialLinks
@@ -70,11 +78,18 @@ export const DEFAULT_INVOICE_SETTINGS: InvoiceSettings = {
   show_phone: true,
   show_email: true,
   footer_address: null,
+  footer_phone: null,
   footer_line_1: null,
   footer_line_2: null,
   footer_line_3: null,
+  footer_line_1_scope: 'both',
+  footer_line_2_scope: 'both',
+  footer_line_3_scope: 'both',
   thank_you_message: 'Thank you for your business!',
   policy_text: null,
+  guarantee_line_1: null,
+  guarantee_line_2: null,
+  since_year: null,
   social_links: {},
   show_tax_breakdown: true,
   show_payment_method: false,

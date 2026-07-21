@@ -2,10 +2,7 @@ import { NextRequest } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { adminSupabase } from '@/backend/config/supabase'
 import { ok, serverError } from '@/backend/utils/api-response'
-
-const TERMINAL_NAMES      = new Set(['repaired', 'collected', 'unrepairable'])
-const COMPLETION_KEYWORDS = ['complet', 'done', 'fixed', 'pick', 'closed', 'resolv', 'finish', 'collect', 'handover']
-const isTerminal = (s: string) => TERMINAL_NAMES.has(s) || COMPLETION_KEYWORDS.some(kw => s.includes(kw))
+import { isTerminalRepairStatus, buildPosOverrideMap, computeRepairRevenue, computeRepairPartsCost } from '@/backend/services/repair-financials.service'
 
 function getPeriodStart(period: string): string {
   const now = new Date()
@@ -27,7 +24,6 @@ export const DashboardController = {
 
     try {
       const urgentCutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-      const TERMINAL_IN  = '(repaired,collected,unrepairable,refunded)'
 
       const todayStart = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).toISOString()
 
@@ -35,8 +31,7 @@ export const DashboardController = {
         salesRes,
         expensesRes,
         repairsTotalRes,
-        repairsOpenRes,
-        repairsUrgentRes,
+        allRepairsStatusRes,
         inventoryRes,
         recentRepairsRes,
         activityRes,
@@ -50,8 +45,11 @@ export const DashboardController = {
         adminSupabase.from('sales').select('id, total, created_at').eq('branch_id', branchId).gte('created_at', periodStart),
         adminSupabase.from('expenses').select('amount').eq('branch_id', branchId).gte('expense_date', periodStart),
         (adminSupabase as any).from('repairs').select('*', { count: 'exact', head: true }).eq('branch_id', branchId) as Promise<{ count: number | null; error: unknown }>,
-        (adminSupabase as any).from('repairs').select('*', { count: 'exact', head: true }).eq('branch_id', branchId).not('status', 'in', TERMINAL_IN) as Promise<{ count: number | null; error: unknown }>,
-        (adminSupabase as any).from('repairs').select('*', { count: 'exact', head: true }).eq('branch_id', branchId).not('status', 'in', TERMINAL_IN).or(`is_rush.eq.true,created_at.lt.${urgentCutoff}`) as Promise<{ count: number | null; error: unknown }>,
+        // Open/Urgent Jobs — always all-time current state, never filtered by
+        // period. Filtered client-side (isTerminalRepairStatus) rather than a
+        // raw SQL status IN-list, since repair statuses are business-defined
+        // free text with no fixed enum (see repair-financials.service.ts).
+        adminSupabase.from('repairs').select('id, status, created_at, is_rush').eq('branch_id', branchId),
         adminSupabase.from('inventory').select('id, quantity, low_stock_alert, variant_id, products!inner(name, sku, is_active, is_service, has_variants)').eq('branch_id', branchId),
         adminSupabase.from('repairs').select('id, job_number, device_brand, device_model, issue, status, created_at, is_rush, customers(first_name,last_name)').eq('branch_id', branchId).order('created_at', { ascending: false }).limit(20),
         adminSupabase.from('repair_status_history').select('id, new_status, note, created_at, repairs!inner(id, job_number, device_brand, device_model), profiles!changed_by(full_name)').eq('repairs.branch_id', branchId).order('created_at', { ascending: false }).limit(20),
@@ -75,24 +73,17 @@ export const DashboardController = {
         (s, r) => s + (r.type === 'cash_in' ? (r.amount ?? 0) : (r.purpose === 'expense' ? 0 : -(r.amount ?? 0))), 0
       )
 
-      const posRepairAmounts = new Map<string, number>()
-      for (const row of (posRepairAmountsRes.data ?? []) as any[]) {
-        const rid = row.repair_id
-        if (!rid) continue
-        const amt = row.sales?.is_refund ? -(row.total ?? 0) : (row.total ?? 0)
-        posRepairAmounts.set(rid, (posRepairAmounts.get(rid) ?? 0) + amt)
-      }
+      const posRepairAmounts = buildPosOverrideMap((posRepairAmountsRes.data ?? []) as any[])
 
-      const repairsCompleted = repairsRevenueRows.filter((r: any) => isTerminal((r.status ?? '').toLowerCase())).length
+      const allRepairsStatus = (allRepairsStatusRes.data ?? []) as any[]
+      const openJobs   = allRepairsStatus.filter((r) => !isTerminalRepairStatus(r.status))
+      const urgentJobs = openJobs.filter((r) =>
+        r.is_rush === true || new Date(r.created_at) < new Date(urgentCutoff)
+      )
+
+      const repairsCompleted = repairsRevenueRows.filter((r: any) => isTerminalRepairStatus(r.status)).length
       const salesCogs = ((salesCogsRes.data ?? []) as any[]).reduce((s, item) => s + (item.quantity ?? 0) * (item.unit_cost || item.products?.cost_price || 0), 0)
-      const repairsPartsCost = ((repairsPartsRes.data ?? []) as any[]).reduce((s, item) => {
-        const repairStatus = (item.repairs?.status ?? '').toLowerCase()
-        const depositPaid  = item.repairs?.deposit_paid ?? 0
-        if (repairStatus === 'refunded') return s
-        if (isTerminal(repairStatus))    return s + (item.quantity ?? 0) * (item.unit_cost ?? 0)
-        if (depositPaid > 0)             return s + (item.quantity ?? 0) * (item.unit_cost ?? 0)
-        return s
-      }, 0)
+      const repairsPartsCost = computeRepairPartsCost((repairsPartsRes.data ?? []) as any[])
 
       const recentRepairs = (recentRepairsRes.data ?? []).map((r) => {
         const customer = r.customers as { first_name: string; last_name?: string } | null
@@ -161,27 +152,15 @@ export const DashboardController = {
       // card, net_profit, sales_profit) reflects it automatically.
       const totalSales    = sales.reduce((s, r) => s + (r.total ?? 0), 0) + cashNet
       const totalExpenses = expenses.reduce((s, r) => s + (r.amount ?? 0), 0)
-      const repairsRevenue = repairsRevenueRows.reduce((s, r) => {
-        const row = r as any
-        const posAmt = posRepairAmounts.get(row.id)
-        if (posAmt !== undefined) return s + posAmt
-
-        const status   = (row.status ?? '').toLowerCase()
-        const deposit  = row.deposit_paid  ?? 0
-        const fullCost = row.actual_cost   ?? row.estimated_cost ?? 0
-        const refund   = row.refund_amount ?? 0
-        if (isTerminal(status))    return s + fullCost
-        if (status === 'refunded') return s + Math.max(0, deposit - refund)
-        return s + deposit
-      }, 0)
+      const repairsRevenue = repairsRevenueRows.reduce((s, r) => s + computeRepairRevenue(r as any, posRepairAmounts), 0)
 
       const stats = {
         total_sales:           totalSales,
         sales_count:           sales.length,
         repairs_total:         repairsTotalRes.count  ?? 0,
-        repairs_open:          repairsOpenRes.count   ?? 0,
+        repairs_open:          openJobs.length,
         repairs_completed:     repairsCompleted,
-        repairs_urgent:        repairsUrgentRes.count ?? 0,
+        repairs_urgent:        urgentJobs.length,
         total_expenses:        totalExpenses,
         low_stock_count:       lowStockCount,
         net_profit:            totalSales + repairsRevenue - totalExpenses,
@@ -247,14 +226,12 @@ export const DashboardController = {
 
     try {
       const urgentCutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-      const TERMINAL_IN  = '(repaired,collected,unrepairable,refunded)'
 
       const [
         salesRes,
         expensesRes,
         repairsTotalRes,
-        repairsOpenRes,
-        repairsUrgentRes,
+        allRepairsStatusRes,
         inventoryRes,
         recentRepairsRes,
         activityRes,
@@ -284,20 +261,14 @@ export const DashboardController = {
           .select('*', { count: 'exact', head: true })
           .eq('branch_id', branchId) as Promise<{ count: number | null; error: unknown }>,
 
-        // COUNT: open repairs
-        (adminSupabase as any)
+        // Open/Urgent Jobs — always all-time current state, never filtered by
+        // period. Filtered client-side (isTerminalRepairStatus) rather than a
+        // raw SQL status IN-list, since repair statuses are business-defined
+        // free text with no fixed enum (see repair-financials.service.ts).
+        adminSupabase
           .from('repairs')
-          .select('*', { count: 'exact', head: true })
-          .eq('branch_id', branchId)
-          .not('status', 'in', TERMINAL_IN) as Promise<{ count: number | null; error: unknown }>,
-
-        // COUNT: urgent repairs (rush OR sitting > 3 days, still open)
-        (adminSupabase as any)
-          .from('repairs')
-          .select('*', { count: 'exact', head: true })
-          .eq('branch_id', branchId)
-          .not('status', 'in', TERMINAL_IN)
-          .or(`is_rush.eq.true,created_at.lt.${urgentCutoff}`) as Promise<{ count: number | null; error: unknown }>,
+          .select('id, status, created_at, is_rush')
+          .eq('branch_id', branchId),
 
         // Low stock alerts — inventory is typically small per branch
         adminSupabase
@@ -368,26 +339,19 @@ export const DashboardController = {
         (s, r) => s + (r.type === 'cash_in' ? (r.amount ?? 0) : (r.purpose === 'expense' ? 0 : -(r.amount ?? 0))), 0
       )
 
-      const posRepairAmounts = new Map<string, number>()
-      for (const row of (posRepairAmountsRes.data ?? []) as any[]) {
-        const rid = row.repair_id
-        if (!rid) continue
-        const amt = row.sales?.is_refund ? -(row.total ?? 0) : (row.total ?? 0)
-        posRepairAmounts.set(rid, (posRepairAmounts.get(rid) ?? 0) + amt)
-      }
+      const posRepairAmounts = buildPosOverrideMap((posRepairAmountsRes.data ?? []) as any[])
 
-      const repairsCompleted = repairsRevenueRows.filter((r: any) => isTerminal((r.status ?? '').toLowerCase())).length
+      const allRepairsStatus = (allRepairsStatusRes.data ?? []) as any[]
+      const openJobs   = allRepairsStatus.filter((r) => !isTerminalRepairStatus(r.status))
+      const urgentJobs = openJobs.filter((r) =>
+        r.is_rush === true || new Date(r.created_at) < new Date(urgentCutoff)
+      )
+
+      const repairsCompleted = repairsRevenueRows.filter((r: any) => isTerminalRepairStatus(r.status)).length
       const salesCogs = ((salesCogsRes.data ?? []) as any[]).reduce((s, item) => {
         return s + (item.quantity ?? 0) * (item.unit_cost || item.products?.cost_price || 0)
       }, 0)
-      const repairsPartsCost = ((repairsPartsRes.data ?? []) as any[]).reduce((s, item) => {
-        const repairStatus = (item.repairs?.status ?? '').toLowerCase()
-        const depositPaid  = item.repairs?.deposit_paid ?? 0
-        if (repairStatus === 'refunded') return s
-        if (isTerminal(repairStatus))    return s + (item.quantity ?? 0) * (item.unit_cost ?? 0)
-        if (depositPaid > 0)             return s + (item.quantity ?? 0) * (item.unit_cost ?? 0)
-        return s
-      }, 0)
+      const repairsPartsCost = computeRepairPartsCost((repairsPartsRes.data ?? []) as any[])
       const recentRepairs = (recentRepairsRes.data ?? []).map((r) => {
         const customer = r.customers as { first_name: string; last_name?: string } | null
         const customerName = customer ? [customer.first_name, customer.last_name].filter(Boolean).join(' ') : null
@@ -424,27 +388,15 @@ export const DashboardController = {
 
       const totalSales    = sales.reduce((s, r) => s + (r.total ?? 0), 0) + cashNet
       const totalExpenses = expenses.reduce((s, r) => s + (r.amount ?? 0), 0)
-      const repairsRevenue = repairsRevenueRows.reduce((s, r) => {
-          const row = r as any
-          const posAmt = posRepairAmounts.get(row.id)
-          if (posAmt !== undefined) return s + posAmt
-
-          const status   = (row.status ?? '').toLowerCase()
-          const deposit  = row.deposit_paid  ?? 0
-          const fullCost = row.actual_cost   ?? row.estimated_cost ?? 0
-          const refund   = row.refund_amount ?? 0
-          if (isTerminal(status))    return s + fullCost
-          if (status === 'refunded') return s + Math.max(0, deposit - refund)
-          return s + deposit
-        }, 0)
+      const repairsRevenue = repairsRevenueRows.reduce((s, r) => s + computeRepairRevenue(r as any, posRepairAmounts), 0)
 
       const stats = {
         total_sales:       totalSales,
         sales_count:       sales.length,
         repairs_total:     repairsTotalRes.count  ?? 0,
-        repairs_open:      repairsOpenRes.count   ?? 0,
+        repairs_open:      openJobs.length,
         repairs_completed: repairsCompleted,
-        repairs_urgent:    repairsUrgentRes.count ?? 0,
+        repairs_urgent:    urgentJobs.length,
         total_expenses:    totalExpenses,
         low_stock_count:   lowStockCount,
         net_profit:        totalSales + repairsRevenue - totalExpenses,

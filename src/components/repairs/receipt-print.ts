@@ -1,4 +1,4 @@
-import type { InvoiceSettings, SocialLinks } from '@/types/invoice-settings'
+import type { InvoiceSettings, SocialLinks, FooterLineScope } from '@/types/invoice-settings'
 import { formatCurrency } from '@/lib/utils'
 
 // Full names used for the side-by-side social header row on the receipt
@@ -71,6 +71,11 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
   const date     = new Date(issuedAt).toLocaleDateString('en-GB')
   const thankYou = settings.thank_you_message || 'Thank you for your business!'
 
+  // Repair jobs pass device/IMEI/fault info; POS sales never do — this is the
+  // existing signal (already used below for the Order Detail box) reused here
+  // to scope which footer lines print on which receipt type.
+  const isRepairReceipt = deviceName !== undefined || deviceImei !== undefined || faults !== undefined
+
   const bnParts = (businessName || '').split('|')
   const mainBn = bnParts[0].trim()
   const tagline = bnParts.length > 1 ? bnParts[1].trim() : null
@@ -83,8 +88,18 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
       val: String(v).replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''),
     }))
 
-  const footerLines = [settings.footer_line_1, settings.footer_line_2, settings.footer_line_3]
-    .filter((l): l is string => !!l && l !== settings.thank_you_message)
+  const footerLineDefs: Array<{ line: string | null; scope: FooterLineScope | undefined }> = [
+    { line: settings.footer_line_1, scope: settings.footer_line_1_scope },
+    { line: settings.footer_line_2, scope: settings.footer_line_2_scope },
+    { line: settings.footer_line_3, scope: settings.footer_line_3_scope },
+  ]
+  const footerLines = footerLineDefs
+    .filter(({ line, scope }) => {
+      if (!line || line === settings.thank_you_message) return false
+      const effectiveScope = scope ?? 'both'
+      return effectiveScope === 'both' || effectiveScope === (isRepairReceipt ? 'repair' : 'pos')
+    })
+    .map(({ line }) => line as string)
 
   // ── CSS ──────────────────────────────────────────────────────────────────
   // @page size is NOT set here — injected dynamically after render measurement.
@@ -100,6 +115,7 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
       font-family: Arial, Helvetica, sans-serif;
       font-size: 12px;
       font-weight: 700;
+      line-height: 1.35;
       color: #000;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
@@ -109,46 +125,46 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
        above and nothing in this file overrides it back down to normal. */
     body { padding: 10px 10px 20px 10px }
     .c  { text-align: center }
-    .logo { display: block; margin: 0 auto 6px; width: 48px; height: 48px; object-fit: contain }
+    .logo { display: block; margin: 0 auto 5px; width: 48px; height: 48px; object-fit: contain }
     .bn { font-size: 15px; font-weight: bold; text-align: center; margin-bottom: 2px }
     .since { font-size: 11px; font-weight: bold; color: #000; text-align: center; margin-bottom: 2px }
     .br { font-size: 11px; color: #000; text-align: center; margin-bottom: 2px }
     .dt { font-size: 11px; color: #000; text-align: center; margin-bottom: 2px }
-    hr  { border: none; border-top: 1px dashed #000; margin: 6px 0 }
-    .ino { font-size: 13px; font-weight: bold; text-align: center; margin-bottom: 2px }
-    .row { display: flex; justify-content: space-between; margin-bottom: 2px }
+    hr  { border: none; border-top: 1px dashed #000; margin: 7px 0 }
+    .ino { font-size: 13px; font-weight: bold; text-align: center; margin-bottom: 3px }
+    .row { display: flex; justify-content: space-between; margin-bottom: 5px }
     .lbl { font-size: 11px; color: #000; font-weight: 700 }
     .val { font-size: 11px; font-weight: bold; color: #000 }
     /* ── Item rows (single line per item, no per-item pricing columns) ── */
-    .irow { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px }
+    .irow { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px }
     .ival { font-size: 11px; font-weight: bold; color: #000; text-align: right; max-width: 65%; word-break: break-word }
-    .itm { display: flex; justify-content: space-between; margin-bottom: 2px }
+    .itm { display: flex; justify-content: space-between; margin-bottom: 5px }
     .itv { font-size: 11px; font-weight: bold; color: #000; text-align: right; max-width: 65% }
-    .tr  { display: flex; justify-content: space-between; margin-bottom: 2px }
+    .tr  { display: flex; justify-content: space-between; margin-bottom: 5px }
     .tl  { font-size: 11px; color: #000; font-weight: 700 }
     .tv  { font-size: 11px; font-weight: bold; color: #000 }
-    .gr  { display: flex; justify-content: space-between; margin-top: 4px }
+    .gr  { display: flex; justify-content: space-between; margin-top: 8px }
     .gl  { font-size: 15px; font-weight: bold; color: #000 }
     .gv  { font-size: 15px; font-weight: bold; color: #000 }
     .bar {
       display: flex; justify-content: space-between;
-      background: #000; padding: 7px; border-radius: 3px; margin-top: 5px;
+      background: #000; padding: 9px; border-radius: 3px; margin-top: 8px;
       -webkit-print-color-adjust: exact; print-color-adjust: exact
     }
     .bl { font-size: 13px; font-weight: bold; color: #fff }
     .bv { font-size: 13px; font-weight: bold; color: #fff }
     /* Footer — kept together, never orphaned onto a new page */
     .ft { page-break-inside: avoid; break-inside: avoid; page-break-before: avoid }
-    .ty { font-size: 12px; font-weight: bold; color: #000; text-align: center; margin-top: 6px }
-    .gt { font-size: 11px; font-weight: bold; color: #000; text-align: center; margin-top: 3px }
-    .fl { font-size: 11px; color: #000; text-align: center; margin-top: 2px; word-break: break-word }
-    .lh { font-size: 10px; font-weight: 700; color: #000; text-align: center; letter-spacing: 0.5px; margin-top: 4px }
-    .hr2 { border: none; border-top: 2px solid #000; margin: 6px 0 }
-    .pl { font-size: 10px; color: #000; text-align: center; margin-top: 5px;
-          border-top: 1px solid #000; padding-top: 4px }
+    .ty { font-size: 13px; font-weight: bold; color: #000; text-align: center; margin-top: 9px }
+    .gt { font-size: 12px; font-weight: bold; color: #000; text-align: center; margin-top: 6px }
+    .fl { font-size: 12px; color: #000; text-align: center; margin-top: 5px; word-break: break-word }
+    .lh { font-size: 10px; font-weight: 700; color: #000; text-align: center; letter-spacing: 0.5px; margin-top: 7px }
+    .hr2 { border: none; border-top: 2px solid #000; margin: 10px 0 }
+    .pl { font-size: 10px; color: #000; text-align: center; margin-top: 8px;
+          border-top: 1px solid #000; padding-top: 6px }
     .grn { color: #1a7a3a }
     /* ── Social grid: fixed 2 columns so pairing never shifts with content length ── */
-    .soc { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 8px; margin-top: 4px }
+    .soc { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; margin-top: 7px }
     .socc { text-align: center }
     .socl { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 10px; font-weight: 700; color: #000 }
     .socv { font-size: 10px; color: #000; word-break: break-word }
@@ -221,14 +237,14 @@ ${L(settings.show_phone && branchPhone, `<div class="dt">${esc(branchPhone)}</di
 <hr>
 <div class="ino">${esc(invoiceNumber)}</div>
 ${date.includes(',')
-  ? `<div style="display:flex;justify-content:space-between;margin-bottom:2px">
+  ? `<div style="display:flex;justify-content:space-between;margin-bottom:5px">
        <span style="font-size:9px"><span class="lbl">Date</span><span style="font-weight:bold">${esc(date.split(',')[0].trim())}</span></span>
        <span style="font-size:9px"><span class="lbl">Time</span><span style="font-weight:bold">${esc(date.split(',')[1].trim())}</span></span>
      </div>`
   : ''
 }
 <hr>
-${(deviceName !== undefined || deviceImei !== undefined || faults !== undefined) ? `
+${isRepairReceipt ? `
 <div class="row"><span class="lbl">Order No.</span><span class="val">${esc(invoiceNumber)}</span></div>
 <div class="row"><span class="lbl">Order Date</span><span class="val">${new Date(issuedAt).toLocaleDateString('en-GB')}</span></div>
 ${dueAt ? `<div class="row"><span class="lbl">Due Date</span><span class="val">${new Date(dueAt).toLocaleDateString('en-GB')}</span></div>` : ''}
@@ -238,30 +254,30 @@ ${dueAt ? `<div class="row"><span class="lbl">Due Date</span><span class="val">$
 <div class="row"><span class="lbl">Customer</span><span class="val">${esc(customerName)}</span></div>
 <div class="row"><span class="lbl">Status</span><span class="val">${esc(status)}</span></div>
 
-${(deviceName !== undefined || deviceImei !== undefined || faults !== undefined) ? `
+${isRepairReceipt ? `
 <div style="margin-top:8px; border:1px solid #000;">
-  <div style="text-align:center; font-weight:bold; border-bottom:1px solid #000; padding:2px 0; font-size:11px; background-color:#f9f9f9;">
+  <div style="text-align:center; font-weight:bold; border-bottom:1px solid #000; padding:4px 0; font-size:11px; background-color:#f9f9f9;">
     Order Detail
   </div>
-  <div style="padding:4px;">
-    ${deviceName ? `<div style="margin-bottom:2px; font-weight:bold; font-size:11px; text-transform:uppercase;">${esc(deviceName)}</div>` : ''}
-    <div style="margin-bottom:2px;"><span class="lbl">Serial No.: </span><span style="font-weight:bold; word-break:break-all;">${esc(deviceImei || 'N/A')}</span></div>
-    <div style="margin-bottom:4px;"><span class="lbl">Faults: </span><span style="font-weight:bold;">${esc(faults || 'N/A')}</span></div>
-    
-    <div style="border-bottom:1px dashed #000; margin:4px 0;"></div>
-    
+  <div style="padding:6px;">
+    ${deviceName ? `<div style="margin-bottom:4px; font-weight:bold; font-size:11px; text-transform:uppercase;">${esc(deviceName)}</div>` : ''}
+    <div style="margin-bottom:4px;"><span class="lbl">Serial No.: </span><span style="font-weight:bold; word-break:break-all;">${esc(deviceImei || 'N/A')}</span></div>
+    <div style="margin-bottom:6px;"><span class="lbl">Faults: </span><span style="font-weight:bold;">${esc(faults || 'N/A')}</span></div>
+
+    <div style="border-bottom:1px dashed #000; margin:6px 0;"></div>
+
     ${items.map(i => {
       const gross = i.quantity * i.unit_price
       const itemDiscount = i.discount ?? 0
       const net = gross - itemDiscount
       return `
-    <div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
       <span style="font-weight:bold; font-size:11px; flex:1; padding-right:8px; word-break:break-word;">${esc(i.description)}</span>
       <span style="font-size:11px; text-align:right;">${itemDiscount > 0 ? `<span style="text-decoration:line-through; color:#888; font-weight:normal; margin-right:4px;">${money(gross, currency)}</span>` : ''}<span style="font-weight:bold;">${money(net, currency)}</span></span>
     </div>
     `
     }).join('')}
-    <div style="border-bottom:1px dashed #000; margin:4px 0;"></div>
+    <div style="border-bottom:1px dashed #000; margin:6px 0;"></div>
     <div class="tr"><span class="tl">Discount</span><span class="tv">${discount > 0 ? '-' + money(discount, currency) : money(0, currency)}</span></div>
     <div class="tr"><span class="tl">Subtotal</span><span class="tv">${money(subtotal, currency)}</span></div>
     ${L(settings.show_tax_breakdown && tax > 0, `<div class="tr"><span class="tl">Tax</span><span class="tv">${money(tax, currency)}</span></div>`)}
@@ -278,7 +294,7 @@ ${items.map(i => {
   const itemDiscount = i.discount ?? 0
   const net = gross - itemDiscount
   return `
-<div style="display:flex; justify-content:space-between; margin-bottom:2px;">
+<div style="display:flex; justify-content:space-between; margin-bottom:5px;">
   <span style="font-weight:bold; font-size:11px; flex:1; padding-right:8px; word-break:break-word;">${i.quantity > 1 ? i.quantity + 'x ' : ''}${esc(i.description)}</span>
   <span style="font-size:11px; text-align:right;">${itemDiscount > 0 ? `<span style="text-decoration:line-through; color:#888; font-weight:normal; margin-right:4px;">${money(gross, currency)}</span>` : ''}<span style="font-weight:bold;">${money(net, currency)}</span></span>
 </div>
@@ -607,22 +623,23 @@ function buildSlipHtml(d: SlipPrintData): string {
       background: #fff;
       font-family: Arial, Helvetica, sans-serif;
       font-size: 12px;
+      line-height: 1.35;
       color: #000;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
     body { padding: 10px 10px 15px 10px }
-    .head  { text-align: center; margin-bottom: 4px }
-    .bname { font-size: 16px; font-weight: bold; margin-bottom: 2px }
-    .addr  { font-size: 10px; color: #000; margin-bottom: 1px }
-    hr { border: none; border-top: 2px solid #000; margin: 8px 0 }
-    .details { text-align: left; font-size: 12px; margin-bottom: 4px }
-    .details div { margin: 3px 0 }
-    .summary { border-top: 2px solid #000; padding-top: 8px; font-size: 12px }
+    .head  { text-align: center; margin-bottom: 6px }
+    .bname { font-size: 16px; font-weight: bold; margin-bottom: 4px }
+    .addr  { font-size: 10px; color: #000; margin-bottom: 3px }
+    hr { border: none; border-top: 2px solid #000; margin: 10px 0 }
+    .details { text-align: left; font-size: 12px; margin-bottom: 6px }
+    .details div { margin: 5px 0 }
+    .summary { border-top: 2px solid #000; padding-top: 10px; font-size: 12px }
     .sumrow { display: flex; justify-content: space-between; border-bottom: 1px solid #000;
-              margin: 4px 0; font-weight: 700; padding-bottom: 2px }
-    .footer { margin-top: 10px; text-align: center; font-size: 10px; font-weight: 700; line-height: 1.6 }
-    .barcode { margin-top: 12px; text-align: center }
+              margin: 6px 0; font-weight: 700; padding-bottom: 4px }
+    .footer { margin-top: 12px; text-align: center; font-size: 10px; font-weight: 700; line-height: 1.6 }
+    .barcode { margin-top: 14px; text-align: center }
     .barcode img { width: 100%; max-width: 220px; height: auto }
   `
 

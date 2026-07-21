@@ -1,5 +1,5 @@
 'use client'
-import type { InvoiceSettings, SocialLinks } from '@/types/invoice-settings'
+import type { InvoiceSettings, SocialLinks, FooterLineScope } from '@/types/invoice-settings'
 import { formatCurrency } from '@/lib/utils'
 
 // Full names used for the side-by-side social header row on the receipt
@@ -91,45 +91,53 @@ export function RepairReceiptHtml({
       val: String(v).replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''),
     }))
 
-  const footerLines = [settings.footer_line_1, settings.footer_line_2, settings.footer_line_3]
-    .filter((l): l is string => !!l && l !== settings.thank_you_message)
+  // This component only renders repair-job invoices (see invoice-modal.tsx),
+  // so a footer line shows here whenever its scope isn't restricted to POS.
+  const footerLineDefs: Array<{ line: string | null; scope: FooterLineScope | undefined }> = [
+    { line: settings.footer_line_1, scope: settings.footer_line_1_scope },
+    { line: settings.footer_line_2, scope: settings.footer_line_2_scope },
+    { line: settings.footer_line_3, scope: settings.footer_line_3_scope },
+  ]
+  const footerLines = footerLineDefs
+    .filter(({ line, scope }) => !!line && line !== settings.thank_you_message && (scope ?? 'both') !== 'pos')
+    .map(({ line }) => line as string)
 
   const s = {
     // fontWeight 700 here is the fix for "dull/faint" thermal print output —
     // thin (normal-weight) strokes print light on a thermal head, bold prints solid.
     // Every element below inherits this unless it sets its own fontWeight.
-    root:     { width, margin: '0 auto', padding: '10px 10px 30px 10px', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '10px', fontWeight: 700, color: '#000', background: '#fff' } as React.CSSProperties,
+    root:     { width, margin: '0 auto', padding: '10px 10px 30px 10px', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '10px', fontWeight: 700, lineHeight: 1.35, color: '#000', background: '#fff' } as React.CSSProperties,
     center:   { textAlign: 'center' as const },
-    logo:     { display: 'block', margin: '0 auto 6px', width: '48px', height: '48px', objectFit: 'contain' as const },
+    logo:     { display: 'block', margin: '0 auto 5px', width: '48px', height: '48px', objectFit: 'contain' as const },
     bizName:  { fontSize: '14px', fontWeight: 'bold', textAlign: 'center' as const, marginBottom: '2px' },
     since:    { fontSize: '10px', fontWeight: 'bold', color: '#000', textAlign: 'center' as const, marginBottom: '2px' },
     branch:   { fontSize: '10px', color: '#000', textAlign: 'center' as const, marginBottom: '2px' },
     detail:   { fontSize: '9.5px', color: '#000', textAlign: 'center' as const, marginBottom: '2px' },
-    divider:  { border: 'none', borderTop: '1px dashed #000', margin: '6px 0' } as React.CSSProperties,
-    invoiceNo:{ fontSize: '11px', fontWeight: 'bold', textAlign: 'center' as const, marginBottom: '2px' },
-    row:      { display: 'flex', justifyContent: 'space-between', marginBottom: '2px' } as React.CSSProperties,
+    divider:  { border: 'none', borderTop: '1px dashed #000', margin: '7px 0' } as React.CSSProperties,
+    invoiceNo:{ fontSize: '11px', fontWeight: 'bold', textAlign: 'center' as const, marginBottom: '3px' },
+    row:      { display: 'flex', justifyContent: 'space-between', marginBottom: '5px' } as React.CSSProperties,
     lbl:      { fontSize: '9.5px', color: '#000', fontWeight: 600 },
     val:      { fontSize: '9.5px', fontWeight: 'bold' },
-    itemRow:  { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2px' } as React.CSSProperties,
+    itemRow:  { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '5px' } as React.CSSProperties,
     itemVal:  { fontSize: '9.5px', fontWeight: 'bold', textAlign: 'right' as const, maxWidth: '65%', wordBreak: 'break-word' as const },
-    totRow:   { display: 'flex', justifyContent: 'space-between', marginBottom: '1.5px' } as React.CSSProperties,
+    totRow:   { display: 'flex', justifyContent: 'space-between', marginBottom: '4px' } as React.CSSProperties,
     totLbl:   { fontSize: '10px', color: '#000', fontWeight: 600 },
     totVal:   { fontSize: '10px', fontWeight: 'bold' },
-    grandRow: { display: 'flex', justifyContent: 'space-between', marginTop: '3px' } as React.CSSProperties,
+    grandRow: { display: 'flex', justifyContent: 'space-between', marginTop: '7px' } as React.CSSProperties,
     grandLbl: { fontSize: '13px', fontWeight: 'bold', color: '#000' },
     grandVal: { fontSize: '13px', fontWeight: 'bold', color: '#000' },
-    balBar:   { display: 'flex', justifyContent: 'space-between', backgroundColor: '#000', padding: '6px', borderRadius: '3px', marginTop: '4px', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' } as React.CSSProperties,
+    balBar:   { display: 'flex', justifyContent: 'space-between', backgroundColor: '#000', padding: '8px', borderRadius: '3px', marginTop: '7px', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' } as React.CSSProperties,
     balLbl:   { fontSize: '11px', fontWeight: 'bold', color: '#fff' },
     balVal:   { fontSize: '11px', fontWeight: 'bold', color: '#fff' },
     footer:   { pageBreakInside: 'avoid', breakInside: 'avoid', pageBreakBefore: 'avoid' } as React.CSSProperties,
-    thankYou: { fontSize: '11px', fontWeight: 'bold', color: '#000', textAlign: 'center' as const, marginTop: '6px' },
-    guarantee:{ fontSize: '9.5px', fontWeight: 'bold', color: '#000', textAlign: 'center' as const, marginTop: '3px' },
-    footLine: { fontSize: '9.5px', color: '#000', textAlign: 'center' as const, marginTop: '2px', wordBreak: 'break-word' as const },
-    lblHead:  { fontSize: '9px', fontWeight: 'bold', color: '#000', textAlign: 'center' as const, letterSpacing: '0.5px', marginTop: '4px' },
-    dividerThick: { border: 'none', borderTop: '2px solid #000', margin: '6px 0' } as React.CSSProperties,
-    policy:   { fontSize: '8.5px', color: '#000', textAlign: 'center' as const, marginTop: '5px', borderTop: '1px solid #000', paddingTop: '4px' },
+    thankYou: { fontSize: '12px', fontWeight: 'bold', color: '#000', textAlign: 'center' as const, marginTop: '9px' },
+    guarantee:{ fontSize: '10.5px', fontWeight: 'bold', color: '#000', textAlign: 'center' as const, marginTop: '6px' },
+    footLine: { fontSize: '10.5px', color: '#000', textAlign: 'center' as const, marginTop: '5px', wordBreak: 'break-word' as const },
+    lblHead:  { fontSize: '9px', fontWeight: 'bold', color: '#000', textAlign: 'center' as const, letterSpacing: '0.5px', marginTop: '7px' },
+    dividerThick: { border: 'none', borderTop: '2px solid #000', margin: '10px 0' } as React.CSSProperties,
+    policy:   { fontSize: '8.5px', color: '#000', textAlign: 'center' as const, marginTop: '8px', borderTop: '1px solid #000', paddingTop: '6px' },
     green:    { color: '#000' },
-    socRow:   { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 8px', marginTop: '4px' } as React.CSSProperties,
+    socRow:   { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 10px', marginTop: '7px' } as React.CSSProperties,
     socCol:   { textAlign: 'center' as const },
     socLbl:   { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: '9px', fontWeight: 'bold', color: '#000' } as React.CSSProperties,
     socVal:   { fontSize: '9px', color: '#000', wordBreak: 'break-word' as const },
@@ -167,24 +175,24 @@ export function RepairReceiptHtml({
       <div style={s.row}><span style={s.lbl}>Status</span><span style={s.val}>{status}</span></div>
 
       <div style={{ marginTop: '8px', border: '1px solid #000' }}>
-        <div style={{ textAlign: 'center', fontWeight: 'bold', borderBottom: '1px solid #000', padding: '2px 0', fontSize: '11px', backgroundColor: '#f9f9f9' }}>
+        <div style={{ textAlign: 'center', fontWeight: 'bold', borderBottom: '1px solid #000', padding: '4px 0', fontSize: '11px', backgroundColor: '#f9f9f9' }}>
           Order Detail
         </div>
-        <div style={{ padding: '4px' }}>
+        <div style={{ padding: '6px' }}>
           {deviceName && (
-            <div style={{ marginBottom: '2px', fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase' }}>{deviceName}</div>
+            <div style={{ marginBottom: '4px', fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase' }}>{deviceName}</div>
           )}
-          <div style={{ marginBottom: '2px' }}><span style={s.lbl}>Serial No.: </span><span style={{fontWeight: 'bold', wordBreak: 'break-all'}}>{deviceImei || 'N/A'}</span></div>
-          <div style={{ marginBottom: '4px' }}><span style={s.lbl}>Faults: </span><span style={{fontWeight: 'bold'}}>{faults || 'N/A'}</span></div>
-          
-          <div style={{ borderBottom: '1px dashed #000', margin: '4px 0' }} />
-          
+          <div style={{ marginBottom: '4px' }}><span style={s.lbl}>Serial No.: </span><span style={{fontWeight: 'bold', wordBreak: 'break-all'}}>{deviceImei || 'N/A'}</span></div>
+          <div style={{ marginBottom: '6px' }}><span style={s.lbl}>Faults: </span><span style={{fontWeight: 'bold'}}>{faults || 'N/A'}</span></div>
+
+          <div style={{ borderBottom: '1px dashed #000', margin: '6px 0' }} />
+
           {items.map((item, i) => {
             const gross = item.quantity * item.unit_price
             const itemDiscount = item.discount ?? 0
             const net = gross - itemDiscount
             return (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
                 <span style={{ fontWeight: 'bold', fontSize: '10px', flex: 1, paddingRight: '8px', wordBreak: 'break-word' }}>{item.description}</span>
                 <span style={{ fontSize: '10px', textAlign: 'right' }}>
                   {itemDiscount > 0 && (
@@ -195,7 +203,7 @@ export function RepairReceiptHtml({
               </div>
             )
           })}
-          <div style={{ borderBottom: '1px dashed #000', margin: '4px 0' }} />
+          <div style={{ borderBottom: '1px dashed #000', margin: '6px 0' }} />
 
       <div style={s.totRow}>
         <span style={s.totLbl}>Discount</span>

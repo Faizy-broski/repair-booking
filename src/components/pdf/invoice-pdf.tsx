@@ -501,9 +501,9 @@ export function InvoicePdf(props: InvoicePdfProps) {
             <Text style={s.thankYou}>{settings.thank_you_message}</Text>
           )}
           {settings.footer_address && <Text style={s.footerLine}>{settings.footer_address}</Text>}
-          {settings.footer_line_1 && <Text style={s.footerLine}>{settings.footer_line_1}</Text>}
-          {settings.footer_line_2 && <Text style={s.footerLine}>{settings.footer_line_2}</Text>}
-          {settings.footer_line_3 && <Text style={s.footerLine}>{settings.footer_line_3}</Text>}
+          {settings.footer_line_1 && (settings.footer_line_1_scope ?? 'both') !== 'pos' && <Text style={s.footerLine}>{settings.footer_line_1}</Text>}
+          {settings.footer_line_2 && (settings.footer_line_2_scope ?? 'both') !== 'pos' && <Text style={s.footerLine}>{settings.footer_line_2}</Text>}
+          {settings.footer_line_3 && (settings.footer_line_3_scope ?? 'both') !== 'pos' && <Text style={s.footerLine}>{settings.footer_line_3}</Text>}
           {socialEntries.length > 0 && (
             <View style={s.socialRow}>
               {socialEntries.map(([key, val], i) => (
@@ -545,9 +545,15 @@ function ReceiptPdf({
   const amtWidth = settings.paper_size === 'Receipt58' ? 44 : 52
 
   // Deduplicate footer lines — don't repeat the thank-you message if it was accidentally
-  // copied into footer_line_1/2/3 as well
-  const uniqueFooterLines = [settings.footer_line_1, settings.footer_line_2, settings.footer_line_3]
-    .filter((line): line is string => !!line && line !== settings.thank_you_message)
+  // copied into footer_line_1/2/3 as well. This renderer is repair/invoice-only,
+  // so a line is dropped if its scope is restricted to POS.
+  const uniqueFooterLines = [
+    { line: settings.footer_line_1, scope: settings.footer_line_1_scope },
+    { line: settings.footer_line_2, scope: settings.footer_line_2_scope },
+    { line: settings.footer_line_3, scope: settings.footer_line_3_scope },
+  ]
+    .filter(({ line, scope }) => !!line && line !== settings.thank_you_message && (scope ?? 'both') !== 'pos')
+    .map(({ line }) => line as string)
 
   // Compute the exact page height so the thermal printer doesn't advance blank paper
   const dynamicPageHeight = calcReceiptPageHeight({

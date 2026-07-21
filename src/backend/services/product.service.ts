@@ -513,6 +513,17 @@ export const ProductService = {
     let stockCostValue   = 0
     let lowStockCount    = 0
 
+    // In Purchase Order is branch-scoped like every other card here — purchase_orders
+    // carries its own branch_id, so a multi-branch business doesn't see other
+    // branches' incoming stock counted against this one.
+    let poQuery = adminSupabase
+      .from('purchase_order_items')
+      .select('*, purchase_orders!inner(business_id, branch_id, status)', { count: 'exact', head: true })
+      .gt('quantity_ordered', 0)
+      .eq('purchase_orders.business_id', businessId)
+      .in('purchase_orders.status', ['pending', 'ordered', 'partial'])
+    if (branchId) poQuery = poQuery.eq('purchase_orders.branch_id', branchId)
+
     // Run all queries in parallel
     const [invResult, variantInvResult, poResult, batchValuation] = await Promise.all([
       // Base product rows (variant_id IS NULL) — includes has_variants so we can skip those below
@@ -527,18 +538,19 @@ export const ProductService = {
       branchId
         ? adminSupabase
             .from('inventory')
-            .select('quantity, low_stock_alert, product_variants!inner(selling_price, cost_price, products!inner(is_service, is_active, selling_price, cost_price))')
+            .select('quantity, low_stock_alert, product_id, product_variants!inner(selling_price, cost_price, products!inner(is_service, is_active, selling_price, cost_price))')
             .eq('branch_id', branchId)
             .not('variant_id', 'is', null)
         : Promise.resolve({ data: null }),
-      adminSupabase
-        .from('purchase_order_items')
-        .select('*, purchase_orders!inner(business_id, status)', { count: 'exact', head: true })
-        .gt('quantity_ordered', 0)
-        .eq('purchase_orders.business_id', businessId)
-        .in('purchase_orders.status', ['pending', 'ordered', 'partial']),
+      poQuery,
       branchId ? ProductService.getBatchValuationByBranch(branchId) : Promise.resolve(new Map()),
     ])
+
+    // Products with variants collapse to a single "needs reordering" row in the
+    // low-stock list view (has_low_stock_variant), so the count here tracks
+    // distinct products, not one increment per low-stock variant, to match
+    // what you actually see after clicking the card.
+    const lowStockProductIds = new Set<string>()
 
     if (branchId && invResult.data) {
       // Base product rows — skip products that have variants; those are counted
@@ -547,13 +559,16 @@ export const ProductService = {
       ;(invResult.data as any[]).forEach((row: any) => {
         const p = row.products
         if (p?.has_variants) return
-        if (p?.is_active && !p?.is_service) {
-          stockRetailValue += (p.selling_price ?? 0) * row.quantity
-          const batch = (batchValuation as Map<string, { totalValue: number }>).get(`${row.product_id}::null`)
-          stockCostValue += batch ? batch.totalValue : (p.cost_price ?? 0) * row.quantity
-        }
+        // Inactive/service rows are excluded from stock value AND from the
+        // low-stock list/filter (list()'s lowStockOnly excludes is_service,
+        // and inactive products aren't shown by default) — exclude them here
+        // too so this count matches what clicking the card actually shows.
+        if (!p?.is_active || p?.is_service) return
+        stockRetailValue += (p.selling_price ?? 0) * row.quantity
+        const batch = (batchValuation as Map<string, { totalValue: number }>).get(`${row.product_id}::null`)
+        stockCostValue += batch ? batch.totalValue : (p.cost_price ?? 0) * row.quantity
         const threshold = row.low_stock_alert ?? 5
-        if (row.quantity <= threshold) lowStockCount++
+        if (row.quantity <= threshold) lowStockProductIds.add(row.product_id)
       })
     }
 
@@ -561,16 +576,16 @@ export const ProductService = {
       ;(variantInvResult.data as any[]).forEach((row: any) => {
         const v = row.product_variants
         const p = v?.products
-        if (p?.is_active && !p?.is_service) {
-          const sellPrice = v.selling_price ?? p.selling_price ?? 0
-          const costPrice = v.cost_price   ?? p.cost_price   ?? 0
-          stockRetailValue += sellPrice * row.quantity
-          stockCostValue   += costPrice  * row.quantity
-        }
+        if (!p?.is_active || p?.is_service) return
+        const sellPrice = v.selling_price ?? p.selling_price ?? 0
+        const costPrice = v.cost_price   ?? p.cost_price   ?? 0
+        stockRetailValue += sellPrice * row.quantity
+        stockCostValue   += costPrice  * row.quantity
         const threshold = row.low_stock_alert ?? 5
-        if (row.quantity <= threshold) lowStockCount++
+        if (row.quantity <= threshold) lowStockProductIds.add(row.product_id)
       })
     }
+    lowStockCount = lowStockProductIds.size
     // When no branchId, return zeros — summing raw prices without quantities
     // would produce a meaningless number that looks like real stock value.
 

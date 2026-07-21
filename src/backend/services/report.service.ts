@@ -1,6 +1,7 @@
 ﻿import { adminSupabase } from '@/backend/config/supabase'
 import { InventoryService } from './inventory.service'
 import { ProductService } from './product.service'
+import { buildPosOverrideMap } from './repair-financials.service'
 
 const db = (table: string): any => (adminSupabase as any).from(table)
 const rpc = (fn: string, args?: Record<string, unknown>): any => (adminSupabase as any).rpc(fn, args)
@@ -42,14 +43,31 @@ export const ReportService = {
   },
 
   async getRepairsReport(branchId: string, from: string, to: string) {
-    const { data, error } = await db('repairs')
-      .select('id, status, actual_cost, estimated_cost, deposit_paid, refund_amount, created_at, updated_at, device_type, device_brand')
-      .eq('branch_id', branchId)
-      .gte('created_at', from)
-      .lte('created_at', to)
-      .order('created_at')
-    if (error) throw error
-    return data
+    const [repairsRes, posSaleItemsRes] = await Promise.all([
+      db('repairs')
+        .select('id, status, actual_cost, estimated_cost, deposit_paid, refund_amount, created_at, updated_at, device_type, device_brand')
+        .eq('branch_id', branchId)
+        .gte('created_at', from)
+        .lte('created_at', to)
+        .order('created_at'),
+
+      // Amounts actually charged through POS for repair-linked line items —
+      // takes priority over deposit_paid/actual_cost below, same rule used by
+      // the Repairs dashboard/Dashboard/Sales page (see repair-financials.service.ts).
+      db('sale_items')
+        .select('repair_id, total, sales!inner(is_refund, branch_id, created_at)')
+        .eq('sales.branch_id', branchId)
+        .gte('sales.created_at', from)
+        .lte('sales.created_at', to)
+        .not('repair_id', 'is', null),
+    ])
+    if (repairsRes.error) throw repairsRes.error
+
+    const posOverrideMap = buildPosOverrideMap((posSaleItemsRes.data ?? []) as any[])
+    return (repairsRes.data ?? []).map((r: any) => ({
+      ...r,
+      pos_net_total: posOverrideMap.get(r.id) ?? null,
+    }))
   },
 
   async getProfitLoss(branchId: string, from: string, to: string) {

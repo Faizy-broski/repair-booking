@@ -70,8 +70,8 @@ export default function RepairsReportPage() {
       const res = await fetch(`/api/reports?${params}`)
       const json = await res.json()
 
-      // Same terminal detection as stats card & dashboard
-      const TERMINAL_EXACT    = new Set(['repaired', 'collected', 'unrepairable'])
+      // Same terminal detection as stats card & dashboard (repair-financials.service.ts)
+      const TERMINAL_EXACT    = new Set(['repaired', 'collected', 'unrepairable', 'refunded', 'completed', 'done', 'fixed', 'closed', 'picked_up', 'handover'])
       const TERMINAL_KEYWORDS = ['complet', 'done', 'fixed', 'pick', 'closed', 'resolv', 'finish', 'collect', 'handover']
       const isTerminal = (k: string) => TERMINAL_EXACT.has(k) || TERMINAL_KEYWORDS.some(kw => k.includes(kw))
 
@@ -81,14 +81,19 @@ export default function RepairsReportPage() {
         const key = normalizeKey(r.status ?? 'unknown')
         if (!grouped[key]) grouped[key] = { name: toLabel(r.status ?? key), count: 0, value: 0 }
         grouped[key].count += 1
-        // Identical revenue logic to stats card — report totals now match for same date range
-        const deposit  = r.deposit_paid  ?? 0
-        const fullCost = r.actual_cost   ?? r.estimated_cost ?? 0
-        const refund   = r.refund_amount ?? 0
+        // Identical revenue logic to stats card — report totals now match for same date range.
+        // A repair actually paid through the POS till overrides the raw repairs-table columns.
         let revenue = 0
-        if (isTerminal(key))         revenue = fullCost
-        else if (key === 'refunded') revenue = Math.max(0, deposit - refund)
-        else                         revenue = deposit
+        if (r.pos_net_total !== null && r.pos_net_total !== undefined) {
+          revenue = r.pos_net_total
+        } else {
+          const deposit  = r.deposit_paid  ?? 0
+          const fullCost = r.actual_cost   ?? r.estimated_cost ?? 0
+          const refund   = r.refund_amount ?? 0
+          if (isTerminal(key))         revenue = fullCost
+          else if (key === 'refunded') revenue = Math.max(0, deposit - refund)
+          else                         revenue = deposit
+        }
         grouped[key].value += revenue
       }
 
@@ -109,7 +114,7 @@ export default function RepairsReportPage() {
   const columns: ColumnDef<RepairRow>[] = [
     { accessorKey: 'name',        header: 'Status' },
     { accessorKey: 'count',       header: 'Count' },
-    { accessorKey: 'total_value', header: 'Total Value', cell: ({ getValue }) => formatCurrency(getValue() as number) },
+    { accessorKey: 'total_value', header: 'Value (Deposit-Weighted)', cell: ({ getValue }) => formatCurrency(getValue() as number) },
   ]
 
   return (
@@ -123,7 +128,7 @@ export default function RepairsReportPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-on-surface">Repairs Report</h1>
-            <p className="text-sm text-on-surface-variant mt-0.5">Repair job status and revenue breakdown</p>
+            <p className="text-sm text-on-surface-variant mt-0.5">Repair job status and revenue breakdown, by booking date — open jobs counted at deposit only</p>
           </div>
         </div>
         <Button
@@ -146,7 +151,7 @@ export default function RepairsReportPage() {
           <p className="mt-1 text-2xl font-bold text-on-surface sm:text-3xl">{totalRepairs}</p>
         </div>
         <div className="rounded-xl border border-outline-variant bg-surface p-4">
-          <p className="text-sm text-on-surface-variant">Total Revenue</p>
+          <p className="text-sm text-on-surface-variant">Total Revenue (Booked, Deposit-Weighted)</p>
           <p className="mt-1 text-2xl font-bold text-green-600 sm:text-3xl">{formatCurrency(totalValue)}</p>
         </div>
       </div>

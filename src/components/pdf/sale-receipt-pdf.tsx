@@ -237,8 +237,15 @@ export function SaleReceiptPdf({
   const paperSizeKey = settings.paper_size in PAPER_SIZES ? settings.paper_size : 'A4'
   const pageWidth = isReceipt ? (settings.paper_size === 'Receipt58' ? 165 : 227) : null
 
-  const uniqueFooterLines = [settings.footer_line_1, settings.footer_line_2, settings.footer_line_3]
-    .filter((l): l is string => !!l && l !== settings.thank_you_message)
+  // This renderer is POS-sale-only, so a footer line prints here whenever
+  // its scope isn't restricted to repair receipts.
+  const uniqueFooterLines = [
+    { line: settings.footer_line_1, scope: settings.footer_line_1_scope },
+    { line: settings.footer_line_2, scope: settings.footer_line_2_scope },
+    { line: settings.footer_line_3, scope: settings.footer_line_3_scope },
+  ]
+    .filter(({ line, scope }) => !!line && line !== settings.thank_you_message && (scope ?? 'both') !== 'repair')
+    .map(({ line }) => line as string)
 
   let displayBranchName = branchName
   if (displayBranchName && displayBranchName.includes('-')) {

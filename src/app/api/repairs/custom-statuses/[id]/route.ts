@@ -8,6 +8,7 @@ const schema = z.object({
   name: z.string().min(1).optional(),
   color: z.string().optional(),
   sort_order: z.number().optional(),
+  is_terminal: z.boolean().optional(),
 })
 
 export const PATCH = withMiddleware(async (req, ctx, { params }) => {

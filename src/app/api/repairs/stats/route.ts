@@ -1,6 +1,7 @@
 import { withMiddleware } from '@/backend/middleware'
 import { adminSupabase } from '@/backend/config/supabase'
 import { ok, serverError } from '@/backend/utils/api-response'
+import { isTerminalRepairStatus, buildPosOverrideMap, computeRepairRevenue, computeRepairPartsCost, filterCompletedRepairsInPeriod } from '@/backend/services/repair-financials.service'
 
 export const GET = withMiddleware(async (req, ctx) => {
   const branchId = req.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId
@@ -16,15 +17,8 @@ export const GET = withMiddleware(async (req, ctx) => {
                      :                        new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   const db           = adminSupabase as any
 
-  const TERMINAL_NAMES      = new Set(['repaired', 'collected', 'unrepairable', 'refunded', 'completed', 'done', 'fixed', 'closed', 'picked_up', 'handover'])
-  const COMPLETION_KEYWORDS = ['complet', 'done', 'fixed', 'pick', 'closed', 'resolv', 'finish', 'collect', 'handover']
-  const isTerminal = (s: string) => {
-    const lo = s.toLowerCase().trim()
-    return TERMINAL_NAMES.has(lo) || COMPLETION_KEYWORDS.some(kw => lo.includes(kw))
-  }
-
   try {
-    const [allRepairsRes, periodRepairsRes, partsRes, posSaleItemsRes, repairPaymentsRes] = await Promise.all([
+    const [allRepairsRes, periodRepairsRes, partsRes, posSaleItemsRes, repairPaymentsRes, completedRepairsRes, completedPartsRes, posSaleItemsAllTimeRes] = await Promise.all([
       // ALL repairs — Open Jobs is a live operational count, not period-filtered
       db.from('repairs')
         .select('id, status, created_at, is_rush')
@@ -55,6 +49,28 @@ export const GET = withMiddleware(async (req, ctx) => {
         .select('amount, method, repairs!inner(branch_id)')
         .eq('repairs.branch_id', branchId)
         .gte('created_at', periodStart),
+
+      // ── Additional/secondary figure only (does not affect repairs_revenue/
+      // repairs_profit above): completed-in-period, by completion date — the
+      // same definition get_profit_loss (P&L report) uses. Exposed as
+      // repairs_revenue_completed/repairs_profit_completed for cross-reference.
+      db.from('repairs')
+        .select('id, status, updated_at, deposit_paid, actual_cost, estimated_cost, refund_amount')
+        .eq('branch_id', branchId)
+        .gte('updated_at', periodStart),
+
+      db.from('repair_items')
+        .select('quantity, unit_cost, repairs!inner(branch_id, updated_at, status, deposit_paid)')
+        .eq('repairs.branch_id', branchId)
+        .gte('repairs.updated_at', periodStart),
+
+      // POS override for the completed-in-period figure — unrestricted by
+      // sale date (matches get_profit_loss): a repair's lifetime POS total
+      // counts once the repair itself completes in-period.
+      db.from('sale_items')
+        .select('repair_id, total, sales!inner(is_refund, branch_id)')
+        .eq('sales.branch_id', branchId)
+        .not('repair_id', 'is', null),
     ])
 
     const allRepairs:    any[] = allRepairsRes.data    ?? []
@@ -71,44 +87,34 @@ export const GET = withMiddleware(async (req, ctx) => {
     }
 
     // Net amount actually charged through POS per repair (refund sales subtract)
-    const posRepairAmounts = new Map<string, number>()
-    for (const row of (posSaleItemsRes.data ?? []) as any[]) {
-      const rid = row.repair_id
-      if (!rid) continue
-      const amt = row.sales?.is_refund ? -(row.total ?? 0) : (row.total ?? 0)
-      posRepairAmounts.set(rid, (posRepairAmounts.get(rid) ?? 0) + amt)
-    }
+    const posRepairAmounts = buildPosOverrideMap((posSaleItemsRes.data ?? []) as any[])
 
     // Open Jobs — always all-time current state, never filtered by period
-    const openJobs   = allRepairs.filter(r => !isTerminal(r.status ?? ''))
+    const openJobs   = allRepairs.filter(r => !isTerminalRepairStatus(r.status))
     const urgentJobs = openJobs.filter(r =>
       r.is_rush === true || new Date(r.created_at) < new Date(urgentCutoff)
     )
 
     // Total / Completed — period-filtered (repairs created in selected period)
-    const completedJobs = periodRepairs.filter(r => isTerminal(r.status ?? ''))
+    const completedJobs = periodRepairs.filter(r => isTerminalRepairStatus(r.status))
 
-    const revenue = periodRepairs.reduce((sum: number, r: any) => {
-      const posAmt = posRepairAmounts.get(r.id)
-      if (posAmt !== undefined) return sum + posAmt
+    const revenue = periodRepairs.reduce((sum: number, r: any) => sum + computeRepairRevenue(r, posRepairAmounts), 0)
 
-      const s        = (r.status ?? '').toLowerCase().trim()
-      const deposit  = r.deposit_paid  ?? 0
-      const fullCost = r.actual_cost   ?? r.estimated_cost ?? 0
-      const refund   = r.refund_amount ?? 0
-      if (isTerminal(s) && s !== 'refunded') return sum + fullCost
-      if (s === 'refunded')                  return sum + Math.max(0, deposit - refund)
-      return sum + deposit
-    }, 0)
+    const partsCost = computeRepairPartsCost((partsRes.data ?? []) as any[])
 
-    const partsCost = (partsRes.data ?? []).reduce((sum: number, item: any) => {
-      const repairStatus = (item.repairs?.status ?? '').toLowerCase().trim()
-      const depositPaid  = item.repairs?.deposit_paid ?? 0
-      if (repairStatus === 'refunded')  return sum
-      if (isTerminal(repairStatus))     return sum + (item.quantity ?? 0) * (item.unit_cost ?? 0)
-      if (depositPaid > 0)              return sum + (item.quantity ?? 0) * (item.unit_cost ?? 0)
-      return sum
-    }, 0)
+    // ── Secondary/reference figure: completed-in-period (matches P&L) ──────
+    // Purely additive — does not change repairs_revenue/repairs_profit above.
+    const posRepairAmountsAllTime = buildPosOverrideMap((posSaleItemsAllTimeRes.data ?? []) as any[])
+    const completedRepairs = filterCompletedRepairsInPeriod(
+      (completedRepairsRes.data ?? []) as any[],
+      periodStart
+    )
+    const revenueCompleted = completedRepairs.reduce(
+      (sum: number, r: any) => sum + computeRepairRevenue(r, posRepairAmountsAllTime), 0
+    )
+    const completedParts = ((completedPartsRes.data ?? []) as any[])
+      .filter((item) => isTerminalRepairStatus(item.repairs?.status))
+    const partsCostCompleted = computeRepairPartsCost(completedParts)
 
     return ok({
       repairs_total:     periodRepairs.length,   // created in selected period
@@ -120,6 +126,10 @@ export const GET = withMiddleware(async (req, ctx) => {
       repairs_cash_deposits:  cashDeposits,
       repairs_card_deposits:  cardDeposits,
       repairs_other_deposits: otherDeposits,
+      // Reference figures only — completed-in-period, matching the P&L
+      // report's definition. Do not replace repairs_revenue/repairs_profit.
+      repairs_revenue_completed: revenueCompleted,
+      repairs_profit_completed:  revenueCompleted - partsCostCompleted,
     })
   } catch (err) {
     return serverError('Failed to fetch repair stats', err)

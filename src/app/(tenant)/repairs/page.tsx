@@ -542,6 +542,10 @@ export default function RepairsPage() {
         cash_deposits:     d.repairs_cash_deposits  ?? 0,
         card_deposits:     d.repairs_card_deposits  ?? 0,
         other_deposits:    d.repairs_other_deposits ?? 0,
+        // Reference-only figures matching the P&L report's definition
+        // (completed-in-period) — shown alongside, never replacing, Revenue/Profit above.
+        revenue_completed: d.repairs_revenue_completed ?? 0,
+        profit_completed:  d.repairs_profit_completed  ?? 0,
       }
     },
   })
@@ -1528,10 +1532,15 @@ export default function RepairsPage() {
             </div>
           </div>
           {repairStats ? (
-            <p className="mt-3 flex items-center gap-1 text-xs font-medium text-tertiary">
-              <TrendingUp className="h-3 w-3" />
-              total this period
-            </p>
+            <>
+              <p className="mt-3 flex items-center gap-1 text-xs font-medium text-tertiary">
+                <TrendingUp className="h-3 w-3" />
+                booked this period (deposits + actuals)
+              </p>
+              <p className="mt-1 text-[11px] text-on-surface-variant" title="Completed jobs only, by completion date — same definition as the Profit & Loss report">
+                {formatCurrency(repairStats.revenue_completed)} completed this period (P&amp;L basis)
+              </p>
+            </>
           ) : (
             <div className="mt-3 h-4 w-20 rounded bg-surface-container animate-pulse" />
           )}
@@ -1556,10 +1565,15 @@ export default function RepairsPage() {
             </div>
           </div>
           {repairStats ? (
-            <p className="mt-3 flex items-center gap-1 text-xs font-medium text-green-600">
-              <TrendingUp className="h-3 w-3" />
-              after parts cost
-            </p>
+            <>
+              <p className="mt-3 flex items-center gap-1 text-xs font-medium text-green-600">
+                <TrendingUp className="h-3 w-3" />
+                revenue above, minus parts cost
+              </p>
+              <p className="mt-1 text-[11px] text-on-surface-variant" title="Completed jobs only, by completion date — same definition as the Profit & Loss report">
+                {formatCurrency(repairStats.profit_completed)} completed this period (P&amp;L basis)
+              </p>
+            </>
           ) : (
             <div className="mt-3 h-4 w-24 rounded bg-surface-container animate-pulse" />
           )}
@@ -1583,7 +1597,7 @@ export default function RepairsPage() {
           </div>
           {repairStats ? (
             <p className="mt-3 flex items-center gap-1 text-xs font-medium text-[#b45309]">
-              All currently active jobs
+              All currently active jobs (all-time, ignores period)
             </p>
           ) : (
             <div className="mt-3 h-4 w-36 rounded bg-surface-container animate-pulse" />
@@ -1609,7 +1623,7 @@ export default function RepairsPage() {
           {repairStats ? (
             <p className="mt-3 flex items-center gap-1 text-xs font-medium text-primary">
               <CheckCircle className="h-3 w-3" />
-              {repairStats.repairs_completed === 0 ? 'None completed yet' : 'Completed this period'}
+              {repairStats.repairs_completed === 0 ? 'None completed yet' : 'Booked this period, now complete'}
             </p>
           ) : (
             <div className="mt-3 h-4 w-28 rounded bg-surface-container animate-pulse" />
