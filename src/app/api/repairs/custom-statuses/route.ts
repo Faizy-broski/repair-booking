@@ -8,6 +8,7 @@ const schema = z.object({
   name: z.string().min(1),
   color: z.string().default('#09d6f1'),
   sort_order: z.number().default(0),
+  is_terminal: z.boolean().default(false),
 })
 
 export const GET = withMiddleware(async (_req, ctx) => {

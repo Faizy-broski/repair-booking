@@ -10,7 +10,7 @@ import {
   CreditCard, AlertCircle, Smartphone, BookOpen, TrendingUp, PieChart,
   ChevronDown, Bell, Server, Clock, Activity, Mail, Users2,
   Store, GitBranch, Sliders, Layers, Settings2, PackagePlus, Cpu, Tag,
-  CalendarDays, LogIn, Palette, LifeBuoy,
+  CalendarDays, LogIn, Palette, LifeBuoy, Truck, ClipboardList,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
@@ -59,6 +59,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Catalogue',      href: '/inventory/catalogue',       icon: Smartphone,   requiredRole: 'branch_manager', module: 'inventory', subItem: true, hideForRetail: true },
   { label: 'Categories',     href: '/inventory/categories',      icon: Layers,       requiredRole: 'staff',          module: 'inventory', subItem: true, retailOnly: true },
   { label: 'Attributes',     href: '/inventory/attributes',      icon: Tag,          requiredRole: 'branch_manager', module: 'inventory', subItem: true, retailOnly: true },
+  { label: 'Suppliers',      href: '/inventory/suppliers',       icon: Truck,        requiredRole: 'staff',          module: 'inventory', subItem: true },
+  { label: 'Purchase Orders', href: '/inventory/purchase-orders', icon: ClipboardList, requiredRole: 'staff',        module: 'inventory', subItem: true },
   { label: 'Customers',      href: '/customers',       icon: Users,           requiredRole: 'staff',          module: 'customers' },
   { label: 'Appointments',   href: '/appointments',    icon: Calendar,        requiredRole: 'staff',          module: 'appointments' },
   { label: 'Invoices',       href: '/invoices',        icon: FileText,        requiredRole: 'staff',          module: 'invoices' },
@@ -84,10 +86,10 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Phone',            href: '/phone',                                   icon: Phone,         requiredRole: 'cashier',        module: 'phone', minBranches: 2 },
   { label: 'Google Reviews',   href: '/google-reviews',                          icon: Star,          requiredRole: 'branch_manager', module: 'google_reviews' },
   { label: 'Notifications',    href: '/settings/notifications',                  icon: Bell,          requiredRole: 'branch_manager', module: 'notifications' },
-  { label: 'Templates',        href: '/settings/notifications',                  icon: Mail,          requiredRole: 'branch_manager', module: 'notifications', subItem: true },
+ // { label: 'Templates',        href: '/settings/notifications',                  icon: Mail,          requiredRole: 'branch_manager', module: 'notifications', subItem: true },
   { label: 'Email (SMTP)',     href: '/settings/notifications/email',            icon: Server,        requiredRole: 'branch_manager', module: 'notifications', subItem: true },
   { label: 'SMS Gateway',      href: '/settings/notifications/sms',              icon: MessageSquare, requiredRole: 'branch_manager', module: 'notifications', subItem: true },
-  { label: 'Invoice Reminders',href: '/settings/notifications/reminders',        icon: Clock,         requiredRole: 'branch_manager', module: 'notifications', subItem: true },
+ //{ label: 'Invoice Reminders',href: '/settings/notifications/reminders',        icon: Clock,         requiredRole: 'branch_manager', module: 'notifications', subItem: true },
   { label: 'Delivery Logs',    href: '/settings/notifications/delivery-logs',    icon: Activity,      requiredRole: 'branch_manager', module: 'notifications', subItem: true },
   { label: 'Helpdesk',         href: '/helpdesk',                                icon: LifeBuoy,      requiredRole: 'branch_manager' },
   { label: 'Settings',         href: '/settings',                                icon: Settings,      requiredRole: 'branch_manager' },

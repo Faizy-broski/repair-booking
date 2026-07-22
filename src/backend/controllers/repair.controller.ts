@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { RepairService } from '@/backend/services/repair.service'
+import { StoreCreditService } from '@/backend/services/store-credit.service'
+import { LoyaltyService } from '@/backend/services/loyalty.service'
 import { CommissionService } from '@/backend/services/payroll.service'
 import { NotificationEngine } from '@/backend/services/notification-engine.service'
 import { adminSupabase } from '@/backend/config/supabase'
-import { ok, created, notFound, serverError } from '@/backend/utils/api-response'
+import { ok, created, notFound, serverError, badRequest } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
 import { z } from 'zod'
@@ -26,14 +28,15 @@ function pdfResponse(buffer: Buffer | Uint8Array, filename: string) {
   })
 }
 
-async function buildRepairInvoiceBuffer(repairId: string, branchId: string | null, businessId: string) {
-  const [repair, renderToBuffer, { InvoicePdf }, { InvoiceSettingsService }, { DEFAULT_INVOICE_SETTINGS }, React] = await Promise.all([
+// Assembles the plain-data shape shared by the server-rendered PDF (standard
+// paper sizes: A4/A5/Letter) and the thermal HTML print path (Receipt80/58/
+// Custom — see getInvoiceData/RepairReceiptHtml). Keeping one data-builder
+// means both paths always agree on totals/items/branch info.
+async function getRepairInvoiceData(repairId: string, branchId: string | null, businessId: string) {
+  const [repair, { InvoiceSettingsService }, { DEFAULT_INVOICE_SETTINGS }] = await Promise.all([
     RepairService.getById(repairId, branchId ?? undefined),
-    import('@react-pdf/renderer').then((m) => m.renderToBuffer),
-    import('@/components/pdf/invoice-pdf'),
     import('@/backend/services/invoice-settings.service'),
     import('@/types/invoice-settings'),
-    import('react').then((m) => m.default),
   ])
 
   if (!repair) return null
@@ -42,31 +45,52 @@ async function buildRepairInvoiceBuffer(repairId: string, branchId: string | nul
   const [settings, branchRow, businessRow] = await Promise.all([
     InvoiceSettingsService.get(businessId, r.branch_id ?? null),
     adminSupabase.from('branches').select('name, address, phone, email, logo_url').eq('id', r.branch_id).single().then((res) => res.data),
-    adminSupabase.from('businesses').select('currency').eq('id', businessId).single().then((res) => res.data),
+    adminSupabase.from('businesses').select('name, currency').eq('id', businessId).single().then((res) => res.data),
   ])
 
-  const repairItems: any[] = Array.isArray(r.repair_items) ? r.repair_items : []
-  const items = repairItems.length > 0
-    ? repairItems.map((item) => ({
-        description: item.name,
-        quantity:    item.quantity ?? 1,
-        unit_price:  Number(item.unit_price ?? 0),
-      }))
-    : [{
-        description: `${r.issue || 'Repair Service'} (${r.device_type} ${r.device_brand} ${r.device_model})`,
-        quantity:    1,
-        unit_price:  Number(r.estimated_cost ?? 0),
-      }]
+  const cf = (r.custom_fields as Record<string, unknown>) ?? {}
+  const faultsArr: string[] = cf.faults
+    ? (Array.isArray(cf.faults) ? cf.faults : [String(cf.faults)])
+    : r.issue
+    ? [r.issue]
+    : []
 
-  const invoiceTotal = repairItems.length > 0
-    ? items.reduce((s, it) => s + it.quantity * it.unit_price, 0)
-    : Number(r.estimated_cost ?? 0)
+  const deviceName = [r.device_brand, r.device_model].filter(Boolean).join(' ') || r.device_type || 'Device'
+
+  const repairItems: any[] = Array.isArray(r.repair_items) ? r.repair_items : []
+  const sumOfPartsGross = repairItems.reduce((s: number, it: any) => s + (it.quantity ?? 1) * Number(it.unit_price ?? 0), 0)
+  const partsDiscount = repairItems.reduce((s: number, it: any) => s + Number(it.discount_amount ?? 0), 0)
+  const repairDiscount = Number(r.discount_amount ?? 0)
+  const netPartsTotal = sumOfPartsGross - partsDiscount
+  const laborFee = Math.max(0, Number(r.estimated_cost ?? 0) + repairDiscount - netPartsTotal)
+
+  const items: any[] = []
+  if (laborFee > 0 || repairItems.length === 0) {
+    items.push({
+      description: `Repair Fee`,
+      quantity:    1,
+      unit_price:  laborFee,
+    })
+  }
+
+  items.push(...repairItems.map((item) => {
+    const discount = Number(item.discount_amount ?? 0)
+    return {
+      description: item.quantity > 1 ? `${item.quantity}x ${item.name}` : item.name,
+      quantity:    item.quantity ?? 1,
+      unit_price:  Number(item.unit_price ?? 0),
+      discount:    discount > 0 ? discount : undefined,
+    }
+  }))
+
+  const invoiceSubtotal = laborFee + sumOfPartsGross
+  const invoiceDiscount = partsDiscount + repairDiscount
+  const invoiceTotal = Math.max(0, invoiceSubtotal - invoiceDiscount)
 
   const customer     = r.customers
   const customerName = customer
     ? `${customer.first_name} ${customer.last_name ?? ''}`.trim()
     : 'Walk-In'
-  const cf = (r.custom_fields as Record<string, unknown>) ?? {}
 
   const mergedSettings = {
     ...DEFAULT_INVOICE_SETTINGS,
@@ -75,52 +99,158 @@ async function buildRepairInvoiceBuffer(repairId: string, branchId: string | nul
     show_logo: settings.show_logo !== false && !!(settings.logo_url ?? branchRow?.logo_url),
   }
 
-  const doc = React.createElement(InvoicePdf, {
+  return {
     settings:        mergedSettings,
-    invoiceNumber:   r.job_number,
-    status:          r.status,
-    issuedAt:        r.created_at,
+    invoiceNumber:   r.job_number as string,
+    status:          r.status as string,
+    issuedAt:        r.created_at as string,
     dueAt:           (cf.due_date as string) ?? null,
-    businessName:    branchRow?.name ?? 'Business',
-    branchName:      branchRow?.name,
-    branchAddress:   branchRow?.address,
-    branchPhone:     branchRow?.phone,
-    branchEmail:     branchRow?.email,
+    businessName:    businessRow?.name ?? branchRow?.name ?? 'Business',
+    branchName:      branchRow?.name ?? null,
+    branchAddress:   branchRow?.address ?? null,
+    branchPhone:     branchRow?.phone ?? null,
+    branchEmail:     branchRow?.email ?? null,
     customerName,
-    customerEmail:   customer?.email,
-    customerPhone:   customer?.phone,
-    customerAddress: customer?.address,
+    deviceName,
+    deviceImei:      r.serial_number || 'N/A',
+    faults:          faultsArr.length > 0 ? faultsArr.join(', ') : 'N/A',
+    customerEmail:   customer?.email ?? null,
+    customerPhone:   customer?.phone ?? null,
+    customerAddress: customer?.address ?? null,
     items,
-    subtotal:        invoiceTotal,
-    discount:        0,
+    subtotal:        invoiceSubtotal,
+    discount:        invoiceDiscount,
     tax:             0,
     total:           invoiceTotal,
     amountPaid:      Number(r.deposit_paid ?? 0),
-    notes:           r.notes,
-    currency:        businessRow?.currency ?? undefined,
-  })
-
-  return { buffer: await renderToBuffer(doc as any), jobNumber: r.job_number as string }
+    notes:           r.notes ?? null,
+    currency:        businessRow?.currency ?? 'GBP',
+    jobNumber:       r.job_number as string,
+  }
 }
 
-async function buildRepairSlipBuffer(repairId: string, branchId: string | null) {
-  const [repair, renderToBuffer, { RepairSlipPdf }, { code128DataUrl }, React] = await Promise.all([
-    RepairService.getById(repairId, branchId ?? undefined),
+async function buildRepairInvoiceBuffer(repairId: string, branchId: string | null, businessId: string) {
+  const [data, renderToBuffer, { InvoicePdf }, React] = await Promise.all([
+    getRepairInvoiceData(repairId, branchId, businessId),
     import('@react-pdf/renderer').then((m) => m.renderToBuffer),
-    import('@/components/pdf/repair-slip-pdf'),
-    import('@/backend/utils/barcode'),
+    import('@/components/pdf/invoice-pdf'),
     import('react').then((m) => m.default),
   ])
 
-  if (!repair) return null
-  const jobNumber = (repair as any).job_number as string
+  if (!data) return null
+  const doc = React.createElement(InvoicePdf, data)
+  return { buffer: await renderToBuffer(doc as any), jobNumber: data.jobNumber }
+}
 
-  const doc = React.createElement(RepairSlipPdf, {
+// Pricing figures for notification emails — same totals math as getRepairInvoiceData
+// (parts + labour minus discounts, less deposit already paid) so the "created" and
+// "status changed" emails always agree with the PDF invoice for the same job.
+// Values come back pre-formatted with the business's currency symbol so templates
+// can drop them straight in as {{total_cost}}, {{deposit_paid}}, {{balance_due}}, etc.
+function getRepairPricingVariables(r: any, currency: string): Record<string, string> {
+  const repairItems: any[] = Array.isArray(r.repair_items) ? r.repair_items : []
+  const partsGross    = repairItems.reduce((s: number, it: any) => s + (it.quantity ?? 1) * Number(it.unit_price ?? 0), 0)
+  const partsDiscount = repairItems.reduce((s: number, it: any) => s + Number(it.discount_amount ?? 0), 0)
+  const repairDiscount = Number(r.discount_amount ?? 0)
+  const estimatedCost = Number(r.estimated_cost ?? 0)
+  const subtotal  = estimatedCost + partsGross
+  const discount  = partsDiscount + repairDiscount
+  const total     = Math.max(0, subtotal - discount)
+  const depositPaid = Number(r.deposit_paid ?? 0)
+  const balanceDue   = Math.max(0, total - depositPaid)
+
+  const fmt = (n: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(n)
+
+  const result = {
+    total_cost:   fmt(total),
+    discount:     discount > 0 ? fmt(discount) : '',
+    deposit_paid: fmt(depositPaid),
+    balance_due:  fmt(balanceDue),
+  }
+
+  // TEMP DEBUG — remove once the pricing-details email rollout is confirmed working.
+  console.log('[DEBUG getRepairPricingVariables] raw:', {
+    estimated_cost: r.estimated_cost, deposit_paid: r.deposit_paid, discount_amount: r.discount_amount,
+    repair_items_count: repairItems.length, currency,
+  }, 'computed:', { subtotal, discount, total, depositPaid, balanceDue }, 'result:', result)
+
+  return result
+}
+
+// Same split as above: plain data for the thermal HTML path, PDF for A4/A5/Letter.
+// Extended to include full repair details so the HTML slip matches the Laravel blade output.
+async function getRepairSlipData(repairId: string, branchId: string | null, businessId: string) {
+  const [repair, { code128DataUrl }, { InvoiceSettingsService }] = await Promise.all([
+    RepairService.getById(repairId, branchId ?? undefined),
+    import('@/backend/utils/barcode'),
+    import('@/backend/services/invoice-settings.service'),
+  ])
+
+  if (!repair) return null
+  const r = repair as any
+  const jobNumber = r.job_number as string
+  const settings = await InvoiceSettingsService.get(businessId, r.branch_id ?? null)
+
+  // Fetch branch info for header (name, address, phone)
+  const [{ data: branchRow }, { data: businessRow }] = await Promise.all([
+    adminSupabase.from('branches').select('name, address, phone').eq('id', r.branch_id).single(),
+    adminSupabase.from('businesses').select('name').eq('id', businessId).single(),
+  ])
+
+  const customer = r.customers
+  const customerName = customer
+    ? `${customer.first_name} ${customer.last_name ?? ''}`.trim()
+    : 'Walk-In'
+
+  // Faults come from the issue field or custom_fields
+  const cf = (r.custom_fields as Record<string, unknown>) ?? {}
+  const faults: string[] = cf.faults
+    ? (Array.isArray(cf.faults) ? cf.faults : [String(cf.faults)])
+    : r.issue
+    ? [r.issue]
+    : []
+
+  const deviceLabel = [r.device_brand, r.device_model].filter(Boolean).join(' ') || r.device_type || 'Device'
+
+  // Charges: use repair_items if present, otherwise estimated_cost
+  const repairItems: any[] = Array.isArray(r.repair_items) ? r.repair_items : []
+  let totalRepairCharges = Number(r.estimated_cost ?? 0)
+  const sumOfParts = repairItems.reduce((s: number, it: any) => s + (it.quantity ?? 1) * Number(it.unit_price ?? 0), 0)
+  totalRepairCharges = Math.max(totalRepairCharges, sumOfParts)
+  const deposit = Number(r.deposit_paid ?? 0)
+  const remaining = Math.max(0, totalRepairCharges - deposit)
+
+  return {
     jobNumber,
     barcodeDataUrl: await code128DataUrl(jobNumber),
-  })
+    paperSize: settings.paper_size as string,
+    customWidth: settings.custom_width ?? null,
+    // Full repair details for the HTML slip
+    businessName:   businessRow?.name ?? branchRow?.name ?? 'Business',
+    branchAddress:  branchRow?.address ?? null,
+    branchPhone:    branchRow?.phone ?? null,
+    customerName,
+    deviceLabel,
+    faults,
+    dueDate:        r.due_date ?? null,
+    createdAt:      r.created_at as string,
+    totalRepairCharges,
+    deposit,
+    remaining,
+  }
+}
 
-  return { buffer: await renderToBuffer(doc as any), jobNumber }
+async function buildRepairSlipBuffer(repairId: string, branchId: string | null, businessId: string) {
+  const [data, renderToBuffer, { RepairSlipPdf }, React] = await Promise.all([
+    getRepairSlipData(repairId, branchId, businessId),
+    import('@react-pdf/renderer').then((m) => m.renderToBuffer),
+    import('@/components/pdf/repair-slip-pdf'),
+    import('react').then((m) => m.default),
+  ])
+
+  if (!data) return null
+  const doc = React.createElement(RepairSlipPdf, data)
+  return { buffer: await renderToBuffer(doc as any), jobNumber: data.jobNumber }
 }
 
 const createSchema = z.object({
@@ -141,12 +271,24 @@ const createSchema = z.object({
   passcode: z.string().optional().nullable(),
   custom_fields: z.record(z.string(), z.unknown()).default({}),
   asset_id: z.string().uuid().optional().nullable(),
+  store_credit_applied: z.number().min(0).optional(),
+  loyalty_points_applied: z.number().int().min(0).optional(),
+  discount_type: z.enum(['fixed', 'percent']).default('fixed'),
+  discount_value: z.number().min(0).default(0),
+  discount_amount: z.number().min(0).default(0),
+  payment_splits: z.array(z.object({
+    method: z.enum(['cash', 'card', 'store_credit', 'loyalty_points']),
+    amount: z.number().positive(),
+  })).optional().default([]),
   parts: z.array(z.object({
     product_id: z.string().uuid().optional().nullable(),
     name: z.string(),
     quantity: z.number().int().min(1).default(1),
     unit_cost: z.number().min(0).default(0),
     unit_price: z.number().min(0).default(0),
+    discount_type: z.enum(['fixed', 'percent']).default('fixed'),
+    discount_value: z.number().min(0).default(0),
+    discount_amount: z.number().min(0).default(0),
   })).optional().default([]),
 })
 
@@ -157,6 +299,87 @@ const statusSchema = z.object({
   note: z.string().optional().default(''),
   send_email: z.boolean().default(false),
 })
+
+// Debits store credit / loyalty points for a repair payment (deposit or a later
+// top-up). Failures are logged and reported back as a warning rather than
+// failing the whole request — the repair itself (and its deposit_paid figure)
+// has already been saved by this point.
+async function applyRepairCreditLoyalty(
+  businessId: string,
+  customerId: string,
+  repair: { id: string; job_number?: string | null },
+  amounts: { storeCreditApplied?: number; loyaltyPointsApplied?: number }
+): Promise<string | null> {
+  const warnings: string[] = []
+
+  if (amounts.storeCreditApplied && amounts.storeCreditApplied > 0) {
+    try {
+      await StoreCreditService.debit(businessId, customerId, amounts.storeCreditApplied, {
+        note: `Repair #${repair.job_number ?? repair.id.slice(-8)} payment`,
+        referenceId: repair.id,
+        referenceType: 'repair',
+      })
+    } catch (err: any) {
+      warnings.push(`Store credit not applied: ${err?.message ?? 'unknown error'}`)
+    }
+  }
+
+  if (amounts.loyaltyPointsApplied && amounts.loyaltyPointsApplied > 0) {
+    try {
+      await LoyaltyService.redeemPoints(businessId, customerId, amounts.loyaltyPointsApplied, {
+        referenceId: repair.id,
+        referenceType: 'repair',
+      })
+    } catch (err: any) {
+      warnings.push(`Loyalty points not applied: ${err?.message ?? 'unknown error'}`)
+    }
+  }
+
+  return warnings.length > 0 ? warnings.join('; ') : null
+}
+
+type PaymentSplit = { method: 'cash' | 'card' | 'store_credit' | 'loyalty_points'; amount: number }
+
+// Split amounts must add up to the amount actually due for this payment event
+// (the full deposit on create; just the top-up delta on update) — arithmetic
+// integrity, not a completion gate.
+function validatePaymentSplits(splits: PaymentSplit[], due: number): string | null {
+  if (splits.length === 0) return null
+  const sum = splits.reduce((s, x) => s + x.amount, 0)
+  if (Math.abs(sum - due) > 0.01) {
+    return `Payment split amounts (£${sum.toFixed(2)}) must add up to the amount due (£${due.toFixed(2)}).`
+  }
+  return null
+}
+
+// Appends this payment event's splits to the cumulative repairs.payment_splits
+// snapshot and records one repair_payments ledger row per split — mirrors
+// record_credit_payment()'s two-tier write for POS on-account payments.
+async function persistRepairPaymentSplits(
+  businessId: string,
+  repairId: string,
+  customerId: string | null,
+  createdBy: string | null,
+  existingSplits: unknown,
+  newSplits: PaymentSplit[]
+) {
+  if (newSplits.length === 0) return
+  const prior = Array.isArray(existingSplits) ? existingSplits : []
+  await adminSupabase
+    .from('repairs')
+    .update({ payment_splits: [...prior, ...newSplits] })
+    .eq('id', repairId)
+  await adminSupabase.from('repair_payments').insert(
+    newSplits.map((s) => ({
+      business_id: businessId,
+      repair_id: repairId,
+      customer_id: customerId,
+      amount: s.amount,
+      method: s.method,
+      created_by: createdBy,
+    }))
+  )
+}
 
 export const RepairController = {
   async list(request: NextRequest, ctx: RequestContext) {
@@ -192,9 +415,15 @@ export const RepairController = {
   async create(request: NextRequest, ctx: RequestContext) {
     const { data, error } = await validateBody(request, createSchema)
     if (error) return error
+    const splitError = validatePaymentSplits(data.payment_splits, data.deposit_paid ?? 0)
+    if (splitError) return badRequest(splitError)
     try {
-      const { parts, ...repairPayload } = data
+      const { parts, store_credit_applied, loyalty_points_applied, payment_splits, ...repairPayload } = data
       const repair = await RepairService.create(repairPayload)
+
+      if (repair && payment_splits.length > 0) {
+        await persistRepairPaymentSplits(ctx.businessId, repair.id, data.customer_id ?? null, ctx.auth.userId, [], payment_splits)
+      }
 
       // Save repair items (parts) if any
       if (parts && parts.length > 0 && repair) {
@@ -270,48 +499,59 @@ export const RepairController = {
 
         const allResolved = [...knownParts, ...resolvedQuickAdd]
         const items = allResolved.map(p => ({
-          repair_id:  repair.id,
-          product_id: p.product_id,
-          name:       p.name,
-          quantity:   p.quantity,
-          unit_cost:  p.unit_cost,
-          unit_price: p.unit_price,
+          repair_id:      repair.id,
+          product_id:     p.product_id,
+          name:           p.name,
+          quantity:       p.quantity,
+          unit_cost:      p.unit_cost,
+          unit_price:     p.unit_price,
+          discount_type:  p.discount_type ?? 'fixed',
+          discount_value: p.discount_value ?? 0,
+          discount_amount: p.discount_amount ?? 0,
         }))
         await adminSupabase.from('repair_items').insert(items)
 
         // Deduct inventory for physical parts immediately on creation
-        await adminSupabase.rpc('deduct_repair_parts', {
+        const { error: deductError } = await adminSupabase.rpc('deduct_repair_parts', {
           p_repair_id: repair.id,
           p_branch_id: data.branch_id,
         })
+        if (deductError) console.error('[RepairController.create] deduct_repair_parts failed:', deductError)
       }
 
       // Fire ticket_created notification in background
       if (data.notify_customer && data.customer_id && repair) {
         Promise.all([
           RepairService.getById(repair.id, data.branch_id),
-          adminSupabase.from('businesses').select('name, phone, email').eq('id', ctx.businessId).single()
+          adminSupabase.from('businesses').select('name, phone, email, currency').eq('id', ctx.businessId).single()
         ]).then(([repairDetail, { data: business }]) => {
           if (repairDetail?.customers) {
             const customerName = `${repairDetail.customers.first_name} ${repairDetail.customers.last_name ?? ''}`.trim()
             const deviceInfo = [repairDetail.device_brand, repairDetail.device_model].filter(Boolean).join(' ') || 'Device'
+            const pricing = getRepairPricingVariables(repairDetail, (business as any)?.currency ?? 'GBP')
+
+            const ticketCreatedVariables = {
+              customer_name: customerName,
+              ticket_number: repair.job_number,
+              device_type:   repairDetail.device_type ?? '',
+              device_brand:  repairDetail.device_brand ?? '',
+              device_model:  deviceInfo,
+              issue:         repairDetail.issue ?? '',
+              store_name:    business?.name ?? 'RepairBooking',
+              store_phone:   business?.phone ?? '',
+              store_email:   business?.email ?? '',
+              ...pricing,
+            }
+
+            // TEMP DEBUG — remove once the pricing-details email rollout is confirmed working.
+            console.log('[DEBUG ticket_created] businessId:', ctx.businessId, 'variables:', ticketCreatedVariables)
 
             NotificationEngine.fire('ticket_created', {
               businessId: ctx.businessId,
               branchId: data.branch_id,
               relatedId: repair.id,
               relatedType: 'repair',
-              variables: {
-                customer_name: customerName,
-                ticket_number: repair.job_number,
-                device_type:   repairDetail.device_type ?? '',
-                device_brand:  repairDetail.device_brand ?? '',
-                device_model:  deviceInfo,
-                issue:         repairDetail.issue ?? '',
-                store_name:    business?.name ?? 'RepairBooking',
-                store_phone:   business?.phone ?? '',
-                store_email:   business?.email ?? '',
-              },
+              variables: ticketCreatedVariables,
               recipient: {
                 email: repairDetail.customers.email ?? null,
                 phone: repairDetail.customers.phone ?? null,
@@ -321,7 +561,14 @@ export const RepairController = {
         }).catch(console.error)
       }
 
-      return created(repair)
+      const credit_apply_warning = repair && data.customer_id
+        ? await applyRepairCreditLoyalty(ctx.businessId, data.customer_id, repair, {
+            storeCreditApplied: store_credit_applied,
+            loyaltyPointsApplied: loyalty_points_applied,
+          })
+        : null
+
+      return created({ ...repair, credit_apply_warning })
     } catch (err) {
       return serverError('Failed to create repair', err)
     }
@@ -332,9 +579,36 @@ export const RepairController = {
     if (error) return error
     const branchId = ctx.auth.branchId ?? undefined
     try {
-      const { parts, ...repairPayload } = data
+      const { data: existing } = await adminSupabase
+        .from('repairs')
+        .select('deposit_paid, payment_splits')
+        .eq('id', id)
+        .single()
+
+      const priorDeposit = (existing as any)?.deposit_paid ?? 0
+      const paymentDue = (data.deposit_paid ?? priorDeposit) - priorDeposit
+      const splitError = validatePaymentSplits(data.payment_splits, paymentDue)
+      if (splitError) return badRequest(splitError)
+
+      const { parts, store_credit_applied, loyalty_points_applied, payment_splits, ...repairPayload } = data
       const repair = await RepairService.update(id, branchId, repairPayload)
-      return ok(repair)
+
+      if (repair && payment_splits.length > 0) {
+        await persistRepairPaymentSplits(
+          ctx.businessId, id, (repair as any).customer_id ?? null, ctx.auth.userId,
+          (existing as any)?.payment_splits, payment_splits
+        )
+      }
+
+      const customerId = repair && (repair as any).customer_id
+      const credit_apply_warning = repair && customerId
+        ? await applyRepairCreditLoyalty(ctx.businessId, customerId, repair, {
+            storeCreditApplied: store_credit_applied,
+            loyaltyPointsApplied: loyalty_points_applied,
+          })
+        : null
+
+      return ok({ ...repair, credit_apply_warning })
     } catch (err) {
       return serverError('Failed to update repair', err)
     }
@@ -347,6 +621,7 @@ export const RepairController = {
       await RepairService.updateStatus(id, data.status, data.note, ctx.auth.userId)
 
       // When marked as refunded, record the deposit_paid as the refund_amount
+      // and restore any store credit / loyalty points that were used to pay for it.
       if (data.status === 'refunded') {
         const branchId = ctx.auth.branchId ?? null
         const repair = await RepairService.getById(id, branchId)
@@ -356,6 +631,37 @@ export const RepairController = {
             .from('repairs')
             .update({ refund_amount: depositPaid })
             .eq('id', id)
+
+          const customerId = (repair as any).customer_id
+          if (customerId) {
+            const note = `Refund reversal for repair #${(repair as any).job_number ?? id.slice(-8)}`
+
+            const { data: creditDebits } = await adminSupabase
+              .from('store_credit_transactions')
+              .select('amount')
+              .eq('business_id', ctx.businessId)
+              .eq('customer_id', customerId)
+              .eq('reference_type', 'repair')
+              .eq('reference_id', id)
+              .eq('type', 'debit')
+            for (const txn of creditDebits ?? []) {
+              await StoreCreditService.credit(ctx.businessId, customerId, -(txn as any).amount, {
+                note, referenceId: id, referenceType: 'repair_refund',
+              }).catch(() => {})
+            }
+
+            const { data: loyaltyRedemptions } = await adminSupabase
+              .from('loyalty_transactions')
+              .select('points')
+              .eq('business_id', ctx.businessId)
+              .eq('customer_id', customerId)
+              .eq('reference_type', 'repair')
+              .eq('reference_id', id)
+              .eq('type', 'redeemed')
+            for (const txn of loyaltyRedemptions ?? []) {
+              await LoyaltyService.addPoints(ctx.businessId, customerId, -(txn as any).points, 'adjusted', id).catch(() => {})
+            }
+          }
         }
       }
 
@@ -376,12 +682,13 @@ export const RepairController = {
       const branchId = ctx.auth.branchId ?? null
       Promise.all([
         RepairService.getById(id, branchId),
-        adminSupabase.from('businesses').select('name, phone, email').eq('id', ctx.businessId).single()
+        adminSupabase.from('businesses').select('name, phone, email, currency').eq('id', ctx.businessId).single()
       ]).then(([repair, { data: business }]) => {
         if (repair?.customers) {
           const customerName = `${repair.customers.first_name} ${repair.customers.last_name ?? ''}`.trim()
           const deviceInfo = [repair.device_brand, repair.device_model].filter(Boolean).join(' ') || 'Device'
           const businessName = business?.name ?? 'RepairBooking'
+          const pricing = getRepairPricingVariables(repair, (business as any)?.currency ?? 'GBP')
 
           const STATUS_LABELS: Record<string, string> = {
             received: 'Received', in_progress: 'In Progress', waiting_parts: 'Waiting for Parts',
@@ -406,6 +713,7 @@ export const RepairController = {
               store_name:     businessName,
               store_phone:    business?.phone ?? '',
               store_email:    business?.email ?? '',
+              ...pricing,
             },
             recipient: {
               email: repair.customers.email ?? null,
@@ -454,11 +762,37 @@ export const RepairController = {
 
   async generateSlipPdf(_request: NextRequest, ctx: RequestContext, id: string) {
     try {
-      const result = await buildRepairSlipBuffer(id, ctx.auth.branchId ?? null)
+      const result = await buildRepairSlipBuffer(id, ctx.auth.branchId ?? null, ctx.businessId)
       if (!result) return notFound('Repair not found')
       return pdfResponse(result.buffer, `slip-${result.jobNumber}.pdf`)
     } catch (err) {
       return serverError('Failed to generate slip PDF', err)
+    }
+  },
+
+  // ── Plain-data endpoints for thermal (Receipt80/58/Custom) printing ──────────
+  // The client prints these via an HTML popup + dynamic @page sizing instead of
+  // a PDF — @react-pdf output isn't reliably honoured by the browser's native
+  // PDF print dialog on thermal printers (paper size defaults to Letter/A4 and
+  // shrinks the whole page). Same data as the PDF path, see getRepairInvoiceData.
+
+  async getInvoiceData(_request: NextRequest, ctx: RequestContext, id: string) {
+    try {
+      const data = await getRepairInvoiceData(id, ctx.auth.branchId ?? null, ctx.businessId)
+      if (!data) return notFound('Repair not found')
+      return ok(data)
+    } catch (err) {
+      return serverError('Failed to fetch invoice data', err)
+    }
+  },
+
+  async getSlipData(_request: NextRequest, ctx: RequestContext, id: string) {
+    try {
+      const data = await getRepairSlipData(id, ctx.auth.branchId ?? null, ctx.businessId)
+      if (!data) return notFound('Repair not found')
+      return ok(data)
+    } catch (err) {
+      return serverError('Failed to fetch slip data', err)
     }
   },
 
@@ -467,7 +801,8 @@ export const RepairController = {
     try {
       await RepairService.remove(id, branchId)
       return ok({ deleted: true })
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.message?.includes('not found')) return notFound('Repair not found')
       return serverError('Failed to delete repair', err)
     }
   },

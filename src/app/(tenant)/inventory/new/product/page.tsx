@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { CreatableCombobox } from '@/components/ui/creatable-combobox'
 import { ImageUpload } from '@/components/ui/image-upload'
+import { SectionCard } from '@/components/ui/section-card'
+import { Toggle } from '@/components/ui/toggle'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/store/auth.store'
 import { queryClient } from '@/lib/query-client'
@@ -77,6 +79,7 @@ export default function NewProductPage() {
   const [lowStockAlert, setLowStockAlert] = useState('5')
   const [supplierId, setSupplierId]       = useState('')
   const [physicalLocation, setPhysicalLocation] = useState('')
+  const [isTradeIn, setIsTradeIn] = useState(false)
   const [commissionEnabled, setCommissionEnabled] = useState(false)
   const [commissionType, setCommissionType]       = useState('percentage')
   const [commissionRate, setCommissionRate]       = useState('')
@@ -281,6 +284,7 @@ export default function NewProductPage() {
     setName(''); setCategoryId(''); setBrandId(''); setModelId('')
     setSku(''); setBarcode(''); setImageUrl(''); setCostPrice(''); setSellingPrice('')
     setInitialStock('0'); setLowStockAlert('5'); setSupplierId(''); setPhysicalLocation('')
+    setIsTradeIn(false)
     setCommissionEnabled(false); setCommissionType('percentage'); setCommissionRate(''); setLoyaltyEnabled(true)
     setHasVariants(false); setAttrDefs([{ id: uid(), name: '', valuesRaw: '' }]); setVariantRows([])
   }
@@ -306,10 +310,12 @@ export default function NewProductPage() {
         has_variants: hasVariants,
         cost_price: parseFloat(costPrice) || 0,
         selling_price: hasVariants ? (parseFloat(sellingPrice) || 0) : (parseFloat(sellingPrice) || 0),
+        valuation_method: 'fifo',
         supplier_id: supplierId || null, track_inventory: true,
         low_stock_alert: parseInt(lowStockAlert) || 0,
         initial_stock: hasVariants ? 0 : (parseInt(initialStock) || 0),
         branch_id: activeBranch?.id ?? null, physical_location: physicalLocation || null,
+        is_trade_in: isTradeIn,
         commission_enabled: commissionEnabled, commission_type: commissionType,
         commission_rate: parseFloat(commissionRate) || 0, loyalty_enabled: loyaltyEnabled,
       }),
@@ -324,6 +330,7 @@ export default function NewProductPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            branch_id: activeBranch?.id ?? null,
             variants: variantRows.map(v => ({
               name: v.name,
               sku: v.sku || null,
@@ -331,6 +338,8 @@ export default function NewProductPage() {
               selling_price: parseFloat(v.sellingPrice) || 0,
               cost_price: parseFloat(v.costPrice) || 0,
               attributes: v.attributes,
+              stock: parseInt(v.stock) || 0,
+              image_url: v.imageUrl || null,
             })),
           }),
         })
@@ -390,14 +399,32 @@ export default function NewProductPage() {
       )}
 
       <main className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl px-6 py-6 space-y-8">
+        <div className="max-w-6xl px-6 py-6 space-y-6">
 
-          {/* Product Details */}
-          <section>
-            <div className="mb-4 border-b border-gray-200 pb-2">
-              <h2 className="text-base font-semibold text-gray-900">Product Details</h2>
-            </div>
-            <div className="space-y-4">
+          {/* Bought from Customer — compact */}
+          <div className="max-w-xl">
+            <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-lg border-2 px-4 py-3 transition-colors ${isTradeIn ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}`}>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isTradeIn ? 'bg-purple-100' : 'bg-gray-100'}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isTradeIn ? 'text-purple-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                </div>
+                <div>
+                  <p className={`text-sm font-semibold ${isTradeIn ? 'text-purple-800' : 'text-gray-900'}`}>Bought from Customer</p>
+                  <p className={`text-xs ${isTradeIn ? 'text-purple-600' : 'text-gray-500'}`}>Mark if this item was purchased directly from a customer</p>
+                </div>
+              </div>
+              <div className="shrink-0 flex items-center gap-2">
+                {isTradeIn && <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-semibold text-purple-700">Active</span>}
+                <Toggle checked={isTradeIn} onChange={setIsTradeIn} color="purple" />
+              </div>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div className="lg:col-span-2 space-y-6">
+
+              {/* Product Details */}
+              <SectionCard title="Product Details">
               <ImageUpload label="Product image" value={imageUrl} onChange={setImageUrl} />
               <Input label="Name" placeholder="Product name" required value={name} onChange={e => setName(e.target.value)} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -441,23 +468,81 @@ export default function NewProductPage() {
                   {barcodeConflict && <p className="mt-1 text-xs text-red-500">This Barcode is already in use</p>}
                 </div>
               </div>
-            </div>
-          </section>
+              </SectionCard>
 
-          {/* Variants */}
-          <section>
-            <div className="mb-4 border-b border-gray-200 pb-2 flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-semibold text-gray-900">Variants</h2>
-                <p className="text-xs text-gray-500 mt-0.5">Optional — define sizes, colours, storage options, etc.</p>
-              </div>
-              <label className="relative inline-flex cursor-pointer items-center gap-2">
-                <span className={`text-sm font-medium ${hasVariants ? 'text-blue-600' : 'text-gray-400'}`}>{hasVariants ? 'Enabled' : 'Disabled'}</span>
-                <input type="checkbox" className="sr-only peer" checked={hasVariants} onChange={e => { setHasVariants(e.target.checked); if (!e.target.checked) setVariantRows([]) }} />
-                <div className="relative peer h-6 w-11 rounded-full bg-gray-300 transition-colors after:absolute after:left-[3px] after:top-[3px] after:h-[18px] after:w-[18px] after:rounded-full after:bg-white after:shadow-sm after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-5" />
-              </label>
             </div>
 
+            <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-[76px]">
+
+              {/* Stock */}
+              <SectionCard title="Stock">
+                <div className="grid grid-cols-1 gap-4">
+                  {!hasVariants && (
+                    <Input label="Opening Stock" type="number" min="0" value={initialStock} onChange={e => setInitialStock(e.target.value)} />
+                  )}
+                  <Input label="Low Stock Alert" type="number" min="0" value={lowStockAlert} onChange={e => setLowStockAlert(e.target.value)} />
+                </div>
+                {hasVariants && (
+                  <p className="text-xs text-gray-500 rounded-lg border border-dashed border-gray-200 px-3 py-2">
+                    Opening stock is set per-variant in the table above.
+                  </p>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Stock Location</label>
+                  <Select options={[{ value: '', label: 'Select location...' }, { value: 'warehouse', label: 'Warehouse (Main Stock)' }, ...branches.map(b => ({ value: b.name, label: b.name + (b.is_main ? ' (Main Branch)' : '') }))]} value={physicalLocation} onValueChange={setPhysicalLocation} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
+                  <CreatableCombobox options={suppliers.map(s => ({ value: s.id, label: s.name }))} value={supplierId} onChange={(v) => setSupplierId(v)} onCreate={createSupplier} onEdit={editSupplier} onDelete={deleteSupplier} placeholder="Select or type to create..." createLabel="Add supplier" />
+                </div>
+              </SectionCard>
+
+              {/* Pricing Options */}
+              <SectionCard title="Pricing Options">
+                <div className="rounded-lg border border-gray-200">
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">Commission</p>
+                      <p className="text-xs text-gray-500">Enable employee commission for this product</p>
+                    </div>
+                    <Toggle checked={commissionEnabled} onChange={setCommissionEnabled} color="blue" />
+                  </div>
+                  {commissionEnabled && (
+                    <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-1 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
+                        <Select options={[{ value: 'percentage', label: 'Percentage (%)' }, { value: 'fixed', label: `Fixed Amount (${currSymbol})` }]} value={commissionType} onValueChange={setCommissionType} />
+                      </div>
+                      <Input label={commissionType === 'percentage' ? 'Rate (%)' : `Amount (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0" value={commissionRate} onChange={e => setCommissionRate(e.target.value)} />
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Loyalty Points</p>
+                    <p className="text-xs text-gray-500">Earn / redeem loyalty points on this product</p>
+                  </div>
+                  <Toggle checked={loyaltyEnabled} onChange={setLoyaltyEnabled} color="blue" />
+                </div>
+              </SectionCard>
+
+            </div>
+          </div>
+
+          {/* Variants — full width so the table has room before it needs to scroll */}
+              <SectionCard
+                title="Variants"
+                description="Optional — define sizes, colours, storage options, etc."
+                action={
+                  <Toggle
+                    checked={hasVariants}
+                    onChange={(v) => { setHasVariants(v); if (!v) setVariantRows([]) }}
+                    label={hasVariants ? 'Enabled' : 'Disabled'}
+                    size="md"
+                    color="blue"
+                  />
+                }
+              >
             {hasVariants && (
               <div className="space-y-4">
                 {/* Attribute definitions */}
@@ -514,7 +599,7 @@ export default function NewProductPage() {
                         <RefreshCw className="h-3 w-3" /> Regenerate
                       </button>
                     </div>
-                    <div className="rounded-lg border border-gray-200">
+                    <div className="rounded-lg border border-gray-200 overflow-x-auto">
                       <table className="w-full divide-y divide-gray-100 text-sm">
                         <thead className="bg-gray-50">
                           <tr>
@@ -523,7 +608,7 @@ export default function NewProductPage() {
                             <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">SKU</th>
                             <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Barcode</th>
                             <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Cost ({currSymbol})</th>
-                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Price ({currSymbol}) *</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Selling Price ({currSymbol}) *</th>
                             <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Stock</th>
                             <th className="px-4 py-3" />
                           </tr>
@@ -599,100 +684,33 @@ export default function NewProductPage() {
                 )}
               </div>
             )}
-          </section>
+          </SectionCard>
 
-          {/* Pricing */}
-          <section>
-            <div className="mb-4 border-b border-gray-200 pb-2">
-              <h2 className="text-base font-semibold text-gray-900">
-                {hasVariants ? 'Default Pricing' : 'Pricing'}
-              </h2>
-              {hasVariants && (
-                <p className="text-xs text-gray-500 mt-0.5">These defaults are pre-filled into generated variants — you can override each one above.</p>
-              )}
-            </div>
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input label={`Cost Price (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
-                <Input label={`Selling Price (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0.00" required={!hasVariants} value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
-              </div>
-              {hasMargin && (
-                <div className="rounded-lg bg-green-50 border border-green-100 px-4 py-2.5 flex items-center gap-4 text-sm">
-                  <span className="text-gray-600">Margin:</span>
-                  <span className="font-semibold text-green-700">{Math.round(((sell - cost) / sell) * 100)}%</span>
-                  <span className="text-gray-500">({formatCurrency(sell - cost)} profit)</span>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div className="lg:col-span-2 space-y-6">
+
+              {/* Pricing */}
+              <SectionCard
+                title={hasVariants ? 'Default Pricing' : 'Pricing'}
+                description={hasVariants
+                  ? 'These defaults are pre-filled into generated variants — you can override each one above.'
+                  : 'This becomes your first stock batch — add more batches after saving.'}
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input label={`Cost Price (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0.00" value={costPrice} onChange={e => setCostPrice(e.target.value)} />
+                  <Input label={`Selling Price (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0.00" required={!hasVariants} value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} />
                 </div>
-              )}
-            </div>
-          </section>
-
-          {/* Stock */}
-          <section>
-            <div className="mb-4 border-b border-gray-200 pb-2">
-              <h2 className="text-base font-semibold text-gray-900">Stock</h2>
-            </div>
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {!hasVariants && (
-                  <Input label="Opening Stock" type="number" min="0" value={initialStock} onChange={e => setInitialStock(e.target.value)} />
-                )}
-                <Input label="Low Stock Alert" type="number" min="0" value={lowStockAlert} onChange={e => setLowStockAlert(e.target.value)} />
-              </div>
-              {hasVariants && (
-                <p className="text-xs text-gray-500 rounded-lg border border-dashed border-gray-200 px-3 py-2">
-                  Opening stock is set per-variant in the table above.
-                </p>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Stock Location</label>
-                <Select options={[{ value: '', label: 'Select location...' }, { value: 'warehouse', label: 'Warehouse (Main Stock)' }, ...branches.map(b => ({ value: b.name, label: b.name + (b.is_main ? ' (Main Branch)' : '') }))]} value={physicalLocation} onValueChange={setPhysicalLocation} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Supplier <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
-                <CreatableCombobox options={suppliers.map(s => ({ value: s.id, label: s.name }))} value={supplierId} onChange={(v) => setSupplierId(v)} onCreate={createSupplier} onEdit={editSupplier} onDelete={deleteSupplier} placeholder="Select or type to create..." createLabel="Add supplier" />
-              </div>
-            </div>
-          </section>
-
-          {/* Pricing Options */}
-          <section>
-            <div className="mb-4 border-b border-gray-200 pb-2">
-              <h2 className="text-base font-semibold text-gray-900">Pricing Options</h2>
-            </div>
-            <div className="space-y-4">
-              <div className="rounded-lg border border-gray-200">
-                <div className="flex items-center justify-between px-4 py-3">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Commission</p>
-                    <p className="text-xs text-gray-500">Enable employee commission for this product</p>
-                  </div>
-                  <label className="relative inline-flex cursor-pointer items-center">
-                    <input type="checkbox" className="sr-only peer" checked={commissionEnabled} onChange={e => setCommissionEnabled(e.target.checked)} />
-                    <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full" />
-                  </label>
-                </div>
-                {commissionEnabled && (
-                  <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
-                      <Select options={[{ value: 'percentage', label: 'Percentage (%)' }, { value: 'fixed', label: `Fixed Amount (${currSymbol})` }]} value={commissionType} onValueChange={setCommissionType} />
-                    </div>
-                    <Input label={commissionType === 'percentage' ? 'Rate (%)' : `Amount (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0" value={commissionRate} onChange={e => setCommissionRate(e.target.value)} />
+                {hasMargin && (
+                  <div className="rounded-lg bg-green-50 border border-green-100 px-4 py-2.5 flex items-center gap-4 text-sm">
+                    <span className="text-gray-600">Margin:</span>
+                    <span className="font-semibold text-green-700">{Math.round(((sell - cost) / sell) * 100)}%</span>
+                    <span className="text-gray-500">({formatCurrency(sell - cost)} profit)</span>
                   </div>
                 )}
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">Loyalty Points</p>
-                  <p className="text-xs text-gray-500">Earn / redeem loyalty points on this product</p>
-                </div>
-                <label className="relative inline-flex cursor-pointer items-center">
-                  <input type="checkbox" className="sr-only peer" checked={loyaltyEnabled} onChange={e => setLoyaltyEnabled(e.target.checked)} />
-                  <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-blue-600 peer-checked:after:translate-x-full" />
-                </label>
-              </div>
+              </SectionCard>
+
             </div>
-          </section>
+          </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-end gap-3 py-6 border-t border-gray-200">
             <Link href="/inventory" className="w-full sm:w-auto"><Button variant="outline" className="w-full">Cancel</Button></Link>

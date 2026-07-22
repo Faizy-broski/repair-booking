@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import Link from 'next/link'
+import { useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
@@ -97,6 +98,7 @@ function generatePassword(): string {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function OnboardBusinessPage() {
+  const queryClient = useQueryClient()
   const [step, setStep] = useState(1)
   const [step1Data, setStep1Data] = useState<Step1Data | null>(null)
   const [step2Data, setStep2Data] = useState<Step2Data | null>(null)
@@ -234,6 +236,7 @@ export default function OnboardBusinessPage() {
         return
       }
       setResult(j.data)
+      queryClient.invalidateQueries({ queryKey: ['superadmin-businesses'] })
     } catch {
       setServerError('Network error. Please try again.')
     } finally {

@@ -216,6 +216,11 @@ export const NotificationEngine = {
   async fire(triggerEvent: TriggerEvent, payload: NotificationPayload): Promise<void> {
     try {
       const template = await NotificationTemplateService.getByTrigger(payload.businessId, triggerEvent)
+      // TEMP DEBUG — remove once the pricing-details email rollout is confirmed working.
+      console.log('[DEBUG NotificationEngine.fire]', triggerEvent, 'businessId:', payload.businessId,
+        'templateFound:', !!template,
+        'templateHasPricingMacro:', template?.email_body?.includes('{{total_cost}}') ?? null,
+        'templateActive:', template?.is_active, 'templateChannel:', template?.channel)
       if (!template) return // No template configured or template is inactive
 
       const { variables, recipient, businessId, branchId, relatedId, relatedType } = payload
@@ -224,6 +229,13 @@ export const NotificationEngine = {
       const subject   = template.subject   ? resolveMacros(template.subject, variables)    : null
       const rawEmailBody = template.email_body ? resolveMacros(template.email_body, variables) : null
       const smsBody   = template.sms_body  ? resolveMacros(template.sms_body, variables)   : null
+
+      // TEMP DEBUG — remove once the pricing-details email rollout is confirmed working.
+      if (rawEmailBody) {
+        const unresolvedMacros = rawEmailBody.match(/\{\{[^}]+\}\}/g)
+        console.log('[DEBUG NotificationEngine.fire]', triggerEvent, 'unresolvedMacrosLeftInBody:', unresolvedMacros ?? 'none',
+          'bodyContainsBalanceDue:', rawEmailBody.includes('Balance Due'))
+      }
 
       const isRepairEvent = triggerEvent === 'ticket_status_changed' || triggerEvent === 'repair_ready'
       const emailBody = rawEmailBody || (isRepairEvent ? buildFallbackRepairEmail(variables) : null)

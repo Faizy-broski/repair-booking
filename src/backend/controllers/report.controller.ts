@@ -31,6 +31,13 @@ const cashMovementSchema = z.object({
   amount: z.number().positive(),
   payment_type: z.string().optional(),
   notes: z.string().optional(),
+  purpose: z.enum(['plain', 'expense', 'buyback']).optional(),
+  expense_category_id: z.string().uuid().nullable().optional(),
+  expense_title: z.string().optional(),
+  buyback_product_id: z.string().uuid().optional(),
+  buyback_name: z.string().optional(),
+  buyback_selling_price: z.number().min(0).optional(),
+  buyback_barcode: z.string().optional(),
 })
 
 const savedReportSchema = z.object({
@@ -50,8 +57,11 @@ export const ReportController = {
 
     try {
       if (type === 'sales') {
-        const data = await ReportService.getSalesReport(branchId, from, to)
-        return ok(data)
+        const [sales, cashMovements] = await Promise.all([
+          ReportService.getSalesReport(branchId, from, to),
+          ReportService.getCashMovementsReport(branchId, from, to),
+        ])
+        return ok({ sales, cash_movements: cashMovements })
       }
       if (type === 'repairs') {
         const data = await ReportService.getRepairsReport(branchId, from, to)
@@ -141,6 +151,11 @@ export const ReportController = {
         const data = await ReportService.getLowStockReport(branchId)
         return ok(data)
       }
+      if (subtype === 'stale_repairs') {
+        const staleDays = Number(searchParams.get('stale_days') ?? '14')
+        const data = await ReportService.getStaleRepairPartsReport(branchId, staleDays)
+        return ok(data)
+      }
       return badRequest('Unknown subtype')
     } catch (err) {
       return serverError('Failed to generate inventory report', err)
@@ -182,11 +197,26 @@ export const ReportController = {
     }
   },
 
+  async previewExpectedCash(request: NextRequest, ctx: RequestContext, sessionId: string) {
+    try {
+      const data = await ReportService.previewExpectedCash(sessionId)
+      return ok(data)
+    } catch (err: any) {
+      return serverError(err?.message ?? 'Failed to compute expected cash', err)
+    }
+  },
+
   async closeSession(request: NextRequest, ctx: RequestContext) {
     const body = await request.json()
     const parsed = closeSessionSchema.safeParse(body)
     if (!parsed.success) return badRequest(parsed.error.message)
     try {
+      const note = parsed.data.closing_note?.trim()
+      const preview = await ReportService.previewExpectedCash(parsed.data.session_id)
+      const diff = parsed.data.closing_cash - (preview?.expected_cash ?? 0)
+      if (Math.abs(diff) > 0.01 && !note) {
+        return badRequest('A reason note is required when the counted cash does not match the expected amount.')
+      }
       const data = await ReportService.closeSession(parsed.data.session_id, parsed.data.closing_cash, parsed.data.closing_note)
       return ok(data)
     } catch (err: any) {
@@ -210,6 +240,13 @@ export const ReportController = {
         amount: parsed.data.amount,
         paymentType: parsed.data.payment_type,
         notes: parsed.data.notes,
+        purpose: parsed.data.purpose,
+        expenseCategoryId: parsed.data.expense_category_id,
+        expenseTitle: parsed.data.expense_title,
+        buybackProductId: parsed.data.buyback_product_id,
+        buybackName: parsed.data.buyback_name,
+        buybackSellingPrice: parsed.data.buyback_selling_price,
+        buybackBarcode: parsed.data.buyback_barcode,
       })
       return ok(data)
     } catch (err: any) {

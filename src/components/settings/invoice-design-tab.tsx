@@ -8,13 +8,22 @@ import { useAuthStore } from '@/store/auth.store'
 import {
   Save, Building2, Palette, Type, AlignLeft, Share2,
   FileText, Settings2, Eye, RefreshCw, CheckCircle2,
-  Globe, Facebook, Instagram, Twitter, Phone, Layers, AlertCircle,
+  Globe, Facebook, Instagram, Twitter, Phone, AlertCircle,
 } from 'lucide-react'
+
+function TikTokIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.76a4.85 4.85 0 0 1-1.01-.07z" />
+    </svg>
+  )
+}
 import { cn } from '@/lib/utils'
 import {
   DEFAULT_INVOICE_SETTINGS,
   type InvoiceSettings,
   type SocialLinks,
+  type FooterLineScope,
 } from '@/types/invoice-settings'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -40,7 +49,7 @@ const SOCIAL_FIELDS: { key: keyof SocialLinks; label: string; icon: React.Elemen
   { key: 'instagram', label: 'Instagram', icon: Instagram, placeholder: 'https://instagram.com/yourhandle' },
   { key: 'twitter',   label: 'Twitter / X', icon: Twitter, placeholder: 'https://x.com/yourhandle' },
   { key: 'whatsapp',  label: 'WhatsApp',  icon: Phone,     placeholder: '+44 7700 900000' },
-  { key: 'tiktok',    label: 'TikTok',    icon: Layers,    placeholder: 'https://tiktok.com/@yourhandle' },
+  { key: 'tiktok',    label: 'TikTok',    icon: TikTokIcon, placeholder: 'https://tiktok.com/@yourhandle' },
 ]
 
 // ── Toggle row ────────────────────────────────────────────────────────────────
@@ -73,6 +82,36 @@ function Toggle({ label, desc, checked, onChange }: {
   )
 }
 
+// ── Footer line scope selector ───────────────────────────────────────────────
+
+const FOOTER_LINE_SCOPE_OPTIONS: { value: FooterLineScope; label: string }[] = [
+  { value: 'both', label: 'Both' },
+  { value: 'repair', label: 'Repair only' },
+  { value: 'pos', label: 'POS only' },
+]
+
+function ScopeSelect({ value, onChange }: { value: FooterLineScope; onChange: (v: FooterLineScope) => void }) {
+  return (
+    <div className="mt-1.5 flex gap-1">
+      {FOOTER_LINE_SCOPE_OPTIONS.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          className={cn(
+            'rounded-md border px-2 py-1 text-xs transition-colors',
+            value === o.value
+              ? 'border-teal-600 bg-teal-50 text-teal-700 font-medium'
+              : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 // ── Section wrapper ───────────────────────────────────────────────────────────
 
 function Section({ icon, title, children }: {
@@ -94,13 +133,19 @@ function Section({ icon, title, children }: {
 
 // ── Live HTML preview ─────────────────────────────────────────────────────────
 
-function InvoicePreview({ s, businessName, branchName }: {
-  s: InvoiceSettings; businessName: string; branchName: string
+function InvoicePreview({ s, businessName, branchName, previewContext }: {
+  s: InvoiceSettings; businessName: string; branchName: string; previewContext: 'repair' | 'pos'
 }) {
   const isReceipt = s.paper_size === 'Receipt80' || s.paper_size === 'Receipt58'
   const isCustom = s.paper_size === 'Custom'
   const socials = Object.entries(s.social_links ?? {}).filter(([, v]) => v)
-  const footerLines = [s.footer_line_1, s.footer_line_2, s.footer_line_3].filter(Boolean)
+  const footerLines = [
+    [s.footer_line_1, s.footer_line_1_scope],
+    [s.footer_line_2, s.footer_line_2_scope],
+    [s.footer_line_3, s.footer_line_3_scope],
+  ]
+    .filter(([line, fscope]) => !!line && (fscope === 'both' || fscope === previewContext))
+    .map(([line]) => line)
 
   const previewItems = [
     { desc: 'iPhone Screen Replacement', qty: 1, price: 79.99 },
@@ -124,6 +169,7 @@ function InvoicePreview({ s, businessName, branchName }: {
       <div style={{ fontFamily: fontStyle, width: `${width * 0.75}px`, backgroundColor: '#fff', margin: '0 auto', padding: '12px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 9 }}>
         {s.show_logo && s.logo_url && <img src={s.logo_url} alt="" style={{ width: 40, height: 40, objectFit: 'contain', display: 'block', margin: '0 auto 6px' }} />}
         {s.show_business_name && <p style={{ textAlign: 'center', fontWeight: 700, fontSize: 11, margin: '0 0 1px' }}>{businessName}</p>}
+        {s.since_year && <p style={{ textAlign: 'center', fontWeight: 700, margin: '0 0 1px' }}>Since {s.since_year}</p>}
         {s.show_branch_name && <p style={{ textAlign: 'center', color: '#6b7280', margin: '0 0 4px' }}>{branchName}</p>}
         <hr style={{ border: 'none', borderTop: '1px dashed #d1d5db', margin: '6px 0' }} />
         <p style={{ fontWeight: 700, textAlign: 'center', margin: '0 0 4px' }}>INV-2024-0042</p>
@@ -152,8 +198,36 @@ function InvoicePreview({ s, businessName, branchName }: {
         </div>
         <hr style={{ border: 'none', borderTop: '1px dashed #d1d5db', margin: '6px 0' }} />
         {s.thank_you_message && <p style={{ textAlign: 'center', fontWeight: 700, color: s.primary_color, margin: '0 0 2px' }}>{s.thank_you_message}</p>}
+        {s.guarantee_line_1 && <p style={{ textAlign: 'center', fontWeight: 700, margin: '2px 0' }}>• {s.guarantee_line_1}</p>}
+        {s.guarantee_line_2 && <p style={{ textAlign: 'center', fontWeight: 700, margin: '2px 0' }}>• {s.guarantee_line_2}</p>}
         {footerLines.map((l, i) => <p key={i} style={{ textAlign: 'center', color: '#9ca3af', margin: '1px 0' }}>{l}</p>)}
-        {socials.map(([k, v]) => <p key={k} style={{ textAlign: 'center', color: '#9ca3af', margin: '1px 0' }}>{k}: {v as string}</p>)}
+        {s.footer_address && (
+          <>
+            <hr style={{ border: 'none', borderTop: '1px dashed #d1d5db', margin: '6px 0' }} />
+            <p style={{ textAlign: 'center', fontWeight: 700, fontSize: 7, letterSpacing: 0.5, margin: '4px 0 1px' }}>ADDRESS</p>
+            <p style={{ textAlign: 'center', color: '#9ca3af', margin: '1px 0' }}>{s.footer_address}</p>
+          </>
+        )}
+        {s.footer_phone && (
+          <>
+            <hr style={{ border: 'none', borderTop: '1px dashed #d1d5db', margin: '6px 0' }} />
+            <p style={{ textAlign: 'center', fontWeight: 700, fontSize: 7, letterSpacing: 0.5, margin: '4px 0 1px' }}>PH</p>
+            <p style={{ textAlign: 'center', color: '#9ca3af', margin: '1px 0' }}>{s.footer_phone}</p>
+          </>
+        )}
+        {socials.length > 0 && (
+          <>
+            <hr style={{ border: 'none', borderTop: '2px solid #d1d5db', margin: '6px 0' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px', marginTop: 4 }}>
+              {socials.map(([k, v]) => (
+                <div key={k} style={{ textAlign: 'center' }}>
+                  <p style={{ fontWeight: 700, margin: 0, textTransform: 'capitalize' }}>{k}</p>
+                  <p style={{ color: '#9ca3af', margin: 0 }}>{v as string}</p>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
         {s.policy_text && <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: 6.5, marginTop: 6, borderTop: '1px solid #e5e7eb', paddingTop: 5 }}>{s.policy_text}</p>}
       </div>
     )
@@ -246,6 +320,7 @@ function InvoicePreview({ s, businessName, branchName }: {
       {/* Footer */}
       <div style={{ backgroundColor: '#f9fafb', borderTop: '1px solid #e5e7eb', padding: '10px 24px' }}>
         {s.thank_you_message && <p style={{ textAlign: 'center', fontWeight: 700, color: s.primary_color, margin: '0 0 4px' }}>{s.thank_you_message}</p>}
+        {s.footer_address && <p style={{ textAlign: 'center', color: '#6b7280', margin: '1px 0' }}>{s.footer_address}</p>}
         {footerLines.map((l, i) => <p key={i} style={{ textAlign: 'center', color: '#6b7280', margin: '1px 0' }}>{l}</p>)}
         {socials.length > 0 && (
           <p style={{ textAlign: 'center', color: '#9ca3af', margin: '4px 0 1px' }}>
@@ -267,6 +342,7 @@ export function InvoiceDesignTab() {
   const queryClient = useQueryClient()
   const [settings, setSettings] = useState<InvoiceSettings>({ ...DEFAULT_INVOICE_SETTINGS })
   const [scope, setScope] = useState<'business' | 'branch'>('business')
+  const [previewContext, setPreviewContext] = useState<'repair' | 'pos'>('repair')
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -523,6 +599,12 @@ export function InvoiceDesignTab() {
                 <Toggle label="Show Phone Number"  checked={settings.show_phone}          onChange={(v) => patch({ show_phone: v })} />
                 <Toggle label="Show Email"         checked={settings.show_email}          onChange={(v) => patch({ show_email: v })} />
               </div>
+              <Input
+                label="Since (Year)"
+                placeholder="e.g. 1971"
+                value={settings.since_year ?? ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ since_year: e.target.value || null })}
+              />
             </Section>
 
             {/* Footer Content */}
@@ -534,23 +616,65 @@ export function InvoiceDesignTab() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ thank_you_message: e.target.value || null })}
               />
               <Input
-                label="Footer Line 1"
-                placeholder="e.g. All repairs come with a 90-day warranty"
-                value={settings.footer_line_1 ?? ''}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ footer_line_1: e.target.value || null })}
+                label="Guarantee Line 1"
+                placeholder="e.g. 1 Month Free Repair Guarantee"
+                value={settings.guarantee_line_1 ?? ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ guarantee_line_1: e.target.value || null })}
               />
               <Input
-                label="Footer Line 2"
-                placeholder="e.g. Free estimates · No fix, no fee"
-                value={settings.footer_line_2 ?? ''}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ footer_line_2: e.target.value || null })}
+                label="Guarantee Line 2"
+                placeholder="e.g. Size change within 15 Days"
+                value={settings.guarantee_line_2 ?? ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ guarantee_line_2: e.target.value || null })}
               />
               <Input
-                label="Footer Line 3"
-                placeholder="e.g. Open Mon–Sat 9am–6pm"
-                value={settings.footer_line_3 ?? ''}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ footer_line_3: e.target.value || null })}
+                label="Address"
+                placeholder="e.g. 164-Bukhsi Market Bano Bazar Anarkali Lahore, Pakistan"
+                value={settings.footer_address ?? ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ footer_address: e.target.value || null })}
               />
+              <Input
+                label="Phone"
+                placeholder="e.g. 042-37731463, 0337-2244476"
+                value={settings.footer_phone ?? ''}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ footer_phone: e.target.value || null })}
+              />
+              <div>
+                <Input
+                  label="Footer Line 1"
+                  placeholder="e.g. All repairs come with a 90-day warranty"
+                  value={settings.footer_line_1 ?? ''}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ footer_line_1: e.target.value || null })}
+                />
+                <ScopeSelect
+                  value={settings.footer_line_1_scope ?? 'both'}
+                  onChange={(v) => patch({ footer_line_1_scope: v })}
+                />
+              </div>
+              <div>
+                <Input
+                  label="Footer Line 2"
+                  placeholder="e.g. Free estimates · No fix, no fee"
+                  value={settings.footer_line_2 ?? ''}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ footer_line_2: e.target.value || null })}
+                />
+                <ScopeSelect
+                  value={settings.footer_line_2_scope ?? 'both'}
+                  onChange={(v) => patch({ footer_line_2_scope: v })}
+                />
+              </div>
+              <div>
+                <Input
+                  label="Footer Line 3"
+                  placeholder="e.g. Open Mon–Sat 9am–6pm"
+                  value={settings.footer_line_3 ?? ''}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ footer_line_3: e.target.value || null })}
+                />
+                <ScopeSelect
+                  value={settings.footer_line_3_scope ?? 'both'}
+                  onChange={(v) => patch({ footer_line_3_scope: v })}
+                />
+              </div>
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-gray-600">Terms / Policy (printed small at bottom)</label>
                 <textarea
@@ -616,8 +740,25 @@ export function InvoiceDesignTab() {
                 <p className="text-sm font-medium text-gray-600">Live Preview</p>
                 <span className="ml-auto text-xs text-gray-400">Updates as you type</span>
               </div>
+              <div className="mb-3 flex gap-1">
+                {(['repair', 'pos'] as const).map((ctx) => (
+                  <button
+                    key={ctx}
+                    type="button"
+                    onClick={() => setPreviewContext(ctx)}
+                    className={cn(
+                      'rounded-md border px-2.5 py-1 text-xs transition-colors',
+                      previewContext === ctx
+                        ? 'border-teal-600 bg-teal-50 text-teal-700 font-medium'
+                        : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                    )}
+                  >
+                    {ctx === 'repair' ? 'Preview as Repair receipt' : 'Preview as POS receipt'}
+                  </button>
+                ))}
+              </div>
               <div className="overflow-hidden rounded-lg" style={{ transform: 'scale(0.92)', transformOrigin: 'top center' }}>
-                <InvoicePreview s={settings} businessName={previewBusinessName} branchName={previewBranchName} />
+                <InvoicePreview s={settings} businessName={previewBusinessName} branchName={previewBranchName} previewContext={previewContext} />
               </div>
             </div>
           </div>

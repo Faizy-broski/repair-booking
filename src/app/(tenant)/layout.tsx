@@ -42,7 +42,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
 
   const {
     setProfile, setBranches, setActiveBranch, setLoading,
-    setCurrency, setBrandColor, setSubscriptionStatus, setVerticalTemplateSlug, clear,
+    setCurrency, setBrandColor, setSubscriptionStatus, setVerticalTemplateSlug, setBusinessName, clear,
     profile: cachedProfile, brandColor,
   } = useAuthStore()
 
@@ -117,6 +117,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
           if (profile) {
             setProfile(profile)
             setVerticalTemplateSlug((profile as any).verticalTemplateSlug ?? null)
+            setBusinessName((profile as any).businessName ?? null)
             if (profile.business_id) {
               const branchRes = await fetch('/api/settings/branches').catch(() => null)
               if (branchRes?.ok) {
@@ -179,12 +180,14 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
         subscriptionStatus,
         currency: fetchedCurrency,
         brandColor: fetchedBrandColor,
+        businessName: fetchedBusinessName,
       } = json.data as {
         profile: Profile & { verticalTemplateSlug: string | null }
         branches: Branch[]
         subscriptionStatus: SubscriptionStatus
         currency: string
         brandColor: string
+        businessName: string | null
       }
 
       if (!profile) {
@@ -204,6 +207,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
       setVerticalTemplateSlug(profile.verticalTemplateSlug ?? null)
       setCurrency(fetchedCurrency ?? 'GBP')
       setBrandColor(fetchedBrandColor ?? '#008080')
+      setBusinessName(fetchedBusinessName ?? null)
       setSubscriptionStatus(subscriptionStatus)
 
       // Reveal the layout immediately — sidebar and page content can render now

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { exportExcel } from '@/lib/export-excel'
 import { DateRangeBar } from '../_components/date-range-bar'
 import Link from 'next/link'
 import {
@@ -14,15 +15,17 @@ import {
 import type { ColumnDef } from '@tanstack/react-table'
 
 interface SalesRow { date: string; total_sales: number; transaction_count: number; avg_order_value: number }
+interface CashMovementRow {
+  type: 'cash_in' | 'cash_out'
+  amount: number
+  purpose: 'plain' | 'expense' | 'buyback'
+  notes: string | null
+  created_at: string
+  profiles: { full_name: string | null } | null
+}
 
 function firstOfMonth() { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] }
 function today() { return new Date().toISOString().split('T')[0] }
-function exportCsv<T extends Record<string, unknown>>(rows: T[], filename: string) {
-  if (!rows.length) return
-  const h = Object.keys(rows[0])
-  const csv = [h.join(','), ...rows.map((r) => h.map((k) => JSON.stringify(r[k] ?? '')).join(','))].join('\n')
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = filename; a.click()
-}
 
 export default function SalesReportPage() {
   const { activeBranch } = useAuthStore()
@@ -35,15 +38,34 @@ export default function SalesReportPage() {
       const res = await fetch(`/api/reports?${params}`)
       const json = await res.json()
       const grouped: Record<string, { total: number; count: number }> = {}
-      for (const s of json.data ?? []) {
+      for (const s of json.data?.sales ?? []) {
         const d = s.created_at?.split('T')[0] ?? ''
         if (!grouped[d]) grouped[d] = { total: 0, count: 0 }
         grouped[d].total += s.total ?? 0
         grouped[d].count += 1
       }
+      // Cash In adds to Sales revenue, Cash Out subtracts — folded into the
+      // same daily buckets (no transaction-count change, revenue-only).
+      for (const m of json.data?.cash_movements ?? []) {
+        const d = m.created_at?.split('T')[0] ?? ''
+        if (!grouped[d]) grouped[d] = { total: 0, count: 0 }
+        grouped[d].total += m.type === 'cash_in' ? (m.amount ?? 0) : -(m.amount ?? 0)
+      }
       return Object.entries(grouped).map(([date, { total, count }]) => ({
         date, total_sales: total, transaction_count: count, avg_order_value: count ? total / count : 0,
       }))
+    },
+    enabled: !!activeBranch,
+    staleTime: 60_000,
+  })
+
+  const { data: cashMovements = [] } = useQuery<CashMovementRow[]>({
+    queryKey: ['report-sales-cash-movements', activeBranch?.id, dateFrom, dateTo],
+    queryFn: async () => {
+      const params = new URLSearchParams({ type: 'sales', branch_id: activeBranch!.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` })
+      const res = await fetch(`/api/reports?${params}`)
+      const json = await res.json()
+      return json.data?.cash_movements ?? []
     },
     enabled: !!activeBranch,
     staleTime: 60_000,
@@ -74,8 +96,8 @@ export default function SalesReportPage() {
             <p className="text-sm text-on-surface-variant mt-0.5">Daily transaction and revenue breakdown</p>
           </div>
         </div>
-        <Button size="sm" className="w-full sm:w-auto" onClick={() => exportCsv(data as unknown as Record<string, unknown>[], `sales-${dateFrom}-${dateTo}.csv`)}>
-          <Download className="h-4 w-4" /> Export CSV
+        <Button size="sm" className="w-full sm:w-auto" onClick={() => exportExcel(data as unknown as Record<string, unknown>[], `sales-${dateFrom}-${dateTo}.xlsx`)}>
+          <Download className="h-4 w-4" /> Export Excel
         </Button>
       </div>
 
@@ -111,6 +133,38 @@ export default function SalesReportPage() {
       )}
 
       <DataTable data={data} columns={columns} isLoading={loading} emptyMessage="No sales data for this period." />
+
+      {cashMovements.length > 0 && (
+        <div className="rounded-xl border border-outline-variant bg-surface p-4">
+          <h3 className="mb-3 text-base font-semibold text-on-surface">Cash Movements</h3>
+          <div className="space-y-2">
+            {cashMovements.map((m, i) => (
+              <div key={i} className="flex items-start justify-between gap-2 border-b border-outline-variant/50 pb-2 last:border-0 last:pb-0">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-semibold ${m.type === 'cash_in' ? 'text-green-600' : 'text-orange-600'}`}>
+                      {m.type === 'cash_in' ? '+ Cash In' : '− Cash Out'}
+                    </span>
+                    <span className="rounded-full bg-surface-container px-2 py-0.5 text-[10px] font-medium capitalize text-on-surface-variant">
+                      {m.purpose}
+                    </span>
+                    {m.purpose === 'plain' && (
+                      <span className="text-[10px] italic text-amber-600">(not in P&amp;L)</span>
+                    )}
+                  </div>
+                  {m.notes && <p className="mt-0.5 truncate text-xs text-on-surface-variant">{m.notes}</p>}
+                  <p className="mt-0.5 text-[11px] text-on-surface-variant">
+                    {new Date(m.created_at).toLocaleString('en-GB')} · {m.profiles?.full_name ?? 'Unknown'}
+                  </p>
+                </div>
+                <span className={`shrink-0 text-sm font-semibold ${m.type === 'cash_in' ? 'text-green-600' : 'text-orange-600'}`}>
+                  {m.type === 'cash_in' ? '+' : '−'}{formatCurrency(m.amount)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -3,6 +3,7 @@ import Stripe from 'stripe'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/backend/config/supabase'
+import { CUSTOM_PLAN_YEARLY_DISCOUNT } from '@/backend/services/custom-plan-pricing'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', { apiVersion: '2026-02-25.clover' })
 
@@ -47,10 +48,12 @@ export async function POST(request: NextRequest) {
 
     const businessId = profile.business_id
 
-    // Look up plan — fetch both monthly and yearly price IDs
+    // Look up plan — fetch the monthly price ID (still cached/reused) and
+    // the raw monthly price (yearly is always derived from this, never a
+    // stored price_yearly — see CUSTOM_PLAN_YEARLY_DISCOUNT).
     const { data: planRow, error: planErr } = await (supabase as any)
       .from('plans')
-      .select('id, name, stripe_price_id_monthly, stripe_price_id_yearly, plan_type, price_monthly, price_yearly')
+      .select('id, name, stripe_price_id_monthly, plan_type, price_monthly')
       .eq('id', planId)
       .eq('is_active', true)
       .single()
@@ -58,44 +61,58 @@ export async function POST(request: NextRequest) {
     const plan = planRow as {
       id: string; name: string
       stripe_price_id_monthly: string | null
-      stripe_price_id_yearly:  string | null
       plan_type: string
       price_monthly: number
-      price_yearly:  number | null
     } | null
     if (planErr || !plan) {
       return NextResponse.json({ error: { message: 'Plan not found' } }, { status: 400 })
     }
+    if (plan.price_monthly <= 0) {
+      return NextResponse.json(
+        { error: { message: `Plan "${plan.name}" has no monthly price configured.` } },
+        { status: 500 }
+      )
+    }
 
-    const useYearly = billingCycle === 'yearly' && !!plan.price_yearly
+    const useYearly = billingCycle === 'yearly'
 
-    // Auto-create Stripe product + price if not yet configured for this cycle
-    let stripePriceId = useYearly ? plan.stripe_price_id_yearly : plan.stripe_price_id_monthly
-    if (!stripePriceId) {
-      const unitAmount = useYearly ? plan.price_yearly! : plan.price_monthly
-      if (unitAmount <= 0) {
-        return NextResponse.json(
-          { error: { message: `Plan "${plan.name}" has no ${billingCycle} price configured.` } },
-          { status: 500 }
-        )
+    // Yearly is always a flat 10% off the current monthly price, built as an
+    // inline price_data line item — never a persisted/cached Price, so a
+    // future price_monthly change (or the discount rate itself) can't leave
+    // stale customers on an outdated cached yearly Price. Monthly keeps the
+    // existing cached-Price-reuse pattern since its price doesn't change
+    // based on billing cycle.
+    let lineItem: Stripe.Checkout.SessionCreateParams.LineItem
+    if (useYearly) {
+      const unitAmount = Math.round(plan.price_monthly * 12 * (1 - CUSTOM_PLAN_YEARLY_DISCOUNT) * 100)
+      lineItem = {
+        price_data: {
+          currency: 'gbp',
+          product_data: { name: plan.name },
+          unit_amount: unitAmount,
+          recurring: { interval: 'year' },
+        },
+        quantity: 1,
       }
-      const product = await stripe.products.create({ name: plan.name })
-      const price = await stripe.prices.create({
-        product: product.id,
-        unit_amount: Math.round(unitAmount * 100),
-        currency: 'gbp',
-        recurring: { interval: useYearly ? 'year' : 'month' },
-      })
-      stripePriceId = price.id
+    } else {
+      let stripePriceId = plan.stripe_price_id_monthly
+      if (!stripePriceId) {
+        const product = await stripe.products.create({ name: plan.name })
+        const price = await stripe.prices.create({
+          product: product.id,
+          unit_amount: Math.round(plan.price_monthly * 100),
+          currency: 'gbp',
+          recurring: { interval: 'month' },
+        })
+        stripePriceId = price.id
 
-      // Persist so we don't recreate next time
-      await (supabase as any)
-        .from('plans')
-        .update(useYearly
-          ? { stripe_price_id_yearly: stripePriceId }
-          : { stripe_price_id_monthly: stripePriceId }
-        )
-        .eq('id', planId)
+        // Persist so we don't recreate next time
+        await (supabase as any)
+          .from('plans')
+          .update({ stripe_price_id_monthly: stripePriceId })
+          .eq('id', planId)
+      }
+      lineItem = { price: stripePriceId, quantity: 1 }
     }
 
     // Get existing Stripe customer ID if available (cast — stripe_customer_id from migration)
@@ -142,15 +159,14 @@ export async function POST(request: NextRequest) {
       ...customerParam,
       mode: 'subscription',
       line_items: [{
-        price: stripePriceId,
-        quantity: 1,
+        ...lineItem,
         ...(vatTaxRateId ? { tax_rates: [vatTaxRateId] } : {}),
       }],
       subscription_data: {
-        metadata: { businessId, planId },
+        metadata: { businessId, planId, billingCycle },
         ...(vatTaxRateId ? { default_tax_rates: [vatTaxRateId] } : {}),
       },
-      metadata: { businessId, planId },
+      metadata: { businessId, planId, billingCycle },
       success_url: successUrl,
       cancel_url:  `${APP_URL}/upgrade`,
     } as Stripe.Checkout.SessionCreateParams)

@@ -73,24 +73,18 @@ export const LoyaltyService = {
     return newBalance
   },
 
-  async redeemPoints(businessId: string, customerId: string, points: number, referenceId?: string) {
-    const balance = await this.getBalance(businessId, customerId)
-    if (balance < points) throw new Error('Insufficient loyalty points')
-
-    const newBalance = balance - points
-
-    await adminSupabase
-      .from('loyalty_points')
-      .update({ balance: newBalance, updated_at: new Date().toISOString() })
-      .eq('business_id', businessId)
-      .eq('customer_id', customerId)
-
-    await adminSupabase.from('loyalty_transactions').insert({
-      business_id: businessId, customer_id: customerId,
-      points: -points, type: 'redeemed', reference_id: referenceId ?? null,
+  async redeemPoints(businessId: string, customerId: string, points: number, opts: {
+    referenceId?: string; referenceType?: string
+  } = {}) {
+    const { data, error } = await (adminSupabase as any).rpc('apply_loyalty_redeem', {
+      p_business_id:    businessId,
+      p_customer_id:    customerId,
+      p_points:         points,
+      p_reference_id:   opts.referenceId ?? null,
+      p_reference_type: opts.referenceType ?? null,
     })
-
-    return newBalance
+    if (error) throw error
+    return data as number
   },
 
   /** Calculate how many points a sale earns */

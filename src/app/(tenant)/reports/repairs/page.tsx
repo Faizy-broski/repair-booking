@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency } from '@/lib/utils'
+import { exportExcel } from '@/lib/export-excel'
 import { DateRangeBar } from '../_components/date-range-bar'
 import Link from 'next/link'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
@@ -52,16 +53,6 @@ function getColor(key: string, index: number) {
 function firstOfMonth() { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] }
 function today() { return new Date().toISOString().split('T')[0] }
 
-function exportCsv<T extends Record<string, unknown>>(rows: T[], filename: string) {
-  if (!rows.length) return
-  const h = Object.keys(rows[0])
-  const csv = [h.join(','), ...rows.map((r) => h.map((k) => JSON.stringify(r[k] ?? '')).join(','))].join('\n')
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-  a.download = filename
-  a.click()
-}
-
 export default function RepairsReportPage() {
   const { activeBranch } = useAuthStore()
   const [dateFrom, setDateFrom] = useState(firstOfMonth)
@@ -79,8 +70,8 @@ export default function RepairsReportPage() {
       const res = await fetch(`/api/reports?${params}`)
       const json = await res.json()
 
-      // Same terminal detection as stats card & dashboard
-      const TERMINAL_EXACT    = new Set(['repaired', 'collected', 'unrepairable'])
+      // Same terminal detection as stats card & dashboard (repair-financials.service.ts)
+      const TERMINAL_EXACT    = new Set(['repaired', 'collected', 'unrepairable', 'refunded', 'completed', 'done', 'fixed', 'closed', 'picked_up', 'handover'])
       const TERMINAL_KEYWORDS = ['complet', 'done', 'fixed', 'pick', 'closed', 'resolv', 'finish', 'collect', 'handover']
       const isTerminal = (k: string) => TERMINAL_EXACT.has(k) || TERMINAL_KEYWORDS.some(kw => k.includes(kw))
 
@@ -90,14 +81,19 @@ export default function RepairsReportPage() {
         const key = normalizeKey(r.status ?? 'unknown')
         if (!grouped[key]) grouped[key] = { name: toLabel(r.status ?? key), count: 0, value: 0 }
         grouped[key].count += 1
-        // Identical revenue logic to stats card — report totals now match for same date range
-        const deposit  = r.deposit_paid  ?? 0
-        const fullCost = r.actual_cost   ?? r.estimated_cost ?? 0
-        const refund   = r.refund_amount ?? 0
+        // Identical revenue logic to stats card — report totals now match for same date range.
+        // A repair actually paid through the POS till overrides the raw repairs-table columns.
         let revenue = 0
-        if (isTerminal(key))         revenue = fullCost
-        else if (key === 'refunded') revenue = Math.max(0, deposit - refund)
-        else                         revenue = deposit
+        if (r.pos_net_total !== null && r.pos_net_total !== undefined) {
+          revenue = r.pos_net_total
+        } else {
+          const deposit  = r.deposit_paid  ?? 0
+          const fullCost = r.actual_cost   ?? r.estimated_cost ?? 0
+          const refund   = r.refund_amount ?? 0
+          if (isTerminal(key))         revenue = fullCost
+          else if (key === 'refunded') revenue = Math.max(0, deposit - refund)
+          else                         revenue = deposit
+        }
         grouped[key].value += revenue
       }
 
@@ -118,7 +114,7 @@ export default function RepairsReportPage() {
   const columns: ColumnDef<RepairRow>[] = [
     { accessorKey: 'name',        header: 'Status' },
     { accessorKey: 'count',       header: 'Count' },
-    { accessorKey: 'total_value', header: 'Total Value', cell: ({ getValue }) => formatCurrency(getValue() as number) },
+    { accessorKey: 'total_value', header: 'Value (Deposit-Weighted)', cell: ({ getValue }) => formatCurrency(getValue() as number) },
   ]
 
   return (
@@ -132,18 +128,18 @@ export default function RepairsReportPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-on-surface">Repairs Report</h1>
-            <p className="text-sm text-on-surface-variant mt-0.5">Repair job status and revenue breakdown</p>
+            <p className="text-sm text-on-surface-variant mt-0.5">Repair job status and revenue breakdown, by booking date — open jobs counted at deposit only</p>
           </div>
         </div>
         <Button
           size="sm"
           className="w-full sm:w-auto"
-          onClick={() => exportCsv(
+          onClick={() => exportExcel(
             data.map((r) => ({ Status: r.name, Count: r.count, 'Total Value': r.total_value })),
-            `repairs-${dateFrom}-${dateTo}.csv`,
+            `repairs-${dateFrom}-${dateTo}.xlsx`,
           )}
         >
-          <Download className="h-4 w-4" /> Export CSV
+          <Download className="h-4 w-4" /> Export Excel
         </Button>
       </div>
 
@@ -155,7 +151,7 @@ export default function RepairsReportPage() {
           <p className="mt-1 text-2xl font-bold text-on-surface sm:text-3xl">{totalRepairs}</p>
         </div>
         <div className="rounded-xl border border-outline-variant bg-surface p-4">
-          <p className="text-sm text-on-surface-variant">Total Revenue</p>
+          <p className="text-sm text-on-surface-variant">Total Revenue (Booked, Deposit-Weighted)</p>
           <p className="mt-1 text-2xl font-bold text-green-600 sm:text-3xl">{formatCurrency(totalValue)}</p>
         </div>
       </div>

@@ -94,7 +94,7 @@ export const footerLinkGroups: FooterLinkGroup[] = [
   {
     title: "Product",
     links: [
-      { label: "Why Repair Pilot?", href: "/features/why-repair-pilot" },
+      { label: "Why iRepairly?", href: "/features/why-irepairly" },
       { label: "Business Types", href: "/features/business-types" },
       { label: "All Features", href: "/features" },
       { label: "Job Management", href: "/features/job-management" },

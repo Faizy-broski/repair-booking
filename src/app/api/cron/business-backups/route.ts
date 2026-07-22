@@ -7,7 +7,7 @@
  *   1. ?action=schedule  — seeds today's backup_registry rows for all active businesses
  *   2. ?action=process   — picks ONE pending row and exports it to Supabase Storage
  *      (call multiple times — once per business that needs backing up)
- *   3. ?action=cleanup   — deletes storage files and registry rows older than 7 days
+ *   3. ?action=cleanup   — deletes storage files and registry rows older than 30 days
  *
  * Security: requires CRON_SECRET env var match via x-cron-secret header or ?secret= param.
  */
@@ -19,12 +19,18 @@ import {
 } from '@/backend/services/backup.service'
 
 export async function GET(req: NextRequest) {
+  // Fail closed: an unset CRON_SECRET must never mean "no auth required" — that
+  // would leave this endpoint (which triggers real data exports and storage
+  // writes) open to anyone on the internet. Misconfiguration is a 500, not a
+  // silent bypass.
   const secret = process.env.CRON_SECRET
-  if (secret) {
-    const provided = req.headers.get('x-cron-secret') ?? req.nextUrl.searchParams.get('secret')
-    if (provided !== secret) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  if (!secret) {
+    console.error('[cron/business-backups] CRON_SECRET is not set — refusing all requests')
+    return NextResponse.json({ error: 'Server misconfigured: CRON_SECRET is not set' }, { status: 500 })
+  }
+  const provided = req.headers.get('x-cron-secret') ?? req.nextUrl.searchParams.get('secret')
+  if (provided !== secret) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const action = req.nextUrl.searchParams.get('action') ?? 'process'

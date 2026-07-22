@@ -1,5 +1,6 @@
 import { adminSupabase } from '@/backend/config/supabase'
 import type { InsertTables, UpdateTables } from '@/types/database'
+import { escapeIlike } from '@/backend/utils/search'
 
 export const CustomerService = {
   async list(businessId: string, params: { page?: number; limit?: number; search?: string }) {
@@ -12,7 +13,8 @@ export const CustomerService = {
       .range((page - 1) * limit, page * limit - 1)
 
     if (search) {
-      q = q.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,phone.ilike.%${search}%,email.ilike.%${search}%,business_name.ilike.%${search}%`)
+      const term = `%${escapeIlike(search)}%`
+      q = q.or(`first_name.ilike.${term},last_name.ilike.${term},phone.ilike.${term},email.ilike.${term},business_name.ilike.${term}`)
     }
 
     const { data, error, count } = await q

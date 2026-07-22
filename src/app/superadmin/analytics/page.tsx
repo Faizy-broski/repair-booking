@@ -1,4 +1,5 @@
 ﻿import { createAdminClient } from '@/backend/config/supabase'
+import { effectiveMonthlyPrice } from '@/backend/services/custom-plan-pricing'
 import { formatCurrency } from '@/lib/utils'
 import {
   TrendingUp, TrendingDown, Building2, CreditCard,
@@ -28,7 +29,7 @@ async function fetchAnalyticsData() {
       .order('created_at', { ascending: true }),
     supabase
       .from('subscriptions')
-      .select('id, status, billing_cycle, created_at, current_period_start, plan_id, plans(id, name, price_monthly, price_yearly)')
+      .select('id, status, billing_cycle, created_at, current_period_start, plan_id, is_custom, custom_price_monthly, plans(id, name, price_monthly, price_yearly)')
       .eq('livemode', true)
       .order('created_at', { ascending: true }),
     supabase
@@ -45,11 +46,7 @@ async function fetchAnalyticsData() {
 
   // ── MRR / ARR ──────────────────────────────────────────────────────────
   const activeSubs = allSubs.filter((s) => s.status === 'active' || s.status === 'trialing')
-  const mrr = activeSubs.reduce((sum, sub) => {
-    const plan = sub.plans as any
-    if (!plan) return sum
-    return sum + (sub.billing_cycle === 'monthly' ? plan.price_monthly : plan.price_yearly / 12)
-  }, 0)
+  const mrr = activeSubs.reduce((sum, sub) => sum + effectiveMonthlyPrice(sub as any), 0)
   const arr = mrr * 12
 
   // ── Monthly signups (last 12 months) ──────────────────────────────────
@@ -75,11 +72,7 @@ async function fetchAnalyticsData() {
         const created = new Date(s.created_at)
         return created < nextD && (s.status === 'active' || s.status === 'trialing')
       })
-      .reduce((sum, sub) => {
-        const plan = sub.plans as any
-        if (!plan) return sum
-        return sum + (sub.billing_cycle === 'monthly' ? plan.price_monthly : plan.price_yearly / 12)
-      }, 0)
+      .reduce((sum, sub) => sum + effectiveMonthlyPrice(sub as any), 0)
     return { month, mrr: Math.round(mrrVal) }
   })
 
@@ -102,7 +95,7 @@ async function fetchAnalyticsData() {
     if (!plan) return
     if (!planMap[plan.id]) planMap[plan.id] = { name: plan.name, subscribers: 0, mrr: 0 }
     planMap[plan.id].subscribers++
-    planMap[plan.id].mrr += sub.billing_cycle === 'monthly' ? plan.price_monthly : plan.price_yearly / 12
+    planMap[plan.id].mrr += effectiveMonthlyPrice(sub as any)
   })
   const totalActiveSubs = activeSubs.length || 1
   const planStats: PlanStat[] = Object.values(planMap)

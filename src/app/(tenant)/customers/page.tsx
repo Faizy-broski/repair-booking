@@ -298,8 +298,8 @@ export default function CustomersPage() {
     setIsDeleting(false)
   }
 
-  const TOGGLEABLE_COLS = ['email', 'address', 'phone', 'created_at']
-  const COL_LABELS: Record<string, string> = { email: 'Email', address: 'Address', phone: 'Contact No', created_at: 'Added' }
+  const TOGGLEABLE_COLS = ['name', 'email', 'business', 'phone', 'address', 'created_at']
+  const COL_LABELS: Record<string, string> = { name: 'Name', email: 'Email', business: 'Business Name', phone: 'Contact No', address: 'Address', created_at: 'Added' }
 
   const columns: ColumnDef<CustomerRow>[] = [
     {

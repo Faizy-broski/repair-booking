@@ -21,6 +21,18 @@ export function InlineFormSheet({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm" />
         <Dialog.Content
+          onInteractOutside={(e) => {
+            const target = e.target as Element;
+            if (target?.closest('[data-combobox-dropdown="true"]')) {
+              e.preventDefault();
+            }
+          }}
+          onFocusOutside={(e) => {
+            const target = e.target as Element;
+            if (target?.closest('[data-combobox-dropdown="true"]')) {
+              e.preventDefault();
+            }
+          }}
           className={cn(
             'fixed top-0 z-50 h-full bg-white shadow-xl',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',

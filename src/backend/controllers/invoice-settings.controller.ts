@@ -6,12 +6,12 @@ import { validateBody } from '@/backend/utils/validate'
 import { z } from 'zod'
 
 const socialLinksSchema = z.object({
-  website:   z.string().url().optional().or(z.literal('')),
-  facebook:  z.string().url().optional().or(z.literal('')),
-  instagram: z.string().url().optional().or(z.literal('')),
-  twitter:   z.string().url().optional().or(z.literal('')),
+  website:   z.string().optional().or(z.literal('')),
+  facebook:  z.string().optional().or(z.literal('')),
+  instagram: z.string().optional().or(z.literal('')),
+  twitter:   z.string().optional().or(z.literal('')),
   whatsapp:  z.string().optional().or(z.literal('')),
-  tiktok:    z.string().url().optional().or(z.literal('')),
+  tiktok:    z.string().optional().or(z.literal('')),
 }).optional()
 
 const schema = z.object({
@@ -38,11 +38,19 @@ const schema = z.object({
   show_email:         z.boolean().optional(),
 
   // Footer
+  footer_address:    z.string().nullable().optional(),
+  footer_phone:      z.string().nullable().optional(),
   footer_line_1:     z.string().nullable().optional(),
   footer_line_2:     z.string().nullable().optional(),
   footer_line_3:     z.string().nullable().optional(),
+  footer_line_1_scope: z.enum(['both', 'repair', 'pos']).optional(),
+  footer_line_2_scope: z.enum(['both', 'repair', 'pos']).optional(),
+  footer_line_3_scope: z.enum(['both', 'repair', 'pos']).optional(),
   thank_you_message: z.string().nullable().optional(),
   policy_text:       z.string().nullable().optional(),
+  since_year:        z.string().nullable().optional(),
+  guarantee_line_1:  z.string().nullable().optional(),
+  guarantee_line_2:  z.string().nullable().optional(),
 
   // Social links
   social_links: socialLinksSchema,
@@ -61,6 +69,7 @@ export const InvoiceSettingsController = {
       const settings = await InvoiceSettingsService.get(ctx.businessId!, branchId)
       return ok(settings)
     } catch (err) {
+      console.error('===== INVOICE SETTINGS ERROR =====', err)
       return serverError('Failed to fetch invoice settings', err)
     }
   },

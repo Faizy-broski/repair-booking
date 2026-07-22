@@ -1,4 +1,5 @@
 import { adminSupabase } from '@/backend/config/supabase'
+import { RepairService } from '@/backend/services/repair.service'
 import type { Json } from '@/types/database'
 
 export interface PaymentSplit {
@@ -49,9 +50,12 @@ export interface SalePayload {
   payment_splits?: PaymentSplit[]
   gift_card_id?: string | null
   gift_card_amount?: number
+  store_credit_amount?: number
+  loyalty_points_used?: number
   notes?: string | null
   items: {
     product_id?: string | null
+    repair_id?: string | null
     variant_id?: string | null
     name: string
     quantity: number
@@ -71,14 +75,47 @@ export const PosService = {
     return data as string
   },
 
-  async recordCreditPayment(saleId: string, amount: number, method: string): Promise<void> {
+  async recordCreditPayment(saleId: string, amount: number, method: string, businessId: string, createdBy: string): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (adminSupabase.rpc as any)('record_credit_payment', {
       p_sale_id: saleId,
       p_amount: amount,
       p_method: method,
+      p_business_id: businessId,
+      p_created_by: createdBy,
     })
     if (error) throw error
+  },
+
+  async getCustomerCreditPayments(customerId: string, params: { from?: string; to?: string } = {}) {
+    let salesQ = adminSupabase
+      .from('sales')
+      .select('id, sale_number, total, amount_paid, payment_status, created_at')
+      .eq('customer_id', customerId)
+      .eq('payment_method', 'on_account')
+      .order('created_at', { ascending: false })
+    if (params.from) salesQ = salesQ.gte('created_at', params.from)
+    if (params.to) salesQ = salesQ.lte('created_at', params.to)
+
+    const { data: sales, error: salesErr } = await salesQ
+    if (salesErr) throw salesErr
+
+    const saleIds = (sales ?? []).map((s: any) => s.id)
+    let payments: any[] = []
+    if (saleIds.length > 0) {
+      const { data, error } = await (adminSupabase as any)
+        .from('sale_payments')
+        .select('id, sale_id, amount, method, created_at, is_backfilled')
+        .in('sale_id', saleIds)
+        .order('created_at', { ascending: true })
+      if (error) throw error
+      payments = data ?? []
+    }
+
+    return (sales ?? []).map((s: any) => ({
+      ...s,
+      payments: payments.filter((p) => p.sale_id === s.id),
+    }))
   },
 
   async getSales(branchId: string, params: { page?: number; limit?: number; from?: string; to?: string; status?: string; search?: string; paymentMethod?: string; outstandingOnly?: boolean; employeeId?: string; employeePurchasesOnly?: boolean }) {
@@ -120,11 +157,81 @@ export const PosService = {
     return { data, count }
   },
 
+  // Unified feed for the Sales page: sales/refunds/exchanges + register cash
+  // in/out, merged and paginated in the DB via get_sales_ledger (migration 158).
+  async getSalesLedger(branchId: string, params: { page?: number; limit?: number; from?: string; to?: string; type?: string; status?: string; search?: string }) {
+    const { page = 1, limit = 20, from, to, type, status, search } = params
+
+    let customerIds: string[] | null = null
+    if (search) {
+      const term = `%${search}%`
+      const { data: matched } = await adminSupabase
+        .from('customers')
+        .select('id')
+        .or(`first_name.ilike.${term},last_name.ilike.${term}`)
+      customerIds = (matched ?? []).map((c: { id: string }) => c.id)
+      if (customerIds.length === 0) customerIds = null
+    }
+
+    const { data, error } = await (adminSupabase as any).rpc('get_sales_ledger', {
+      p_branch_id: branchId,
+      p_from: from ?? null,
+      p_to: to ?? null,
+      p_type: type ?? null,
+      p_status: status ?? null,
+      p_search: search ?? null,
+      p_customer_ids: customerIds,
+      p_limit: limit,
+      p_offset: (page - 1) * limit,
+    })
+    if (error) throw error
+
+    const rows = (data ?? []) as Array<Record<string, unknown> & { total_count: number }>
+    const total = rows.length > 0 ? Number(rows[0].total_count) : 0
+
+    const cashierIds = [...new Set(rows.map(r => r.cashier_id).filter(Boolean))] as string[]
+    const customerRowIds = [...new Set(rows.map(r => r.customer_id).filter(Boolean))] as string[]
+    const [{ data: cashiers }, { data: customers }] = await Promise.all([
+      cashierIds.length
+        ? adminSupabase.from('profiles').select('id, full_name').in('id', cashierIds)
+        : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
+      customerRowIds.length
+        ? adminSupabase.from('customers').select('id, first_name, last_name').in('id', customerRowIds)
+        : Promise.resolve({ data: [] as { id: string; first_name: string; last_name: string | null }[] }),
+    ])
+    const cashierMap = new Map((cashiers ?? []).map(c => [c.id, c]))
+    const customerMap = new Map((customers ?? []).map(c => [c.id, c]))
+
+    const enriched = rows.map(r => ({
+      ...r,
+      total: r.amount, // alias so the Sales table's existing `total` column works for every record type
+      profiles: r.cashier_id ? { full_name: cashierMap.get(r.cashier_id as string)?.full_name ?? null } : null,
+      customers: r.customer_id ? (() => {
+        const c = customerMap.get(r.customer_id as string)
+        return c ? { first_name: c.first_name, last_name: c.last_name } : null
+      })() : null,
+    }))
+
+    return { data: enriched, count: total }
+  },
+
+  async deleteCashMovement(id: string, branchId: string | null) {
+    const { data: movement, error: fetchError } = await (adminSupabase as any)
+      .from('cash_movements').select('id, purpose, branch_id').eq('id', id).single()
+    if (fetchError) throw fetchError
+    if (branchId && movement.branch_id !== branchId) throw new Error('Cash movement not found')
+    if (movement.purpose && movement.purpose !== 'plain') {
+      throw new Error('This cash movement is linked to an expense or buyback record and cannot be deleted here')
+    }
+    const { error } = await (adminSupabase as any).from('cash_movements').delete().eq('id', id)
+    if (error) throw error
+  },
+
   async getSalesStats(branchId: string, params: { from?: string; to?: string; status?: string }) {
     const { from, to, status } = params
     let q = adminSupabase
       .from('sales')
-      .select('total, is_refund')
+      .select('total, is_refund, payment_method, payment_splits')
       .eq('branch_id', branchId)
 
     if (from) q = q.gte('created_at', from)
@@ -137,18 +244,65 @@ export const PosService = {
     const rows = data ?? []
     const sales = rows.filter(r => !r.is_refund)
     const refunds = rows.filter(r => r.is_refund)
-    return {
+    const stats = {
       sales_count: sales.length,
       revenue: sales.reduce((s, r) => s + Number(r.total), 0),
       refund_count: refunds.length,
       refund_amount: refunds.reduce((s, r) => s + Number(r.total), 0),
+      cash_total: 0,
+      card_total: 0,
+      cash_in_total: 0,
+      cash_out_total: 0,
     }
+
+    // Cash/card breakdown — used by the retail template's Sales page cards.
+    for (const r of sales) {
+      if (r.payment_method === 'cash') {
+        stats.cash_total += Number(r.total)
+      } else if (r.payment_method === 'card') {
+        stats.card_total += Number(r.total)
+      } else if (r.payment_method === 'split' && Array.isArray(r.payment_splits)) {
+        for (const s of r.payment_splits as { method: string; amount: number }[]) {
+          if (s.method === 'cash') stats.cash_total += Number(s.amount)
+          else if (s.method === 'card') stats.card_total += Number(s.amount)
+        }
+      }
+    }
+
+    // Cash In adds to Sales revenue, Cash Out subtracts — same window/branch.
+    let cashQ = (adminSupabase as any)
+      .from('cash_movements')
+      .select('type, amount')
+      .eq('branch_id', branchId)
+    if (from) cashQ = cashQ.gte('created_at', from)
+    if (to) cashQ = cashQ.lte('created_at', to)
+    const { data: cashRows } = await cashQ
+    for (const r of (cashRows ?? []) as any[]) {
+      if (r.type === 'cash_in') stats.cash_in_total += Number(r.amount)
+      else stats.cash_out_total += Number(r.amount)
+    }
+    stats.revenue += stats.cash_in_total - stats.cash_out_total
+
+    // Repair job revenue (deposits/final charges) has no `sales` row unless
+    // paid off through the POS cart — fold it in here so the Sales page
+    // totals reflect real revenue collected via the Repairs module too.
+    // Skipped when filtering by a `sales.payment_status` value, since repairs
+    // have no equivalent status to filter on.
+    if (!status) {
+      const repairStats = await RepairService.getRevenueStats(branchId, { from, to })
+      stats.sales_count   += repairStats.count
+      stats.revenue       += repairStats.revenue
+      stats.refund_count  += repairStats.refundCount
+      stats.refund_amount += repairStats.refundAmount
+    }
+
+    return stats
   },
 
   async getSaleById(id: string, branchId: string | null) {
     let q = adminSupabase
       .from('sales')
-      .select('*, sale_items(*), customers(*), profiles!cashier_id(full_name)')
+      .select('*, sale_items(*), customers(*), profiles!cashier_id(full_name), branches!branch_id(name,address,phone,email,logo_url)')
       .eq('id', id)
     if (branchId) q = q.eq('branch_id', branchId)
     const { data, error } = await q.single()

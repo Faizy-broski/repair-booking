@@ -5,7 +5,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { usePosStore } from '@/store/pos.store'
 import { formatCurrency } from '@/lib/utils'
 import { usePinPrompt } from '@/components/ui/pin-prompt'
-import type { RegisterSession } from './_types'
+import type { RegisterSession, ZReport } from './_types'
 
 import { Button } from '@/components/ui/button'
 import { RegisterGate } from './_components/register-gate'
@@ -13,8 +13,9 @@ import { CartPanel } from './_components/cart-panel'
 import { RepairsTab } from './_components/repairs-tab'
 import { ProductsTab } from './_components/products-tab'
 import { CloseRegisterModal } from './_components/modals/close-register-modal'
-import { CashMovementModal } from './_components/modals/cash-movement-modal'
+import { CashMovementModal, type BuybackPayload } from './_components/modals/cash-movement-modal'
 import { useHidScanner } from '@/hooks/use-hid-scanner'
+import { useRealtime } from '@/hooks/use-realtime'
 
 import { toast } from 'sonner'
 import type { Product } from '@/types/database'
@@ -61,7 +62,43 @@ export default function PosPage() {
   const [closeRegisterModal, setCloseRegisterModal] = useState(false)
   const [closingDenoms, setClosingDenoms] = useState<Record<string, number>>({})
   const [closingNote, setClosingNote] = useState('')
-  const [zReport, setZReport] = useState<Record<string, unknown> | null>(null)
+  const [zReport, setZReport] = useState<ZReport | null>(null)
+  const [expectedCash, setExpectedCash] = useState<number | null>(null)
+  const [expectedCashLoading, setExpectedCashLoading] = useState(false)
+
+  // ── Live session stats (net sales / repair / product / credit / cash in-out) ──
+  const [sessionStats, setSessionStats] = useState<{
+    total_sales: number; repair_sales: number; total_refunds: number; repair_refunds: number
+    store_credit_sales: number; loyalty_points_sales: number; on_account_sales: number
+    repair_store_credit_sales: number; repair_loyalty_points_sales: number
+    cash_in: number; cash_out: number; buyback_out: number
+    credit_repayments_cash: number; credit_repayments_total: number
+    expected_cash: number; opening_float: number
+  } | null>(null)
+
+  const fetchSessionStats = useCallback(async (sessionId: string) => {
+    try {
+      const res = await fetch(`/api/pos/session/${sessionId}/expected-cash`)
+      if (!res.ok) return
+      const j = await res.json()
+      if (j.data) setSessionStats(j.data)
+    } catch { /* best-effort — live stats aren't critical path */ }
+  }, [])
+
+  useEffect(() => {
+    if (!pos.session) { setSessionStats(null); return }
+    fetchSessionStats(pos.session.id)
+    const interval = setInterval(() => fetchSessionStats(pos.session!.id), 30000)
+    return () => clearInterval(interval)
+  }, [pos.session, fetchSessionStats])
+
+  const refreshSessionStats = useCallback(() => {
+    if (pos.session) fetchSessionStats(pos.session.id)
+  }, [pos.session, fetchSessionStats])
+
+  useRealtime({ table: 'sales', filterColumn: 'branch_id', filterValue: activeBranch?.id, onInsert: refreshSessionStats, onUpdate: refreshSessionStats })
+  useRealtime({ table: 'repairs', filterColumn: 'branch_id', filterValue: activeBranch?.id, onInsert: refreshSessionStats, onUpdate: refreshSessionStats })
+  useRealtime({ table: 'cash_movements', filterColumn: 'branch_id', filterValue: activeBranch?.id, onInsert: refreshSessionStats })
 
   // ── Cash In/Out modal ─────────────────────────────────────────────────────────
   const [cashMovementOpen, setCashMovementOpen] = useState(false)
@@ -177,15 +214,31 @@ export default function PosPage() {
     setSessionProcessing(false)
   }
 
+  async function openCloseRegisterModal() {
+    setCloseRegisterModal(true)
+    if (!pos.session) return
+    setExpectedCashLoading(true)
+    try {
+      const res = await fetch(`/api/pos/session/${pos.session.id}/expected-cash`)
+      const j = await res.json()
+      setExpectedCash(res.ok ? (j.data?.expected_cash ?? null) : null)
+    } catch {
+      setExpectedCash(null)
+    }
+    setExpectedCashLoading(false)
+  }
+
   async function handleCloseRegister() {
     if (!pos.session) return
-    setSessionProcessing(true)
     const DENOMINATIONS = [
       { value: 50 }, { value: 20 }, { value: 10 }, { value: 5 },
       { value: 2 }, { value: 1 }, { value: 0.50 }, { value: 0.20 },
       { value: 0.10 }, { value: 0.05 }, { value: 0.02 }, { value: 0.01 },
     ]
     const total = DENOMINATIONS.reduce((sum, d) => sum + (closingDenoms[String(d.value)] ?? 0) * d.value, 0)
+    const hasDiscrepancy = expectedCash !== null && Math.abs(total - expectedCash) > 0.01
+    if (hasDiscrepancy && !closingNote.trim()) return
+    setSessionProcessing(true)
     const res = await fetch('/api/pos/session/close', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -201,22 +254,34 @@ export default function PosPage() {
       pos.setSessionLoaded(false)
       setClosingDenoms({})
       setClosingNote('')
+      setExpectedCash(null)
     } else if (j?.error?.message?.includes('Session already closed')) {
       // Session was already closed externally — sync local state
       pos.setSession(null)
       pos.setSessionLoaded(false)
       setClosingDenoms({})
       setClosingNote('')
+      setExpectedCash(null)
       await fetchSession()
     }
     setSessionProcessing(false)
   }
 
-  async function handleCashMovement(expenseCategoryId: string | null, addToExpense: boolean) {
+  async function handleCashMovement(categoryId: string | null, addToLedger: boolean, buyback?: BuybackPayload | null) {
     if (!pos.session || !cashMovementAmount) return
     setCashMovementSaving(true)
     const amount = parseFloat(cashMovementAmount)
 
+    const purpose = cashMovementType !== 'cash_out' ? 'plain'
+      : addToLedger ? 'expense'
+      : buyback ? 'buyback'
+      : 'plain'
+
+    // Everything (cash movement + its offsetting expense/buyback entry) is
+    // recorded atomically server-side (record_cash_movement RPC) — if the
+    // offsetting side fails (e.g. a duplicate barcode), the whole thing rolls
+    // back, so we never end up with cash removed from the drawer and nothing
+    // to show for it.
     const res = await fetch('/api/pos/session/movements', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -225,33 +290,26 @@ export default function PosPage() {
         type: cashMovementType,
         amount,
         notes: cashMovementNotes || undefined,
+        purpose,
+        expense_category_id: purpose === 'expense' ? (categoryId || null) : undefined,
+        expense_title: purpose === 'expense' ? (cashMovementNotes?.trim() || 'POS Cash Out') : undefined,
+        buyback_name: purpose === 'buyback' ? buyback?.name : undefined,
+        buyback_selling_price: purpose === 'buyback' ? buyback?.selling_price : undefined,
+        buyback_barcode: purpose === 'buyback' ? buyback?.barcode : undefined,
       }),
     })
 
     if (res.ok) {
-      if (cashMovementType === 'cash_out' && addToExpense && activeBranch?.id) {
-        await fetch('/api/expenses', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            branch_id: activeBranch.id,
-            category_id: expenseCategoryId || null,
-            title: cashMovementNotes?.trim() || 'POS Cash Out',
-            amount,
-            expense_date: new Date().toISOString().split('T')[0],
-            notes: cashMovementNotes?.trim() || null,
-          }),
-        })
-        toast.success(`Cash out of ${formatCurrency(amount)} recorded as expense`)
-      } else if (cashMovementType === 'cash_out') {
-        toast.success(`Cash out of ${formatCurrency(amount)} recorded`)
-      } else {
-        toast.success(`Cash in of ${formatCurrency(amount)} recorded`)
-      }
+      if (purpose === 'expense') toast.success(`Cash out of ${formatCurrency(amount)} recorded as expense`)
+      else if (purpose === 'buyback') toast.success(`Cash out of ${formatCurrency(amount)} recorded as buyback — 1 unit added to stock`)
+      else if (cashMovementType === 'cash_out') toast.success(`Cash out of ${formatCurrency(amount)} recorded`)
+      else toast.success(`Cash in of ${formatCurrency(amount)} recorded`)
       setCashMovementOpen(false)
       setCashMovementAmount('')
       setCashMovementNotes('')
     } else {
-      toast.error('Failed to record cash movement')
+      const errJson = await res.json().catch(() => ({}))
+      toast.error(errJson?.error?.message ?? 'Failed to record cash movement')
     }
     setCashMovementSaving(false)
   }
@@ -268,22 +326,41 @@ export default function PosPage() {
 
   if (!pos.session && shiftRequired) {
     return (
-      <RegisterGate
-        activeBranchName={activeBranch?.name}
-        existingSession={pos.existingSession}
-        sessionProcessing={sessionProcessing}
-        prevClosingBalance={prevClosingBalance}
-        openingDenoms={openingDenoms}
-        setOpeningDenoms={setOpeningDenoms}
-        openingFloat={openingFloat}
-        setOpeningFloat={setOpeningFloat}
-        openingNote={openingNote}
-        setOpeningNote={setOpeningNote}
-        joinShiftOpen={joinShiftOpen}
-        setJoinShiftOpen={setJoinShiftOpen}
-        handleOpenRegister={handleOpenRegister}
-        handleJoinShift={handleJoinShift}
-      />
+      <>
+        <RegisterGate
+          activeBranchName={activeBranch?.name}
+          existingSession={pos.existingSession}
+          sessionProcessing={sessionProcessing}
+          prevClosingBalance={prevClosingBalance}
+          openingDenoms={openingDenoms}
+          setOpeningDenoms={setOpeningDenoms}
+          openingFloat={openingFloat}
+          setOpeningFloat={setOpeningFloat}
+          openingNote={openingNote}
+          setOpeningNote={setOpeningNote}
+          joinShiftOpen={joinShiftOpen}
+          setJoinShiftOpen={setJoinShiftOpen}
+          handleOpenRegister={handleOpenRegister}
+          handleJoinShift={handleJoinShift}
+        />
+        {/* Kept alive here too: closing the register nulls pos.session, which
+            triggers this early return — without this, the Z-Report summary
+            modal would unmount before the cashier ever saw it. */}
+        <CloseRegisterModal
+          open={closeRegisterModal}
+          onClose={() => { setCloseRegisterModal(false); setZReport(null); setExpectedCash(null) }}
+          zReport={zReport}
+          sessionProcessing={sessionProcessing}
+          closingDenoms={closingDenoms}
+          setClosingDenoms={setClosingDenoms}
+          closingNote={closingNote}
+          setClosingNote={setClosingNote}
+          handleCloseRegister={handleCloseRegister}
+          expectedCash={expectedCash}
+          expectedCashLoading={expectedCashLoading}
+          sessionStats={sessionStats}
+        />
+      </>
     )
   }
 
@@ -319,7 +396,7 @@ export default function PosPage() {
             <Button 
               variant="secondary"
               size="sm"
-              onClick={() => setCloseRegisterModal(true)}
+              onClick={openCloseRegisterModal}
               className="text-red-600 hover:text-red-700 font-bold"
             >
               Close Register
@@ -327,6 +404,48 @@ export default function PosPage() {
           </div>
         </div>
       )}
+
+      {/* Live session stats: net/repair/product/credit sales + cash in/out, updates in realtime */}
+      {pos.session && sessionStats && (() => {
+        const productSales = sessionStats.total_sales
+        const repairSales = sessionStats.repair_sales
+        // "Credit Sales" = on-account (accounts-receivable) sales — money owed,
+        // not yet collected. Store credit / loyalty are prepaid tenders (the
+        // customer already paid in advance), so they're excluded here.
+        const creditSales = sessionStats.on_account_sales
+        // Net Sales is pure revenue recognized this session (product + repair,
+        // less refunds) — deliberately EXCLUDING Cash In/Out, which are manual
+        // drawer adjustments, not sales performance. They're shown as their own
+        // tiles instead of being blended into this figure.
+        const netSales = (sessionStats.total_sales - sessionStats.total_refunds)
+          + (sessionStats.repair_sales - sessionStats.repair_refunds)
+        return (
+          <div className="shrink-0 border-b border-gray-200 bg-gray-50 px-3 py-2 sm:px-5">
+            <div className="flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {([
+                ['Net Sales',      netSales,                                'text-brand-teal-dark', 'bg-brand-teal'],
+                ['Product Sales',  productSales,                            'text-blue-700',   'bg-blue-500'],
+                ['Credit Sales',   creditSales,                             'text-purple-700', 'bg-purple-500'],
+                ['Repair Sales',   repairSales,                             'text-indigo-700', 'bg-indigo-500'],
+                ['Credit Repaid',  sessionStats.credit_repayments_cash ?? 0, 'text-cyan-700',  'bg-cyan-500'],
+                ['Refunds',        -(sessionStats.total_refunds + sessionStats.repair_refunds), 'text-red-700', 'bg-red-500'],
+                ['Cash In',        sessionStats.cash_in,                    'text-green-700',  'bg-green-500'],
+                ['Cash Out',       sessionStats.cash_out,                   'text-orange-700', 'bg-orange-500'],
+                ['Buyback',        sessionStats.buyback_out ?? 0,           'text-pink-700',   'bg-pink-500'],
+                ['Expected Cash',  sessionStats.expected_cash,              'text-amber-700',  'bg-amber-500'],
+              ] as [string, number, string, string][]).map(([label, value, textCls, dotCls]) => (
+                <div key={label} className="flex shrink-0 flex-col gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm">
+                  <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-bold uppercase tracking-wide text-gray-500">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${dotCls}`} />
+                    {label}
+                  </span>
+                  <span className={`whitespace-nowrap text-base font-bold leading-none ${textCls}`}>{formatCurrency(value)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
 
       <div className="flex flex-1 overflow-hidden">
 
@@ -389,7 +508,7 @@ export default function PosPage() {
       {/* ── Modals ── */}
       <CloseRegisterModal
         open={closeRegisterModal}
-        onClose={() => { setCloseRegisterModal(false); setZReport(null) }}
+        onClose={() => { setCloseRegisterModal(false); setZReport(null); setExpectedCash(null) }}
         zReport={zReport}
         sessionProcessing={sessionProcessing}
         closingDenoms={closingDenoms}
@@ -397,6 +516,9 @@ export default function PosPage() {
         closingNote={closingNote}
         setClosingNote={setClosingNote}
         handleCloseRegister={handleCloseRegister}
+        expectedCash={expectedCash}
+        expectedCashLoading={expectedCashLoading}
+        sessionStats={sessionStats}
       />
 
       <CashMovementModal
