@@ -56,9 +56,9 @@ export interface NotificationLogEntry {
 // ── Available macros per trigger event ────────────────────────────────────────
 
 export const MACRO_CATALOG: Record<string, string[]> = {
-  ticket_created:         ['customer_name', 'ticket_number', 'device_type', 'device_brand', 'device_model', 'issue', 'store_name', 'store_phone', 'store_email'],
-  ticket_status_changed:  ['customer_name', 'ticket_number', 'device_type', 'device_brand', 'device_model', 'issue', 'status', 'note', 'store_name', 'store_phone', 'store_email'],
-  repair_ready:           ['customer_name', 'ticket_number', 'device_type', 'device_brand', 'device_model', 'issue', 'store_name', 'store_phone', 'store_email'],
+  ticket_created:         ['customer_name', 'ticket_number', 'device_type', 'device_brand', 'device_model', 'issue', 'total_cost', 'discount', 'deposit_paid', 'balance_due', 'store_name', 'store_phone', 'store_email'],
+  ticket_status_changed:  ['customer_name', 'ticket_number', 'device_type', 'device_brand', 'device_model', 'issue', 'status', 'note', 'total_cost', 'discount', 'deposit_paid', 'balance_due', 'store_name', 'store_phone', 'store_email'],
+  repair_ready:           ['customer_name', 'ticket_number', 'device_type', 'device_brand', 'device_model', 'issue', 'total_cost', 'discount', 'deposit_paid', 'balance_due', 'store_name', 'store_phone', 'store_email'],
   invoice_created:        ['customer_name', 'invoice_number', 'total', 'balance_due', 'due_date', 'currency', 'store_name'],
   invoice_overdue:        ['customer_name', 'invoice_number', 'total', 'balance_due', 'due_date', 'currency', 'store_name'],
   part_arrived:           ['customer_name', 'ticket_number', 'device_type', 'device_brand', 'device_model', 'store_name', 'store_phone'],

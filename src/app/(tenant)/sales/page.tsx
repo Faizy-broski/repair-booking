@@ -16,25 +16,30 @@ import type { ColumnDef } from '@tanstack/react-table'
 
 interface SaleRow {
   id: string
-  branch_id: string
+  branch_id?: string
   customer_id: string | null
   cashier_id: string | null
-  subtotal: number
-  discount: number
-  tax: number
+  subtotal?: number
+  discount?: number
+  tax?: number
   total: number
   payment_method: string
   payment_status: string
-  payment_splits: { method: string; amount: number }[] | null
+  payment_splits?: { method: string; amount: number }[] | null
   is_refund: boolean
   is_exchange: boolean
   refund_reason: string | null
-  original_sale_id: string | null
+  original_sale_id?: string | null
   exchange_original_id: string | null
   notes: string | null
   created_at: string
   customers?: { first_name: string; last_name: string | null } | null
   profiles?: { full_name: string | null } | null
+  // Ledger-only fields (present on rows from /api/pos/sales/ledger)
+  record_type?: 'sale' | 'refund' | 'exchange' | 'cash_in' | 'cash_out'
+  reference?: string
+  purpose?: 'plain' | 'expense' | 'buyback' | null
+  product_name?: string | null
 }
 
 interface ExchangeNewItem {
@@ -76,9 +81,13 @@ const STATUS_COLORS: Record<string, string> = {
   on_account: 'bg-purple-100 text-purple-700',
   exchange: 'bg-indigo-100 text-indigo-700',
   exchange_return: 'bg-orange-100 text-orange-700',
+  cash_in: 'bg-teal-100 text-teal-800',
+  cash_out: 'bg-rose-100 text-rose-700',
 }
 
 function getRowBadge(row: SaleRow): { label: string; cls: string } {
+  if (row.record_type === 'cash_in') return { label: 'Cash In', cls: STATUS_COLORS.cash_in }
+  if (row.record_type === 'cash_out') return { label: 'Cash Out', cls: STATUS_COLORS.cash_out }
   if (row.is_exchange) return { label: 'Exchange', cls: STATUS_COLORS.exchange }
   if (row.is_refund && row.refund_reason === 'Product exchange') return { label: 'Exchange Return', cls: STATUS_COLORS.exchange_return }
   const label = getStatusLabel(row.payment_status, row.payment_method)
@@ -110,6 +119,7 @@ export default function SalesPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('')
+  const [typeFilter, setTypeFilter] = useState<string>('')
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
 
@@ -121,6 +131,9 @@ export default function SalesPage() {
   // Detail modal
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailId, setDetailId] = useState<string | null>(null)
+
+  // Read-only detail for cash in/out rows (data already in the ledger row — no extra fetch)
+  const [cashDetailRow, setCashDetailRow] = useState<SaleRow | null>(null)
 
   // Delete confirmation
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
@@ -237,6 +250,21 @@ export default function SalesPage() {
     onError: (err: Error) => {
       toast.error(err.message)
     },
+  })
+
+  const deleteCashMovementMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/pos/cash-movements/${id}`, { method: 'DELETE' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error?.message ?? 'Failed to delete cash movement')
+    },
+    onSuccess: () => {
+      toast.success('Cash movement deleted')
+      setDeleteConfirmId(null)
+      queryClient.invalidateQueries({ queryKey: ['sales'] })
+      queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
+    },
+    onError: (err: Error) => { toast.error(err.message) },
   })
 
   const refundMutation = useMutation({
@@ -576,7 +604,7 @@ export default function SalesPage() {
   })
 
   const { data: salesData, isLoading: loading, isFetching } = useQuery({
-    queryKey: ['sales', activeBranch?.id, page, pageSize, dateFrom, dateTo, statusFilter, search],
+    queryKey: ['sales', activeBranch?.id, page, pageSize, dateFrom, dateTo, statusFilter, typeFilter, search],
     queryFn: async () => {
       const params = new URLSearchParams({
         branch_id: activeBranch!.id,
@@ -586,8 +614,9 @@ export default function SalesPage() {
       if (dateFrom) params.set('from', dateFrom)
       if (dateTo) params.set('to', dateTo)
       if (statusFilter) params.set('status', statusFilter)
+      if (typeFilter) params.set('type', typeFilter)
       if (search) params.set('search', search)
-      const res = await fetch(`/api/pos/sales?${params}`)
+      const res = await fetch(`/api/pos/sales/ledger?${params}`)
       const json = await res.json()
       return { rows: (json.data ?? []) as SaleRow[], total: json.meta?.total ?? 0 }
     },
@@ -605,7 +634,7 @@ export default function SalesPage() {
       if (statusFilter) params.set('status', statusFilter)
       const res = await fetch(`/api/pos/sales/stats?${params}`)
       const json = await res.json()
-      return json.data as { sales_count: number; revenue: number; refund_count: number; refund_amount: number; cash_total: number; card_total: number }
+      return json.data as { sales_count: number; revenue: number; refund_count: number; refund_amount: number; cash_total: number; card_total: number; cash_in_total: number; cash_out_total: number }
     },
     enabled: !!activeBranch,
     placeholderData: (prev) => prev,
@@ -628,10 +657,16 @@ export default function SalesPage() {
     refundCount: statsData?.refund_count ?? 0,
     cashTotal: statsData?.cash_total ?? 0,
     cardTotal: statsData?.card_total ?? 0,
+    cashInTotal: statsData?.cash_in_total ?? 0,
+    cashOutTotal: statsData?.cash_out_total ?? 0,
   }
 
-  function viewDetail(id: string) {
-    setDetailId(id)
+  function viewDetail(row: SaleRow) {
+    if (row.record_type === 'cash_in' || row.record_type === 'cash_out') {
+      setCashDetailRow(row)
+      return
+    }
+    setDetailId(row.id)
     setDetailOpen(true)
   }
 
@@ -679,14 +714,15 @@ export default function SalesPage() {
     {
       accessorKey: 'id',
       header: 'Sale #',
-      cell: ({ getValue }) => {
-        const id = getValue() as string
+      cell: ({ row }) => {
+        const sale = row.original
+        const label = sale.reference ?? sale.id.slice(-8).toUpperCase()
         return (
           <button
-            onClick={() => viewDetail(id)}
+            onClick={() => viewDetail(sale)}
             className="cursor-pointer font-mono text-xs text-teal-700 underline-offset-2 hover:underline"
           >
-            {id.slice(-8).toUpperCase()}
+            {label}
           </button>
         )
       },
@@ -721,10 +757,12 @@ export default function SalesPage() {
       accessorKey: 'total',
       header: 'Total',
       cell: ({ row }) => {
-        const isRefund = row.original.is_refund
+        const rt = row.original.record_type
+        const isNegative = row.original.is_refund || rt === 'cash_out'
+        const colorCls = rt === 'cash_in' ? 'text-teal-700' : isNegative ? 'text-red-600' : ''
         return (
-          <span className={isRefund ? 'text-red-600' : ''}>
-            {isRefund ? '-' : ''}{formatCurrency(Math.abs(Number(row.original.total)))}
+          <span className={colorCls}>
+            {isNegative ? '-' : ''}{formatCurrency(Math.abs(Number(row.original.total)))}
           </span>
         )
       },
@@ -747,6 +785,7 @@ export default function SalesPage() {
       cell: ({ row }) => {
         const sale = row.original
         const isDownloading = downloadingId === sale.id
+        const isCash = sale.record_type === 'cash_in' || sale.record_type === 'cash_out'
         return (
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
@@ -762,7 +801,7 @@ export default function SalesPage() {
               >
                 {/* View Details */}
                 <DropdownMenu.Item
-                  onSelect={() => viewDetail(sale.id)}
+                  onSelect={() => viewDetail(sale)}
                   className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-none transition-colors hover:bg-gray-50"
                 >
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 transition-colors group-hover:bg-gray-200">
@@ -771,10 +810,26 @@ export default function SalesPage() {
                   <span className="font-medium">View Details</span>
                 </DropdownMenu.Item>
 
-                <DropdownMenu.Separator className="my-1 -mx-1 border-t border-gray-100" />
+                {/* Delete Cash Movement — only "plain" movements; expense/buyback stay tied to their linked record */}
+                {isCash && canDelete && (sale.purpose === 'plain' || !sale.purpose) && (
+                  <>
+                    <DropdownMenu.Separator className="my-1 -mx-1 border-t border-gray-100" />
+                    <DropdownMenu.Item
+                      onSelect={() => handleDeleteSale(sale.id)}
+                      className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-red-50"
+                    >
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-red-100 transition-colors group-hover:bg-red-200">
+                        <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                      </span>
+                      <span className="font-medium text-red-600">Delete</span>
+                    </DropdownMenu.Item>
+                  </>
+                )}
+
+                {!isCash && <DropdownMenu.Separator className="my-1 -mx-1 border-t border-gray-100" />}
 
                 {/* Edit Sale */}
-                {canDelete && !sale.is_refund && (
+                {!isCash && canDelete && !sale.is_refund && (
                   <DropdownMenu.Item
                     onSelect={() => { setDetailId(sale.id); setPendingEdit(true) }}
                     className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-blue-50"
@@ -787,7 +842,7 @@ export default function SalesPage() {
                 )}
 
                 {/* Process Refund */}
-                {canDelete && !sale.is_refund && !sale.is_exchange && sale.payment_status !== 'refunded' && (
+                {!isCash && canDelete && !sale.is_refund && !sale.is_exchange && sale.payment_status !== 'refunded' && (
                   <DropdownMenu.Item
                     onSelect={() => { setDetailId(sale.id); setPendingRefund(true) }}
                     className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-amber-50"
@@ -800,7 +855,7 @@ export default function SalesPage() {
                 )}
 
                 {/* Exchange */}
-                {canDelete && !sale.is_refund && !sale.is_exchange && sale.payment_status !== 'refunded' && (
+                {!isCash && canDelete && !sale.is_refund && !sale.is_exchange && sale.payment_status !== 'refunded' && (
                   <DropdownMenu.Item
                     onSelect={() => { setDetailId(sale.id); setPendingExchange(true) }}
                     className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-indigo-50"
@@ -812,7 +867,7 @@ export default function SalesPage() {
                   </DropdownMenu.Item>
                 )}
                 {/* Exchange sale row — shortcut back to original sale */}
-                {canDelete && sale.is_exchange && sale.exchange_original_id && (
+                {!isCash && canDelete && sale.is_exchange && sale.exchange_original_id && (
                   <DropdownMenu.Item
                     onSelect={() => { setDetailId(sale.exchange_original_id!); setPendingExchange(true) }}
                     className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-indigo-50"
@@ -824,25 +879,27 @@ export default function SalesPage() {
                   </DropdownMenu.Item>
                 )}
 
-                <DropdownMenu.Separator className="my-1 -mx-1 border-t border-gray-100" />
+                {!isCash && <DropdownMenu.Separator className="my-1 -mx-1 border-t border-gray-100" />}
 
                 {/* Download Receipt */}
-                <DropdownMenu.Item
-                  onSelect={() => fetchAndDownloadReceipt(sale.id)}
-                  onMouseEnter={() => prefetchPdf(`/api/pos/sales/${sale.id}/pdf`)}
-                  disabled={isDownloading}
-                  className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-none transition-colors hover:bg-gray-50 disabled:opacity-40"
-                >
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 transition-colors group-hover:bg-gray-200">
-                    {isDownloading
-                      ? <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-500" />
-                      : <Download className="h-3.5 w-3.5 text-gray-500" />}
-                  </span>
-                  <span className="font-medium">{isDownloading ? 'Generating…' : 'Download Receipt'}</span>
-                </DropdownMenu.Item>
+                {!isCash && (
+                  <DropdownMenu.Item
+                    onSelect={() => fetchAndDownloadReceipt(sale.id)}
+                    onMouseEnter={() => prefetchPdf(`/api/pos/sales/${sale.id}/pdf`)}
+                    disabled={isDownloading}
+                    className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-none transition-colors hover:bg-gray-50 disabled:opacity-40"
+                  >
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 transition-colors group-hover:bg-gray-200">
+                      {isDownloading
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-500" />
+                        : <Download className="h-3.5 w-3.5 text-gray-500" />}
+                    </span>
+                    <span className="font-medium">{isDownloading ? 'Generating…' : 'Download Receipt'}</span>
+                  </DropdownMenu.Item>
+                )}
 
                 {/* Delete Sale */}
-                {canDelete && !sale.is_refund && (
+                {!isCash && canDelete && !sale.is_refund && (
                   <>
                     <DropdownMenu.Separator className="my-1 -mx-1 border-t border-gray-100" />
                     <DropdownMenu.Item
@@ -881,11 +938,13 @@ export default function SalesPage() {
       </div>
 
       {/* Summary cards */}
-      <div className={`grid grid-cols-2 gap-4 ${isRetailTemplate ? 'sm:grid-cols-4 lg:grid-cols-6' : 'sm:grid-cols-4'}`}>
+      <div className={`grid grid-cols-2 gap-4 ${isRetailTemplate ? 'sm:grid-cols-4 lg:grid-cols-8' : 'sm:grid-cols-3 lg:grid-cols-6'}`}>
         <SummaryCard label="Total Sales" value={String(summary.totalSales)} />
         <SummaryCard label="Revenue" value={formatCurrency(summary.totalRevenue)} className="text-green-600" />
         <SummaryCard label="Refunds" value={String(summary.refundCount)} />
         <SummaryCard label="Refund Amount" value={formatCurrency(summary.totalRefunds)} className="text-red-600" />
+        <SummaryCard label="Cash In" value={formatCurrency(summary.cashInTotal)} className="text-teal-700" />
+        <SummaryCard label="Cash Out" value={formatCurrency(summary.cashOutTotal)} className="text-rose-600" />
         {isRetailTemplate && (
           <>
             <SummaryCard label="Cash Sales" value={formatCurrency(summary.cashTotal)} />
@@ -963,8 +1022,19 @@ export default function SalesPage() {
             <option value="refunded">Refunded</option>
           </select>
         </div>
-        {(dateFrom || dateTo || statusFilter || search) && (
-          <Button variant="ghost" size="sm" onClick={() => { setDateFrom(''); setDateTo(''); setStatusFilter(''); setSearchInput(''); setSearch(''); setPage(0) }}>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-500">Type</label>
+          <select className="rounded-md border px-3 py-1.5 text-sm" value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(0) }}>
+            <option value="">All</option>
+            <option value="sale">Sale</option>
+            <option value="refund">Refund</option>
+            <option value="exchange">Exchange</option>
+            <option value="cash_in">Cash In</option>
+            <option value="cash_out">Cash Out</option>
+          </select>
+        </div>
+        {(dateFrom || dateTo || statusFilter || typeFilter || search) && (
+          <Button variant="ghost" size="sm" onClick={() => { setDateFrom(''); setDateTo(''); setStatusFilter(''); setTypeFilter(''); setSearchInput(''); setSearch(''); setPage(0) }}>
             <X className="mr-1 h-3 w-3" /> Clear
           </Button>
         )}
@@ -1616,39 +1686,92 @@ export default function SalesPage() {
         )}
       </Modal>
 
-      {/* Delete confirmation modal */}
-      <Modal open={!!deleteConfirmId} onClose={() => setDeleteConfirmId(null)} title="Delete Sale" size="sm">
-        <div className="space-y-4">
-          {(() => {
-            const row = sales.find(s => s.id === deleteConfirmId)
-            return row?.payment_status === 'partial' ? (
-              <div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800">
-                <p className="font-semibold mb-1">This sale has partial refunds.</p>
-                <p>Deleting it will also delete all associated refund records. Only the unrefunded inventory will be restored. This cannot be undone.</p>
+      {/* Cash In / Cash Out detail modal — read-only, data comes straight from the table row */}
+      <Modal
+        open={!!cashDetailRow}
+        onClose={() => setCashDetailRow(null)}
+        title={cashDetailRow?.record_type === 'cash_in' ? 'Cash In Details' : 'Cash Out Details'}
+        size="sm"
+      >
+        {cashDetailRow && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${cashDetailRow.record_type === 'cash_in' ? 'bg-teal-100 text-teal-700' : 'bg-rose-100 text-rose-600'}`}>
+                <DollarSign className="h-5 w-5" />
+              </span>
+              <div>
+                <p className={`text-xl font-bold ${cashDetailRow.record_type === 'cash_in' ? 'text-teal-700' : 'text-rose-600'}`}>
+                  {cashDetailRow.record_type === 'cash_out' ? '-' : ''}{formatCurrency(Math.abs(Number(cashDetailRow.total)))}
+                </p>
+                <p className="text-xs text-gray-500 font-mono">{cashDetailRow.reference}</p>
               </div>
-            ) : (
-              <p className="text-sm text-gray-600">
-                This will permanently delete the sale and restore inventory quantities. This action cannot be undone.
-              </p>
-            )
-          })()}
-          <div className="flex gap-3 justify-end">
-            <Button variant="outline" onClick={() => setDeleteConfirmId(null)} disabled={deleteMutation.isPending}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => deleteMutation.mutate(deleteConfirmId!)}
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending
-                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                : <Trash2 className="mr-2 h-4 w-4" />}
-              {deleteMutation.isPending ? 'Deleting…' : 'Delete Sale'}
-            </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div><span className="text-gray-500">Date</span><br />{formatDateTime(cashDetailRow.created_at)}</div>
+              <div><span className="text-gray-500">Cashier</span><br />{cashDetailRow.profiles?.full_name ?? '—'}</div>
+              <div><span className="text-gray-500">Method</span><br />{PAYMENT_LABELS[cashDetailRow.payment_method] ?? cashDetailRow.payment_method}</div>
+              <div>
+                <span className="text-gray-500">Purpose</span><br />
+                {cashDetailRow.purpose === 'expense' ? 'Expense' : cashDetailRow.purpose === 'buyback' ? 'Buyback' : 'Plain'}
+              </div>
+              {cashDetailRow.purpose === 'buyback' && (
+                <div className="col-span-2">
+                  <span className="text-gray-500">Product</span><br />
+                  {cashDetailRow.product_name ?? '—'}
+                </div>
+              )}
+            </div>
+            {cashDetailRow.notes && (
+              <div className="rounded-md bg-gray-50 p-3 text-sm">
+                <p className="mb-1 text-xs font-medium text-gray-500">Notes</p>
+                <p className="text-gray-700">{cashDetailRow.notes}</p>
+              </div>
+            )}
           </div>
-        </div>
+        )}
       </Modal>
+
+      {/* Delete confirmation modal */}
+      {(() => {
+        const row = sales.find(s => s.id === deleteConfirmId)
+        const isCash = row?.record_type === 'cash_in' || row?.record_type === 'cash_out'
+        const mutation = isCash ? deleteCashMovementMutation : deleteMutation
+        return (
+          <Modal open={!!deleteConfirmId} onClose={() => setDeleteConfirmId(null)} title={isCash ? 'Delete Cash Movement' : 'Delete Sale'} size="sm">
+            <div className="space-y-4">
+              {isCash ? (
+                <p className="text-sm text-gray-600">
+                  This will permanently delete this {row?.record_type === 'cash_in' ? 'Cash In' : 'Cash Out'} record. This action cannot be undone.
+                </p>
+              ) : row?.payment_status === 'partial' ? (
+                <div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800">
+                  <p className="font-semibold mb-1">This sale has partial refunds.</p>
+                  <p>Deleting it will also delete all associated refund records. Only the unrefunded inventory will be restored. This cannot be undone.</p>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-600">
+                  This will permanently delete the sale and restore inventory quantities. This action cannot be undone.
+                </p>
+              )}
+              <div className="flex gap-3 justify-end">
+                <Button variant="outline" onClick={() => setDeleteConfirmId(null)} disabled={mutation.isPending}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => mutation.mutate(deleteConfirmId!)}
+                  disabled={mutation.isPending}
+                >
+                  {mutation.isPending
+                    ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    : <Trash2 className="mr-2 h-4 w-4" />}
+                  {mutation.isPending ? 'Deleting…' : 'Delete'}
+                </Button>
+              </div>
+            </div>
+          </Modal>
+        )
+      })()}
 
       {/* Delete PIN modal (retail template only) */}
       <DeletePinModal />

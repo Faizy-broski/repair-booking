@@ -1,5 +1,6 @@
 import { getAdminSupabase } from '@/backend/config/supabase'
 import { slugify } from '@/lib/utils'
+import { NotificationTemplateService } from '@/backend/services/notification-template.service'
 
 interface RegisterPayload {
   businessName: string
@@ -185,6 +186,11 @@ export const AuthService = {
     await supabase.from('repair_faults').insert(
       defaultFaults.map(f => ({ ...f, business_id: business.id }))
     )
+
+    // 7. Seed default notification templates (ticket_created, ticket_status_changed,
+    // repair_ready, etc.) — without these, NotificationEngine.fire() silently no-ops
+    // for every automatic email trigger since it requires an active template row.
+    await NotificationTemplateService.seedForBusiness(business.id)
 
     return { business, branch, userId }
   },

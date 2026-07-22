@@ -228,6 +228,36 @@ export const PosController = {
     }
   },
 
+  async listSalesLedger(request: NextRequest, ctx: RequestContext) {
+    const { searchParams } = request.nextUrl
+    const branchId = searchParams.get('branch_id') ?? ctx.auth.branchId ?? null
+    if (!branchId) return badRequest('branch_id required')
+    const { page, limit } = getPagination(searchParams)
+    try {
+      const { data, count } = await PosService.getSalesLedger(branchId, {
+        page,
+        limit,
+        from: searchParams.get('from') ?? undefined,
+        to: searchParams.get('to') ?? undefined,
+        type: searchParams.get('type') ?? undefined,
+        status: searchParams.get('status') ?? undefined,
+        search: searchParams.get('search') ?? undefined,
+      })
+      return ok(data, { page, limit, total: count ?? 0 })
+    } catch (err) {
+      return serverError('Failed to fetch sales ledger', err)
+    }
+  },
+
+  async deleteCashMovement(_request: NextRequest, ctx: RequestContext, id: string) {
+    try {
+      await PosService.deleteCashMovement(id, ctx.auth.branchId ?? null)
+      return ok({})
+    } catch (err: any) {
+      return badRequest(err?.message ?? 'Failed to delete cash movement')
+    }
+  },
+
   async recordCreditPayment(request: NextRequest, ctx: RequestContext, saleId: string) {
     const schema = z.object({
       amount: z.number().positive(),

@@ -142,6 +142,41 @@ async function buildRepairInvoiceBuffer(repairId: string, branchId: string | nul
   return { buffer: await renderToBuffer(doc as any), jobNumber: data.jobNumber }
 }
 
+// Pricing figures for notification emails — same totals math as getRepairInvoiceData
+// (parts + labour minus discounts, less deposit already paid) so the "created" and
+// "status changed" emails always agree with the PDF invoice for the same job.
+// Values come back pre-formatted with the business's currency symbol so templates
+// can drop them straight in as {{total_cost}}, {{deposit_paid}}, {{balance_due}}, etc.
+function getRepairPricingVariables(r: any, currency: string): Record<string, string> {
+  const repairItems: any[] = Array.isArray(r.repair_items) ? r.repair_items : []
+  const partsGross    = repairItems.reduce((s: number, it: any) => s + (it.quantity ?? 1) * Number(it.unit_price ?? 0), 0)
+  const partsDiscount = repairItems.reduce((s: number, it: any) => s + Number(it.discount_amount ?? 0), 0)
+  const repairDiscount = Number(r.discount_amount ?? 0)
+  const estimatedCost = Number(r.estimated_cost ?? 0)
+  const subtotal  = estimatedCost + partsGross
+  const discount  = partsDiscount + repairDiscount
+  const total     = Math.max(0, subtotal - discount)
+  const depositPaid = Number(r.deposit_paid ?? 0)
+  const balanceDue   = Math.max(0, total - depositPaid)
+
+  const fmt = (n: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(n)
+
+  const result = {
+    total_cost:   fmt(total),
+    discount:     discount > 0 ? fmt(discount) : '',
+    deposit_paid: fmt(depositPaid),
+    balance_due:  fmt(balanceDue),
+  }
+
+  // TEMP DEBUG — remove once the pricing-details email rollout is confirmed working.
+  console.log('[DEBUG getRepairPricingVariables] raw:', {
+    estimated_cost: r.estimated_cost, deposit_paid: r.deposit_paid, discount_amount: r.discount_amount,
+    repair_items_count: repairItems.length, currency,
+  }, 'computed:', { subtotal, discount, total, depositPaid, balanceDue }, 'result:', result)
+
+  return result
+}
+
 // Same split as above: plain data for the thermal HTML path, PDF for A4/A5/Letter.
 // Extended to include full repair details so the HTML slip matches the Laravel blade output.
 async function getRepairSlipData(repairId: string, branchId: string | null, businessId: string) {
@@ -488,28 +523,35 @@ export const RepairController = {
       if (data.notify_customer && data.customer_id && repair) {
         Promise.all([
           RepairService.getById(repair.id, data.branch_id),
-          adminSupabase.from('businesses').select('name, phone, email').eq('id', ctx.businessId).single()
+          adminSupabase.from('businesses').select('name, phone, email, currency').eq('id', ctx.businessId).single()
         ]).then(([repairDetail, { data: business }]) => {
           if (repairDetail?.customers) {
             const customerName = `${repairDetail.customers.first_name} ${repairDetail.customers.last_name ?? ''}`.trim()
             const deviceInfo = [repairDetail.device_brand, repairDetail.device_model].filter(Boolean).join(' ') || 'Device'
+            const pricing = getRepairPricingVariables(repairDetail, (business as any)?.currency ?? 'GBP')
+
+            const ticketCreatedVariables = {
+              customer_name: customerName,
+              ticket_number: repair.job_number,
+              device_type:   repairDetail.device_type ?? '',
+              device_brand:  repairDetail.device_brand ?? '',
+              device_model:  deviceInfo,
+              issue:         repairDetail.issue ?? '',
+              store_name:    business?.name ?? 'RepairBooking',
+              store_phone:   business?.phone ?? '',
+              store_email:   business?.email ?? '',
+              ...pricing,
+            }
+
+            // TEMP DEBUG — remove once the pricing-details email rollout is confirmed working.
+            console.log('[DEBUG ticket_created] businessId:', ctx.businessId, 'variables:', ticketCreatedVariables)
 
             NotificationEngine.fire('ticket_created', {
               businessId: ctx.businessId,
               branchId: data.branch_id,
               relatedId: repair.id,
               relatedType: 'repair',
-              variables: {
-                customer_name: customerName,
-                ticket_number: repair.job_number,
-                device_type:   repairDetail.device_type ?? '',
-                device_brand:  repairDetail.device_brand ?? '',
-                device_model:  deviceInfo,
-                issue:         repairDetail.issue ?? '',
-                store_name:    business?.name ?? 'RepairBooking',
-                store_phone:   business?.phone ?? '',
-                store_email:   business?.email ?? '',
-              },
+              variables: ticketCreatedVariables,
               recipient: {
                 email: repairDetail.customers.email ?? null,
                 phone: repairDetail.customers.phone ?? null,
@@ -640,12 +682,13 @@ export const RepairController = {
       const branchId = ctx.auth.branchId ?? null
       Promise.all([
         RepairService.getById(id, branchId),
-        adminSupabase.from('businesses').select('name, phone, email').eq('id', ctx.businessId).single()
+        adminSupabase.from('businesses').select('name, phone, email, currency').eq('id', ctx.businessId).single()
       ]).then(([repair, { data: business }]) => {
         if (repair?.customers) {
           const customerName = `${repair.customers.first_name} ${repair.customers.last_name ?? ''}`.trim()
           const deviceInfo = [repair.device_brand, repair.device_model].filter(Boolean).join(' ') || 'Device'
           const businessName = business?.name ?? 'RepairBooking'
+          const pricing = getRepairPricingVariables(repair, (business as any)?.currency ?? 'GBP')
 
           const STATUS_LABELS: Record<string, string> = {
             received: 'Received', in_progress: 'In Progress', waiting_parts: 'Waiting for Parts',
@@ -670,6 +713,7 @@ export const RepairController = {
               store_name:     businessName,
               store_phone:    business?.phone ?? '',
               store_email:    business?.email ?? '',
+              ...pricing,
             },
             recipient: {
               email: repair.customers.email ?? null,

@@ -157,6 +157,76 @@ export const PosService = {
     return { data, count }
   },
 
+  // Unified feed for the Sales page: sales/refunds/exchanges + register cash
+  // in/out, merged and paginated in the DB via get_sales_ledger (migration 158).
+  async getSalesLedger(branchId: string, params: { page?: number; limit?: number; from?: string; to?: string; type?: string; status?: string; search?: string }) {
+    const { page = 1, limit = 20, from, to, type, status, search } = params
+
+    let customerIds: string[] | null = null
+    if (search) {
+      const term = `%${search}%`
+      const { data: matched } = await adminSupabase
+        .from('customers')
+        .select('id')
+        .or(`first_name.ilike.${term},last_name.ilike.${term}`)
+      customerIds = (matched ?? []).map((c: { id: string }) => c.id)
+      if (customerIds.length === 0) customerIds = null
+    }
+
+    const { data, error } = await (adminSupabase as any).rpc('get_sales_ledger', {
+      p_branch_id: branchId,
+      p_from: from ?? null,
+      p_to: to ?? null,
+      p_type: type ?? null,
+      p_status: status ?? null,
+      p_search: search ?? null,
+      p_customer_ids: customerIds,
+      p_limit: limit,
+      p_offset: (page - 1) * limit,
+    })
+    if (error) throw error
+
+    const rows = (data ?? []) as Array<Record<string, unknown> & { total_count: number }>
+    const total = rows.length > 0 ? Number(rows[0].total_count) : 0
+
+    const cashierIds = [...new Set(rows.map(r => r.cashier_id).filter(Boolean))] as string[]
+    const customerRowIds = [...new Set(rows.map(r => r.customer_id).filter(Boolean))] as string[]
+    const [{ data: cashiers }, { data: customers }] = await Promise.all([
+      cashierIds.length
+        ? adminSupabase.from('profiles').select('id, full_name').in('id', cashierIds)
+        : Promise.resolve({ data: [] as { id: string; full_name: string | null }[] }),
+      customerRowIds.length
+        ? adminSupabase.from('customers').select('id, first_name, last_name').in('id', customerRowIds)
+        : Promise.resolve({ data: [] as { id: string; first_name: string; last_name: string | null }[] }),
+    ])
+    const cashierMap = new Map((cashiers ?? []).map(c => [c.id, c]))
+    const customerMap = new Map((customers ?? []).map(c => [c.id, c]))
+
+    const enriched = rows.map(r => ({
+      ...r,
+      total: r.amount, // alias so the Sales table's existing `total` column works for every record type
+      profiles: r.cashier_id ? { full_name: cashierMap.get(r.cashier_id as string)?.full_name ?? null } : null,
+      customers: r.customer_id ? (() => {
+        const c = customerMap.get(r.customer_id as string)
+        return c ? { first_name: c.first_name, last_name: c.last_name } : null
+      })() : null,
+    }))
+
+    return { data: enriched, count: total }
+  },
+
+  async deleteCashMovement(id: string, branchId: string | null) {
+    const { data: movement, error: fetchError } = await (adminSupabase as any)
+      .from('cash_movements').select('id, purpose, branch_id').eq('id', id).single()
+    if (fetchError) throw fetchError
+    if (branchId && movement.branch_id !== branchId) throw new Error('Cash movement not found')
+    if (movement.purpose && movement.purpose !== 'plain') {
+      throw new Error('This cash movement is linked to an expense or buyback record and cannot be deleted here')
+    }
+    const { error } = await (adminSupabase as any).from('cash_movements').delete().eq('id', id)
+    if (error) throw error
+  },
+
   async getSalesStats(branchId: string, params: { from?: string; to?: string; status?: string }) {
     const { from, to, status } = params
     let q = adminSupabase
@@ -181,6 +251,8 @@ export const PosService = {
       refund_amount: refunds.reduce((s, r) => s + Number(r.total), 0),
       cash_total: 0,
       card_total: 0,
+      cash_in_total: 0,
+      cash_out_total: 0,
     }
 
     // Cash/card breakdown — used by the retail template's Sales page cards.
@@ -205,10 +277,11 @@ export const PosService = {
     if (from) cashQ = cashQ.gte('created_at', from)
     if (to) cashQ = cashQ.lte('created_at', to)
     const { data: cashRows } = await cashQ
-    const cashNet = ((cashRows ?? []) as any[]).reduce(
-      (s, r) => s + (r.type === 'cash_in' ? Number(r.amount) : -Number(r.amount)), 0
-    )
-    stats.revenue += cashNet
+    for (const r of (cashRows ?? []) as any[]) {
+      if (r.type === 'cash_in') stats.cash_in_total += Number(r.amount)
+      else stats.cash_out_total += Number(r.amount)
+    }
+    stats.revenue += stats.cash_in_total - stats.cash_out_total
 
     // Repair job revenue (deposits/final charges) has no `sales` row unless
     // paid off through the POS cart — fold it in here so the Sales page
