@@ -48,6 +48,7 @@ export interface InvoiceSettings {
   footer_line_3_scope: FooterLineScope
   thank_you_message: string | null
   policy_text: string | null
+  policy_text_scope: FooterLineScope
   guarantee_line_1: string | null
   guarantee_line_2: string | null
   since_year: string | null
@@ -87,6 +88,7 @@ export const DEFAULT_INVOICE_SETTINGS: InvoiceSettings = {
   footer_line_3_scope: 'both',
   thank_you_message: 'Thank you for your business!',
   policy_text: null,
+  policy_text_scope: 'both',
   guarantee_line_1: null,
   guarantee_line_2: null,
   since_year: null,

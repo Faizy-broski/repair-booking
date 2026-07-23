@@ -48,6 +48,7 @@ const schema = z.object({
   footer_line_3_scope: z.enum(['both', 'repair', 'pos']).optional(),
   thank_you_message: z.string().nullable().optional(),
   policy_text:       z.string().nullable().optional(),
+  policy_text_scope: z.enum(['both', 'repair', 'pos']).optional(),
   since_year:        z.string().nullable().optional(),
   guarantee_line_1:  z.string().nullable().optional(),
   guarantee_line_2:  z.string().nullable().optional(),

@@ -67,12 +67,20 @@ export interface SalePayload {
 }
 
 export const PosService = {
-  async processSale(payload: SalePayload): Promise<string> {
+  async processSale(payload: SalePayload): Promise<{ saleId: string; invoiceNumber: string | null }> {
     const { data, error } = await adminSupabase.rpc('process_sale', {
       p_sale_data: payload as unknown as Json,
     })
     if (error) throw error
-    return data as string
+    const saleId = data as string
+
+    const { data: sale } = await adminSupabase
+      .from('sales')
+      .select('invoice_number')
+      .eq('id', saleId)
+      .single()
+
+    return { saleId, invoiceNumber: sale?.invoice_number ?? null }
   },
 
   async recordCreditPayment(saleId: string, amount: number, method: string, businessId: string, createdBy: string): Promise<void> {

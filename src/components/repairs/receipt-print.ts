@@ -101,6 +101,10 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
     })
     .map(({ line }) => line as string)
 
+  const policyScope = settings.policy_text_scope ?? 'both'
+  const showPolicyText = !!settings.policy_text
+    && (policyScope === 'both' || policyScope === (isRepairReceipt ? 'repair' : 'pos'))
+
   // ── CSS ──────────────────────────────────────────────────────────────────
   // @page size is NOT set here — injected dynamically after render measurement.
   // margin:0 is set here so it applies to the static CSS shipped with the HTML.
@@ -125,8 +129,8 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
        above and nothing in this file overrides it back down to normal. */
     body { padding: 10px 10px 20px 10px }
     .c  { text-align: center }
-    .logo { display: block; margin: 0 auto 5px; width: 48px; height: 48px; object-fit: contain }
-    .bn { font-size: 15px; font-weight: bold; text-align: center; margin-bottom: 2px }
+    .logo { display: block; margin: 0 auto 5px; width: 64px; height: 64px; object-fit: contain }
+    .bn { font-size: 18px; font-weight: bold; text-align: center; margin-bottom: 2px }
     .since { font-size: 11px; font-weight: bold; color: #000; text-align: center; margin-bottom: 2px }
     .br { font-size: 11px; color: #000; text-align: center; margin-bottom: 2px }
     .dt { font-size: 11px; color: #000; text-align: center; margin-bottom: 2px }
@@ -157,16 +161,12 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
     .ft { page-break-inside: avoid; break-inside: avoid; page-break-before: avoid }
     .ty { font-size: 13px; font-weight: bold; color: #000; text-align: center; margin-top: 9px }
     .gt { font-size: 12px; font-weight: bold; color: #000; text-align: center; margin-top: 6px }
-    .fl { font-size: 12px; color: #000; text-align: center; margin-top: 5px; word-break: break-word }
+    .fl { font-size: 12px; color: #000; text-align: center; margin-top: 5px; word-break: break-word; white-space: pre-line }
     .lh { font-size: 10px; font-weight: 700; color: #000; text-align: center; letter-spacing: 0.5px; margin-top: 7px }
     .hr2 { border: none; border-top: 2px solid #000; margin: 10px 0 }
     .pl { font-size: 10px; color: #000; text-align: center; margin-top: 8px;
-          border-top: 1px solid #000; padding-top: 6px }
+          border-top: 1px solid #000; padding-top: 6px; white-space: pre-line }
     .grn { color: #1a7a3a }
-    /* Whole receipt as one unbreakable block — a pagination hint only (no visual
-       effect), so a fallback multi-page print can't cut mid-section (e.g. splitting
-       the "Order Detail" box between Deposit/Paid and the Remaining bar). */
-    .rcpt { page-break-inside: avoid; break-inside: avoid }
     /* ── Social grid: fixed 2 columns so pairing never shifts with content length ── */
     .soc { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; margin-top: 7px }
     .socc { text-align: center }
@@ -231,7 +231,6 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>
 ${debugMode ? debugPanel : '<div id="dbg" style="display:none"></div>'}
-<div class="rcpt">
 ${L(settings.show_logo && settings.logo_url, `<img src="${esc(settings.logo_url)}" class="logo" alt="">`)}
 ${L(settings.show_business_name !== false, `<div class="bn">${esc(mainBn || businessName)}</div>`)}
 ${L(settings.since_year, `<div class="since">Since ${esc(settings.since_year)}</div>`)}
@@ -323,8 +322,7 @@ ${L(bal > 0, `<div class="bar"><span class="bl">Balance Due</span><span class="b
   ${L(settings.footer_address, `<hr><div class="lh">ADDRESS</div><div class="fl">${esc(settings.footer_address)}</div>`)}
   ${L(settings.footer_phone, `<hr><div class="lh">PH</div><div class="fl">${esc(settings.footer_phone)}</div>`)}
   ${L(socials.length > 0, `<hr class="hr2"><div class="soc">${socials.map(s => `<div class="socc"><div class="socl">${s.icon}<span>${esc(s.label)}</span></div><div class="socv">${esc(s.val)}</div></div>`).join('')}</div>`)}
-  ${L(settings.policy_text, `<div class="pl">${esc(settings.policy_text)}</div>`)}
-</div>
+  ${L(showPolicyText, `<div class="pl">${esc(settings.policy_text)}</div>`)}
 </div>
 </body></html>`
 }
@@ -507,16 +505,11 @@ export function printReceipt(data: ReceiptPrintData, preOpenedWin?: Window | nul
     // so the last line of the receipt is never clipped by the page boundary.
     const rawHeight     = win!.document.body.scrollHeight
     const contentHeight = rawHeight + 80
-    // Windows/thermal-printer driver paper-size lists are defined in mm, not px —
-    // expressing @page in the same unit is what the driver is actually matching
-    // against, so convert here rather than sending it a raw CSS px number.
-    const contentHeightMm = (contentHeight * 25.4 / 96).toFixed(2)
 
     // Log everything so the developer can verify
     console.group('[RECEIPT PRINT] triggerPrint fired')
     console.log('body.scrollHeight (raw)        :', rawHeight, 'px')
-    console.log('contentHeight (+80 buffer)     :', contentHeight, 'px')
-    console.log('contentHeight (mm)             :', contentHeightMm, 'mm  ← used for @page')
+    console.log('contentHeight (+80 buffer)     :', contentHeight, 'px  ← used for @page')
     console.log('doc.scrollHeight  (IGNORED)    :', win!.document.documentElement.scrollHeight, 'px  ← window height, do NOT use')
     console.log('window.innerHeight             :', win!.innerHeight, 'px')
     console.log('window.innerWidth              :', win!.innerWidth, 'px')
@@ -530,7 +523,7 @@ export function printReceipt(data: ReceiptPrintData, preOpenedWin?: Window | nul
     // 'portrait' forces width < height orientation regardless of driver defaults.
     const pageRule = isCustom && customH
       ? `@page { size: ${paperWidthCss} ${customH}mm portrait; margin: 0; }`
-      : `@page { size: ${paperWidthCss} ${contentHeightMm}mm portrait; margin: 0; }`
+      : `@page { size: ${paperWidthCss} ${contentHeight}px portrait; margin: 0; }`
     console.log('Injecting @page rule           :', pageRule)
     console.groupEnd()
 
@@ -652,9 +645,6 @@ function buildSlipHtml(d: SlipPrintData): string {
     .footer { margin-top: 12px; text-align: center; font-size: 10px; font-weight: 700; line-height: 1.6 }
     .barcode { margin-top: 14px; text-align: center }
     .barcode img { width: 100%; max-width: 220px; height: auto }
-    /* Whole slip as one unbreakable block — a pagination hint only (no visual
-       effect), so a fallback multi-page print can't cut mid-section. */
-    .rcpt { page-break-inside: avoid; break-inside: avoid }
   `
 
   const esc = (s: string | null | undefined) => {
@@ -663,7 +653,6 @@ function buildSlipHtml(d: SlipPrintData): string {
   }
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>
-<div class="rcpt">
 <div class="head">
   <div class="bname">${esc(d.businessName)}</div>
   ${d.branchAddress ? `<div class="addr">${esc(d.branchAddress)}</div>` : ''}
@@ -686,7 +675,6 @@ function buildSlipHtml(d: SlipPrintData): string {
   <p>Refund &amp; Exchange within 28 Days<br>and with Proof of Purchase only.</p>
 </div>
 <div class="barcode"><img src="${d.barcodeDataUrl}" alt="Barcode"></div>
-</div>
 </body></html>`
 }
 
@@ -733,11 +721,9 @@ export function printSlip(
 
   const doMeasureAndPrint = () => {
     const contentHeight = win!.document.body.scrollHeight + 60
-    // Express in mm (the unit printer-driver paper-size lists use) rather than px.
-    const contentHeightMm = (contentHeight * 25.4 / 96).toFixed(2)
     // CRITICAL: 'portrait' prevents Windows thermal drivers from auto-rotating
     // 80mm paper to landscape (which prints text sideways bottom-to-top).
-    const pageRule = `@page { size: ${paperWidthCss} ${contentHeightMm}mm portrait; margin: 0; }`
+    const pageRule = `@page { size: ${paperWidthCss} ${contentHeight}px portrait; margin: 0; }`
 
     const sizeStyle = win!.document.createElement('style')
     sizeStyle.id = 'dynamic-page-size'
@@ -762,3 +748,4 @@ export function printSlip(
 
   win.addEventListener('load', () => setTimeout(doMeasureAndPrint, 1000), { once: true })
 }
+

@@ -108,8 +108,8 @@ export function RepairReceiptHtml({
     // Every element below inherits this unless it sets its own fontWeight.
     root:     { width, margin: '0 auto', padding: '10px 10px 30px 10px', fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '10px', fontWeight: 700, lineHeight: 1.35, color: '#000', background: '#fff' } as React.CSSProperties,
     center:   { textAlign: 'center' as const },
-    logo:     { display: 'block', margin: '0 auto 5px', width: '48px', height: '48px', objectFit: 'contain' as const },
-    bizName:  { fontSize: '14px', fontWeight: 'bold', textAlign: 'center' as const, marginBottom: '2px' },
+    logo:     { display: 'block', margin: '0 auto 5px', width: '64px', height: '64px', objectFit: 'contain' as const },
+    bizName:  { fontSize: '18px', fontWeight: 'bold', textAlign: 'center' as const, marginBottom: '2px' },
     since:    { fontSize: '10px', fontWeight: 'bold', color: '#000', textAlign: 'center' as const, marginBottom: '2px' },
     branch:   { fontSize: '10px', color: '#000', textAlign: 'center' as const, marginBottom: '2px' },
     detail:   { fontSize: '9.5px', color: '#000', textAlign: 'center' as const, marginBottom: '2px' },
@@ -132,10 +132,10 @@ export function RepairReceiptHtml({
     footer:   { pageBreakInside: 'avoid', breakInside: 'avoid', pageBreakBefore: 'avoid' } as React.CSSProperties,
     thankYou: { fontSize: '12px', fontWeight: 'bold', color: '#000', textAlign: 'center' as const, marginTop: '9px' },
     guarantee:{ fontSize: '10.5px', fontWeight: 'bold', color: '#000', textAlign: 'center' as const, marginTop: '6px' },
-    footLine: { fontSize: '10.5px', color: '#000', textAlign: 'center' as const, marginTop: '5px', wordBreak: 'break-word' as const },
+    footLine: { fontSize: '10.5px', color: '#000', textAlign: 'center' as const, marginTop: '5px', wordBreak: 'break-word' as const, whiteSpace: 'pre-line' as const },
     lblHead:  { fontSize: '9px', fontWeight: 'bold', color: '#000', textAlign: 'center' as const, letterSpacing: '0.5px', marginTop: '7px' },
     dividerThick: { border: 'none', borderTop: '2px solid #000', margin: '10px 0' } as React.CSSProperties,
-    policy:   { fontSize: '8.5px', color: '#000', textAlign: 'center' as const, marginTop: '8px', borderTop: '1px solid #000', paddingTop: '6px' },
+    policy:   { fontSize: '8.5px', color: '#000', textAlign: 'center' as const, marginTop: '8px', borderTop: '1px solid #000', paddingTop: '6px', whiteSpace: 'pre-line' as const },
     green:    { color: '#000' },
     socRow:   { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 10px', marginTop: '7px' } as React.CSSProperties,
     socCol:   { textAlign: 'center' as const },
@@ -278,7 +278,7 @@ export function RepairReceiptHtml({
             </div>
           </>
         )}
-        {settings.policy_text && (
+        {settings.policy_text && (settings.policy_text_scope ?? 'both') !== 'pos' && (
           <div style={s.policy}>{settings.policy_text}</div>
         )}
       </div>

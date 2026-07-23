@@ -640,11 +640,13 @@ export function InvoiceDesignTab() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ footer_phone: e.target.value || null })}
               />
               <div>
-                <Input
-                  label="Footer Line 1"
+                <label className="mb-1.5 block text-xs font-medium text-gray-600">Footer Line 1</label>
+                <textarea
+                  rows={2}
                   placeholder="e.g. All repairs come with a 90-day warranty"
                   value={settings.footer_line_1 ?? ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ footer_line_1: e.target.value || null })}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => patch({ footer_line_1: e.target.value || null })}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
                 />
                 <ScopeSelect
                   value={settings.footer_line_1_scope ?? 'both'}
@@ -652,11 +654,13 @@ export function InvoiceDesignTab() {
                 />
               </div>
               <div>
-                <Input
-                  label="Footer Line 2"
+                <label className="mb-1.5 block text-xs font-medium text-gray-600">Footer Line 2</label>
+                <textarea
+                  rows={2}
                   placeholder="e.g. Free estimates · No fix, no fee"
                   value={settings.footer_line_2 ?? ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ footer_line_2: e.target.value || null })}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => patch({ footer_line_2: e.target.value || null })}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
                 />
                 <ScopeSelect
                   value={settings.footer_line_2_scope ?? 'both'}
@@ -664,11 +668,13 @@ export function InvoiceDesignTab() {
                 />
               </div>
               <div>
-                <Input
-                  label="Footer Line 3"
-                  placeholder="e.g. Open Mon–Sat 9am–6pm"
+                <label className="mb-1.5 block text-xs font-medium text-gray-600">Footer Line 3</label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Timing Mon to Sat 9:30am to 6pm&#10;Sunday 10:00am to 4pm"
                   value={settings.footer_line_3 ?? ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ footer_line_3: e.target.value || null })}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => patch({ footer_line_3: e.target.value || null })}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
                 />
                 <ScopeSelect
                   value={settings.footer_line_3_scope ?? 'both'}
@@ -683,6 +689,10 @@ export function InvoiceDesignTab() {
                   value={settings.policy_text ?? ''}
                   onChange={(e) => patch({ policy_text: e.target.value || null })}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                />
+                <ScopeSelect
+                  value={settings.policy_text_scope ?? 'both'}
+                  onChange={(v) => patch({ policy_text_scope: v })}
                 />
               </div>
             </Section>

@@ -157,6 +157,7 @@ function priceParts(item: SaleItem) {
 
 export interface SaleReceiptPdfProps {
   saleId: string
+  invoiceNumber?: string | null
   date: string
   customerName: string
   cashierName: string
@@ -212,7 +213,7 @@ const STATUS_COLORS: Record<string, string> = {
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export function SaleReceiptPdf({
-  saleId, date, customerName, cashierName, paymentMethod, paymentStatus,
+  saleId, invoiceNumber, date, customerName, cashierName, paymentMethod, paymentStatus,
   items, subtotal, discount, tax, total, amountPaid, depositLabelAmount,
   isRefund, refundReason, paymentSplits, notes,
   businessName, branchName, branchAddress, branchPhone, branchEmail, logoUrl,
@@ -227,6 +228,7 @@ export function SaleReceiptPdf({
   const depositPaid = amountPaid ?? 0
   const outstanding = Math.max(0, total - depositPaid)
   const displayDepositAmount = depositLabelAmount ?? depositPaid
+  const displayInvoiceNumber = invoiceNumber ?? saleId.slice(-8).toUpperCase()
 
   const isReceipt = settings.paper_size?.startsWith('Receipt')
   const family = settings.font_family || 'Helvetica'
@@ -443,7 +445,7 @@ export function SaleReceiptPdf({
           <Text style={s.receiptTitle}>{isExchange ? 'EXCHANGE' : isRefund ? 'Refund' : 'ORDER RECEIPT'}</Text>
           <View style={{ marginTop: 6, alignItems: isReceipt ? 'center' : 'flex-start' }}>
             <Text style={{ fontSize: isReceipt ? 7.5 : 8, color: '#ffffffdd', marginBottom: 2 }}>
-              Invoice #: {saleId.slice(-8).toUpperCase()}
+              Invoice #: {displayInvoiceNumber}
             </Text>
             {date.includes(',') ? (
               <View style={{ flexDirection: 'row' }}>
@@ -806,7 +808,7 @@ export function SaleReceiptPdf({
               </View>
             )}
 
-            {settings.policy_text && (
+            {settings.policy_text && (settings.policy_text_scope ?? 'both') !== 'repair' && (
               <Text style={{ fontSize: 6.5, color: C.faint, textAlign: 'center', marginTop: 10, borderTopWidth: 0.5, borderTopColor: C.border, paddingTop: 8 }}>
                 {settings.policy_text}
               </Text>
