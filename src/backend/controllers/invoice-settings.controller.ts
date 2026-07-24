@@ -11,6 +11,7 @@ const socialLinksSchema = z.object({
   instagram: z.string().optional().or(z.literal('')),
   twitter:   z.string().optional().or(z.literal('')),
   whatsapp:  z.string().optional().or(z.literal('')),
+  landline:  z.string().optional().or(z.literal('')),
   tiktok:    z.string().optional().or(z.literal('')),
 }).optional()
 

@@ -74,8 +74,9 @@ export const PosService = {
     if (error) throw error
     const saleId = data as string
 
-    const { data: sale } = await adminSupabase
-      .from('sales')
+    // Cast: invoice_number was added in migration 166, ahead of the generated
+    // Supabase types picking it up — same as the `sale_number` column above.
+    const { data: sale } = await (adminSupabase.from('sales') as any)
       .select('invoice_number')
       .eq('id', saleId)
       .single()

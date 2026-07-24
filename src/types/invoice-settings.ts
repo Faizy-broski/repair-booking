@@ -4,6 +4,7 @@ export interface SocialLinks {
   instagram?: string
   twitter?: string
   whatsapp?: string
+  landline?: string
   tiktok?: string
 }
 

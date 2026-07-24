@@ -18,7 +18,7 @@ function hexToRgba(hex: string | undefined | null, alpha: number): string {
 
 const SOCIAL_LABELS: Record<keyof SocialLinks, string> = {
   website: 'Web', facebook: 'FB', instagram: 'IG',
-  twitter: 'TW', whatsapp: 'WA', tiktok: 'TT',
+  twitter: 'TW', whatsapp: 'WA', landline: 'Tel', tiktok: 'TT',
 }
 
 // ── Paper size map ─────────────────────────────────────────────────────────────
