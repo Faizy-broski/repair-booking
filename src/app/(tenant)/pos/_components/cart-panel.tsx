@@ -285,7 +285,9 @@ export function CartPanel({ mobileView }: Props) {
     paymentSplits?: PaymentSplit[],
     paymentStatus?: string,
     amountPaid?: number,
+    invoiceNumber?: string | null,
   ) {
+    const displayInvoiceNumber = invoiceNumber ?? `#${saleId.slice(-8).toUpperCase()}`
     const customerName = pos.customer
       ? `${pos.customer.first_name} ${pos.customer.last_name ?? ''}`.trim()
       : 'Walk-In Customer'
@@ -302,7 +304,7 @@ export function CartPanel({ mobileView }: Props) {
       //  • 8s afterprint delay covers slow EPSON USB drivers
       const data: ReceiptPrintData = {
         settings:      { ...DEFAULT_INVOICE_SETTINGS, ...(invoiceSettings ?? {}) },
-        invoiceNumber: `#${saleId.slice(-8).toUpperCase()}`,
+        invoiceNumber: displayInvoiceNumber,
         status:        paymentStatus ?? 'paid',
         issuedAt:      new Date().toISOString(),
         businessName:  businessName ?? activeBranch?.name ?? 'Business',
@@ -338,6 +340,7 @@ export function CartPanel({ mobileView }: Props) {
       const blob = await pdf(
         <SaleReceiptPdf
           saleId={saleId}
+          invoiceNumber={invoiceNumber}
           date={formatDateTime(new Date().toISOString())}
           customerName={customerName}
           cashierName={profile?.full_name ?? '—'}
@@ -432,7 +435,7 @@ export function CartPanel({ mobileView }: Props) {
       // page refresh.
       queryClient.invalidateQueries({ queryKey: ['pos-products'] })
       queryClient.invalidateQueries({ queryKey: ['pos-variants'] })
-      await printReceipt(saleJson.data?.sale_id ?? 'unknown', paymentMethod, receiptItems, preWin, paymentSplits)
+      await printReceipt(saleJson.data?.sale_id ?? 'unknown', paymentMethod, receiptItems, preWin, paymentSplits, undefined, undefined, saleJson.data?.invoice_number)
       setTimeout(() => { setSuccess(false); setPaymentOpen(false) }, 2500)
     } else {
       // Rollback: restore cart and hide success screen
@@ -504,7 +507,7 @@ export function CartPanel({ mobileView }: Props) {
       // page refresh.
       queryClient.invalidateQueries({ queryKey: ['pos-products'] })
       queryClient.invalidateQueries({ queryKey: ['pos-variants'] })
-      await printReceipt(saleJson.data?.sale_id ?? 'unknown', 'cash', receiptItemsCash, preWinCash)
+      await printReceipt(saleJson.data?.sale_id ?? 'unknown', 'cash', receiptItemsCash, preWinCash, undefined, undefined, undefined, saleJson.data?.invoice_number)
       setTimeout(() => setSuccess(false), 2500)
     } else {
       // Rollback: restore cart and hide success screen
@@ -608,7 +611,7 @@ export function CartPanel({ mobileView }: Props) {
       queryClient.invalidateQueries({ queryKey: ['credits'] })
       const creditStatus  = deposit <= 0 ? 'on_account' : deposit >= total ? 'paid' : 'partial'
       const depositSplits = deposit > 0 ? [{ method: creditDepositMethod as PaymentSplit['method'], amount: deposit }] : undefined
-      await printReceipt(saleJson.data?.sale_id ?? 'unknown', 'on_account', receiptItemsCredit, preWinCredit, depositSplits, creditStatus, deposit)
+      await printReceipt(saleJson.data?.sale_id ?? 'unknown', 'on_account', receiptItemsCredit, preWinCredit, depositSplits, creditStatus, deposit, saleJson.data?.invoice_number)
       setTimeout(() => { setSuccess(false) }, 2500)
     } else {
       preWinCredit?.close()
