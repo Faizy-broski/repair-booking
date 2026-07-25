@@ -76,6 +76,14 @@ function money(n: number, currency?: string) {
   return formatCurrency(n, currency)
 }
 
+// Only the labour/repair-fee line is hidden when show_final_amount_only is on —
+// parts keep showing their description and price. Identified by the literal
+// description getRepairInvoiceData() gives it ("Repair Fee").
+function visibleItems<T extends { description: string }>(items: T[], settings: InvoiceSettings): T[] {
+  if (!settings.show_final_amount_only) return items
+  return items.filter((i) => i.description !== 'Repair Fee')
+}
+
 export function RepairReceiptHtml({
   settings, invoiceNumber, status, issuedAt, dueAt,
   businessName, branchName, branchAddress, branchPhone, customerName, deviceName, deviceImei, faults,
@@ -192,7 +200,7 @@ export function RepairReceiptHtml({
 
           <div style={{ borderBottom: '1px dashed #000', margin: '6px 0' }} />
 
-          {items.map((item, i) => {
+          {visibleItems(items, settings).map((item, i) => {
             const gross = item.quantity * item.unit_price
             const itemDiscount = item.discount ?? 0
             const net = gross - itemDiscount
@@ -210,19 +218,23 @@ export function RepairReceiptHtml({
           })}
           <div style={{ borderBottom: '1px dashed #000', margin: '6px 0' }} />
 
-      <div style={s.totRow}>
-        <span style={s.totLbl}>Discount</span>
-        <span style={s.totVal}>{discount > 0 ? `-${money(discount, currency)}` : money(0, currency)}</span>
-      </div>
-      <div style={s.totRow}>
-        <span style={s.totLbl}>Subtotal</span>
-        <span style={s.totVal}>{money(subtotal, currency)}</span>
-      </div>
-      {settings.show_tax_breakdown && tax > 0 && (
-        <div style={s.totRow}>
-          <span style={s.totLbl}>Tax</span>
-          <span style={s.totVal}>{money(tax, currency)}</span>
-        </div>
+      {!settings.show_final_amount_only && (
+        <>
+          <div style={s.totRow}>
+            <span style={s.totLbl}>Discount</span>
+            <span style={s.totVal}>{discount > 0 ? `-${money(discount, currency)}` : money(0, currency)}</span>
+          </div>
+          <div style={s.totRow}>
+            <span style={s.totLbl}>Subtotal</span>
+            <span style={s.totVal}>{money(subtotal, currency)}</span>
+          </div>
+          {settings.show_tax_breakdown && tax > 0 && (
+            <div style={s.totRow}>
+              <span style={s.totLbl}>Tax</span>
+              <span style={s.totVal}>{money(tax, currency)}</span>
+            </div>
+          )}
+        </>
       )}
 
       <hr style={s.divider} />

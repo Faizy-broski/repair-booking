@@ -63,6 +63,7 @@ export const InvoiceSettingsService = {
       show_tax_breakdown: row.show_tax_breakdown ?? true,
       show_payment_method: row.show_payment_method ?? false,
       show_unpaid_watermark: row.show_unpaid_watermark ?? true,
+      show_final_amount_only: row.show_final_amount_only ?? false,
     }
   },
 

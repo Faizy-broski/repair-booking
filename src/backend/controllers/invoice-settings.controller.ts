@@ -61,6 +61,7 @@ const schema = z.object({
   show_tax_breakdown:    z.boolean().optional(),
   show_payment_method:   z.boolean().optional(),
   show_unpaid_watermark: z.boolean().optional(),
+  show_final_amount_only: z.boolean().optional(),
 })
 
 export const InvoiceSettingsController = {

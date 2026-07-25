@@ -55,6 +55,7 @@ export interface ZReport {
   grand_total?: number
   opened_at?: string
   closed_at?: string
+  expenses?: number
 }
 
 export interface CreditActivityEntry {

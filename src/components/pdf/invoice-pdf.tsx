@@ -8,6 +8,14 @@ function fmt(n: number, currency?: string) {
   return formatCurrency(n, currency)
 }
 
+// Only the labour/repair-fee line is hidden when show_final_amount_only is on —
+// parts keep showing their description and price. The line is identified by the
+// literal description getRepairInvoiceData() gives it ("Repair Fee").
+function visibleItems<T extends { description: string }>(items: T[], settings: InvoiceSettings): T[] {
+  if (!settings.show_final_amount_only) return items
+  return items.filter((i) => i.description !== 'Repair Fee')
+}
+
 function hexToRgba(hex: string | undefined | null, alpha: number): string {
   if (!hex || hex.length < 4) return `rgba(0,0,0,${alpha})`
   const r = parseInt(hex.slice(1, 3), 16)
@@ -53,6 +61,7 @@ function calcReceiptPageHeight(opts: {
   socialLinkCount: number
   policyText: string | null | undefined
   pageWidth: number
+  showFinalAmountOnly?: boolean
 }): number {
   let h = 20 // page padding top (10) + bottom (10)
 
@@ -80,9 +89,11 @@ function calcReceiptPageHeight(opts: {
   h += itemsHeight
   h += 14 // third divider
 
-  h += 14 // subtotal row
-  if (opts.hasDiscount) h += 12
-  if (opts.showTax)     h += 12
+  if (!opts.showFinalAmountOnly) {
+    h += 14 // subtotal row
+    if (opts.hasDiscount) h += 12
+    if (opts.showTax)     h += 12
+  }
 
   h += 14 // fourth divider
   h += 24 // grand total (fontSize 11 bold, marginTop 3)
@@ -423,7 +434,7 @@ export function InvoicePdf(props: InvoicePdfProps) {
             <Text style={[s.thText, s.colUnit, { textAlign: 'right' }]}>Unit Price</Text>
             <Text style={[s.thText, s.colTotal, { textAlign: 'right' }]}>Amount</Text>
           </View>
-          {items.map((item, i) => {
+          {visibleItems(items, settings).map((item, i) => {
             const gross = item.quantity * item.unit_price
             const itemDiscount = item.discount ?? 0
             const net = gross - itemDiscount
@@ -448,21 +459,25 @@ export function InvoicePdf(props: InvoicePdfProps) {
 
         {/* ── Totals ── */}
         <View style={s.totalsSection}>
-          <View style={s.totalRow}>
-            <Text style={s.totalLabel}>Subtotal</Text>
-            <Text style={s.totalValue}>{fmt(subtotal, currency)}</Text>
-          </View>
-          {discount > 0 && (
-            <View style={s.totalRow}>
-              <Text style={s.totalLabel}>Discount</Text>
-              <Text style={[s.totalValue, { color: '#10b981' }]}>-{fmt(discount, currency)}</Text>
-            </View>
-          )}
-          {settings.show_tax_breakdown && tax > 0 && (
-            <View style={s.totalRow}>
-              <Text style={s.totalLabel}>Tax</Text>
-              <Text style={s.totalValue}>{fmt(tax, currency)}</Text>
-            </View>
+          {!settings.show_final_amount_only && (
+            <>
+              <View style={s.totalRow}>
+                <Text style={s.totalLabel}>Subtotal</Text>
+                <Text style={s.totalValue}>{fmt(subtotal, currency)}</Text>
+              </View>
+              {discount > 0 && (
+                <View style={s.totalRow}>
+                  <Text style={s.totalLabel}>Discount</Text>
+                  <Text style={[s.totalValue, { color: '#10b981' }]}>-{fmt(discount, currency)}</Text>
+                </View>
+              )}
+              {settings.show_tax_breakdown && tax > 0 && (
+                <View style={s.totalRow}>
+                  <Text style={s.totalLabel}>Tax</Text>
+                  <Text style={s.totalValue}>{fmt(tax, currency)}</Text>
+                </View>
+              )}
+            </>
           )}
           <View style={s.divider} />
           <View style={s.grandTotalRow}>
@@ -562,7 +577,7 @@ function ReceiptPdf({
     showBranchName:   !!(settings.show_branch_name && branchName),
     showAddress:      !!(settings.show_address && branchAddress),
     showPhone:        !!(settings.show_phone && branchPhone),
-    items:            items,
+    items:            visibleItems(items, settings),
     hasDiscount:      discount > 0,
     showTax:          !!(settings.show_tax_breakdown && tax > 0),
     hasPaid:          amountPaid > 0,
@@ -572,6 +587,7 @@ function ReceiptPdf({
     socialLinkCount:  socialEntries.length,
     policyText:       settings.policy_text,
     pageWidth,
+    showFinalAmountOnly: settings.show_final_amount_only,
   })
 
   const s = StyleSheet.create({
@@ -631,7 +647,7 @@ function ReceiptPdf({
         </View>
 
         <View style={s.divider} />
-        {items.map((item, i) => {
+        {visibleItems(items, settings).map((item, i) => {
           const gross = item.quantity * item.unit_price
           const itemDiscount = item.discount ?? 0
           const net = gross - itemDiscount
@@ -651,9 +667,13 @@ function ReceiptPdf({
         })}
 
         <View style={s.divider} />
-        <View style={s.totalRow}><Text style={s.totalLabel}>Subtotal</Text><Text style={s.totalValue}>{fmt(subtotal)}</Text></View>
-        {discount > 0 && <View style={s.totalRow}><Text style={s.totalLabel}>Discount</Text><Text style={[s.totalValue, { color: '#10b981' }]}>-{fmt(discount)}</Text></View>}
-        {settings.show_tax_breakdown && tax > 0 && <View style={s.totalRow}><Text style={s.totalLabel}>Tax</Text><Text style={s.totalValue}>{fmt(tax)}</Text></View>}
+        {!settings.show_final_amount_only && (
+          <>
+            <View style={s.totalRow}><Text style={s.totalLabel}>Subtotal</Text><Text style={s.totalValue}>{fmt(subtotal)}</Text></View>
+            {discount > 0 && <View style={s.totalRow}><Text style={s.totalLabel}>Discount</Text><Text style={[s.totalValue, { color: '#10b981' }]}>-{fmt(discount)}</Text></View>}
+            {settings.show_tax_breakdown && tax > 0 && <View style={s.totalRow}><Text style={s.totalLabel}>Tax</Text><Text style={s.totalValue}>{fmt(tax)}</Text></View>}
+          </>
+        )}
         <View style={s.divider} />
         <View style={s.grandRow}><Text style={s.grandLabel}>Total</Text><Text style={s.grandValue}>{fmt(total)}</Text></View>
         {amountPaid > 0 && <View style={s.totalRow}><Text style={s.totalLabel}>Paid</Text><Text style={[s.totalValue, { color: '#10b981' }]}>{fmt(amountPaid)}</Text></View>}

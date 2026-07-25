@@ -156,11 +156,16 @@ function InvoicePreview({ s, businessName, branchName, previewContext }: {
     .filter(([line, fscope]) => !!line && (fscope === 'both' || fscope === previewContext))
     .map(([line]) => line)
 
-  const previewItems = [
+  const allPreviewItems = [
     { desc: 'iPhone Screen Replacement', qty: 1, price: 79.99 },
     { desc: 'Labour & Parts',            qty: 2, price: 15.00 },
   ]
-  const subtotal = previewItems.reduce((a, i) => a + i.qty * i.price, 0)
+  // Only the labour/repair-fee line is hidden when show_final_amount_only is on —
+  // parts keep showing their description and price.
+  const previewItems = s.show_final_amount_only
+    ? allPreviewItems.filter((i) => i.desc !== 'Labour & Parts')
+    : allPreviewItems
+  const subtotal = allPreviewItems.reduce((a, i) => a + i.qty * i.price, 0)
   const tax = 22.00
   const total = subtotal + tax
   const balanceDue = 36.98
@@ -195,10 +200,14 @@ function InvoicePreview({ s, businessName, branchName, previewContext }: {
           </div>
         ))}
         <hr style={{ border: 'none', borderTop: '1px dashed #d1d5db', margin: '6px 0' }} />
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-          <span style={{ color: '#6b7280' }}>Subtotal</span><span>£{subtotal.toFixed(2)}</span>
-        </div>
-        {s.show_tax_breakdown && <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}><span style={{ color: '#6b7280' }}>Tax</span><span>£{tax.toFixed(2)}</span></div>}
+        {!s.show_final_amount_only && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+              <span style={{ color: '#6b7280' }}>Subtotal</span><span>£{subtotal.toFixed(2)}</span>
+            </div>
+            {s.show_tax_breakdown && <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}><span style={{ color: '#6b7280' }}>Tax</span><span>£{tax.toFixed(2)}</span></div>}
+          </>
+        )}
         <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 12, margin: '4px 0' }}>
           <span>Total</span><span style={{ color: s.primary_color }}>£{total.toFixed(2)}</span>
         </div>
@@ -307,13 +316,17 @@ function InvoicePreview({ s, businessName, branchName, previewContext }: {
       {/* Totals */}
       <div style={{ padding: '8px 24px 12px', display: 'flex', justifyContent: 'flex-end' }}>
         <div style={{ width: 180 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-            <span style={{ color: '#6b7280' }}>Subtotal</span><span>£{subtotal.toFixed(2)}</span>
-          </div>
-          {s.show_tax_breakdown && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-              <span style={{ color: '#6b7280' }}>Tax</span><span>£{tax.toFixed(2)}</span>
-            </div>
+          {!s.show_final_amount_only && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                <span style={{ color: '#6b7280' }}>Subtotal</span><span>£{subtotal.toFixed(2)}</span>
+              </div>
+              {s.show_tax_breakdown && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                  <span style={{ color: '#6b7280' }}>Tax</span><span>£{tax.toFixed(2)}</span>
+                </div>
+              )}
+            </>
           )}
           <hr style={{ border: 'none', borderTop: '1px solid #e5e7eb', margin: '5px 0' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 11, marginBottom: 4 }}>
@@ -747,6 +760,12 @@ export function InvoiceDesignTab() {
                   desc="Show a faint 'UNPAID' watermark on outstanding invoices"
                   checked={settings.show_unpaid_watermark}
                   onChange={(v) => patch({ show_unpaid_watermark: v })}
+                />
+                <Toggle
+                  label="Show Only Final Amount"
+                  desc="Hide the labour/repair fee line — parts still show their description and price, and the total stays fully calculated."
+                  checked={settings.show_final_amount_only}
+                  onChange={(v) => patch({ show_final_amount_only: v })}
                 />
               </div>
             </Section>

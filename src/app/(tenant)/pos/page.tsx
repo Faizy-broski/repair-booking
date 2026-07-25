@@ -73,7 +73,7 @@ export default function PosPage() {
     repair_store_credit_sales: number; repair_loyalty_points_sales: number
     cash_in: number; cash_out: number; buyback_out: number
     credit_repayments_cash: number; credit_repayments_total: number
-    expected_cash: number; opening_float: number
+    expected_cash: number; opening_float: number; expenses?: number
   } | null>(null)
 
   const fetchSessionStats = useCallback(async (sessionId: string) => {
@@ -432,6 +432,10 @@ export default function PosPage() {
                 ['Cash In',        sessionStats.cash_in,                    'text-green-700',  'bg-green-500'],
                 ['Cash Out',       sessionStats.cash_out,                   'text-orange-700', 'bg-orange-500'],
                 ['Buyback',        sessionStats.buyback_out ?? 0,           'text-pink-700',   'bg-pink-500'],
+                // Expense is a one-off customization for a single business — the
+                // backend only returns this field for that business, so it's
+                // simply absent (undefined) for everyone else.
+                ...(sessionStats.expenses !== undefined ? [['Expense', sessionStats.expenses, 'text-rose-700', 'bg-rose-500']] : []),
                 ['Expected Cash',  sessionStats.expected_cash,              'text-amber-700',  'bg-amber-500'],
               ] as [string, number, string, string][]).map(([label, value, textCls, dotCls]) => (
                 <div key={label} className="flex shrink-0 flex-col gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm">

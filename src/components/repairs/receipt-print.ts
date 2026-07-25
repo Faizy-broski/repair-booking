@@ -29,6 +29,14 @@ function esc(s: string | null | undefined): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
+// Only the labour/repair-fee line is hidden when show_final_amount_only is on —
+// parts keep showing their description and price. Identified by the literal
+// description getRepairInvoiceData() gives it ("Repair Fee").
+function visibleItems<T extends { description: string }>(items: T[], settings: InvoiceSettings): T[] {
+  if (!settings.show_final_amount_only) return items
+  return items.filter((i) => i.description !== 'Repair Fee')
+}
+
 export interface ReceiptPrintData {
   settings: InvoiceSettings
   invoiceNumber: string
@@ -276,7 +284,7 @@ ${isRepairReceipt ? `
 
     <div style="border-bottom:1px dashed #000; margin:6px 0;"></div>
 
-    ${items.map(i => {
+    ${visibleItems(items, settings).map(i => {
       const gross = i.quantity * i.unit_price
       const itemDiscount = i.discount ?? 0
       const net = gross - itemDiscount
@@ -288,9 +296,9 @@ ${isRepairReceipt ? `
     `
     }).join('')}
     <div style="border-bottom:1px dashed #000; margin:6px 0;"></div>
-    <div class="tr"><span class="tl">Discount</span><span class="tv">${discount > 0 ? '-' + money(discount, currency) : money(0, currency)}</span></div>
-    <div class="tr"><span class="tl">Subtotal</span><span class="tv">${money(subtotal, currency)}</span></div>
-    ${L(settings.show_tax_breakdown && tax > 0, `<div class="tr"><span class="tl">Tax</span><span class="tv">${money(tax, currency)}</span></div>`)}
+    ${L(!settings.show_final_amount_only, `<div class="tr"><span class="tl">Discount</span><span class="tv">${discount > 0 ? '-' + money(discount, currency) : money(0, currency)}</span></div>`)}
+    ${L(!settings.show_final_amount_only, `<div class="tr"><span class="tl">Subtotal</span><span class="tv">${money(subtotal, currency)}</span></div>`)}
+    ${L(!settings.show_final_amount_only && settings.show_tax_breakdown && tax > 0, `<div class="tr"><span class="tl">Tax</span><span class="tv">${money(tax, currency)}</span></div>`)}
     <hr>
     <div class="gr"><span class="gl">Total Charges</span><span class="gv">${money(total, currency)}</span></div>
     <div class="tr"><span class="tl">Deposit / Paid</span><span class="tv">${money(amountPaid, currency)}</span></div>

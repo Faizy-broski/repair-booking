@@ -61,6 +61,7 @@ export interface InvoiceSettings {
   show_tax_breakdown: boolean
   show_payment_method: boolean
   show_unpaid_watermark: boolean
+  show_final_amount_only: boolean
 }
 
 export const DEFAULT_INVOICE_SETTINGS: InvoiceSettings = {
@@ -97,4 +98,5 @@ export const DEFAULT_INVOICE_SETTINGS: InvoiceSettings = {
   show_tax_breakdown: true,
   show_payment_method: false,
   show_unpaid_watermark: true,
+  show_final_amount_only: false,
 }

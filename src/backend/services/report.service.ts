@@ -6,6 +6,23 @@ import { buildPosOverrideMap } from './repair-financials.service'
 const db = (table: string): any => (adminSupabase as any).from(table)
 const rpc = (fn: string, args?: Record<string, unknown>): any => (adminSupabase as any).rpc(fn, args)
 
+// The Expense figure on the POS register summary is a one-off customization for
+// a single client business — not a general feature — so it's gated behind an
+// explicit business ID rather than a module setting.
+const EXPENSE_STAT_BUSINESS_IDS = new Set(['b822b350-8590-49c8-a421-1018dd92c468'])
+
+// Expenses aren't tracked by the register RPCs (register_session_expected /
+// close_register_session) — they're recorded separately via the Expenses page,
+// same source the dashboard's "Total Expenses" card uses. Sums them here so the
+// POS session stats and Z-report can show an Expense figure alongside sales.
+async function sumExpensesSince(branchId: string, sinceIso: string): Promise<number> {
+  const { data } = await db('expenses')
+    .select('amount')
+    .eq('branch_id', branchId)
+    .gte('expense_date', sinceIso)
+  return (data ?? []).reduce((sum: number, row: any) => sum + Number(row.amount ?? 0), 0)
+}
+
 export const ReportService = {
   async getDashboardStats(branchId: string, startDate: string, endDate: string) {
     const { data, error } = await rpc('get_dashboard_stats', {
@@ -490,17 +507,35 @@ export const ReportService = {
   async previewExpectedCash(sessionId: string) {
     const { data, error } = await rpc('register_session_expected', { p_session_id: sessionId })
     if (error) throw error
-    return data
+
+    const { data: session } = await db('register_sessions')
+      .select('business_id, branch_id, opened_at')
+      .eq('id', sessionId)
+      .single()
+    const expenses = (session && EXPENSE_STAT_BUSINESS_IDS.has(session.business_id))
+      ? await sumExpensesSince(session.branch_id, session.opened_at)
+      : undefined
+
+    return { ...data, expenses }
   },
 
   async closeSession(sessionId: string, closingCash: number, closingNote?: string) {
+    const { data: session } = await db('register_sessions')
+      .select('business_id, branch_id, opened_at')
+      .eq('id', sessionId)
+      .single()
+
     const { data, error } = await (adminSupabase as any).rpc('close_register_session', {
       p_session_id: sessionId,
       p_closing_cash: closingCash,
       p_closing_note: closingNote ?? null,
     })
     if (error) throw error
-    return data
+
+    const expenses = (session && EXPENSE_STAT_BUSINESS_IDS.has(session.business_id))
+      ? await sumExpensesSince(session.branch_id, session.opened_at)
+      : undefined
+    return { ...data, expenses }
   },
 
   async getCurrentSession(branchId: string | null) {

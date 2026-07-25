@@ -13,7 +13,7 @@ interface SessionStats {
   repair_store_credit_sales: number; repair_loyalty_points_sales: number
   cash_in: number; cash_out: number; buyback_out: number
   credit_repayments_cash: number; credit_repayments_total: number
-  expected_cash: number; opening_float: number
+  expected_cash: number; opening_float: number; expenses?: number
 }
 
 interface Props {
@@ -111,7 +111,16 @@ export function CloseRegisterModal({
                   <p className="mt-0.5 font-semibold text-cyan-700">+{formatCurrency(zReport.credit_repayments_cash ?? 0)}</p>
                 </div>
               )}
+              {(zReport.expenses ?? 0) > 0 && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
+                  <p className="text-xs text-rose-700">Expense</p>
+                  <p className="mt-0.5 font-semibold text-rose-700">-{formatCurrency(zReport.expenses ?? 0)}</p>
+                </div>
+              )}
             </div>
+            {(zReport.expenses ?? 0) > 0 && (
+              <p className="mt-2 text-xs text-gray-400 italic">Expense reflects business expenses logged for this branch since the shift opened — shown for information only and excluded from the cash reconciliation below (cash-drawer expenses are already captured in Cash Out).</p>
+            )}
             {((zReport.cash_in ?? 0) > 0 || (zReport.cash_out ?? 0) > 0) && (
               <p className="mt-2 text-xs text-gray-400 italic">Cash In/Out are manual drawer adjustments for the whole shift — not tied to product or repair sales specifically. Buyback is a subset of Cash Out, shown separately for clarity.</p>
             )}
@@ -277,6 +286,9 @@ export function CloseRegisterModal({
                       ['Cash In',       sessionStats.cash_in,                'text-green-700',  'bg-green-500'],
                       ['Cash Out',      sessionStats.cash_out,               'text-orange-700', 'bg-orange-500'],
                       ['Buyback',       sessionStats.buyback_out,            'text-pink-700',   'bg-pink-500'],
+                      // Expense is a one-off customization for a single business — the
+                      // backend only returns this field for that business.
+                      ...(sessionStats.expenses !== undefined ? [['Expense', sessionStats.expenses, 'text-rose-700', 'bg-rose-500'] as const] : []),
                     ] as [string, number | undefined, string, string][]).map(([label, value, textCls, dotCls]) => (
                       <div key={label} className="min-w-0 rounded-xl border border-gray-200 bg-white p-2.5 sm:p-3">
                         <p className="flex items-center gap-1.5 truncate text-[11px] text-gray-500 sm:text-xs" title={label}>
