@@ -557,6 +557,7 @@ export function InvoiceDesignTab() {
                   value={settings.logo_url ?? ''}
                   onChange={(url) => patch({ logo_url: url || null })}
                   placeholder="Upload invoice logo"
+                  trimPadding
                 />
               </div>
               <div className="grid grid-cols-3 gap-3">
