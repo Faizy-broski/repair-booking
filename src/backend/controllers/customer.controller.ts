@@ -59,7 +59,7 @@ export const CustomerController = {
     try {
       const limitCheck = await PlanLimitService.checkLimit(ctx.businessId, 'max_customers')
       if (!limitCheck.allowed) {
-        return forbidden(`Customer limit reached. Your plan allows ${limitCheck.limit} customers.`)
+        return forbidden(`Customer limit reached. Your plan allows ${limitCheck.limit} customers.`, 'LIMIT_REACHED')
       }
 
       const customer = await CustomerService.create({

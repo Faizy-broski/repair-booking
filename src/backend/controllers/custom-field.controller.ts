@@ -42,7 +42,7 @@ export const CustomFieldController = {
     try {
       const limitCheck = await PlanLimitService.checkLimit(ctx.businessId, 'max_custom_fields')
       if (!limitCheck.allowed) {
-        return forbidden(`Custom field limit reached. Your plan allows ${limitCheck.limit} custom field${limitCheck.limit === 1 ? '' : 's'}.`)
+        return forbidden(`Custom field limit reached. Your plan allows ${limitCheck.limit} custom field${limitCheck.limit === 1 ? '' : 's'}.`, 'LIMIT_REACHED')
       }
       const field = await CustomFieldService.create({
         ...data,

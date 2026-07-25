@@ -22,6 +22,7 @@ import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import { Suspense } from 'react'
+import { showApiError } from '@/lib/limit-error'
 import type { ColumnDef } from '@tanstack/react-table'
 
 interface EmployeeRow {
@@ -343,7 +344,12 @@ function EmployeesPageInner() {
         queryClient.invalidateQueries({ queryKey: ['employees-list', activeBranch.id] })
       } else {
         const j = await res.json()
-        setCreateError(j?.error?.message ?? 'Failed to create employee.')
+        if (j?.error?.code === 'LIMIT_REACHED') {
+          setSheetOpen(false)
+          showApiError(j.error, router, 'max_employees')
+        } else {
+          setCreateError(j?.error?.message ?? 'Failed to create employee.')
+        }
       }
     }
   }

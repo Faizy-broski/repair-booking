@@ -1,11 +1,13 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus, Trash2, GripVertical, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { MODULES, type Module } from '@/backend/config/constants'
+import { showApiError } from '@/lib/limit-error'
 
 type FieldType = 'text' | 'textarea' | 'number' | 'select' | 'date' | 'boolean' | 'checkbox' | 'phone' | 'email'
 
@@ -45,6 +47,7 @@ interface CustomFieldBuilderProps {
  * Fetches existing fields from /api/custom-fields and allows CRUD.
  */
 export function CustomFieldBuilder({ module: initialModule, repairCategory: initialCategory, onSaved }: CustomFieldBuilderProps) {
+  const router = useRouter()
   const [module, setModule] = useState<string>(initialModule ?? 'repairs')
   const [repairCategory, setRepairCategory] = useState<string>(initialCategory ?? '')
   const [fields, setFields] = useState<CustomField[]>([])
@@ -126,7 +129,11 @@ export function CustomFieldBuilder({ module: initialModule, repairCategory: init
           })
           if (!res.ok) {
             const json = await res.json().catch(() => null)
-            setSaveError(json?.error?.message ?? 'Failed to save custom field.')
+            if (json?.error?.code === 'LIMIT_REACHED') {
+              showApiError(json.error, router, 'max_custom_fields')
+            } else {
+              setSaveError(json?.error?.message ?? 'Failed to save custom field.')
+            }
             return
           }
         }

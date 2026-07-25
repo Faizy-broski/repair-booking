@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button as UIButton } from '@/components/ui/button'
 import { Input as UIInput } from '@/components/ui/input'
 import { ImageUpload as UIImageUpload } from '@/components/ui/image-upload'
@@ -8,6 +9,7 @@ import { useForm, useFieldArray, useFormContext, Controller } from 'react-hook-f
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
 import { Plus as PlusIcon, UserRound, MapPin, Phone, Pencil, Building2, Mail, ShieldCheck, Check, Loader2 } from 'lucide-react'
+import { showApiError } from '@/lib/limit-error'
 
 interface BranchUser {
   id: string; full_name: string | null; email: string | null; role: string; avatar_url: string | null; is_active: boolean | null
@@ -36,6 +38,7 @@ const newBranchSchema = branchSchema.extend({
 type NewBranchFormData = z.infer<typeof newBranchSchema>
 
 export default function BranchesSettingsPage() {
+  const router = useRouter()
   const { branches: storeBranches, setBranches: setStoreBranches, activeBranch, setActiveBranch } = useAuthStore()
   const [branchList, setBranchList] = useState<Branch[]>(storeBranches as Branch[])
   const [editBranchId, setEditBranchId] = useState<string | null>(null)
@@ -88,7 +91,15 @@ export default function BranchesSettingsPage() {
       refreshBranches()
     } else {
       const json = await res.json()
-      setBranchCreateError(json?.error?.message ?? 'Failed to create branch.')
+      if (json?.error?.code === 'LIMIT_REACHED') {
+        // Branch creation checks both the branch limit and the user limit
+        // (a branch always comes with a manager account) — route to whichever
+        // dimension the backend actually rejected on.
+        const limitKey = (json.error.message as string)?.startsWith('User limit') ? 'max_users' : 'max_branches'
+        showApiError(json.error, router, limitKey)
+      } else {
+        setBranchCreateError(json?.error?.message ?? 'Failed to create branch.')
+      }
     }
   }
 

@@ -1,13 +1,15 @@
 'use client'
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, Pencil, Check, X, Layers } from 'lucide-react'
+import { Plus, Trash2, Pencil, Check, X, Layers, ChevronDown, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 interface CostLayer {
   id: string
   quantity: number
+  quantity_received: number | null
+  depleted_at: string | null
   unit_cost: number
   selling_price: number | null
   received_at: string
@@ -32,6 +34,7 @@ export function BatchManager({ productId, variantId, branchId }: BatchManagerPro
   const [newCost, setNewCost] = useState('')
   const [newPrice, setNewPrice] = useState('')
   const [saving, setSaving] = useState(false)
+  const [showDepleted, setShowDepleted] = useState(false)
 
   const queryKey = ['inv-product-cost-layers', productId, branchId]
 
@@ -47,7 +50,11 @@ export function BatchManager({ productId, variantId, branchId }: BatchManagerPro
     enabled: !!productId,
   })
 
-  const layers = (allLayers ?? []).filter(l => l.variant_id === variantId)
+  const forVariant = (allLayers ?? []).filter(l => l.variant_id === variantId)
+  const layers = forVariant.filter(l => l.quantity > 0)
+  const depletedLayers = forVariant
+    .filter(l => l.quantity === 0)
+    .sort((a, b) => new Date(b.depleted_at ?? 0).getTime() - new Date(a.depleted_at ?? 0).getTime())
 
   function invalidateAll() {
     qc.invalidateQueries({ queryKey })
@@ -204,6 +211,45 @@ export function BatchManager({ productId, variantId, branchId }: BatchManagerPro
         <button type="button" onClick={() => setAdding(true)} className="flex items-center gap-1.5 text-sm font-medium text-brand-teal hover:text-brand-teal-dark">
           <Plus className="h-3.5 w-3.5" /> Add batch
         </button>
+      )}
+
+      {depletedLayers.length > 0 && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowDepleted(v => !v)}
+            className="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700"
+          >
+            {showDepleted ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            Depleted batches ({depletedLayers.length})
+          </button>
+          {showDepleted && (
+            <div className="mt-2 rounded-lg border border-gray-200 overflow-x-auto opacity-70">
+              <table className="w-full divide-y divide-gray-100 text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Received</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Depleted</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Received Qty</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Cost Price</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Selling Price</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {depletedLayers.map(layer => (
+                    <tr key={layer.id}>
+                      <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{formatDate(layer.received_at)}</td>
+                      <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{layer.depleted_at ? formatDate(layer.depleted_at) : '—'}</td>
+                      <td className="px-3 py-2 text-gray-600">{layer.quantity_received ?? layer.quantity}</td>
+                      <td className="px-3 py-2 text-gray-600">{formatCurrency(layer.unit_cost)}</td>
+                      <td className="px-3 py-2 text-gray-600">{layer.selling_price != null ? formatCurrency(layer.selling_price) : <span className="text-gray-300">—</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
     </div>
   )

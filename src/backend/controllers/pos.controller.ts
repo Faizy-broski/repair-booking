@@ -190,14 +190,14 @@ export const PosController = {
     const { data, error } = await validateBody(request, createSaleSchema)
     if (error) return error
     try {
-      const saleId = await PosService.processSale(data)
+      const { saleId, invoiceNumber } = await PosService.processSale(data)
       CommissionService.recordForSale(ctx.businessId, data.cashier_id, saleId, data.total, {
         servedByEmployeeId: data.served_by_employee_id ?? null,
         manualCommission: data.commission_amount
           ? { type: data.commission_type ?? 'flat', value: data.commission_amount }
           : null,
       }).catch(() => {})
-      return created({ sale_id: saleId })
+      return created({ sale_id: saleId, invoice_number: invoiceNumber })
     } catch (err: any) {
       if (err?.code === 'P0001' && err?.message) return badRequest(err.message, 'STOCK_ERROR')
       return serverError('Failed to process sale', err)

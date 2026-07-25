@@ -55,6 +55,7 @@ export const InvoiceSettingsService = {
       footer_line_3_scope: row.footer_line_3_scope ?? 'both',
       thank_you_message: row.thank_you_message ?? DEFAULT_INVOICE_SETTINGS.thank_you_message,
       policy_text: row.policy_text ?? null,
+      policy_text_scope: row.policy_text_scope ?? 'both',
       since_year: row.since_year ?? null,
       guarantee_line_1: row.guarantee_line_1 ?? null,
       guarantee_line_2: row.guarantee_line_2 ?? null,

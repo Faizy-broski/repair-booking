@@ -67,12 +67,21 @@ export interface SalePayload {
 }
 
 export const PosService = {
-  async processSale(payload: SalePayload): Promise<string> {
+  async processSale(payload: SalePayload): Promise<{ saleId: string; invoiceNumber: string | null }> {
     const { data, error } = await adminSupabase.rpc('process_sale', {
       p_sale_data: payload as unknown as Json,
     })
     if (error) throw error
-    return data as string
+    const saleId = data as string
+
+    // Cast: invoice_number was added in migration 166, ahead of the generated
+    // Supabase types picking it up — same as the `sale_number` column above.
+    const { data: sale } = await (adminSupabase.from('sales') as any)
+      .select('invoice_number')
+      .eq('id', saleId)
+      .single()
+
+    return { saleId, invoiceNumber: sale?.invoice_number ?? null }
   },
 
   async recordCreditPayment(saleId: string, amount: number, method: string, businessId: string, createdBy: string): Promise<void> {

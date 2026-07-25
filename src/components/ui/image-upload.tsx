@@ -2,6 +2,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { ImagePlus, X, Loader2, Link as LinkIcon, Upload, Camera } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { trimImagePadding } from '@/lib/image-trim'
 
 interface ImageUploadProps {
   /** Current image URL (Supabase storage or external) */
@@ -13,6 +14,8 @@ interface ImageUploadProps {
   /** Compact mode only — square size. Defaults to 'sm' (32px). */
   size?: 'sm' | 'md' | 'lg'
   className?: string
+  /** Auto-trim transparent/near-white padding before upload (logos squeezed into a fixed box). */
+  trimPadding?: boolean
 }
 
 const COMPACT_SIZES = {
@@ -30,7 +33,7 @@ const COMPACT_SIZES = {
  * Compact mode (for catalogue rows):
  *   <ImageUpload value={imageUrl} onChange={setImageUrl} compact />
  */
-export function ImageUpload({ value, onChange, label, compact = false, size = 'sm', className }: ImageUploadProps) {
+export function ImageUpload({ value, onChange, label, compact = false, size = 'sm', className, trimPadding = false }: ImageUploadProps) {
   const fileRef    = useRef<HTMLInputElement>(null)
   const videoRef   = useRef<HTMLVideoElement>(null)
   const canvasRef  = useRef<HTMLCanvasElement>(null)
@@ -87,8 +90,9 @@ export function ImageUpload({ value, onChange, label, compact = false, size = 's
     }
     setUploading(true)
     try {
+      const toUpload = trimPadding ? await trimImagePadding(file) : file
       const form = new FormData()
-      form.append('file', file)
+      form.append('file', toUpload)
       const res = await fetch('/api/upload/image', { method: 'POST', body: form })
       if (res.status === 413) {
         setError('Image is too large — please use an image under 10 MB')

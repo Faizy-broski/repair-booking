@@ -18,7 +18,7 @@ function hexToRgba(hex: string | undefined | null, alpha: number): string {
 
 const SOCIAL_LABELS: Record<keyof SocialLinks, string> = {
   website: 'Web', facebook: 'FB', instagram: 'IG',
-  twitter: 'TW', whatsapp: 'WA', tiktok: 'TT',
+  twitter: 'TW', whatsapp: 'WA', landline: 'Tel', tiktok: 'TT',
 }
 
 // ── Paper size map ─────────────────────────────────────────────────────────────
@@ -514,7 +514,7 @@ export function InvoicePdf(props: InvoicePdfProps) {
               ))}
             </View>
           )}
-          {settings.policy_text && (
+          {settings.policy_text && (settings.policy_text_scope ?? 'both') !== 'pos' && (
             <Text style={s.policy}>{settings.policy_text}</Text>
           )}
         </View>
@@ -675,7 +675,9 @@ function ReceiptPdf({
         {socialEntries.map(([key, val], i) => (
           <Text key={key} style={s.footerText}>{SOCIAL_LABELS[key]}: {val}</Text>
         ))}
-        {settings.policy_text && <Text style={s.policy}>{settings.policy_text}</Text>}
+        {settings.policy_text && (settings.policy_text_scope ?? 'both') !== 'pos' && (
+          <Text style={s.policy}>{settings.policy_text}</Text>
+        )}
       </Page>
     </Document>
   )

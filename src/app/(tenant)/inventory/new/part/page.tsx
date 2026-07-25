@@ -14,6 +14,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { queryClient } from '@/lib/query-client'
 import { formatCurrency, getCurrencySymbol } from '@/lib/utils'
 import Link from 'next/link'
+import { showApiError } from '@/lib/limit-error'
 
 interface Category    { id: string; name: string }
 interface Brand       { id: string; name: string; category_id?: string | null }
@@ -372,8 +373,12 @@ export default function NewPartPage() {
       }
     } else {
       const j = await res.json().catch(() => ({}))
-      const msg = j?.error?.message || j?.message || 'Failed to save.'
-      setSaveError(msg); toast.error(msg)
+      if (j?.error?.code === 'LIMIT_REACHED') {
+        showApiError(j.error, router, 'max_products')
+      } else {
+        const msg = j?.error?.message || j?.message || 'Failed to save.'
+        setSaveError(msg); toast.error(msg)
+      }
     }
     setSaving(false)
   }

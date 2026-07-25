@@ -32,8 +32,8 @@ export function unauthorized(message = 'Unauthorized'): NextResponse {
   return NextResponse.json({ data: null, error: { code: 'UNAUTHORIZED', message } }, { status: 401 })
 }
 
-export function forbidden(message = 'Forbidden'): NextResponse {
-  return NextResponse.json({ data: null, error: { code: 'FORBIDDEN', message } }, { status: 403 })
+export function forbidden(message = 'Forbidden', code = 'FORBIDDEN'): NextResponse {
+  return NextResponse.json({ data: null, error: { code, message } }, { status: 403 })
 }
 
 export function notFound(message = 'Not found'): NextResponse {

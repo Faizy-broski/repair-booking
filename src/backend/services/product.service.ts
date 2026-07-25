@@ -12,7 +12,7 @@ export const ProductService = {
   async getCostLayers(productId: string, branchId?: string) {
     let q = db
       .from('inventory_cost_layers')
-      .select('id, quantity, unit_cost, selling_price, received_at, source_type, branch_id, variant_id')
+      .select('id, quantity, quantity_received, depleted_at, unit_cost, selling_price, received_at, source_type, branch_id, variant_id')
       .eq('product_id', productId)
       .order('received_at', { ascending: true })
     if (branchId) q = q.eq('branch_id', branchId)

@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { KeyRound, Pencil, X, Crown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -7,6 +8,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
+import { showApiError } from '@/lib/limit-error'
 
 interface UserRow {
   id: string; full_name: string | null; email: string; role: string; is_active: boolean
@@ -59,6 +61,7 @@ const ROLE_LABELS: Record<string, string> = {
 }
 
 export default function UsersSettingsPage() {
+  const router = useRouter()
   const { isOwner, branches, profile } = useAuthStore()
   const [users, setUsers] = useState<UserRow[]>([])
   const [userCreateError, setUserCreateError] = useState<string | null>(null)
@@ -180,13 +183,17 @@ export default function UsersSettingsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
-    if (res.ok) { 
+    if (res.ok) {
       userForm.reset()
       const json = await res.json()
-      setUsers((u) => [...u, json.data]) 
-    } else { 
+      setUsers((u) => [...u, json.data])
+    } else {
       const j = await res.json()
-      setUserCreateError(j?.error?.message ?? 'Failed to create user.') 
+      if (j?.error?.code === 'LIMIT_REACHED') {
+        showApiError(j.error, router, 'max_users')
+      } else {
+        setUserCreateError(j?.error?.message ?? 'Failed to create user.')
+      }
     }
   }
 
