@@ -13,6 +13,7 @@ import { toast } from 'sonner'
 import { useAuthStore } from '@/store/auth.store'
 import { queryClient } from '@/lib/query-client'
 import { formatCurrency, getCurrencySymbol } from '@/lib/utils'
+import { showApiError } from '@/lib/limit-error'
 import Link from 'next/link'
 
 interface Category    { id: string; name: string }
@@ -364,8 +365,12 @@ export default function NewProductPage() {
       }
     } else {
       const j = await res.json().catch(() => ({}))
-      const msg = j?.error?.message || j?.message || 'Failed to save.'
-      setSaveError(msg); toast.error(msg)
+      if (j?.error?.code === 'LIMIT_REACHED') {
+        showApiError(j.error, router, 'max_products')
+      } else {
+        const msg = j?.error?.message || j?.message || 'Failed to save.'
+        setSaveError(msg); toast.error(msg)
+      }
     }
     setSaving(false)
   }

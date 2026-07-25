@@ -42,12 +42,12 @@ export const BranchController = {
         const limitMsg = branchLimitCheck.limit != null
           ? `Your plan allows ${branchLimitCheck.limit} branch${branchLimitCheck.limit === 1 ? '' : 'es'}.`
           : (branchLimitCheck.reason ?? 'Upgrade your plan to add more branches.')
-        return forbidden(`Branch limit reached. ${limitMsg}`)
+        return forbidden(`Branch limit reached. ${limitMsg}`, 'LIMIT_REACHED')
       }
 
       const userLimitCheck = await PlanLimitService.checkLimit(ctx.businessId, 'max_users')
       if (!userLimitCheck.allowed) {
-        return forbidden(`User limit reached. Your plan allows ${userLimitCheck.limit} user${userLimitCheck.limit === 1 ? '' : 's'}.`)
+        return forbidden(`User limit reached. Your plan allows ${userLimitCheck.limit} user${userLimitCheck.limit === 1 ? '' : 's'}.`, 'LIMIT_REACHED')
       }
 
       const { manager_full_name, manager_email, manager_password, manager_role, ...branchData } = data

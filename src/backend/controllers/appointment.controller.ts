@@ -89,7 +89,7 @@ export const AppointmentController = {
     try {
       const limitCheck = await PlanLimitService.checkLimit(ctx.businessId, 'max_appointments_per_month')
       if (!limitCheck.allowed) {
-        return forbidden(`Appointment limit reached. Your plan allows ${limitCheck.limit} appointments per month.`)
+        return forbidden(`Appointment limit reached. Your plan allows ${limitCheck.limit} appointments per month.`, 'LIMIT_REACHED')
       }
 
       // Check for overlapping appointments

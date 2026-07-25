@@ -141,7 +141,7 @@ export const ProductController = {
       const limitCheck = await PlanLimitService.checkLimit(ctx.businessId, limitKey)
       if (!limitCheck.allowed) {
         const label = data.is_service ? 'service' : 'product'
-        return forbidden(`${label.charAt(0).toUpperCase() + label.slice(1)} limit reached. Your plan allows ${limitCheck.limit} ${label}s.`)
+        return forbidden(`${label.charAt(0).toUpperCase() + label.slice(1)} limit reached. Your plan allows ${limitCheck.limit} ${label}s.`, 'LIMIT_REACHED')
       }
 
       const { initial_stock, low_stock_alert, branch_id, ...productData } = data
@@ -219,7 +219,7 @@ export const ProductController = {
       const limitCheck = await PlanLimitService.checkLimit(ctx.businessId, limitKey)
       if (!limitCheck.allowed) {
         const label = (source as any).is_service ? 'service' : 'product'
-        return forbidden(`${label.charAt(0).toUpperCase() + label.slice(1)} limit reached. Your plan allows ${limitCheck.limit} ${label}s.`)
+        return forbidden(`${label.charAt(0).toUpperCase() + label.slice(1)} limit reached. Your plan allows ${limitCheck.limit} ${label}s.`, 'LIMIT_REACHED')
       }
 
       const branchId = request.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId ?? undefined

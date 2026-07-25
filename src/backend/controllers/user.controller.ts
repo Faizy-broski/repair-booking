@@ -47,7 +47,7 @@ export const UserController = {
     try {
       const limitCheck = await PlanLimitService.checkLimit(ctx.businessId, 'max_users')
       if (!limitCheck.allowed) {
-        return forbidden(`User limit reached. Your plan allows ${limitCheck.limit} user${limitCheck.limit === 1 ? '' : 's'}.`)
+        return forbidden(`User limit reached. Your plan allows ${limitCheck.limit} user${limitCheck.limit === 1 ? '' : 's'}.`, 'LIMIT_REACHED')
       }
 
       const user = await UserService.create({

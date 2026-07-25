@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -11,6 +12,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
 import { addDays, format, startOfWeek, isSameDay } from 'date-fns'
+import { showApiError } from '@/lib/limit-error'
 
 interface AppointmentRow {
   id: string
@@ -53,6 +55,7 @@ type FormData = z.infer<typeof schema>
 const DEFAULT_HOURS = Array.from({ length: 15 }, (_, i) => i + 7) // 7am - 9pm
 
 export default function AppointmentsPage() {
+  const router = useRouter()
   const { activeBranch } = useAuthStore()
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }))
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -117,7 +120,11 @@ export default function AppointmentsPage() {
     if (res.ok) { reset(); setSheetOpen(false); queryClient.invalidateQueries({ queryKey: ['appointments-data'] }) }
     else {
       const json = await res.json().catch(() => null)
-      setCreateError(json?.error?.message ?? 'Failed to create appointment.')
+      if (json?.error?.code === 'LIMIT_REACHED') {
+        showApiError(json.error, router, 'max_appointments_per_month')
+      } else {
+        setCreateError(json?.error?.message ?? 'Failed to create appointment.')
+      }
     }
   }
 

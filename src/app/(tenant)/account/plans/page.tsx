@@ -1,7 +1,7 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { CheckCircle2, Loader2, Zap, ArrowLeft } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { CheckCircle2, Loader2, Zap, ArrowLeft, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/store/auth.store'
@@ -27,6 +27,30 @@ interface Plan {
   limits?: Record<string, number | boolean | null> | null
 }
 
+// Maps a backend plan-limit key to the Custom Plan dimension it corresponds
+// to, so the builder can be pre-bumped and highlighted for limits it can
+// actually address. Limits with no entry here (customers, custom fields,
+// appointments/month) aren't independently adjustable via Custom Plan —
+// a higher fixed tier is the only path for those.
+const LIMIT_TO_DIMENSION: Record<string, 'branches' | 'staff' | 'inventoryLimit' | 'repairLimit'> = {
+  max_branches: 'branches',
+  max_users: 'staff',
+  max_employees: 'staff',
+  max_products: 'inventoryLimit',
+  max_services: 'repairLimit',
+}
+
+const LIMIT_FRIENDLY_LABEL: Record<string, string> = {
+  max_customers: 'customers',
+  max_branches: 'branches',
+  max_users: 'staff',
+  max_employees: 'staff',
+  max_products: 'inventory items',
+  max_services: 'services',
+  max_custom_fields: 'custom fields',
+  max_appointments_per_month: 'appointments per month',
+}
+
 function parseFeatures(features: string[] | null): string[] {
   if (!features) return []
   if (Array.isArray(features)) return features
@@ -35,6 +59,10 @@ function parseFeatures(features: string[] | null): string[] {
 
 export default function PlansPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const limitReason = searchParams.get('reason') === 'limit'
+  const limitKey = searchParams.get('limit')
+  const limitDimension = limitKey ? LIMIT_TO_DIMENSION[limitKey] : undefined
   const { subscriptionStatus } = useAuthStore()
   const [plans, setPlans] = useState<Plan[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,9 +73,31 @@ export default function PlansPage() {
   const [customEditable, setCustomEditable] = useState(false) // trialing, is_custom, no stripe_sub_id yet
   const [savingCustom, setSavingCustom] = useState(false)
   const [upgradingCustom, setUpgradingCustom] = useState(false)
+  const appliedLimitInit = useRef(false)
   const { profile } = useAuthStore()
   const customPlanBaseline = deriveCustomPlanBaseline(plans)
   const effectiveCustomPlan = customPlan ?? makeDefaultCustomPlanState(customPlanBaseline)
+
+  // Arrived here via an "Upgrade Plan" CTA on a limit-reached error — if the
+  // hit limit maps to a Custom Plan dimension (branches/staff/inventory/repairs),
+  // pre-bump that dimension one increment above baseline so the builder already
+  // shows a plan that would fix it. Skipped if a trial custom-plan state has
+  // already been loaded (see the effect below) so we never clobber real data.
+  useEffect(() => {
+    if (!limitReason || !limitDimension || plans.length === 0 || appliedLimitInit.current) return
+    appliedLimitInit.current = true
+    setCustomPlan((prev) => {
+      if (prev) return prev
+      const base = makeDefaultCustomPlanState(customPlanBaseline)
+      switch (limitDimension) {
+        case 'branches': return { ...base, branches: base.branches + 1 }
+        case 'staff': return { ...base, staff: base.staff + 5 }
+        case 'inventoryLimit': return { ...base, inventoryLimit: base.inventoryLimit + 1000 }
+        case 'repairLimit': return { ...base, repairLimit: base.repairLimit + 1000 }
+        default: return prev
+      }
+    })
+  }, [limitReason, limitDimension, plans, customPlanBaseline])
 
   useEffect(() => {
     fetch('/api/plans')
@@ -181,6 +231,18 @@ export default function PlansPage() {
           </p>
         </div>
 
+        {limitReason && (
+          <div className="mb-8 flex items-start gap-3 rounded-xl border border-brand-teal/30 bg-brand-teal/10 px-4 py-3 text-sm text-on-surface">
+            <Info className="h-4 w-4 shrink-0 mt-0.5 text-brand-teal" />
+            <p>
+              You&apos;ve reached the {limitKey ? (LIMIT_FRIENDLY_LABEL[limitKey] ?? 'limit') : 'limit'} on your current plan.{' '}
+              {limitDimension
+                ? 'Pick a plan below, or build a Custom Plan sized for your business.'
+                : 'Pick a plan below with a higher limit.'}
+            </p>
+          </div>
+        )}
+
         {/* Billing cycle toggle */}
         <div className="flex justify-center mb-8">
           <div className="flex items-center gap-1 rounded-full border border-outline-variant bg-surface-container-low p-1">
@@ -311,6 +373,7 @@ export default function PlansPage() {
               onChange={setCustomPlan}
               baseline={customPlanBaseline}
               variant="light"
+              highlight={limitReason && !!limitDimension}
               billingCycle={billingCycle}
               ctaLabel={
                 customEditable

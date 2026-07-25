@@ -77,7 +77,7 @@ export const EmployeeController = {
     try {
       const limitCheck = await PlanLimitService.checkLimit(ctx.businessId, 'max_employees')
       if (!limitCheck.allowed) {
-        return forbidden(`Employee limit reached. Your plan allows ${limitCheck.limit} employee${limitCheck.limit === 1 ? '' : 's'}.`)
+        return forbidden(`Employee limit reached. Your plan allows ${limitCheck.limit} employee${limitCheck.limit === 1 ? '' : 's'}.`, 'LIMIT_REACHED')
       }
       const email = data.email || null
       if (email) {

@@ -19,6 +19,7 @@ import type { ColumnDef, VisibilityState } from '@tanstack/react-table'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { showApiError } from '@/lib/limit-error'
 
 interface CustomerRow {
   id: string
@@ -215,7 +216,7 @@ export default function CustomersPage() {
     } else {
       if (prev) queryClient.setQueryData(customersKey, prev)
       const j = await res.json()
-      toast.error(j?.error?.message ?? 'Failed to create customer.')
+      showApiError(j?.error, router, 'max_customers', 'Failed to create customer.')
     }
   }
 
