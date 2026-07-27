@@ -3,7 +3,7 @@ import { useState, use } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Truck, Phone, Mail, MapPin, Banknote, FileText, Download, Receipt, Search, X, Loader2, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Truck, Phone, Mail, MapPin, Banknote, FileText, Download, Receipt, Search, X, Loader2, RefreshCw, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { BrandSpinner } from '@/components/ui/brand-spinner'
 import { Button } from '@/components/ui/button'
@@ -172,16 +172,21 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
         <ArrowLeft className="h-4 w-4" /> Back to Suppliers
       </button>
 
-      <div className="flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100">
-          <Truck className="h-6 w-6 text-blue-600" />
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100">
+            <Truck className="h-6 w-6 text-blue-600" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">{supplier.name}</h1>
+            <p className="text-sm text-gray-500">
+              {[supplier.contact_person, supplier.city, supplier.country].filter(Boolean).join(' · ') || 'No contact details'}
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">{supplier.name}</h1>
-          <p className="text-sm text-gray-500">
-            {[supplier.contact_person, supplier.city, supplier.country].filter(Boolean).join(' · ') || 'No contact details'}
-          </p>
-        </div>
+        <Button onClick={() => router.push(`/inventory/purchase-orders?new=1&supplier_id=${id}`)}>
+          <Plus className="h-4 w-4" /> New Purchase Order
+        </Button>
       </div>
 
       <div className="flex gap-1 border-b border-gray-200">

@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import Link from 'next/link'
 import { Plus, Eye, X, CheckCircle, Copy, Banknote, Loader2, Pencil, Trash2, ArrowLeft, MoreVertical } from 'lucide-react'
@@ -14,7 +14,7 @@ import { DataTable } from '@/components/shared/data-table'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { confirmToast } from '@/lib/confirm-toast'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import type { ColumnDef } from '@tanstack/react-table'
 
@@ -54,6 +54,7 @@ const MANUAL_STATUSES = ['draft', 'pending', 'in_progress', 'cancelled']
 export default function PurchaseOrdersPage() {
   const { activeBranch } = useAuthStore()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const queryClient = useQueryClient()
   const [page,      setPage]      = useState(0)
@@ -81,6 +82,16 @@ export default function PurchaseOrdersPage() {
   const [editItems,    setEditItems]    = useState<DraftItem[]>([])
   const [editSaving,   setEditSaving]   = useState(false)
   const [editPickerOpen, setEditPickerOpen] = useState(false)
+
+  useEffect(() => {
+    const prefillSupplierId = searchParams.get('supplier_id')
+    if (searchParams.get('new') === '1' && prefillSupplierId) {
+      setSupplierId(prefillSupplierId)
+      setSheetOpen(true)
+      router.replace('/inventory/purchase-orders')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function openEditRow(id: string) {
     setEditId(id)

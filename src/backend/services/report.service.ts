@@ -23,6 +23,70 @@ async function sumExpensesSince(branchId: string, sinceIso: string): Promise<num
   return (data ?? []).reduce((sum: number, row: any) => sum + Number(row.amount ?? 0), 0)
 }
 
+interface TopSellerRow { name: string; quantity: number; revenue: number }
+
+// Top products/categories by sale revenue for the P&L breakdown. Excludes
+// refund line items (sales.is_refund) and service-only rows (no product_id)
+// so rankings reflect actual product sales, not returns or labor.
+async function getTopSellers(branchId: string, from: string, to: string): Promise<{
+  topProducts: TopSellerRow[]; topCategories: TopSellerRow[]
+}> {
+  const { data, error } = await db('sale_items')
+    .select('product_id, quantity, total, products(name, category_id, categories(name)), sales!inner(branch_id, created_at, is_refund)')
+    .eq('sales.branch_id', branchId)
+    .eq('sales.is_refund', false)
+    .gte('sales.created_at', from)
+    .lte('sales.created_at', to)
+  if (error) throw error
+
+  const byProduct: Record<string, TopSellerRow> = {}
+  const byCategory: Record<string, TopSellerRow> = {}
+  for (const row of (data ?? []) as any[]) {
+    if (!row.product_id || !row.products) continue
+    const quantity = Number(row.quantity ?? 0)
+    const revenue = Number(row.total ?? 0)
+
+    const product = byProduct[row.product_id] ??= { name: row.products.name, quantity: 0, revenue: 0 }
+    product.quantity += quantity
+    product.revenue += revenue
+
+    const categoryId = row.products.category_id ?? 'uncategorized'
+    const category = byCategory[categoryId] ??= { name: row.products.categories?.name ?? 'Uncategorized', quantity: 0, revenue: 0 }
+    category.quantity += quantity
+    category.revenue += revenue
+  }
+
+  return {
+    topProducts: Object.values(byProduct).sort((a, b) => b.revenue - a.revenue).slice(0, 5),
+    topCategories: Object.values(byCategory).sort((a, b) => b.revenue - a.revenue).slice(0, 5),
+  }
+}
+
+// Loss detail for the P&L report: revenue given back via POS refunds and
+// repair refunds, which get_profit_loss() only nets out of revenue rather
+// than reporting explicitly.
+async function getLossBreakdown(branchId: string, from: string, to: string) {
+  const [refundsRes, repairRefundsRes] = await Promise.all([
+    db('sales').select('total').eq('branch_id', branchId).eq('is_refund', true).gte('created_at', from).lte('created_at', to),
+    db('repairs').select('refund_amount').eq('branch_id', branchId).gt('refund_amount', 0).gte('updated_at', from).lte('updated_at', to),
+  ])
+  if (refundsRes.error) throw refundsRes.error
+  if (repairRefundsRes.error) throw repairRefundsRes.error
+
+  const salesRefundRows = (refundsRes.data ?? []) as any[]
+  const repairRefundRows = (repairRefundsRes.data ?? []) as any[]
+  const salesRefunds = salesRefundRows.reduce((s, r) => s + Math.abs(Number(r.total ?? 0)), 0)
+  const repairRefunds = repairRefundRows.reduce((s, r) => s + Number(r.refund_amount ?? 0), 0)
+
+  return {
+    sales_refunds: salesRefunds,
+    sales_refund_count: salesRefundRows.length,
+    repair_refunds: repairRefunds,
+    repair_refund_count: repairRefundRows.length,
+    total_loss: salesRefunds + repairRefunds,
+  }
+}
+
 export const ReportService = {
   async getDashboardStats(branchId: string, startDate: string, endDate: string) {
     const { data, error } = await rpc('get_dashboard_stats', {
@@ -93,6 +157,22 @@ export const ReportService = {
       p_start_date: from.split('T')[0],
       p_end_date: to.split('T')[0],
     })
+
+    // Top sellers / loss detail are additive to whichever base P&L path runs
+    // below — degrade to empty rather than failing the whole report if either
+    // query hits a schema mismatch.
+    const [sellers, lossBreakdown] = await Promise.all([
+      getTopSellers(branchId, from, to).catch(() => ({ topProducts: [] as TopSellerRow[], topCategories: [] as TopSellerRow[] })),
+      getLossBreakdown(branchId, from, to).catch(() => ({
+        sales_refunds: 0, sales_refund_count: 0, repair_refunds: 0, repair_refund_count: 0, total_loss: 0,
+      })),
+    ])
+    const extras = {
+      top_products: sellers.topProducts,
+      top_categories: sellers.topCategories,
+      loss_breakdown: lossBreakdown,
+    }
+
     if (error) {
       // Fallback to JS aggregation if function not migrated yet
       const [salesRes, expensesRes, salariesRes, cashMovementsRes] = await Promise.all([
@@ -110,9 +190,13 @@ export const ReportService = {
         (s: number, r: any) => s + (r.type === 'cash_in' ? r.amount : (r.purpose === 'expense' ? 0 : -r.amount)), 0
       )
       const totalRevenue = revenue + cashNet
-      return { revenue, repair_revenue: 0, other_income: cashNet, total_revenue: totalRevenue, cogs: 0, expenses, salaries, total_costs: expenses + salaries, gross_profit: totalRevenue, net_profit: totalRevenue - expenses - salaries }
+      return {
+        revenue, repair_revenue: 0, other_income: cashNet, total_revenue: totalRevenue, cogs: 0, expenses, salaries,
+        total_costs: expenses + salaries, gross_profit: totalRevenue, net_profit: totalRevenue - expenses - salaries,
+        ...extras,
+      }
     }
-    return data
+    return { ...data, ...extras }
   },
 
   async getRevenuByBranch(businessId: string, from: string, to: string) {

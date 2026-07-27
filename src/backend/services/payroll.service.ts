@@ -25,7 +25,9 @@ export const PayrollService = {
   },
 
   async calculate(employeeId: string, branchId: string, businessId: string, startDate: string, endDate: string) {
-    // Call DB function to get calculated amounts
+    // Call DB function to get calculated amounts. calculate_payroll() sums actual
+    // clocked hours from time_clocks and multiplies by the employee's hourly_rate —
+    // it only returns total_hours/hourly_pay/commission_total/gross_pay.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (adminSupabase as any).rpc('calculate_payroll', {
       p_employee_id: employeeId,
@@ -37,23 +39,22 @@ export const PayrollService = {
 
     const result = (data as {
       total_hours: number; hourly_pay: number
-      commission_total: number; base_salary: number; gross_pay: number
-      purchase_deductions: number; net_pay: number
+      commission_total: number; gross_pay: number
     }[])[0]
 
-    // Get employee hourly rate
-    const { data: emp } = await db('employees').select('hourly_rate').eq('id', employeeId).single()
-    const hourlyRate = (emp as { hourly_rate: number | null } | null)?.hourly_rate ?? 0
+    // Get employee hourly rate + base salary (base salary is stored for reference
+    // only — gross_pay is driven by hours worked × hourly rate, plus commissions)
+    const { data: emp } = await db('employees').select('hourly_rate, base_salary').eq('id', employeeId).single()
+    const hourlyRate = (emp as { hourly_rate: number | null; base_salary?: number | null } | null)?.hourly_rate ?? 0
+    const baseSalary = (emp as { hourly_rate: number | null; base_salary?: number | null } | null)?.base_salary ?? 0
 
     return {
-      total_hours:         result?.total_hours ?? 0,
-      hourly_rate:         hourlyRate,
-      base_salary:         result?.base_salary ?? 0,
-      hourly_pay:          result?.hourly_pay ?? 0,
-      commission_total:    result?.commission_total ?? 0,
-      gross_pay:           result?.gross_pay ?? 0,
-      purchase_deductions: result?.purchase_deductions ?? 0,
-      net_pay:             result?.net_pay ?? result?.gross_pay ?? 0,
+      total_hours:      result?.total_hours ?? 0,
+      hourly_rate:      hourlyRate,
+      base_salary:      baseSalary,
+      hourly_pay:       result?.hourly_pay ?? 0,
+      commission_total: result?.commission_total ?? 0,
+      gross_pay:        result?.gross_pay ?? 0,
     }
   },
 
@@ -77,18 +78,17 @@ export const PayrollService = {
 
     const { data, error } = await db('payroll_periods')
       .insert({
-        business_id:         businessId,
-        branch_id:           branchId,
-        employee_id:         employeeId,
-        start_date:          startDate,
-        end_date:            endDate,
-        total_hours:         calc.total_hours,
-        hourly_rate:         calc.hourly_rate,
-        base_salary:         calc.base_salary,
-        commission_total:    calc.commission_total,
-        purchase_deductions: calc.purchase_deductions,
-        notes:               notes ?? null,
-        status:              'draft',
+        business_id:      businessId,
+        branch_id:        branchId,
+        employee_id:      employeeId,
+        start_date:       startDate,
+        end_date:         endDate,
+        total_hours:      calc.total_hours,
+        hourly_rate:      calc.hourly_rate,
+        base_salary:      calc.base_salary,
+        commission_total: calc.commission_total,
+        notes:            notes ?? null,
+        status:           'draft',
       })
       .select('*, employees(first_name, last_name)')
       .single()
@@ -119,7 +119,7 @@ export const PayrollService = {
     return data as Tables<'payroll_periods'>
   },
 
-  async markPaid(id: string, branchId: string | undefined): Promise<Tables<'payroll_periods'>> {
+  async markPaid(id: string, branchId: string | undefined, paidBy?: string): Promise<Tables<'payroll_periods'>> {
     let q = db('payroll_periods')
       .update({ status: 'paid' })
       .eq('id', id)
@@ -127,30 +127,33 @@ export const PayrollService = {
     if (branchId) q = q.eq('branch_id', branchId)
     const { data, error } = await q.select().single()
     if (error) throw error
+    const period = data as Tables<'payroll_periods'>
 
     // Mark linked commissions as paid
-    const { data: period } = await db('payroll_periods').select('employee_id, start_date, end_date').eq('id', id).single()
-    if (period) {
-      await db('employee_commissions')
-        .update({ status: 'paid' })
-        .eq('employee_id', period.employee_id)
-        .eq('status', 'approved')
-        .gte('created_at', period.start_date)
-        .lte('created_at', period.end_date)
-    }
+    await db('employee_commissions')
+      .update({ status: 'paid' })
+      .eq('employee_id', period.employee_id)
+      .eq('status', 'approved')
+      .gte('created_at', period.start_date)
+      .lte('created_at', period.end_date)
 
-    // Settle outstanding employee purchases against the purchase_deductions amount
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (adminSupabase as any).rpc('settle_payroll_purchases', { p_payroll_period_id: id })
+    // Record the payout as a salary expense so it's reflected in expense
+    // totals / Profit & Loss (which sum the `salaries` table by pay_date).
+    // The tagged note lets reopen() find and reverse this exact entry.
+    await db('salaries').insert({
+      branch_id:   period.branch_id,
+      employee_id: period.employee_id,
+      amount:      period.gross_pay ?? 0,
+      pay_date:    new Date().toISOString().slice(0, 10),
+      pay_period:  `${period.start_date} to ${period.end_date}`,
+      notes:       `Payroll period ${id}`,
+      created_by:  paidBy ?? null,
+    })
 
-    return data as Tables<'payroll_periods'>
+    return period
   },
 
   async reopen(id: string, branchId: string | undefined): Promise<Tables<'payroll_periods'>> {
-    // Reverse purchase settlements before reopening
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (adminSupabase as any).rpc('unsettle_payroll_purchases', { p_payroll_period_id: id })
-
     let q = db('payroll_periods')
       .update({ status: 'draft', approved_by: null, approved_at: null })
       .eq('id', id)
@@ -158,19 +161,23 @@ export const PayrollService = {
     if (branchId) q = q.eq('branch_id', branchId)
     const { data, error } = await q.select().single()
     if (error) throw error
+    const period = data as Tables<'payroll_periods'>
 
     // Revert linked commissions back to pending
-    const { data: period } = await db('payroll_periods').select('employee_id, start_date, end_date').eq('id', id).single()
-    if (period) {
-      await db('employee_commissions')
-        .update({ status: 'pending' })
-        .eq('employee_id', period.employee_id)
-        .in('status', ['approved', 'paid'])
-        .gte('created_at', period.start_date)
-        .lte('created_at', period.end_date)
-    }
+    await db('employee_commissions')
+      .update({ status: 'pending' })
+      .eq('employee_id', period.employee_id)
+      .in('status', ['approved', 'paid'])
+      .gte('created_at', period.start_date)
+      .lte('created_at', period.end_date)
 
-    return data as Tables<'payroll_periods'>
+    // Reverse the salary expense entry recorded when this period was paid
+    await db('salaries')
+      .delete()
+      .eq('employee_id', period.employee_id)
+      .eq('notes', `Payroll period ${id}`)
+
+    return period
   },
 }
 

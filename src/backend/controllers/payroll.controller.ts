@@ -67,7 +67,7 @@ export const PayrollController = {
 
   async markPaid(request: NextRequest, ctx: RequestContext, id: string) {
     try {
-      const period = await PayrollService.markPaid(id, ctx.auth.branchId ?? undefined)
+      const period = await PayrollService.markPaid(id, ctx.auth.branchId ?? undefined, ctx.auth.userId)
       return ok(period)
     } catch (err) {
       return serverError('Failed to mark payroll as paid', err)

@@ -9,6 +9,13 @@ import { exportExcel } from '@/lib/export-excel'
 import { DateRangeBar } from '../_components/date-range-bar'
 import Link from 'next/link'
 
+interface TopSellerRow { name: string; quantity: number; revenue: number }
+interface LossBreakdown {
+  sales_refunds: number; sales_refund_count: number
+  repair_refunds: number; repair_refund_count: number
+  total_loss: number
+}
+
 interface ProfitLossData {
   revenue: number; repair_revenue: number; total_revenue: number
   cogs: number; expenses: number; salaries: number; total_costs: number
@@ -25,6 +32,9 @@ interface ProfitLossData {
   // always sums to `repair_revenue`.
   repair_revenue_pos?: number
   repair_revenue_direct?: number
+  top_products?: TopSellerRow[]
+  top_categories?: TopSellerRow[]
+  loss_breakdown?: LossBreakdown
 }
 
 function firstOfMonth() { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] }
@@ -137,7 +147,84 @@ export default function ProfitLossReportPage() {
               </div>
             )}
           </div>
+
+          {/* Top sellers */}
+          {(data.top_categories?.length || data.top_products?.length) ? (
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              <TopSellerTable title="Top 5 Categories Sold" rows={data.top_categories ?? []} />
+              <TopSellerTable title="Top 5 Products Sold" rows={data.top_products ?? []} />
+            </div>
+          ) : null}
+
+          {/* Loss detail */}
+          {data.loss_breakdown && (
+            <div className="rounded-xl border border-outline-variant bg-surface p-5">
+              <h3 className="mb-4 text-base font-semibold text-on-surface">Loss Detail</h3>
+              <div className="space-y-0 text-base divide-y divide-outline-variant/50">
+                {[
+                  { label: 'Sales Refunds', count: data.loss_breakdown.sales_refund_count, value: data.loss_breakdown.sales_refunds },
+                  { label: 'Repair Refunds', count: data.loss_breakdown.repair_refund_count, value: data.loss_breakdown.repair_refunds },
+                ].map(({ label, count, value }) => (
+                  <div key={label} className="flex justify-between py-2.5">
+                    <span className="text-on-surface-variant">
+                      {label}{count > 0 ? ` (${count})` : ''}
+                    </span>
+                    <span className={value > 0 ? 'text-red-600' : 'text-on-surface-variant'}>
+                      {value > 0 ? `(${formatCurrency(value)})` : formatCurrency(0)}
+                    </span>
+                  </div>
+                ))}
+                <div className="flex justify-between py-2.5 font-semibold">
+                  <span className="text-on-surface">Total Loss from Refunds</span>
+                  <span className={data.loss_breakdown.total_loss > 0 ? 'text-red-600' : 'text-on-surface-variant'}>
+                    {data.loss_breakdown.total_loss > 0 ? `(${formatCurrency(data.loss_breakdown.total_loss)})` : formatCurrency(0)}
+                  </span>
+                </div>
+                {data.net_profit < 0 && (
+                  <div className="flex justify-between py-2.5 font-semibold">
+                    <span className="text-red-600">Net Loss for Period</span>
+                    <span className="text-red-600">({formatCurrency(Math.abs(data.net_profit))})</span>
+                  </div>
+                )}
+              </div>
+              <p className="mt-3 text-xs text-on-surface-variant">
+                Refunded sales are already excluded from Sales Revenue above — this section shows how much revenue was given back, for visibility into what&apos;s driving losses.
+              </p>
+            </div>
+          )}
         </>
+      )}
+    </div>
+  )
+}
+
+function TopSellerTable({ title, rows }: { title: string; rows: TopSellerRow[] }) {
+  return (
+    <div className="rounded-xl border border-outline-variant bg-surface p-5">
+      <h3 className="mb-4 text-base font-semibold text-on-surface">{title}</h3>
+      {rows.length === 0 ? (
+        <p className="py-6 text-center text-sm text-on-surface-variant">No sales in this period.</p>
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs uppercase text-on-surface-variant">
+              <th className="pb-2 font-medium">#</th>
+              <th className="pb-2 font-medium">Name</th>
+              <th className="pb-2 text-right font-medium">Qty Sold</th>
+              <th className="pb-2 text-right font-medium">Revenue</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-outline-variant/50">
+            {rows.map((row, i) => (
+              <tr key={`${row.name}-${i}`}>
+                <td className="py-2 text-on-surface-variant">{i + 1}</td>
+                <td className="py-2 text-on-surface">{row.name}</td>
+                <td className="py-2 text-right text-on-surface-variant">{row.quantity}</td>
+                <td className="py-2 text-right font-medium text-green-700">{formatCurrency(row.revenue)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   )
