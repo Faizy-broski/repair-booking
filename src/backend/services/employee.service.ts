@@ -87,7 +87,13 @@ export const EmployeeService = {
   },
 
   async clockIn(branchId: string, employeeId: string) {
-    // Check if already clocked in
+    // This SELECT-then-INSERT is only a fast pre-check, not the actual
+    // guarantee — two concurrent "Clock In" requests (double-tap, retried
+    // request) could both pass it before either commits. The
+    // idx_time_clocks_one_open_shift partial unique index (migration 046)
+    // is what actually prevents a duplicate open shift; a violation of it
+    // lands here as a Postgres unique_violation, which we translate to the
+    // same friendly message.
     const { data: active } = await adminSupabase
       .from('time_clocks')
       .select('id')
@@ -104,7 +110,12 @@ export const EmployeeService = {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      if ((error as { code?: string }).code === '23505') {
+        throw new Error('Employee is already clocked in')
+      }
+      throw error
+    }
     return data
   },
 
@@ -177,6 +188,16 @@ export const EmployeeService = {
     breakMinutes: number,
     notes: string | null
   ) {
+    if (breakMinutes < 0) throw new Error('Break minutes cannot be negative')
+    if (clockOut) {
+      const inMs = new Date(clockIn).getTime()
+      const outMs = new Date(clockOut).getTime()
+      if (!(outMs > inMs)) throw new Error('Clock out must be after clock in')
+      if (breakMinutes * 60_000 >= outMs - inMs) {
+        throw new Error('Break time cannot be longer than the shift itself')
+      }
+    }
+
     const { data, error } = await adminSupabase
       .from('time_clocks')
       .insert({

@@ -529,8 +529,8 @@ export function InvoicePdf(props: InvoicePdfProps) {
               ))}
             </View>
           )}
-          {settings.policy_text && (settings.policy_text_scope ?? 'both') !== 'pos' && (
-            <Text style={s.policy}>{settings.policy_text}</Text>
+          {settings.policy_text_repair && (
+            <Text style={s.policy}>{settings.policy_text_repair}</Text>
           )}
         </View>
 
@@ -585,7 +585,7 @@ function ReceiptPdf({
     hasThankYou:      !!settings.thank_you_message,
     footerLines:      uniqueFooterLines,
     socialLinkCount:  socialEntries.length,
-    policyText:       settings.policy_text,
+    policyText:       settings.policy_text_repair,
     pageWidth,
     showFinalAmountOnly: settings.show_final_amount_only,
   })
@@ -695,8 +695,8 @@ function ReceiptPdf({
         {socialEntries.map(([key, val], i) => (
           <Text key={key} style={s.footerText}>{SOCIAL_LABELS[key]}: {val}</Text>
         ))}
-        {settings.policy_text && (settings.policy_text_scope ?? 'both') !== 'pos' && (
-          <Text style={s.policy}>{settings.policy_text}</Text>
+        {settings.policy_text_repair && (
+          <Text style={s.policy}>{settings.policy_text_repair}</Text>
         )}
       </Page>
     </Document>

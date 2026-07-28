@@ -142,6 +142,8 @@ export default function InventoryAttributesPage() {
     { label: 'Products',        href: '/inventory' },
     { label: 'Purchase Orders', href: '/inventory/purchase-orders' },
     { label: 'Suppliers',       href: '/inventory/suppliers' },
+    { label: 'Bin',             href: '/inventory/bin' },
+    { label: 'Damage Returns',  href: '/inventory/damage-returns' },
     // { label: 'Stock Count', href: '/inventory/stock-count' },  // disabled
     ...(isRetail ? [
       { label: 'Categories', href: '/inventory/categories' },

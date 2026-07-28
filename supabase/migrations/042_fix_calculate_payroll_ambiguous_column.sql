@@ -14,7 +14,14 @@
 -- app already reads employees.base_salary directly where it's needed for
 -- display (src/backend/services/payroll.service.ts calculate()).
 
-CREATE OR REPLACE FUNCTION calculate_payroll(
+DROP FUNCTION IF EXISTS calculate_payroll(
+    UUID,
+    UUID,
+    DATE,
+    DATE
+);
+
+CREATE FUNCTION calculate_payroll(
   p_employee_id UUID,
   p_branch_id   UUID,
   p_start_date  DATE,

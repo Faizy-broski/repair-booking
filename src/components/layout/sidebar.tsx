@@ -10,7 +10,7 @@ import {
   CreditCard, AlertCircle, Smartphone, BookOpen, TrendingUp, PieChart,
   ChevronDown, Bell, Server, Clock, Activity, Mail, Users2,
   Store, GitBranch, Sliders, Layers, Settings2, PackagePlus, Cpu, Tag,
-  CalendarDays, LogIn, Palette, LifeBuoy, Truck, ClipboardList,
+  CalendarDays, LogIn, Palette, LifeBuoy, Truck, ClipboardList, Trash2, Undo2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
@@ -61,6 +61,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Attributes',     href: '/inventory/attributes',      icon: Tag,          requiredRole: 'branch_manager', module: 'inventory', subItem: true, retailOnly: true },
   { label: 'Suppliers',      href: '/inventory/suppliers',       icon: Truck,        requiredRole: 'staff',          module: 'inventory', subItem: true },
   { label: 'Purchase Orders', href: '/inventory/purchase-orders', icon: ClipboardList, requiredRole: 'staff',        module: 'inventory', subItem: true },
+  { label: 'Bin',            href: '/inventory/bin',             icon: Trash2,        requiredRole: 'staff',        module: 'inventory', subItem: true },
+  { label: 'Damage Returns', href: '/inventory/damage-returns',  icon: Undo2,         requiredRole: 'staff',        module: 'inventory', subItem: true },
   { label: 'Customers',      href: '/customers',       icon: Users,           requiredRole: 'staff',          module: 'customers' },
   { label: 'Appointments',   href: '/appointments',    icon: Calendar,        requiredRole: 'staff',          module: 'appointments' },
   { label: 'Invoices',       href: '/invoices',        icon: FileText,        requiredRole: 'staff',          module: 'invoices' },

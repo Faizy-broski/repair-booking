@@ -295,8 +295,8 @@ export function RepairReceiptHtml({
             </div>
           </>
         )}
-        {settings.policy_text && (settings.policy_text_scope ?? 'both') !== 'pos' && (
-          <div style={s.policy}>{settings.policy_text}</div>
+        {settings.policy_text_repair && (
+          <div style={s.policy}>{settings.policy_text_repair}</div>
         )}
       </div>
     </div>

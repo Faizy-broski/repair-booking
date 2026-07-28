@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Package, CheckCircle2, XCircle, Pencil, Copy } from 'lucide-react'
+import { ArrowLeft, Package, CheckCircle2, XCircle, Pencil, Copy, Undo2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -46,6 +47,12 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
   const [grnNote,  setGrnNote]  = useState('')
   const [processing, setProcessing] = useState(false)
   const [cloning, setCloning]   = useState(false)
+
+  // Return to Supplier (damage return) state
+  const [returnModal,   setReturnModal]   = useState(false)
+  const [returnQtys,    setReturnQtys]    = useState<Record<string, number>>({})
+  const [returnReasons, setReturnReasons] = useState<Record<string, string>>({})
+  const [returning,     setReturning]     = useState(false)
 
   // Edit state
   const [editOpen,      setEditOpen]      = useState(false)
@@ -93,6 +100,46 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
     setGrnModal(false)
     fetchPO()
     setProcessing(false)
+  }
+
+  function openReturnModal() {
+    if (!po) return
+    setReturnQtys({})
+    setReturnReasons({})
+    setReturnModal(true)
+  }
+
+  async function submitReturn() {
+    if (!po || !activeBranch) return
+    const items = po.purchase_order_items
+      .filter((item) => item.quantity_received > 0 && (returnQtys[item.id] ?? 0) > 0)
+      .map((item) => ({
+        po_item_id: item.id,
+        product_id: item.product_id,
+        variant_id: item.variant_id ?? undefined,
+        name:       item.name,
+        sku:        item.sku ?? undefined,
+        quantity:   returnQtys[item.id],
+        unit_cost:  item.unit_cost,
+        reason:     returnReasons[item.id] || undefined,
+      }))
+    if (items.length === 0) { toast.error('Enter a quantity for at least one item.'); return }
+    setReturning(true)
+    try {
+      const res = await fetch(`/api/supplier-returns?branch_id=${activeBranch.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supplier_id: po.supplier_id, po_id: po.id, items }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error?.message ?? 'Failed to create return')
+      toast.success('Draft return created')
+      router.push(`/inventory/damage-returns/${json.data.id}`)
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setReturning(false)
+    }
   }
 
   async function updateStatus(status: string) {
@@ -197,6 +244,11 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
           {canReceive && (
             <Button size="sm" onClick={openGrn}>
               <Package className="h-4 w-4" /> Receive Stock
+            </Button>
+          )}
+          {['in_progress', 'received'].includes(po.status) && (
+            <Button size="sm" variant="outline" onClick={openReturnModal}>
+              <Undo2 className="h-4 w-4" /> Return to Supplier
             </Button>
           )}
           {canCancel && (
@@ -320,6 +372,61 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
             disabled={Object.values(grnQtys).every((q) => q === 0)}
           >
             Confirm Receipt &amp; Update Stock
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Return to Supplier Modal (damage return) */}
+      <Modal
+        open={returnModal}
+        onClose={() => setReturnModal(false)}
+        title="Return to Supplier"
+        size="sm"
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-gray-500">
+            Pick quantities of received items to return to the supplier as damaged. This creates a draft return — stock isn't deducted until you ship it from Damage Returns.
+          </p>
+          <div className="space-y-3">
+            {po.purchase_order_items.filter((item) => item.quantity_received > 0).map((item) => (
+              <div key={item.id} className="space-y-1.5 border-b border-gray-100 pb-2 last:border-0">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">{item.name}</p>
+                    <p className="text-xs text-gray-400">Received: {item.quantity_received}</p>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    max={item.quantity_received}
+                    value={returnQtys[item.id] ?? 0}
+                    onChange={(e) => {
+                      const val = Math.min(Number(e.target.value), item.quantity_received)
+                      setReturnQtys((q) => ({ ...q, [item.id]: isNaN(val) ? 0 : val }))
+                    }}
+                    className="h-8 w-20 rounded-md border border-gray-300 px-2 text-right text-sm"
+                  />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Reason (e.g. screen cracked)"
+                  value={returnReasons[item.id] ?? ''}
+                  onChange={(e) => setReturnReasons((r) => ({ ...r, [item.id]: e.target.value }))}
+                  className="h-8 w-full rounded-md border border-gray-300 px-2 text-sm"
+                />
+              </div>
+            ))}
+            {po.purchase_order_items.filter((item) => item.quantity_received > 0).length === 0 && (
+              <p className="py-3 text-center text-xs text-gray-400">No received items on this PO yet.</p>
+            )}
+          </div>
+          <Button
+            className="w-full"
+            onClick={submitReturn}
+            loading={returning}
+            disabled={Object.values(returnQtys).every((q) => !q)}
+          >
+            <Undo2 className="h-4 w-4" /> Create Draft Return
           </Button>
         </div>
       </Modal>

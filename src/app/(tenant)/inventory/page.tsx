@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { Plus, Search, AlertTriangle, Upload, Download, CheckCircle2, Package, Boxes, TrendingDown, ShoppingCart, Edit2, Trash2, Layers, X, ExternalLink, Filter, ChevronDown, RefreshCw, Barcode, MoreVertical, Copy, ShoppingBag, Percent, Loader2 } from 'lucide-react'
+import { Plus, Search, AlertTriangle, Upload, Download, CheckCircle2, Package, Boxes, TrendingDown, ShoppingCart, Edit2, Trash2, Layers, X, ExternalLink, Filter, ChevronDown, RefreshCw, Barcode, MoreVertical, Copy, ShoppingBag, Percent, Loader2, Archive, Undo2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/ui/modal'
@@ -72,6 +72,8 @@ function RowActionsMenu({
   showDiscount,
   hasActiveDiscount,
   onPutOnSale,
+  onMoveToBin,
+  onReturnToSupplier,
 }: {
   productId: string
   onDelete: () => void
@@ -80,6 +82,8 @@ function RowActionsMenu({
   showDiscount?: boolean
   hasActiveDiscount?: boolean
   onPutOnSale?: () => void
+  onMoveToBin: () => void
+  onReturnToSupplier: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState({ top: 0, left: 0 })
@@ -149,6 +153,20 @@ function RowActionsMenu({
               {hasActiveDiscount ? 'Edit Sale Price' : 'Put on Sale'}
             </button>
           )}
+          <button
+            onClick={() => { onMoveToBin(); setOpen(false) }}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-amber-700 hover:bg-amber-50"
+          >
+            <Archive className="h-3.5 w-3.5" />
+            Move to Bin
+          </button>
+          <button
+            onClick={() => { onReturnToSupplier(); setOpen(false) }}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-orange-700 hover:bg-orange-50"
+          >
+            <Undo2 className="h-3.5 w-3.5" />
+            Return to Supplier
+          </button>
           <button
             onClick={() => { onDelete(); setOpen(false) }}
             className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
@@ -283,6 +301,276 @@ function DiscountModal({
   )
 }
 
+function BinModal({
+  product, branchId, onClose, onSaved,
+}: {
+  product: ProductRow | null
+  branchId: string | undefined
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [variants, setVariants] = useState<ProductVariant[]>([])
+  const [loadingVariants, setLoadingVariants] = useState(false)
+  const [variantId, setVariantId] = useState('')
+  const [quantity, setQuantity] = useState('')
+  const [reason, setReason] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!product) return
+    setVariantId('')
+    setQuantity('')
+    setReason('')
+    if (product.has_variants && branchId) {
+      setLoadingVariants(true)
+      fetch(`/api/products/${product.id}/variants?branch_id=${branchId}`)
+        .then((res) => res.json())
+        .then((json) => setVariants(json.data ?? []))
+        .finally(() => setLoadingVariants(false))
+    } else {
+      setVariants([])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id, branchId])
+
+  if (!product || !branchId) return null
+
+  const selectedVariant = variants.find((v) => v.id === variantId) ?? null
+  const onHand = product.has_variants ? (selectedVariant?.stock ?? 0) : (product.on_hand ?? 0)
+
+  async function handleSubmit() {
+    if (product!.has_variants && !variantId) { toast.error('Select a variant.'); return }
+    const qty = parseInt(quantity, 10)
+    if (!qty || qty < 1) { toast.error('Enter a quantity to move to the Bin.'); return }
+    if (qty > onHand) { toast.error(`Only ${onHand} on hand.`); return }
+    setSaving(true)
+    try {
+      const res = await fetch('/api/inventory/bin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          branch_id:  branchId,
+          product_id: product!.id,
+          variant_id: product!.has_variants ? variantId : undefined,
+          quantity:   qty,
+          reason:     reason || undefined,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error?.message ?? 'Failed to move item to Bin')
+      toast.success('Moved to Bin')
+      onSaved()
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Modal open={!!product} onClose={onClose} title="Move to Bin" size="sm">
+      <div className="space-y-4">
+        <p className="text-sm text-gray-500">
+          Move stock of <strong>{product.name}</strong> to the Bin as a 100% loss. It's removed from active inventory and can be restored later if this was a mistake.
+        </p>
+        {product.has_variants && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">Variant</label>
+            <select
+              className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              value={variantId}
+              onChange={(e) => setVariantId(e.target.value)}
+              disabled={loadingVariants}
+            >
+              <option value="">{loadingVariants ? 'Loading…' : 'Select variant…'}</option>
+              {variants.map((v) => (
+                <option key={v.id} value={v.id}>{v.name} ({v.stock ?? 0} on hand)</option>
+              ))}
+            </select>
+          </div>
+        )}
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-500">Quantity to move to Bin</label>
+          <input
+            type="number" min={1} max={onHand || undefined}
+            className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+            value={quantity}
+            onChange={(e) => {
+              const val = e.target.value
+              if (val === '') { setQuantity(''); return }
+              const num = parseInt(val, 10)
+              setQuantity(!isNaN(num) && onHand > 0 && num > onHand ? String(onHand) : val)
+            }}
+            placeholder={`Max ${onHand}`}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-500">Reason (optional)</label>
+          <input
+            type="text"
+            className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. Water damaged, screen cracked in storage"
+          />
+        </div>
+        <Button className="w-full bg-amber-600 hover:bg-amber-700 text-white" onClick={handleSubmit} loading={saving}>
+          <Archive className="h-4 w-4" /> Move to Bin
+        </Button>
+      </div>
+    </Modal>
+  )
+}
+
+function ReturnToSupplierModal({
+  product, branchId, onClose, onSaved,
+}: {
+  product: ProductRow | null
+  branchId: string | undefined
+  onClose: () => void
+  onSaved: (returnId: string) => void
+}) {
+  const [variants, setVariants] = useState<ProductVariant[]>([])
+  const [loadingVariants, setLoadingVariants] = useState(false)
+  const [variantId, setVariantId] = useState('')
+  const [quantity, setQuantity] = useState('')
+  const [reason, setReason] = useState('')
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [supplierId, setSupplierId] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!product) return
+    setVariantId('')
+    setQuantity('')
+    setReason('')
+    setSupplierId('')
+    fetch('/api/suppliers').then((r) => r.json()).then((j) => setSuppliers(j.data ?? []))
+    if (product.has_variants && branchId) {
+      setLoadingVariants(true)
+      fetch(`/api/products/${product.id}/variants?branch_id=${branchId}`)
+        .then((res) => res.json())
+        .then((json) => setVariants(json.data ?? []))
+        .finally(() => setLoadingVariants(false))
+    } else {
+      setVariants([])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id, branchId])
+
+  if (!product || !branchId) return null
+
+  const selectedVariant = variants.find((v) => v.id === variantId) ?? null
+  const onHand = product.has_variants ? (selectedVariant?.stock ?? 0) : (product.on_hand ?? 0)
+  const unitCost = product.has_variants ? (selectedVariant?.cost_price ?? 0) : (product.cost_price ?? 0)
+
+  async function handleSubmit() {
+    if (!supplierId) { toast.error('Select a supplier.'); return }
+    if (product!.has_variants && !variantId) { toast.error('Select a variant.'); return }
+    const qty = parseInt(quantity, 10)
+    if (!qty || qty < 1) { toast.error('Enter a quantity to return.'); return }
+    if (qty > onHand) { toast.error(`Only ${onHand} on hand.`); return }
+    setSaving(true)
+    try {
+      const name = product!.has_variants && selectedVariant
+        ? `${product!.name} – ${selectedVariant.name}`
+        : product!.name
+      const sku = product!.has_variants ? (selectedVariant?.sku ?? null) : product!.sku
+      const res = await fetch(`/api/supplier-returns?branch_id=${branchId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supplier_id: supplierId,
+          items: [{
+            product_id: product!.id,
+            variant_id: product!.has_variants ? variantId : undefined,
+            name,
+            sku: sku ?? undefined,
+            quantity: qty,
+            unit_cost: unitCost,
+            reason: reason || undefined,
+          }],
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error?.message ?? 'Failed to create return')
+      toast.success('Draft return created — ship it from Damage Returns to update stock')
+      onSaved(json.data.id)
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Modal open={!!product} onClose={onClose} title="Return to Supplier" size="sm">
+      <div className="space-y-4">
+        <p className="text-sm text-gray-500">
+          Create a draft damage return for <strong>{product.name}</strong>. Stock is only deducted once you ship the return to the supplier.
+        </p>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-500">Supplier</label>
+          <select
+            className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+            value={supplierId}
+            onChange={(e) => setSupplierId(e.target.value)}
+          >
+            <option value="">Select supplier…</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+        {product.has_variants && (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-500">Variant</label>
+            <select
+              className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              value={variantId}
+              onChange={(e) => setVariantId(e.target.value)}
+              disabled={loadingVariants}
+            >
+              <option value="">{loadingVariants ? 'Loading…' : 'Select variant…'}</option>
+              {variants.map((v) => (
+                <option key={v.id} value={v.id}>{v.name} ({v.stock ?? 0} on hand)</option>
+              ))}
+            </select>
+          </div>
+        )}
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-500">Quantity to return</label>
+          <input
+            type="number" min={1} max={onHand || undefined}
+            className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+            value={quantity}
+            onChange={(e) => {
+              const val = e.target.value
+              if (val === '') { setQuantity(''); return }
+              const num = parseInt(val, 10)
+              setQuantity(!isNaN(num) && onHand > 0 && num > onHand ? String(onHand) : val)
+            }}
+            placeholder={`Max ${onHand}`}
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-500">Reason (e.g. water damaged, screen cracked)</label>
+          <input
+            type="text"
+            className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. Water damaged, screen cracked in storage"
+          />
+        </div>
+        <Button className="w-full bg-orange-600 hover:bg-orange-700 text-white" onClick={handleSubmit} loading={saving}>
+          <Undo2 className="h-4 w-4" /> Create Draft Return
+        </Button>
+      </div>
+    </Modal>
+  )
+}
+
 export default function InventoryPage() {
   const { activeBranch, isLoading: authLoading, verticalTemplateSlug } = useAuthStore()
   const isRetail = verticalTemplateSlug === 'retail-store'
@@ -311,6 +599,8 @@ export default function InventoryPage() {
   const [deleteTarget, setDeleteTarget] = useState<ProductRow | null>(null)
   const [barcodeTarget, setBarcodeTarget] = useState<ProductRow | null>(null)
   const [discountTarget, setDiscountTarget] = useState<{ product: ProductRow; variant?: ProductVariant | null } | null>(null)
+  const [binTarget, setBinTarget] = useState<ProductRow | null>(null)
+  const [returnTarget, setReturnTarget] = useState<ProductRow | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
@@ -682,6 +972,8 @@ export default function InventoryPage() {
             showDiscount={isRetail && !row.original.is_service}
             hasActiveDiscount={row.original.has_variants ? !!row.original.has_variant_discount : !!row.original.active_discount}
             onPutOnSale={() => row.original.has_variants ? openVariantDrawer(row.original) : setDiscountTarget({ product: row.original })}
+            onMoveToBin={() => setBinTarget(row.original)}
+            onReturnToSupplier={() => setReturnTarget(row.original)}
           />
         </div>
       ),
@@ -696,6 +988,8 @@ export default function InventoryPage() {
           { label: 'Products',        href: '/inventory' },
           { label: 'Purchase Orders', href: '/inventory/purchase-orders' },
           { label: 'Suppliers',       href: '/inventory/suppliers' },
+          { label: 'Bin',             href: '/inventory/bin' },
+          { label: 'Damage Returns',  href: '/inventory/damage-returns' },
           // { label: 'Stock Count', href: '/inventory/stock-count' },  // disabled
           ...(isRetail ? [
             { label: 'Categories',    href: '/inventory/categories' },
@@ -1184,6 +1478,30 @@ export default function InventoryPage() {
           // The variant drawer's list is local state, not react-query — if a
           // variant was just discounted, re-fetch so the drawer reflects it.
           if (variantDrawer) openVariantDrawer(variantDrawer)
+        }}
+      />
+
+      <BinModal
+        product={binTarget}
+        branchId={branchId ?? undefined}
+        onClose={() => setBinTarget(null)}
+        onSaved={() => {
+          setBinTarget(null)
+          queryClient.invalidateQueries({ queryKey: ['inventory'] })
+          queryClient.invalidateQueries({ queryKey: ['pos-products'] })
+          queryClient.invalidateQueries({ queryKey: ['pos-variants'] })
+          if (variantDrawer) openVariantDrawer(variantDrawer)
+        }}
+      />
+
+      <ReturnToSupplierModal
+        product={returnTarget}
+        branchId={branchId ?? undefined}
+        onClose={() => setReturnTarget(null)}
+        onSaved={(returnId) => {
+          setReturnTarget(null)
+          queryClient.invalidateQueries({ queryKey: ['inventory'] })
+          router.push(`/inventory/damage-returns/${returnId}`)
         }}
       />
 

@@ -155,6 +155,7 @@ function InvoicePreview({ s, businessName, branchName, previewContext }: {
   ]
     .filter(([line, fscope]) => !!line && (fscope === 'both' || fscope === previewContext))
     .map(([line]) => line)
+  const policyText = previewContext === 'pos' ? s.policy_text_pos : s.policy_text_repair
 
   const allPreviewItems = [
     { desc: 'iPhone Screen Replacement', qty: 1, price: 79.99 },
@@ -246,7 +247,7 @@ function InvoicePreview({ s, businessName, branchName, previewContext }: {
             </div>
           </>
         )}
-        {s.policy_text && <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: 6.5, marginTop: 6, borderTop: '1px solid #e5e7eb', paddingTop: 5 }}>{s.policy_text}</p>}
+        {policyText && <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: 6.5, marginTop: 6, borderTop: '1px solid #e5e7eb', paddingTop: 5 }}>{policyText}</p>}
       </div>
     )
   }
@@ -349,8 +350,8 @@ function InvoicePreview({ s, businessName, branchName, previewContext }: {
             {socials.map(([k, v], i) => `${i > 0 ? '  ·  ' : ''}${k}: ${v as string}`).join('')}
           </p>
         )}
-        {s.policy_text && (
-          <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: 7, marginTop: 6, borderTop: '1px solid #e5e7eb', paddingTop: 6 }}>{s.policy_text}</p>
+        {policyText && (
+          <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: 7, marginTop: 6, borderTop: '1px solid #e5e7eb', paddingTop: 6 }}>{policyText}</p>
         )}
       </div>
     </div>
@@ -705,17 +706,23 @@ export function InvoiceDesignTab() {
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-600">Terms / Policy (printed small at bottom)</label>
+                <label className="mb-1.5 block text-xs font-medium text-gray-600">POS Terms &amp; Conditions (printed small at bottom of sale receipts)</label>
                 <textarea
                   rows={3}
                   placeholder="e.g. All sales are final. Warranty void if tampered with. Registered in England & Wales..."
-                  value={settings.policy_text ?? ''}
-                  onChange={(e) => patch({ policy_text: e.target.value || null })}
+                  value={settings.policy_text_pos ?? ''}
+                  onChange={(e) => patch({ policy_text_pos: e.target.value || null })}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
                 />
-                <ScopeSelect
-                  value={settings.policy_text_scope ?? 'both'}
-                  onChange={(v) => patch({ policy_text_scope: v })}
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-gray-600">Repair Terms &amp; Conditions (printed small at bottom of repair invoices)</label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. Devices left uncollected after 90 days may be recycled. Warranty void if tampered with..."
+                  value={settings.policy_text_repair ?? ''}
+                  onChange={(e) => patch({ policy_text_repair: e.target.value || null })}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
                 />
               </div>
             </Section>

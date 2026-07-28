@@ -93,7 +93,17 @@ export const PayrollService = {
       .select('*, employees(first_name, last_name)')
       .single()
 
-    if (error) throw error
+    if (error) {
+      // The SELECT-based overlap check above is only a fast pre-check — it
+      // can't stop two concurrent submissions from both passing it before
+      // either commits. The `payroll_periods_no_overlap` exclusion constraint
+      // (migration 046) is the actual guarantee; translate its violation into
+      // the same friendly message rather than a raw Postgres error.
+      if ((error as { code?: string }).code === '23P01') {
+        throw new Error('This period overlaps an existing payroll period for this employee.')
+      }
+      throw error
+    }
     return data as Tables<'payroll_periods'>
   },
 
@@ -139,15 +149,18 @@ export const PayrollService = {
 
     // Record the payout as a salary expense so it's reflected in expense
     // totals / Profit & Loss (which sum the `salaries` table by pay_date).
-    // The tagged note lets reopen() find and reverse this exact entry.
+    // Linked back via payroll_period_id (a real FK) rather than matching on
+    // the notes text — reopen() uses that column to find and reverse this
+    // exact entry, so it still works even if notes is ever hand-edited.
     await db('salaries').insert({
-      branch_id:   period.branch_id,
-      employee_id: period.employee_id,
-      amount:      period.gross_pay ?? 0,
-      pay_date:    new Date().toISOString().slice(0, 10),
-      pay_period:  `${period.start_date} to ${period.end_date}`,
-      notes:       `Payroll period ${id}`,
-      created_by:  paidBy ?? null,
+      branch_id:         period.branch_id,
+      employee_id:       period.employee_id,
+      amount:            period.gross_pay ?? 0,
+      pay_date:          new Date().toISOString().slice(0, 10),
+      pay_period:        `${period.start_date} to ${period.end_date}`,
+      notes:             `Payroll period ${id}`,
+      payroll_period_id: id,
+      created_by:        paidBy ?? null,
     })
 
     return period
@@ -174,8 +187,7 @@ export const PayrollService = {
     // Reverse the salary expense entry recorded when this period was paid
     await db('salaries')
       .delete()
-      .eq('employee_id', period.employee_id)
-      .eq('notes', `Payroll period ${id}`)
+      .eq('payroll_period_id', id)
 
     return period
   },

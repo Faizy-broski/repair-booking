@@ -110,9 +110,8 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
     })
     .map(({ line }) => line as string)
 
-  const policyScope = settings.policy_text_scope ?? 'both'
-  const showPolicyText = !!settings.policy_text
-    && (policyScope === 'both' || policyScope === (isRepairReceipt ? 'repair' : 'pos'))
+  const policyText = isRepairReceipt ? settings.policy_text_repair : settings.policy_text_pos
+  const showPolicyText = !!policyText
 
   // ── CSS ──────────────────────────────────────────────────────────────────
   // @page size is NOT set here — injected dynamically after render measurement.
@@ -336,7 +335,7 @@ ${L(bal > 0, `<div class="bar"><span class="bl">Balance Due</span><span class="b
   ${L(settings.footer_address, `<hr><div class="lh">ADDRESS</div><div class="fl">${esc(settings.footer_address)}</div>`)}
   ${L(settings.footer_phone, `<hr><div class="lh">PH</div><div class="fl">${esc(settings.footer_phone)}</div>`)}
   ${L(socials.length > 0, `<hr class="hr2"><div class="soc">${socials.map(s => `<div class="socc"><div class="socl">${s.icon}<span>${esc(s.label)}</span></div><div class="socv">${esc(s.val)}</div></div>`).join('')}</div>`)}
-  ${L(showPolicyText, `<div class="pl">${esc(settings.policy_text)}</div>`)}
+  ${L(showPolicyText, `<div class="pl">${esc(policyText)}</div>`)}
 </div>
 </div>
 </body></html>`

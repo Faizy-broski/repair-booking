@@ -63,7 +63,7 @@ const schema = z.object({
   email: z.string().email().optional().or(z.literal('')),
   phone: z.string().optional(),
   role: z.string().optional(),
-  hourly_rate: z.coerce.number().optional(),
+  hourly_rate: z.coerce.number().min(0).optional(),
   base_salary: z.coerce.number().min(0).optional(),
 }).refine((data) => {
   if (!data.phone || !data.phone.startsWith('+')) return true

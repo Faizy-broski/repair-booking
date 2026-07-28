@@ -282,7 +282,7 @@ export function SaleReceiptPdf({
         hasThankYou: !!settings.thank_you_message,
         footerLines: uniqueFooterLines,
         socialLinkCount: settings.social_links ? Object.values(settings.social_links).filter(Boolean).length : 0,
-        policyText: settings.policy_text,
+        policyText: settings.policy_text_pos,
         pageWidth,
       }),
     ]
@@ -808,9 +808,9 @@ export function SaleReceiptPdf({
               </View>
             )}
 
-            {settings.policy_text && (settings.policy_text_scope ?? 'both') !== 'repair' && (
+            {settings.policy_text_pos && (
               <Text style={{ fontSize: 6.5, color: C.faint, textAlign: 'center', marginTop: 10, borderTopWidth: 0.5, borderTopColor: C.border, paddingTop: 8 }}>
-                {settings.policy_text}
+                {settings.policy_text_pos}
               </Text>
             )}
 
