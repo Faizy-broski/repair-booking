@@ -88,6 +88,9 @@ export function CartPanel({ mobileView }: Props) {
   // "Served By" + per-sale commission entry is specific to the retail-store
   // vertical template, independent of any module's enabled/disabled state.
   const isRetailTemplate = verticalTemplateSlug === 'retail-store'
+  // One-off customization for a single business: show the payment buttons
+  // at the top of the cart panel (in addition to the bottom) as well.
+  const showTopPaymentButtons = activeBranch?.business_id === '01b4583d-a23d-48b3-83ff-339203ff07de'
 
   // ── Customer state ─────────────────────────────────────────────────────────
   const [customerSearch, setCustomerSearch]         = useState('')
@@ -450,8 +453,8 @@ export function CartPanel({ mobileView }: Props) {
     setProcessing(false)
   }
 
-  // ── Cash payment shortcut ──────────────────────────────────────────────────
-  async function processCashPayment() {
+  // ── Cash / Card single-tender payment shortcut ────────────────────────────
+  async function processCashPayment(method: 'cash' | 'card' = 'cash') {
     if (!activeBranch || !profile || pos.cart.length === 0) return
     setProcessing(true)
 
@@ -489,7 +492,7 @@ export function CartPanel({ mobileView }: Props) {
         branch_id: activeBranch.id, cashier_id: profile.id,
         customer_id: pos.customer?.id ?? null,
         subtotal, discount: discountAmt, tax: taxAmt, total,
-        payment_method: 'cash',
+        payment_method: method,
         served_by_employee_id: servedByEmployeeId || null,
         commission_amount: servedByEmployeeId && commissionAmount ? parseFloat(commissionAmount) : null,
         commission_type: servedByEmployeeId && commissionAmount ? commissionType : null,
@@ -507,7 +510,7 @@ export function CartPanel({ mobileView }: Props) {
       // page refresh.
       queryClient.invalidateQueries({ queryKey: ['pos-products'] })
       queryClient.invalidateQueries({ queryKey: ['pos-variants'] })
-      await printReceipt(saleJson.data?.sale_id ?? 'unknown', 'cash', receiptItemsCash, preWinCash, undefined, undefined, undefined, saleJson.data?.invoice_number)
+      await printReceipt(saleJson.data?.sale_id ?? 'unknown', method, receiptItemsCash, preWinCash, undefined, undefined, undefined, saleJson.data?.invoice_number)
       setTimeout(() => setSuccess(false), 2500)
     } else {
       // Rollback: restore cart and hide success screen
@@ -667,6 +670,42 @@ export function CartPanel({ mobileView }: Props) {
           Re-open in POS
         </button>
       </div>
+
+      {/* Payment buttons (top) — one-off placement for this business only, replaces the bottom row */}
+      {showTopPaymentButtons && (
+        <div className="shrink-0 border-b border-gray-200 bg-white px-3 py-2">
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => { pos.setPaymentMethod('split'); setSplits(Object.fromEntries(splitChannels.map(c => [c, '']))); pos.cart.length > 0 && setPaymentOpen(true) }}
+              disabled={pos.cart.length === 0}
+              className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border-2 border-[#1a3c40] bg-[#1a3c40] py-2.5 text-sm font-bold text-white hover:bg-[#15332e] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <SplitSquareHorizontal className="h-4 w-4 shrink-0" /> Multiple Pay
+            </button>
+            <button
+              onClick={() => processCashPayment('cash')}
+              disabled={pos.cart.length === 0 || processing}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-green-600 py-2.5 text-sm font-bold text-white hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Banknote className="h-4 w-4 shrink-0" /> Cash
+            </button>
+            <button
+              onClick={() => processCashPayment('card')}
+              disabled={pos.cart.length === 0 || processing}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-purple-600 py-2.5 text-sm font-bold text-white hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <CreditCard className="h-4 w-4 shrink-0" /> Card
+            </button>
+            <button
+              onClick={() => { pos.clearCart(); setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat') }}
+              disabled={pos.cart.length === 0}
+              className="flex items-center justify-center rounded-lg bg-red-500 px-3 py-2.5 text-sm font-bold text-white hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Customer section */}
       <div className="border-b border-gray-100 px-3 py-2" ref={customerRef}>
@@ -998,43 +1037,45 @@ export function CartPanel({ mobileView }: Props) {
         )}
       </div>
 
-      {/* Payment buttons */}
-      <div className="shrink-0 border-t border-gray-200 bg-white px-3 py-2.5">
-        <div className="flex gap-1.5">
-          <button
-            onClick={() => { pos.setPaymentMethod('split'); setSplits(Object.fromEntries(splitChannels.map(c => [c, '']))); pos.cart.length > 0 && setPaymentOpen(true) }}
-            disabled={pos.cart.length === 0}
-            className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border-2 border-[#1a3c40] bg-[#1a3c40] py-2.5 text-sm font-bold text-white hover:bg-[#15332e] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            <SplitSquareHorizontal className="h-4 w-4 shrink-0" /> Multiple Pay
-          </button>
-          <button
-            onClick={processCashPayment}
-            disabled={pos.cart.length === 0 || processing}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-green-600 py-2.5 text-sm font-bold text-white hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            <Banknote className="h-4 w-4 shrink-0" /> Cash
-          </button>
-          <button
-            onClick={() => { if (pos.cart.length > 0 && !processing) setCreditOpen(true) }}
-            disabled={pos.cart.length === 0 || processing}
-            title="Sell on credit — customer or employee"
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-purple-600 py-2.5 text-sm font-bold text-white hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            <CreditCard className="h-4 w-4 shrink-0" /> Credit
-          </button>
-          <button
-            onClick={() => { pos.clearCart(); setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat') }}
-            disabled={pos.cart.length === 0}
-            className="flex items-center justify-center rounded-lg bg-red-500 px-3 py-2.5 text-sm font-bold text-white hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            <X className="h-4 w-4" />
-          </button>
+      {/* Payment buttons — this business gets its own row at the top instead (see above) */}
+      {!showTopPaymentButtons && (
+        <div className="shrink-0 border-t border-gray-200 bg-white px-3 py-2.5">
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => { pos.setPaymentMethod('split'); setSplits(Object.fromEntries(splitChannels.map(c => [c, '']))); pos.cart.length > 0 && setPaymentOpen(true) }}
+              disabled={pos.cart.length === 0}
+              className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border-2 border-[#1a3c40] bg-[#1a3c40] py-2.5 text-sm font-bold text-white hover:bg-[#15332e] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <SplitSquareHorizontal className="h-4 w-4 shrink-0" /> Multiple Pay
+            </button>
+            <button
+              onClick={() => processCashPayment('cash')}
+              disabled={pos.cart.length === 0 || processing}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-green-600 py-2.5 text-sm font-bold text-white hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Banknote className="h-4 w-4 shrink-0" /> Cash
+            </button>
+            <button
+              onClick={() => { if (pos.cart.length > 0 && !processing) setCreditOpen(true) }}
+              disabled={pos.cart.length === 0 || processing}
+              title="Sell on credit — customer or employee"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-purple-600 py-2.5 text-sm font-bold text-white hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <CreditCard className="h-4 w-4 shrink-0" /> Credit
+            </button>
+            <button
+              onClick={() => { pos.clearCart(); setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat') }}
+              disabled={pos.cart.length === 0}
+              className="flex items-center justify-center rounded-lg bg-red-500 px-3 py-2.5 text-sm font-bold text-white hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          {!pos.customer && pos.cart.length > 0 && (
+            <p className="mt-1 text-center text-xs text-gray-400">Select a customer to enable Credit payment</p>
+          )}
         </div>
-        {!pos.customer && pos.cart.length > 0 && (
-          <p className="mt-1 text-center text-xs text-gray-400">Select a customer to enable Credit payment</p>
-        )}
-      </div>
+      )}
 
       {/* ── MODALS ── */}
 

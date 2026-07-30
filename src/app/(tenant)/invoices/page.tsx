@@ -441,8 +441,13 @@ export default function InvoicesPage() {
 
   const lineItemSubtotal = lineItems.reduce((s, i) => s + i.quantity * i.unit_price, 0)
 
+  // One-off customization for a single business: the page's default top
+  // padding (inherited from the tenant layout's <main>) reads as too much
+  // empty space above the Invoices header, so pull it up just here.
+  const reduceTopSpace = activeBranch?.business_id === '01b4583d-a23d-48b3-83ff-339203ff07de'
+
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 ${reduceTopSpace ? '-mt-4' : ''}`}>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Invoices</h1>
