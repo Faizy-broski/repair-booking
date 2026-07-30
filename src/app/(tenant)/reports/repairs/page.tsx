@@ -88,7 +88,7 @@ export default function RepairsReportPage() {
           revenue = r.pos_net_total
         } else {
           const deposit  = r.deposit_paid  ?? 0
-          const fullCost = r.actual_cost   ?? r.estimated_cost ?? 0
+          const fullCost = r.actual_cost != null ? r.actual_cost : Math.max(0, (r.estimated_cost ?? 0) - (r.discount_amount ?? 0))
           const refund   = r.refund_amount ?? 0
           if (isTerminal(key))         revenue = fullCost
           else if (key === 'refunded') revenue = Math.max(0, deposit - refund)

@@ -257,7 +257,7 @@ function buildExportRow(r: RepairRow): (string | number)[] {
     r.issue && r.issue.toLowerCase() !== 'not specified' ? r.issue : 'N/A',
     r.status,
     cf.due_date ? formatDate(cf.due_date) : 'N/A',
-    r.actual_cost ?? r.estimated_cost ?? 0,
+    r.actual_cost != null ? r.actual_cost : Math.max(0, (r.estimated_cost ?? 0) - (((r as any).discount_amount ?? 0))),
     r.created_at ? formatDate(r.created_at) : 'N/A'
   ]
 }
@@ -377,7 +377,7 @@ export default function RepairsPage() {
   // Edit Job Sheet modal
   const [editOpen, setEditOpen] = useState(false)
   const [editRepair, setEditRepair] = useState<RepairRow | null>(null)
-  const [editData, setEditData] = useState({ due_date: '', estimated_cost: '', deposit_paid: '', payment_methods: [] as ('cash' | 'card' | 'store_credit' | 'loyalty_points')[], payment_amounts: { cash: '', card: '' }, status: '', credit_apply_input: '', loyalty_apply_input: '', discount_type: 'fixed' as 'fixed' | 'percent', discount_value: '', subtotal: 0 })
+  const [editData, setEditData] = useState({ due_date: '', estimated_cost: '', deposit_paid: '', payment_methods: [] as ('cash' | 'card' | 'store_credit' | 'loyalty_points')[], payment_amounts: { cash: '', card: '' }, status: '', credit_apply_input: '', loyalty_apply_input: '', discount_type: 'fixed' as 'fixed' | 'percent', discount_value: '' })
   const [editPaymentSplitError, setEditPaymentSplitError] = useState('')
   const [editSaving, setEditSaving] = useState(false)
   const [editErrors, setEditErrors] = useState<{ due_date?: string; estimated_cost?: string; deposit_paid?: string }>({})
@@ -555,13 +555,13 @@ export default function RepairsPage() {
     queryClient.invalidateQueries({ queryKey: ['dashboard'] })
   }
 
-  // Auto-populate total charges = job fee + net parts total - overall discount
+  // Auto-populate total charges = job fee + net parts total (gross, discount applied separately)
   useEffect(() => {
     setJobData((prev) => {
       const fee = parseFloat(prev.job_fee) || 0
       const discountValue = parseFloat(prev.discount_value) || 0
-      const { total } = computeJobTotal(fee, repairParts, prev.discount_type, discountValue)
-      return { ...prev, estimated_cost: total.toFixed(2) }
+      const { subtotal } = computeJobTotal(fee, repairParts, prev.discount_type, discountValue)
+      return { ...prev, estimated_cost: subtotal.toFixed(2) }
     })
   }, [repairParts])
 
@@ -650,9 +650,6 @@ export default function RepairsPage() {
     setEditRepair(r)
     const cf = (r.custom_fields as any) ?? {}
     const rAny = r as any
-    // Reconstruct the pre-discount subtotal from the persisted net total + previous
-    // discount, so re-entering a discount here recomputes off the same base.
-    const subtotal = (r.estimated_cost ?? 0) + (rAny.discount_amount ?? 0)
     setEditData({
       due_date: cf.due_date ?? '',
       estimated_cost: r.estimated_cost != null ? String(r.estimated_cost) : '',
@@ -664,7 +661,6 @@ export default function RepairsPage() {
       loyalty_apply_input: '',
       discount_type: (rAny.discount_type as 'fixed' | 'percent') ?? 'fixed',
       discount_value: rAny.discount_value != null ? String(rAny.discount_value) : '',
-      subtotal,
     })
     setEditErrors({})
     setEditPaymentSplitError('')
@@ -704,7 +700,11 @@ export default function RepairsPage() {
           deposit_paid: editData.deposit_paid === '' ? 0 : parseFloat(editData.deposit_paid),
           discount_type: editData.discount_type,
           discount_value: parseFloat(editData.discount_value) || 0,
-          discount_amount: Math.max(0, Math.min(editData.subtotal, editData.discount_type === 'percent' ? editData.subtotal * ((parseFloat(editData.discount_value) || 0) / 100) : (parseFloat(editData.discount_value) || 0))),
+          discount_amount: (() => {
+            const gross = parseFloat(editData.estimated_cost) || 0
+            const raw = editData.discount_type === 'percent' ? gross * ((parseFloat(editData.discount_value) || 0) / 100) : (parseFloat(editData.discount_value) || 0)
+            return Math.max(0, Math.min(gross, raw))
+          })(),
           status: editData.status || undefined,
           custom_fields: {
             ...cf,
@@ -1390,7 +1390,11 @@ export default function RepairsPage() {
     {
       accessorKey: 'actual_cost', header: 'Cost', cell: ({ getValue, row }) => {
         const v = getValue() as number | null
-        return v ? formatCurrency(v) : row.original.estimated_cost ? `~${formatCurrency(row.original.estimated_cost)}` : '—'
+        if (v) return formatCurrency(v)
+        const est = row.original.estimated_cost
+        if (!est) return '—'
+        const net = Math.max(0, est - (((row.original as any).discount_amount ?? 0)))
+        return `~${formatCurrency(net)}`
       }
     },
     { 
@@ -2108,7 +2112,10 @@ export default function RepairsPage() {
                   .filter(Boolean) as string[]
               )]
             : deviceData.models
-          const remaining = (parseFloat(jobData.estimated_cost) || 0) - (parseFloat(jobData.deposit_paid) || 0)
+          const jobDiscountAmount = jobData.discount_type === 'percent'
+            ? (parseFloat(jobData.estimated_cost) || 0) * ((parseFloat(jobData.discount_value) || 0) / 100)
+            : (parseFloat(jobData.discount_value) || 0)
+          const remaining = (parseFloat(jobData.estimated_cost) || 0) - Math.max(0, jobDiscountAmount) - (parseFloat(jobData.deposit_paid) || 0)
           const pricePending = jobData.price_pending
           const inp = 'h-8 w-full rounded-md border-2 border-gray-200 bg-white px-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20'
           const sel = `${inp} appearance-none`
@@ -2574,9 +2581,8 @@ export default function RepairsPage() {
                         value={jobData.job_fee}
                         onChange={(e) => {
                           const fee = e.target.value
-                          const discountValue = parseFloat(jobData.discount_value) || 0
-                          const { total } = computeJobTotal(parseFloat(fee) || 0, repairParts, jobData.discount_type, discountValue)
-                          setJobData((p) => ({ ...p, job_fee: fee, estimated_cost: total.toFixed(2) }))
+                          const { subtotal } = computeJobTotal(parseFloat(fee) || 0, repairParts, jobData.discount_type, parseFloat(jobData.discount_value) || 0)
+                          setJobData((p) => ({ ...p, job_fee: fee, estimated_cost: subtotal.toFixed(2) }))
                         }}
                         placeholder="0.00"
                         className={`${inp} pl-6 ${pricePending ? 'opacity-40 cursor-not-allowed' : ''}`}
@@ -2599,9 +2605,7 @@ export default function RepairsPage() {
                           value={jobData.discount_value}
                           onChange={(e) => {
                             const discountValue = e.target.value
-                            const fee = parseFloat(jobData.job_fee) || 0
-                            const { total } = computeJobTotal(fee, repairParts, jobData.discount_type, parseFloat(discountValue) || 0)
-                            setJobData((p) => ({ ...p, discount_value: discountValue, estimated_cost: total.toFixed(2) }))
+                            setJobData((p) => ({ ...p, discount_value: discountValue }))
                           }}
                           placeholder="0.00"
                           className={`${inp} pl-6 ${pricePending ? 'opacity-40 cursor-not-allowed' : ''}`}
@@ -2612,10 +2616,7 @@ export default function RepairsPage() {
                         disabled={pricePending}
                         onClick={() => {
                           const nextType = jobData.discount_type === 'percent' ? 'fixed' : 'percent'
-                          const fee = parseFloat(jobData.job_fee) || 0
-                          const discountValue = parseFloat(jobData.discount_value) || 0
-                          const { total } = computeJobTotal(fee, repairParts, nextType, discountValue)
-                          setJobData((p) => ({ ...p, discount_type: nextType, estimated_cost: total.toFixed(2) }))
+                          setJobData((p) => ({ ...p, discount_type: nextType }))
                         }}
                         title={jobData.discount_type === 'percent' ? 'Switch to fixed amount' : 'Switch to percentage'}
                         className={`h-8 w-8 shrink-0 rounded-md border text-xs font-semibold transition-colors ${pricePending ? 'opacity-40 cursor-not-allowed border-gray-200 text-gray-300' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
@@ -2897,7 +2898,8 @@ export default function RepairsPage() {
         {editRepair && (() => {
           const total = parseFloat(editData.estimated_cost) || 0
           const deposit = parseFloat(editData.deposit_paid) || 0
-          const remaining = total - deposit
+          const editDiscountAmount = Math.max(0, Math.min(total, editData.discount_type === 'percent' ? total * ((parseFloat(editData.discount_value) || 0) / 100) : (parseFloat(editData.discount_value) || 0)))
+          const remaining = total - editDiscountAmount - deposit
           const inp = 'h-10 w-full rounded-lg border border-gray-300 px-3 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-700/10'
           const lbl = 'mb-1 block text-sm font-semibold text-gray-800'
           return (
@@ -2968,10 +2970,7 @@ export default function RepairsPage() {
                       min="0"
                       value={editData.discount_value}
                       onChange={(e) => {
-                        const discountValue = parseFloat(e.target.value) || 0
-                        const amt = editData.discount_type === 'percent' ? editData.subtotal * (discountValue / 100) : discountValue
-                        const total = Math.max(0, editData.subtotal - Math.max(0, Math.min(editData.subtotal, amt)))
-                        setEditData((p) => ({ ...p, discount_value: e.target.value, estimated_cost: total.toFixed(2) }))
+                        setEditData((p) => ({ ...p, discount_value: e.target.value }))
                       }}
                       placeholder="0.00"
                       className={`${inp} pl-6`}
@@ -2981,10 +2980,7 @@ export default function RepairsPage() {
                     type="button"
                     onClick={() => {
                       const nextType = editData.discount_type === 'percent' ? 'fixed' : 'percent'
-                      const discountValue = parseFloat(editData.discount_value) || 0
-                      const amt = nextType === 'percent' ? editData.subtotal * (discountValue / 100) : discountValue
-                      const total = Math.max(0, editData.subtotal - Math.max(0, Math.min(editData.subtotal, amt)))
-                      setEditData((p) => ({ ...p, discount_type: nextType, estimated_cost: total.toFixed(2) }))
+                      setEditData((p) => ({ ...p, discount_type: nextType }))
                     }}
                     title={editData.discount_type === 'percent' ? 'Switch to fixed amount' : 'Switch to percentage'}
                     className="h-10 w-10 shrink-0 rounded-lg border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
@@ -3020,10 +3016,10 @@ export default function RepairsPage() {
                 {remaining > 0 && (
                   <button
                     type="button"
-                    onClick={() => setEditData((p) => ({ ...p, deposit_paid: String(total) }))}
+                    onClick={() => setEditData((p) => ({ ...p, deposit_paid: String(total - editDiscountAmount) }))}
                     className="mt-1.5 w-full rounded-md border border-green-300 bg-green-50 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100 transition-colors"
                   >
-                    Mark as Fully Paid (£{total.toFixed(2)})
+                    Mark as Fully Paid (£{(total - editDiscountAmount).toFixed(2)})
                   </button>
                 )}
               </div>

@@ -34,6 +34,7 @@ interface CustomerDetail {
     created_at: string
     actual_cost: number | null
     estimated_cost: number | null
+    discount_amount: number | null
   }[]
   sales: {
     id: string
@@ -451,7 +452,11 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                 </Badge>
                 <div className="text-right shrink-0">
                   <p className="text-xs font-medium text-gray-900">
-                    {r.actual_cost ? formatCurrency(r.actual_cost) : r.estimated_cost ? `~${formatCurrency(r.estimated_cost)}` : '—'}
+                    {r.actual_cost
+                      ? formatCurrency(r.actual_cost)
+                      : r.estimated_cost
+                      ? `~${formatCurrency(Math.max(0, r.estimated_cost - (r.discount_amount ?? 0)))}`
+                      : '—'}
                   </p>
                   <p className="text-xs text-gray-400">{new Date(r.created_at).toLocaleDateString()}</p>
                 </div>

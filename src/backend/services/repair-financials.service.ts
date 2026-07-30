@@ -50,6 +50,7 @@ export interface RepairRevenueRow {
   deposit_paid?: number | null
   actual_cost?: number | null
   estimated_cost?: number | null
+  discount_amount?: number | null
   refund_amount?: number | null
 }
 
@@ -62,7 +63,12 @@ export function computeRepairRevenue(repair: RepairRevenueRow, posOverrideMap: M
 
   const status   = (repair.status ?? '').toLowerCase().trim()
   const deposit  = repair.deposit_paid  ?? 0
-  const fullCost = repair.actual_cost   ?? repair.estimated_cost ?? 0
+  // actual_cost, when set, is the final agreed amount and already accounts for any
+  // discount; estimated_cost is the fixed gross total, so the discount is subtracted
+  // only when falling back to it.
+  const fullCost = repair.actual_cost != null
+    ? repair.actual_cost
+    : Math.max(0, (repair.estimated_cost ?? 0) - (repair.discount_amount ?? 0))
   const refund   = repair.refund_amount ?? 0
 
   if (status === 'refunded') return Math.max(0, deposit - refund)

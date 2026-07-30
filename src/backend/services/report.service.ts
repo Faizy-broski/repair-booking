@@ -126,7 +126,7 @@ export const ReportService = {
   async getRepairsReport(branchId: string, from: string, to: string) {
     const [repairsRes, posSaleItemsRes] = await Promise.all([
       db('repairs')
-        .select('id, status, actual_cost, estimated_cost, deposit_paid, refund_amount, created_at, updated_at, device_type, device_brand')
+        .select('id, status, actual_cost, estimated_cost, discount_amount, deposit_paid, refund_amount, created_at, updated_at, device_type, device_brand')
         .eq('branch_id', branchId)
         .gte('created_at', from)
         .lte('created_at', to)

@@ -43,7 +43,7 @@ export const CustomerService = {
         .single(),
       adminSupabase
         .from('repairs')
-        .select('id, job_number, status, device_brand, device_model, created_at, actual_cost, estimated_cost')
+        .select('id, job_number, status, device_brand, device_model, created_at, actual_cost, estimated_cost, discount_amount')
         .eq('customer_id', id)
         .order('created_at', { ascending: false })
         .limit(50),

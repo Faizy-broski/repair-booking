@@ -26,7 +26,7 @@ export const GET = withMiddleware(async (req, ctx) => {
 
       // Period repairs — Total, Completed, Revenue, Profit are period-filtered
       db.from('repairs')
-        .select('id, status, created_at, deposit_paid, actual_cost, estimated_cost, refund_amount')
+        .select('id, status, created_at, deposit_paid, actual_cost, estimated_cost, discount_amount, refund_amount')
         .eq('branch_id', branchId)
         .gte('created_at', periodStart),
 
@@ -55,7 +55,7 @@ export const GET = withMiddleware(async (req, ctx) => {
       // same definition get_profit_loss (P&L report) uses. Exposed as
       // repairs_revenue_completed/repairs_profit_completed for cross-reference.
       db.from('repairs')
-        .select('id, status, updated_at, deposit_paid, actual_cost, estimated_cost, refund_amount')
+        .select('id, status, updated_at, deposit_paid, actual_cost, estimated_cost, discount_amount, refund_amount')
         .eq('branch_id', branchId)
         .gte('updated_at', periodStart),
 

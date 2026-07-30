@@ -132,7 +132,7 @@ export const RepairService = {
     const db = adminSupabase as any
 
     let repairsQ = db.from('repairs')
-      .select('id, status, deposit_paid, actual_cost, estimated_cost, refund_amount')
+      .select('id, status, deposit_paid, actual_cost, estimated_cost, discount_amount, refund_amount')
       .eq('branch_id', branchId)
     if (from) repairsQ = repairsQ.gte('created_at', from)
     if (to)   repairsQ = repairsQ.lte('created_at', to)
@@ -165,7 +165,7 @@ export const RepairService = {
 
       const s        = (r.status ?? '').toLowerCase().trim()
       const deposit   = r.deposit_paid  ?? 0
-      const fullCost  = r.actual_cost   ?? r.estimated_cost ?? 0
+      const fullCost  = r.actual_cost != null ? r.actual_cost : Math.max(0, (r.estimated_cost ?? 0) - (r.discount_amount ?? 0))
       const refund    = r.refund_amount ?? 0
 
       if (s === 'refunded') {

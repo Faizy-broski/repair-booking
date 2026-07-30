@@ -53,7 +53,7 @@ function RepairCard({ repair, isDragOverlay = false }: { repair: RepairRow; isDr
           )}
         </div>
         {repair.estimated_cost && (
-          <span className="text-xs text-gray-500">{formatCurrency(repair.estimated_cost)}</span>
+          <span className="text-xs text-gray-500">{formatCurrency(Math.max(0, repair.estimated_cost - ((repair as any).discount_amount || 0)))}</span>
         )}
       </div>
       {repair.customers && (

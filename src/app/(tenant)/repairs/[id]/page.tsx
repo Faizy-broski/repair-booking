@@ -409,6 +409,19 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
               )
             })()}
             <InfoRow label="Deposit paid" value={formatCurrency(repair.deposit_paid)} />
+            {(() => {
+              // actual_cost, when set, is the final agreed amount (discount already
+              // accounted for); estimated_cost is the fixed gross total, so discount
+              // is only subtracted when falling back to it.
+              const partsDiscount = repair.repair_items.reduce((s, i) => s + (i.discount_amount || 0), 0)
+              const totalDiscount = (repair.discount_amount || 0) + partsDiscount
+              const total = repair.actual_cost != null
+                ? repair.actual_cost
+                : Math.max(0, (repair.estimated_cost ?? 0) - totalDiscount)
+              if (!total && !repair.deposit_paid) return null
+              const balanceDue = Math.max(0, total - (repair.deposit_paid || 0))
+              return <InfoRow label="Balance due" value={formatCurrency(balanceDue)} />
+            })()}
             {repair.repair_payments && repair.repair_payments.length > 0 && (
               <div className="flex flex-wrap items-start gap-x-2 gap-y-1 py-0.5">
                 <span className="w-24 shrink-0 text-gray-400">Payments</span>

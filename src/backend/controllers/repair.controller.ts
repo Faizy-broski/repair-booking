@@ -62,7 +62,9 @@ async function getRepairInvoiceData(repairId: string, branchId: string | null, b
   const partsDiscount = repairItems.reduce((s: number, it: any) => s + Number(it.discount_amount ?? 0), 0)
   const repairDiscount = Number(r.discount_amount ?? 0)
   const netPartsTotal = sumOfPartsGross - partsDiscount
-  const laborFee = Math.max(0, Number(r.estimated_cost ?? 0) + repairDiscount - netPartsTotal)
+  // estimated_cost is the gross total (job fee + net parts), never reduced by the
+  // overall job discount — so labor fee is recovered by subtracting parts alone.
+  const laborFee = Math.max(0, Number(r.estimated_cost ?? 0) - netPartsTotal)
 
   const items: any[] = []
   if (laborFee > 0 || repairItems.length === 0) {
@@ -142,39 +144,29 @@ async function buildRepairInvoiceBuffer(repairId: string, branchId: string | nul
   return { buffer: await renderToBuffer(doc as any), jobNumber: data.jobNumber }
 }
 
-// Pricing figures for notification emails — same totals math as getRepairInvoiceData
-// (parts + labour minus discounts, less deposit already paid) so the "created" and
-// "status changed" emails always agree with the PDF invoice for the same job.
+// Pricing figures for notification emails. estimated_cost is the fixed gross total
+// (job fee + net parts) — never mutated by the overall job discount — so it's used
+// as total_cost directly, and discount_amount/repair_items discounts are subtracted
+// once here to get balance_due. Keeps these emails in agreement with the PDF invoice.
 // Values come back pre-formatted with the business's currency symbol so templates
 // can drop them straight in as {{total_cost}}, {{deposit_paid}}, {{balance_due}}, etc.
 function getRepairPricingVariables(r: any, currency: string): Record<string, string> {
   const repairItems: any[] = Array.isArray(r.repair_items) ? r.repair_items : []
-  const partsGross    = repairItems.reduce((s: number, it: any) => s + (it.quantity ?? 1) * Number(it.unit_price ?? 0), 0)
   const partsDiscount = repairItems.reduce((s: number, it: any) => s + Number(it.discount_amount ?? 0), 0)
   const repairDiscount = Number(r.discount_amount ?? 0)
-  const estimatedCost = Number(r.estimated_cost ?? 0)
-  const subtotal  = estimatedCost + partsGross
-  const discount  = partsDiscount + repairDiscount
-  const total     = Math.max(0, subtotal - discount)
+  const total = Number(r.estimated_cost ?? 0)
+  const discount = partsDiscount + repairDiscount
   const depositPaid = Number(r.deposit_paid ?? 0)
-  const balanceDue   = Math.max(0, total - depositPaid)
+  const balanceDue = Math.max(0, total - discount - depositPaid)
 
   const fmt = (n: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(n)
 
-  const result = {
+  return {
     total_cost:   fmt(total),
     discount:     discount > 0 ? fmt(discount) : '',
     deposit_paid: fmt(depositPaid),
     balance_due:  fmt(balanceDue),
   }
-
-  // TEMP DEBUG — remove once the pricing-details email rollout is confirmed working.
-  console.log('[DEBUG getRepairPricingVariables] raw:', {
-    estimated_cost: r.estimated_cost, deposit_paid: r.deposit_paid, discount_amount: r.discount_amount,
-    repair_items_count: repairItems.length, currency,
-  }, 'computed:', { subtotal, discount, total, depositPaid, balanceDue }, 'result:', result)
-
-  return result
 }
 
 // Same split as above: plain data for the thermal HTML path, PDF for A4/A5/Letter.
@@ -212,13 +204,13 @@ async function getRepairSlipData(repairId: string, branchId: string | null, busi
 
   const deviceLabel = [r.device_brand, r.device_model].filter(Boolean).join(' ') || r.device_type || 'Device'
 
-  // Charges: use repair_items if present, otherwise estimated_cost
+  // estimated_cost is the gross total (job fee + net parts), already inclusive of parts.
   const repairItems: any[] = Array.isArray(r.repair_items) ? r.repair_items : []
-  let totalRepairCharges = Number(r.estimated_cost ?? 0)
-  const sumOfParts = repairItems.reduce((s: number, it: any) => s + (it.quantity ?? 1) * Number(it.unit_price ?? 0), 0)
-  totalRepairCharges = Math.max(totalRepairCharges, sumOfParts)
+  const totalRepairCharges = Number(r.estimated_cost ?? 0)
+  const partsDiscount = repairItems.reduce((s: number, it: any) => s + Number(it.discount_amount ?? 0), 0)
+  const discount = partsDiscount + Number(r.discount_amount ?? 0)
   const deposit = Number(r.deposit_paid ?? 0)
-  const remaining = Math.max(0, totalRepairCharges - deposit)
+  const remaining = Math.max(0, totalRepairCharges - discount - deposit)
 
   return {
     jobNumber,
@@ -543,9 +535,6 @@ export const RepairController = {
               ...pricing,
             }
 
-            // TEMP DEBUG — remove once the pricing-details email rollout is confirmed working.
-            console.log('[DEBUG ticket_created] businessId:', ctx.businessId, 'variables:', ticketCreatedVariables)
-
             NotificationEngine.fire('ticket_created', {
               businessId: ctx.businessId,
               branchId: data.branch_id,
@@ -670,7 +659,7 @@ export const RepairController = {
         const branchId = ctx.auth.branchId ?? null
         RepairService.getById(id, branchId).then((repair) => {
           if (repair?.assigned_to) {
-            const total = (repair as Record<string, unknown>).total_cost as number ?? 0
+            const total = Number((repair as Record<string, unknown>).estimated_cost ?? 0)
             CommissionService.recordForRepair(ctx.businessId, repair.assigned_to, id, total).catch(() => {})
           }
         }).catch(() => {})

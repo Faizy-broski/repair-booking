@@ -25,6 +25,7 @@ interface RepairRow {
   device_model: string | null
   issue: string | null
   estimated_cost: number | null
+  discount_amount: number | null
   deposit_paid: number | null
   created_at: string
   custom_fields?: { due_date?: string | null } | null
@@ -39,7 +40,8 @@ function row2arr(r: RepairRow, businessName: string) {
   const device = [r.device_type, r.device_brand, r.device_model].filter(Boolean).join(' ') || 'N/A'
   const employee = r.employees ? `${r.employees.first_name} ${r.employees.last_name ?? ''}`.trim() : 'N/A'
   const due = (r.custom_fields as any)?.due_date ?? 'N/A'
-  return [r.job_number, r.status ?? 'N/A', r.customers ? `${r.customers.first_name} ${r.customers.last_name ?? ''}`.trim() : 'N/A', r.customers?.phone ?? 'N/A', device, r.issue ?? 'N/A', formatDate(r.created_at), due, r.estimated_cost ? `£${r.estimated_cost.toFixed(2)}` : 'N/A', businessName, employee]
+  const net = r.estimated_cost != null ? Math.max(0, r.estimated_cost - (r.discount_amount ?? 0)) : null
+  return [r.job_number, r.status ?? 'N/A', r.customers ? `${r.customers.first_name} ${r.customers.last_name ?? ''}`.trim() : 'N/A', r.customers?.phone ?? 'N/A', device, r.issue ?? 'N/A', formatDate(r.created_at), due, net != null ? `£${net.toFixed(2)}` : 'N/A', businessName, employee]
 }
 
 export default function RepairCustomerDetailPage() {
@@ -184,7 +186,12 @@ export default function RepairCustomerDetailPage() {
     },
     {
       id: 'cost', header: 'Estimated Cost',
-      cell: ({ row }) => row.original.estimated_cost ? `£${row.original.estimated_cost.toFixed(2)}` : '—',
+      cell: ({ row }) => {
+        const est = row.original.estimated_cost
+        if (!est) return '—'
+        const net = Math.max(0, est - (row.original.discount_amount ?? 0))
+        return `£${net.toFixed(2)}`
+      },
     },
     {
       id: 'business', header: 'Business Name',
