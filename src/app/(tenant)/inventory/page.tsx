@@ -17,6 +17,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ScanButton } from '@/components/scanner/scan-button'
 import { ScannerModal } from '@/components/scanner/scanner-modal'
 import { BarcodeModal } from '@/components/inventory/barcode-modal'
+import { BulkBarcodeModal } from '@/components/inventory/bulk-barcode-modal'
 
 interface ProductRow {
   id: string
@@ -619,6 +620,7 @@ export default function InventoryPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false)
+  const [showBulkBarcode, setShowBulkBarcode] = useState(false)
 
   // View Variants drawer
   const [variantDrawer, setVariantDrawer] = useState<ProductRow | null>(null)
@@ -1254,6 +1256,9 @@ export default function InventoryPage() {
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5">
           <span className="text-sm font-medium text-red-700">{selectedIds.size} item{selectedIds.size !== 1 ? 's' : ''} selected</span>
+          <Button size="sm" variant="outline" onClick={() => setShowBulkBarcode(true)}>
+            <Barcode className="h-4 w-4" /> Print Barcodes
+          </Button>
           <Button size="sm" variant="destructive" onClick={() => setShowBulkDeleteConfirm(true)}>
             <Trash2 className="h-4 w-4" /> Delete selected
           </Button>
@@ -1460,6 +1465,12 @@ export default function InventoryPage() {
           setBarcodeTarget(null)
           queryClient.invalidateQueries({ queryKey: ['inventory'] })
         }}
+      />
+
+      <BulkBarcodeModal
+        open={showBulkBarcode}
+        products={displayProducts.filter((p: ProductRow) => selectedIds.has(p.id))}
+        onClose={() => setShowBulkBarcode(false)}
       />
 
       <DiscountModal
