@@ -66,6 +66,62 @@ export interface SalePayload {
   }[]
 }
 
+export interface SalesStatsSaleRow {
+  total: number
+  is_refund: boolean
+  payment_method: string
+  payment_splits?: PaymentSplit[] | null
+}
+
+export interface SalesStatsCashRow {
+  type: string
+  amount: number
+}
+
+// Pure reduction of raw `sales`/`cash_movements` rows into the Sales page
+// summary cards — split out of getSalesStats so it can be unit tested without
+// a DB. Excludes repair revenue/refunds, folded in by the caller afterwards.
+export function computeSalesStats(rows: SalesStatsSaleRow[], cashRows: SalesStatsCashRow[]) {
+  const sales = rows.filter(r => !r.is_refund)
+  const refunds = rows.filter(r => r.is_refund)
+  const stats = {
+    sales_count: sales.length,
+    revenue: sales.reduce((s, r) => s + Number(r.total), 0),
+    refund_count: refunds.length,
+    // Refund rows store `total` negative (see process_refund) — take the
+    // magnitude so this stays a positive figure, consistent with
+    // RepairService.getRevenueStats().refundAmount, which the caller adds in.
+    refund_amount: refunds.reduce((s, r) => s + Math.abs(Number(r.total)), 0),
+    cash_total: 0,
+    card_total: 0,
+    cash_in_total: 0,
+    cash_out_total: 0,
+  }
+
+  // Cash/card breakdown — used by the retail template's Sales page cards.
+  for (const r of sales) {
+    if (r.payment_method === 'cash') {
+      stats.cash_total += Number(r.total)
+    } else if (r.payment_method === 'card') {
+      stats.card_total += Number(r.total)
+    } else if (r.payment_method === 'split' && Array.isArray(r.payment_splits)) {
+      for (const s of r.payment_splits) {
+        if (s.method === 'cash') stats.cash_total += Number(s.amount)
+        else if (s.method === 'card') stats.card_total += Number(s.amount)
+      }
+    }
+  }
+
+  // Cash In adds to Sales revenue, Cash Out subtracts — same window/branch.
+  for (const r of cashRows) {
+    if (r.type === 'cash_in') stats.cash_in_total += Number(r.amount)
+    else stats.cash_out_total += Number(r.amount)
+  }
+  stats.revenue += stats.cash_in_total - stats.cash_out_total
+
+  return stats
+}
+
 export const PosService = {
   async processSale(payload: SalePayload): Promise<{ saleId: string; invoiceNumber: string | null }> {
     const { data, error } = await adminSupabase.rpc('process_sale', {
@@ -250,34 +306,6 @@ export const PosService = {
     const { data, error } = await q
     if (error) throw error
 
-    const rows = data ?? []
-    const sales = rows.filter(r => !r.is_refund)
-    const refunds = rows.filter(r => r.is_refund)
-    const stats = {
-      sales_count: sales.length,
-      revenue: sales.reduce((s, r) => s + Number(r.total), 0),
-      refund_count: refunds.length,
-      refund_amount: refunds.reduce((s, r) => s + Number(r.total), 0),
-      cash_total: 0,
-      card_total: 0,
-      cash_in_total: 0,
-      cash_out_total: 0,
-    }
-
-    // Cash/card breakdown — used by the retail template's Sales page cards.
-    for (const r of sales) {
-      if (r.payment_method === 'cash') {
-        stats.cash_total += Number(r.total)
-      } else if (r.payment_method === 'card') {
-        stats.card_total += Number(r.total)
-      } else if (r.payment_method === 'split' && Array.isArray(r.payment_splits)) {
-        for (const s of r.payment_splits as { method: string; amount: number }[]) {
-          if (s.method === 'cash') stats.cash_total += Number(s.amount)
-          else if (s.method === 'card') stats.card_total += Number(s.amount)
-        }
-      }
-    }
-
     // Cash In adds to Sales revenue, Cash Out subtracts — same window/branch.
     let cashQ = (adminSupabase as any)
       .from('cash_movements')
@@ -286,11 +314,8 @@ export const PosService = {
     if (from) cashQ = cashQ.gte('created_at', from)
     if (to) cashQ = cashQ.lte('created_at', to)
     const { data: cashRows } = await cashQ
-    for (const r of (cashRows ?? []) as any[]) {
-      if (r.type === 'cash_in') stats.cash_in_total += Number(r.amount)
-      else stats.cash_out_total += Number(r.amount)
-    }
-    stats.revenue += stats.cash_in_total - stats.cash_out_total
+
+    const stats = computeSalesStats((data ?? []) as SalesStatsSaleRow[], (cashRows ?? []) as SalesStatsCashRow[])
 
     // Repair job revenue (deposits/final charges) has no `sales` row unless
     // paid off through the POS cart — fold it in here so the Sales page

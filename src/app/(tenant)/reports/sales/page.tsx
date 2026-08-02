@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { exportExcel } from '@/lib/export-excel'
 import { DateRangeBar } from '../_components/date-range-bar'
+import { groupDailySales } from '@/lib/reports/sales-report'
 import Link from 'next/link'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -37,23 +38,7 @@ export default function SalesReportPage() {
       const params = new URLSearchParams({ type: 'sales', branch_id: activeBranch!.id, from: `${dateFrom}T00:00:00`, to: `${dateTo}T23:59:59` })
       const res = await fetch(`/api/reports?${params}`)
       const json = await res.json()
-      const grouped: Record<string, { total: number; count: number }> = {}
-      for (const s of json.data?.sales ?? []) {
-        const d = s.created_at?.split('T')[0] ?? ''
-        if (!grouped[d]) grouped[d] = { total: 0, count: 0 }
-        grouped[d].total += s.total ?? 0
-        grouped[d].count += 1
-      }
-      // Cash In adds to Sales revenue, Cash Out subtracts — folded into the
-      // same daily buckets (no transaction-count change, revenue-only).
-      for (const m of json.data?.cash_movements ?? []) {
-        const d = m.created_at?.split('T')[0] ?? ''
-        if (!grouped[d]) grouped[d] = { total: 0, count: 0 }
-        grouped[d].total += m.type === 'cash_in' ? (m.amount ?? 0) : -(m.amount ?? 0)
-      }
-      return Object.entries(grouped).map(([date, { total, count }]) => ({
-        date, total_sales: total, transaction_count: count, avg_order_value: count ? total / count : 0,
-      }))
+      return groupDailySales(json.data?.sales ?? [], json.data?.cash_movements ?? [])
     },
     enabled: !!activeBranch,
     staleTime: 60_000,

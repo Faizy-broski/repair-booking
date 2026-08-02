@@ -97,6 +97,27 @@ export function filterCompletedRepairsInPeriod<T extends { status?: string | nul
   })
 }
 
+export interface SalesCogsRow {
+  quantity?: number | null
+  unit_cost?: number | null
+  products?: { cost_price?: number | null } | null
+  sales?: { is_refund?: boolean | null } | null
+}
+
+// COGS for the "Sales Profit" dashboard card: sale_items.quantity × unit_cost
+// (falling back to the product's current cost_price when unit_cost wasn't
+// captured, e.g. on refund line items). Refund line items are excluded
+// defensively here too — process_refund (migration 010) re-inserts a
+// sale_items row with the ORIGINAL positive quantity for the returned item,
+// so counting them would double the COGS already recorded against the
+// original sale instead of reversing it.
+export function computeSalesCogs(rows: SalesCogsRow[]): number {
+  return rows.reduce((sum, item) => {
+    if (item.sales?.is_refund) return sum
+    return sum + (item.quantity ?? 0) * (item.unit_cost || item.products?.cost_price || 0)
+  }, 0)
+}
+
 export interface RepairPartsCostRow {
   quantity?: number | null
   unit_cost?: number | null

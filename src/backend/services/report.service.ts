@@ -100,7 +100,7 @@ export const ReportService = {
 
   async getSalesReport(branchId: string, from: string, to: string) {
     const { data, error } = await db('sales')
-      .select('id, total, discount, tax, payment_method, created_at, customers(first_name,last_name)')
+      .select('id, total, discount, tax, payment_method, created_at, is_refund, customers(first_name,last_name)')
       .eq('branch_id', branchId)
       .gte('created_at', from)
       .lte('created_at', to)
