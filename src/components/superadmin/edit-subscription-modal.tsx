@@ -105,6 +105,10 @@ export function EditSubscriptionModal({
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Failed to save')
+      if (json.stripeSyncError) {
+        setError(`Saved locally, but Stripe wasn't updated: ${json.stripeSyncError}`)
+        return
+      }
       onSaved()
     } catch (err: any) {
       setError(err.message)
@@ -276,11 +280,12 @@ export function EditSubscriptionModal({
           {/* Stripe note */}
           <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
             <p className="text-xs text-gray-500 leading-relaxed">
-              <strong className="text-gray-700">Note:</strong> Changes are applied to
-              your platform only. Stripe billing is <em>not</em> modified. If this
-              business has an active Stripe subscription, manage it separately in the
-              Stripe dashboard.
-              {isCustomPlan && ' Custom plan pricing shown here is what the business is billed manually — it is not pushed to Stripe.'}
+              <strong className="text-gray-700">Note:</strong> Status, billing cycle,
+              and period dates are applied to your platform only — Stripe billing for
+              those is <em>not</em> modified.
+              {isCustomPlan
+                ? ' Custom Plan pricing IS pushed to Stripe on save (with an immediate prorated adjustment) if this business has an active Stripe subscription.'
+                : ' If this business has an active Stripe subscription, its price is not changed here — manage that separately in the Stripe dashboard.'}
             </p>
           </div>
 

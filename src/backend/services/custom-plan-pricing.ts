@@ -18,6 +18,7 @@
  * src/components/landing/custom-plan-card.tsx.
  */
 import { z } from 'zod'
+import type Stripe from 'stripe'
 
 export interface CustomPlanBaseline {
   basePricePence: number
@@ -129,6 +130,23 @@ export function computeCustomPlanTotalPence(
  * the subscription row itself in custom_price_monthly. Reading plan.price_monthly
  * directly for an is_custom subscription would silently under/over-report revenue.
  */
+let cachedCustomPlanStripeProductId: string | null = null
+
+/**
+ * Every custom-priced Stripe subscription item needs a `product` ID (Stripe's
+ * subscription-update API, unlike Checkout, has no inline product_data) — this
+ * looks up the shared "Custom Plan" Product by name and creates it once if it
+ * doesn't exist yet, since every custom Price is unique but the Product is not.
+ */
+export async function getOrCreateCustomPlanStripeProductId(stripe: Stripe): Promise<string> {
+  if (cachedCustomPlanStripeProductId) return cachedCustomPlanStripeProductId
+  const { data } = await stripe.products.list({ active: true, limit: 100 })
+  const existing = data.find((p) => p.name === 'Custom Plan')
+  const product = existing ?? (await stripe.products.create({ name: 'Custom Plan' }))
+  cachedCustomPlanStripeProductId = product.id
+  return product.id
+}
+
 export function effectiveMonthlyPrice(sub: {
   is_custom?: boolean | null
   custom_price_monthly?: number | null

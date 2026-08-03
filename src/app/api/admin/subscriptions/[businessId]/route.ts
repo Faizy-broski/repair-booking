@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import Stripe from 'stripe'
 import { withMiddleware } from '@/backend/middleware'
 import type { RequestContext } from '@/backend/middleware'
 import { createAdminClient } from '@/backend/config/supabase'
@@ -7,7 +8,11 @@ import {
   getCustomPlanBaseline,
   customPlanDimensionsSchema,
   computeCustomPlanPricePence,
+  computeCustomPlanTotalPence,
+  getOrCreateCustomPlanStripeProductId,
 } from '@/backend/services/custom-plan-pricing'
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', { apiVersion: '2026-02-25.clover' as any })
 
 const VALID_STATUSES  = ['active', 'trialing', 'past_due', 'canceled', 'suspended'] as const
 const VALID_CYCLES    = ['monthly', 'yearly'] as const
@@ -82,6 +87,13 @@ async function handler(
     return NextResponse.json({ error: 'Plan not found' }, { status: 404 })
   }
 
+  // ── Read existing subscription to preserve Stripe IDs ──────────────────────
+  const { data: existingSub } = await (supabase as any)
+    .from('subscriptions')
+    .select('stripe_sub_id, stripe_customer_id, livemode, canceled_at')
+    .eq('business_id', businessId)
+    .maybeSingle()
+
   // ── Custom Plan dimensions ──────────────────────────────────────────────────
   // The "Custom Plan" catalog row is a shared placeholder (see migration 111) —
   // the real branches/staff/inventory/repair numbers and price live on the
@@ -95,6 +107,9 @@ async function handler(
     custom_max_services:  null,
     custom_price_monthly: null,
   }
+
+  let stripeSynced: boolean | null = null
+  let stripeSyncError: string | null = null
 
   if (isCustomPlan) {
     if (!customDimensions || typeof customDimensions !== 'object') {
@@ -118,14 +133,40 @@ async function handler(
       custom_max_services:  dims.repairLimit,
       custom_price_monthly: pricePence / 100,
     }
-  }
 
-  // ── Read existing subscription to preserve Stripe IDs ──────────────────────
-  const { data: existingSub } = await (supabase as any)
-    .from('subscriptions')
-    .select('stripe_sub_id, stripe_customer_id, livemode, canceled_at')
-    .eq('business_id', businessId)
-    .maybeSingle()
+    // ── Push the negotiated price to the real Stripe subscription ────────────
+    // Local-only fields above are never reflected in Stripe unless we do this
+    // explicitly — Stripe otherwise keeps billing whatever price the
+    // subscription was originally created with.
+    if (existingSub?.stripe_sub_id) {
+      try {
+        const stripeSub = await stripe.subscriptions.retrieve(existingSub.stripe_sub_id)
+        const itemId = stripeSub.items.data[0]?.id
+        if (!itemId) throw new Error('Stripe subscription has no line items')
+
+        const totalPence = computeCustomPlanTotalPence(dims, baseline, billingCycle as Cycle)
+        const productId = await getOrCreateCustomPlanStripeProductId(stripe)
+
+        await stripe.subscriptions.update(existingSub.stripe_sub_id, {
+          items: [{
+            id: itemId,
+            price_data: {
+              currency: 'gbp',
+              product: productId,
+              unit_amount: totalPence,
+              recurring: { interval: billingCycle === 'yearly' ? 'year' : 'month' },
+            },
+          }],
+          proration_behavior: 'create_prorations',
+        })
+        stripeSynced = true
+      } catch (err: any) {
+        stripeSynced = false
+        stripeSyncError = err?.message ?? 'Failed to update Stripe subscription'
+        console.error('[admin/subscriptions PATCH] Stripe sync error:', stripeSyncError)
+      }
+    }
+  }
 
   const now = new Date().toISOString()
 
@@ -179,6 +220,8 @@ async function handler(
     business: business.name,
     plan:     plan.name,
     status,
+    ...(stripeSynced !== null ? { stripeSynced } : {}),
+    ...(stripeSyncError ? { stripeSyncError } : {}),
   })
 }
 
