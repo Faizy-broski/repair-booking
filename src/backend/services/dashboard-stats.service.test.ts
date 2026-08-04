@@ -54,6 +54,39 @@ describe('computeDashboardFinancials — Use case: a normal trading day', () => 
   })
 })
 
+describe('computeDashboardFinancials — Use case: repair sent to a third-party lab', () => {
+  it('a finished repair with a lab fee has that fee deducted from repairs_profit, but not from net_profit (matches how parts cost is already excluded from net_profit)', () => {
+    const stats = computeDashboardFinancials(baseInput({
+      repairsRevenueRows: [{ id: 'r1', status: 'completed', actual_cost: 100, lab_fee: 25 }],
+    }))
+    expect(stats.repairs_revenue).toBe(100)
+    expect(stats.repairs_profit).toBe(75)   // 100 - 25 lab fee (no parts)
+    expect(stats.net_profit).toBe(100)      // unaffected, same as parts cost
+  })
+
+  it('lab fee on a still-open job with no deposit paid is not yet counted (mirrors parts cost gating)', () => {
+    const stats = computeDashboardFinancials(baseInput({
+      repairsRevenueRows: [{ id: 'r1', status: 'in_progress', deposit_paid: 0, lab_fee: 25 }],
+    }))
+    expect(stats.repairs_profit).toBe(0) // revenue 0 - lab fee 0 (not gated in yet)
+  })
+
+  it('lab fee on an open job counts once a deposit has been paid, same as parts cost', () => {
+    const stats = computeDashboardFinancials(baseInput({
+      repairsRevenueRows: [{ id: 'r1', status: 'in_progress', deposit_paid: 20, lab_fee: 25 }],
+    }))
+    expect(stats.repairs_revenue).toBe(20)
+    expect(stats.repairs_profit).toBe(-5) // 20 deposit - 25 lab fee
+  })
+
+  it('a refunded repair excludes its lab fee entirely, matching parts cost', () => {
+    const stats = computeDashboardFinancials(baseInput({
+      repairsRevenueRows: [{ id: 'r1', status: 'refunded', deposit_paid: 20, refund_amount: 20, lab_fee: 25 }],
+    }))
+    expect(stats.repairs_profit).toBe(0)
+  })
+})
+
 describe('computeDashboardFinancials — Use case: refund lowers revenue but must not double-charge COGS', () => {
   it('a $100 sale later fully refunded nets to zero sales_profit, not negative', () => {
     // The refund's sale_items row is excluded from salesCogsRows entirely by

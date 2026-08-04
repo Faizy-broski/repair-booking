@@ -575,6 +575,12 @@ function ReturnToSupplierModal({
 export default function InventoryPage() {
   const { activeBranch, isLoading: authLoading, verticalTemplateSlug } = useAuthStore()
   const isRetail = verticalTemplateSlug === 'retail-store'
+  const isTyreShop = verticalTemplateSlug === 'mobile-tyre-fitting'
+  // Simplified catalog (Category + Brand + Attributes, no Device Type/Model/
+  // Part split) — shared by Retail and Mobile Tyre Fitting. Valuation Method
+  // and "Put on Sale" stay isRetail-only below (tyre shops still do batch
+  // costing; "Put on Sale" is a retail promo feature, not requested here).
+  const useSimpleCatalog = isRetail || isTyreShop
   // Use the branch ID as a stable primitive — avoids re-running effects when
   // the layout refreshes the activeBranch object reference but the ID is the same.
   const branchId = activeBranch?.id ?? null
@@ -861,7 +867,7 @@ export default function InventoryPage() {
     },
     {
       id: 'category',
-      header: isRetail ? 'Category' : 'Device Type',
+      header: useSimpleCatalog ? 'Category' : 'Device Type',
       cell: ({ row }) => row.original.categories?.name
         ? <Badge variant="secondary">{row.original.categories.name}</Badge>
         : <span className="text-gray-300">—</span>,
@@ -873,7 +879,7 @@ export default function InventoryPage() {
         ? <span className="text-sm text-gray-600">{row.original.brands.name}</span>
         : <span className="text-gray-300">—</span>,
     },
-    ...(!isRetail ? [
+    ...(!useSimpleCatalog ? [
       {
         id: 'model',
         header: 'Model',
@@ -993,7 +999,7 @@ export default function InventoryPage() {
           { label: 'Bin',             href: '/inventory/bin' },
           { label: 'Damage Returns',  href: '/inventory/damage-returns' },
           // { label: 'Stock Count', href: '/inventory/stock-count' },  // disabled
-          ...(isRetail ? [
+          ...(useSimpleCatalog ? [
             { label: 'Categories',    href: '/inventory/categories' },
             { label: 'Attributes',    href: '/inventory/attributes' },
           ] : []),
@@ -1124,8 +1130,8 @@ export default function InventoryPage() {
 
       {/* Filter Bar */}
       <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
-        {/* Retail: category quick-filter pills */}
-        {isRetail && categories.length > 0 && (
+        {/* Simplified-catalog verticals (Retail, Tyre Fitting): category quick-filter pills */}
+        {useSimpleCatalog && categories.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap pb-1 border-b border-gray-100">
             <button
               onClick={() => { setCategoryFilter(''); setPage(0) }}
@@ -1151,13 +1157,13 @@ export default function InventoryPage() {
             <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               type="search"
-              placeholder={isRetail ? 'Search by name, SKU, barcode...' : 'Search by name, SKU, barcode, IMEI...'}
+              placeholder={useSimpleCatalog ? 'Search by name, SKU, barcode...' : 'Search by name, SKU, barcode, IMEI...'}
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(0) }}
               className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
             />
           </div>
-          {!isRetail && (
+          {!useSimpleCatalog && (
             <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 gap-0.5">
               {(['all', 'product', 'part'] as const).map((f) => (
                 <button
@@ -1190,7 +1196,7 @@ export default function InventoryPage() {
         {showAdvancedFilters && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-gray-100">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">{isRetail ? 'Category' : 'Device Type / Category'}</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{useSimpleCatalog ? 'Category' : 'Device Type / Category'}</label>
               <Select
                 options={[{ value: '', label: 'All Categories' }, ...categories.map(c => ({ value: c.id, label: c.name }))]}
                 value={categoryFilter}

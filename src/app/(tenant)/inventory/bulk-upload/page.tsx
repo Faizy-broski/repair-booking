@@ -206,6 +206,8 @@ const CHUNK_SIZE = 100
 export default function BulkUploadPage() {
   const { activeBranch, verticalTemplateSlug } = useAuthStore()
   const isRetail = verticalTemplateSlug === 'retail-store'
+  const isTyreShop = verticalTemplateSlug === 'mobile-tyre-fitting'
+  const useSimpleCatalog = isRetail || isTyreShop
   const queryClient = useQueryClient()
   const router = useRouter()
 
@@ -361,7 +363,7 @@ export default function BulkUploadPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-on-surface">Bulk Upload</h1>
-          <p className="text-sm text-on-surface-variant mt-0.5">{isRetail ? 'Import products in bulk from a CSV file' : 'Import products or parts in bulk from a CSV file'}</p>
+          <p className="text-sm text-on-surface-variant mt-0.5">{useSimpleCatalog ? 'Import products in bulk from a CSV file' : 'Import products or parts in bulk from a CSV file'}</p>
         </div>
         <Link href="/inventory">
           <Button size="sm">Back to Inventory</Button>
@@ -370,7 +372,7 @@ export default function BulkUploadPage() {
 
       {/* Tab: Product / Part */}
       <div className="flex gap-1 bg-surface-container-low p-1 rounded-xl w-fit">
-        {(isRetail ? ['product'] : ['product', 'part'] as ItemType[]).map((t) => (
+        {(useSimpleCatalog ? ['product'] : ['product', 'part'] as ItemType[]).map((t) => (
           <button
             key={t}
             onClick={() => { setItemType(t as ItemType); clearFile() }}

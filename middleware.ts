@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { verifyImpersonationJwt } from '@/lib/impersonation'
 
-const PUBLIC_PATHS = ['/api/auth/', '/api/webhooks/', '/api/public/', '/book/', '/_next/', '/favicon.ico', '/images/', '/api/google-reviews/oauth/callback']
+const PUBLIC_PATHS = ['/api/auth/', '/api/webhooks/', '/api/public/', '/book/', '/s/', '/_next/', '/favicon.ico', '/images/', '/api/google-reviews/oauth/callback']
 
 // Cache business existence checks so we don't hit the DB on every request.
 // Business records change rarely (creation, suspension). The cache expires

@@ -1,0 +1,12 @@
+[
+{"type":"header","version":"5.2.2","comment":"Export to JSON plugin for PHPMyAdmin"},
+{"type":"database","name":"thesiztb_repairbooking"},
+{"type":"table","name":"user_contact_access","database":"thesiztb_repairbooking","data":
+[
+{"id":"1","user_id":"5","contact_id":"4"},
+{"id":"2","user_id":"5","contact_id":"5"},
+{"id":"3","user_id":"5","contact_id":"6"},
+{"id":"4","user_id":"5","contact_id":"8"}
+]
+}
+]

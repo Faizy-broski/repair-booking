@@ -141,6 +141,16 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
   const router = useRouter()
   const { profile, activeBranch, branches, subscriptionStatus, isLoading: authLoading, verticalTemplateSlug } = useAuthStore()
   const isRetail = verticalTemplateSlug === 'retail-store'
+  const isTyreShop = verticalTemplateSlug === 'mobile-tyre-fitting'
+  // Mobile tyre-fitting vertical relabels the shared "Repairs" module as "Jobs" —
+  // same underlying pages/routes, just different copy for this business type.
+  const TYRE_SHOP_LABELS: Record<string, string> = {
+    '/repairs': 'Tyre Jobs',
+    '/repairs/service-catalogue': 'Service Catalogue',
+    '/repairs/customers': 'Job Customers',
+    '/repairs/settings': 'Job Settings',
+    '/reports/repairs': 'Jobs',
+  }
   const { isModuleEnabled, configs, isLoading: configsLoading, invalidate: invalidateConfigs } = useModuleConfigStore()
   const hasSubscriptionAccess = subscriptionStatus === null || subscriptionStatus.hasAccess
 
@@ -170,17 +180,22 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
   // wait for module configs which may never load for an inactive account.
   const navReady = !authLoading && (configsReady || !hasSubscriptionAccess)
 
+  // Mobile tyre-fitting shares the same simplified Category+Brand+Attributes
+  // catalog as retail-store (no Device Type/Model/Part split) — so it follows
+  // the same retailOnly/hideForRetail nav rules as retail.
+  const useSimpleCatalog = isRetail || isTyreShop
+
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (!hasAccess(profile?.role ?? 'cashier', item.requiredRole)) return false
-    if (item.retailOnly && !isRetail) return false
-    if (item.hideForRetail && isRetail) return false
+    if (item.retailOnly && !useSimpleCatalog) return false
+    if (item.hideForRetail && useSimpleCatalog) return false
     if (item.minBranches && branches.length < item.minBranches) return false
     if (item.module == null && item.requiredModules == null) return true
     if (!navReady) return false
     if (item.module != null && !isModuleEnabled(item.module)) return false
     if (item.requiredModules && !item.requiredModules.every((m) => isModuleEnabled(m))) return false
     return true
-  })
+  }).map((item) => (isTyreShop && TYRE_SHOP_LABELS[item.href]) ? { ...item, label: TYRE_SHOP_LABELS[item.href] } : item)
 
   const groups = buildGroups(visibleItems)
 

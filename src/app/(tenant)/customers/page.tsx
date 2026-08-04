@@ -14,6 +14,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
 import { PhoneInput } from '@/components/ui/phone-input'
+import { VehiclePicker, NewVehicleFields, type VehicleValue } from '@/components/vehicles/vehicle-picker'
 import validations from '@/components/layout/number-validations.json'
 import type { ColumnDef, VisibilityState } from '@tanstack/react-table'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
@@ -30,6 +31,7 @@ interface CustomerRow {
   address: string | null
   business_name: string | null
   created_at: string
+  vehicles?: { registration_number: string }[]
 }
 
 const schema = z.object({
@@ -58,6 +60,8 @@ const schema = z.object({
 })
 
 type FormData = z.infer<typeof schema>
+
+const EMPTY_VEHICLE: VehicleValue = { registration_number: '', make: '', model: '', colour: '', tyre_size: '', notes: '' }
 
 const EXPORTABLE_COLUMNS = ['Sr#', 'Name', 'Email', 'Business Name', 'Contact No', 'Address']
 
@@ -112,7 +116,8 @@ function exportPDF(customers: CustomerRow[]) {
 }
 
 export default function CustomersPage() {
-  const { activeBranch } = useAuthStore()
+  const { activeBranch, verticalTemplateSlug } = useAuthStore()
+  const isTyreShop = verticalTemplateSlug === 'mobile-tyre-fitting'
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -135,6 +140,7 @@ export default function CustomersPage() {
   const [createError, setCreateError] = useState<string | null>(null)
   const [customFields, setCustomFields] = useState<Record<string, unknown>>({})
   const { defs: customerFieldDefs } = useCustomFieldDefs('customers')
+  const [newVehicle, setNewVehicle] = useState<VehicleValue | null>(null)
 
   // Edit sheet
   const [editSheetOpen, setEditSheetOpen] = useState(false)
@@ -142,6 +148,12 @@ export default function CustomersPage() {
   const [editError, setEditError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<CustomerRow | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  // Edit sheet — vehicles (tyre template only), mirrors the Add Customer
+  // sheet's vehicle section so both forms behave consistently.
+  const [editVehicles, setEditVehicles] = useState<VehicleValue[]>([])
+  const [showAddEditVehicle, setShowAddEditVehicle] = useState(false)
+  const [editVehicleDraft, setEditVehicleDraft] = useState<VehicleValue>(EMPTY_VEHICLE)
+  const [savingEditVehicle, setSavingEditVehicle] = useState(false)
 
   // Column visibility
   const [colVisibility, setColVisibility] = useState<VisibilityState>({})
@@ -200,7 +212,9 @@ export default function CustomersPage() {
       business_name: data.business_name ?? null,
       created_at: new Date().toISOString(),
     }
+    const vehicleToCreate = newVehicle
     createForm.reset()
+    setNewVehicle(null)
     setSheetOpen(false)
     queryClient.setQueryData(customersKey, (old: any) => {
       if (!old?.rows) return old
@@ -212,6 +226,24 @@ export default function CustomersPage() {
       body: JSON.stringify({ ...data, branch_id: activeBranch.id, custom_fields: customFields }),
     })
     if (res.ok) {
+      const json = await res.json()
+      const createdId = json.data?.id
+      if (createdId && vehicleToCreate?.registration_number.trim()) {
+        const vehRes = await fetch('/api/vehicles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_id: createdId,
+            registration_number: vehicleToCreate.registration_number,
+            make: vehicleToCreate.make || null,
+            model: vehicleToCreate.model || null,
+            colour: vehicleToCreate.colour || null,
+            tyre_size: vehicleToCreate.tyre_size || null,
+            notes: vehicleToCreate.notes || null,
+          }),
+        }).catch(() => null)
+        if (!vehRes?.ok) toast.error('Customer saved, but the vehicle could not be added. Add it from the customer’s page.')
+      }
       queryClient.invalidateQueries({ queryKey: ['customers', activeBranch?.id] })
     } else {
       if (prev) queryClient.setQueryData(customersKey, prev)
@@ -231,7 +263,46 @@ export default function CustomersPage() {
       business_name: customer.business_name ?? '',
     })
     setEditError(null)
+    setEditVehicles([])
+    setShowAddEditVehicle(false)
+    setEditVehicleDraft(EMPTY_VEHICLE)
     setEditSheetOpen(true)
+    if (isTyreShop) {
+      fetch(`/api/vehicles?customer_id=${customer.id}`)
+        .then((r) => r.json())
+        .then((j) => setEditVehicles(j.data ?? []))
+        .catch(() => {})
+    }
+  }
+
+  async function addEditVehicle() {
+    if (!editingCustomer || !editVehicleDraft.registration_number.trim()) return
+    setSavingEditVehicle(true)
+    try {
+      const res = await fetch('/api/vehicles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: editingCustomer.id,
+          registration_number: editVehicleDraft.registration_number,
+          make: editVehicleDraft.make || null,
+          model: editVehicleDraft.model || null,
+          colour: editVehicleDraft.colour || null,
+          tyre_size: editVehicleDraft.tyre_size || null,
+          notes: editVehicleDraft.notes || null,
+        }),
+      })
+      if (res.ok) {
+        const json = await res.json()
+        setEditVehicles((prev) => [...prev, json.data])
+        setEditVehicleDraft(EMPTY_VEHICLE)
+        setShowAddEditVehicle(false)
+      } else {
+        toast.error('Failed to add vehicle.')
+      }
+    } finally {
+      setSavingEditVehicle(false)
+    }
   }
 
   async function onEdit(data: FormData) {
@@ -299,8 +370,8 @@ export default function CustomersPage() {
     setIsDeleting(false)
   }
 
-  const TOGGLEABLE_COLS = ['name', 'email', 'business', 'phone', 'address', 'created_at']
-  const COL_LABELS: Record<string, string> = { name: 'Name', email: 'Email', business: 'Business Name', phone: 'Contact No', address: 'Address', created_at: 'Added' }
+  const TOGGLEABLE_COLS = ['name', 'email', 'business', 'phone', ...(isTyreShop ? ['vehicle'] : []), 'address', 'created_at']
+  const COL_LABELS: Record<string, string> = { name: 'Name', email: 'Email', business: 'Business Name', phone: 'Contact No', vehicle: 'Vehicle', address: 'Address', created_at: 'Added' }
 
   const columns: ColumnDef<CustomerRow>[] = [
     {
@@ -345,6 +416,15 @@ export default function CustomersPage() {
       header: 'Contact No',
       cell: ({ getValue }) => (getValue() as string) || 'N/A',
     },
+    ...(isTyreShop ? [{
+      id: 'vehicle',
+      header: 'Vehicle',
+      cell: ({ row }: { row: { original: CustomerRow } }) => {
+        const plates = (row.original.vehicles ?? []).map((v) => v.registration_number)
+        if (plates.length === 0) return <span className="text-gray-400">N/A</span>
+        return <span className="font-mono text-xs">{plates.join(', ')}</span>
+      },
+    } as ColumnDef<CustomerRow>] : []),
     {
       accessorKey: 'address',
       header: 'Address',
@@ -493,7 +573,7 @@ export default function CustomersPage() {
       />
 
       {/* Add Customer Sheet */}
-      <InlineFormSheet open={sheetOpen} onClose={() => { setSheetOpen(false); setCreateError(null) }} title="Add Customer">
+      <InlineFormSheet open={sheetOpen} onClose={() => { setSheetOpen(false); setCreateError(null); setNewVehicle(null) }} title="Add Customer">
         <form onSubmit={createForm.handleSubmit(onCreate)} className="space-y-4">
           {createError && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{createError}</div>
@@ -502,7 +582,7 @@ export default function CustomersPage() {
             <Input label="First Name" required error={createForm.formState.errors.first_name?.message} {...createForm.register('first_name')} />
             <Input label="Last Name" {...createForm.register('last_name')} />
           </div>
-          <Input label="Business Name" {...createForm.register('business_name')} />
+          {!isTyreShop && <Input label="Business Name" {...createForm.register('business_name')} />}
           <div className="grid grid-cols-2 gap-3">
             <Input label="Email" type="email" {...createForm.register('email')} />
           </div>
@@ -516,6 +596,12 @@ export default function CustomersPage() {
             <label className="mb-1 block text-sm font-medium text-gray-700">Address</label>
             <textarea rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" {...createForm.register('address')} />
           </div>
+          {isTyreShop && (
+            <div className="border-t border-gray-100 pt-3">
+              <p className="mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Vehicle (optional)</p>
+              <VehiclePicker customerId={null} value={newVehicle} onChange={setNewVehicle} />
+            </div>
+          )}
           {customerFieldDefs.length > 0 && (
             <div className="border-t border-gray-100 pt-3 mt-2">
               <p className="mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Additional Info</p>
@@ -533,7 +619,7 @@ export default function CustomersPage() {
       </InlineFormSheet>
 
       {/* Edit Customer Sheet */}
-      <InlineFormSheet open={editSheetOpen} onClose={() => { setEditSheetOpen(false); setEditError(null) }} title="Edit Customer">
+      <InlineFormSheet open={editSheetOpen} onClose={() => { setEditSheetOpen(false); setEditError(null); setShowAddEditVehicle(false); setEditVehicleDraft(EMPTY_VEHICLE) }} title="Edit Customer">
         <form onSubmit={editForm.handleSubmit(onEdit)} className="space-y-4">
           {editError && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{editError}</div>
@@ -542,7 +628,7 @@ export default function CustomersPage() {
             <Input label="First Name" required error={editForm.formState.errors.first_name?.message} {...editForm.register('first_name')} />
             <Input label="Last Name" {...editForm.register('last_name')} />
           </div>
-          <Input label="Business Name" {...editForm.register('business_name')} />
+          {!isTyreShop && <Input label="Business Name" {...editForm.register('business_name')} />}
           <div className="grid grid-cols-2 gap-3">
             <Input label="Email" type="email" {...editForm.register('email')} />
           </div>
@@ -556,6 +642,42 @@ export default function CustomersPage() {
             <label className="mb-1 block text-sm font-medium text-gray-700">Address</label>
             <textarea rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" {...editForm.register('address')} />
           </div>
+          {isTyreShop && (
+            <div className="border-t border-gray-100 pt-3">
+              <p className="mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Vehicles</p>
+              {editVehicles.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {editVehicles.map((v) => (
+                    <span key={v.id} className="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700">
+                      {v.registration_number.toUpperCase()}
+                      {(v.make || v.model) && <span className="ml-1 font-normal text-gray-400">{[v.make, v.model].filter(Boolean).join(' ')}</span>}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {showAddEditVehicle ? (
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
+                  <NewVehicleFields draft={editVehicleDraft} setDraft={setEditVehicleDraft} />
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" onClick={addEditVehicle} loading={savingEditVehicle} disabled={!editVehicleDraft.registration_number.trim()}>
+                      Add Vehicle
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => { setShowAddEditVehicle(false); setEditVehicleDraft(EMPTY_VEHICLE) }}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowAddEditVehicle(true)}
+                  className="flex items-center gap-1 rounded-md border border-dashed border-gray-300 px-2.5 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50"
+                >
+                  <Plus className="h-3 w-3" /> Add vehicle
+                </button>
+              )}
+            </div>
+          )}
           <Button type="submit" className="w-full" loading={editForm.formState.isSubmitting}>Save Changes</Button>
         </form>
       </InlineFormSheet>

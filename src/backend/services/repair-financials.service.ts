@@ -52,6 +52,7 @@ export interface RepairRevenueRow {
   estimated_cost?: number | null
   discount_amount?: number | null
   refund_amount?: number | null
+  lab_fee?: number | null
 }
 
 // Per-repair revenue contribution: POS-charged amount if one exists, else
@@ -115,6 +116,23 @@ export function computeSalesCogs(rows: SalesCogsRow[]): number {
   return rows.reduce((sum, item) => {
     if (item.sales?.is_refund) return sum
     return sum + (item.quantity ?? 0) * (item.unit_cost || item.products?.cost_price || 0)
+  }, 0)
+}
+
+// Third-party lab fee cost — money paid to an outside lab (data recovery,
+// chip-level repair, etc.) to do part of the job. It's a pass-through cost,
+// never billed to the customer, so it's gated exactly like parts COGS below
+// (excluded once refunded; counted for finished jobs; counted for open jobs
+// once a deposit has been paid) so it reduces profit the same way.
+export function computeRepairLabFeeCost(rows: RepairRevenueRow[]): number {
+  return rows.reduce((sum, r) => {
+    const status      = (r.status ?? '').toLowerCase().trim()
+    const depositPaid = r.deposit_paid ?? 0
+    const labFee      = r.lab_fee ?? 0
+    if (status === 'refunded') return sum
+    if (isTerminalRepairStatus(status)) return sum + labFee
+    if (depositPaid > 0) return sum + labFee
+    return sum
   }, 0)
 }
 

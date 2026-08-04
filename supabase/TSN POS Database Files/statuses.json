@@ -1,0 +1,31 @@
+[
+{"type":"header","version":"5.2.2","comment":"Export to JSON plugin for PHPMyAdmin"},
+{"type":"database","name":"thesiztb_repairbooking"},
+{"type":"table","name":"statuses","database":"thesiztb_repairbooking","data":
+[
+{"id":"5","status_name":"In progress","status_color":"#d92629","business_id":"3","created_at":"2025-01-11 06:30:32","updated_at":"2025-01-11 06:30:32"},
+{"id":"9","status_name":"Repaired","status_color":"#12bced","business_id":"3","created_at":"2025-01-21 04:36:22","updated_at":"2025-01-21 04:36:22"},
+{"id":"10","status_name":"Complete","status_color":"#00aaeb","business_id":"3","created_at":"2025-01-21 04:44:45","updated_at":"2025-01-21 04:44:45"},
+{"id":"11","status_name":"Can not be repaired","status_color":"#1a388d","business_id":"3","created_at":"2025-01-21 04:45:32","updated_at":"2025-01-21 04:45:32"},
+{"id":"12","status_name":"Customer Collected","status_color":"#008000","business_id":"3","created_at":"2025-01-21 04:46:13","updated_at":"2025-01-21 04:46:13"},
+{"id":"15","status_name":"Booked","status_color":"#2a2a2c","business_id":"3","created_at":"2025-02-04 14:07:23","updated_at":"2025-02-04 14:07:23"},
+{"id":"17","status_name":"Warranty","status_color":"#09d6f1","business_id":"3","created_at":"2025-02-22 14:52:05","updated_at":"2025-02-22 14:52:05"},
+{"id":"21","status_name":"In progress","status_color":"#d92629","business_id":"6","created_at":"2025-01-11 06:30:32","updated_at":"2025-01-11 06:30:32"},
+{"id":"22","status_name":"Repaired","status_color":"#12bced","business_id":"6","created_at":"2025-01-21 04:36:22","updated_at":"2025-01-21 04:36:22"},
+{"id":"23","status_name":"Waiting for parts","status_color":"#00aaeb","business_id":"6","created_at":"2025-01-21 04:44:45","updated_at":"2026-03-05 16:27:41"},
+{"id":"24","status_name":"Can not be repaired","status_color":"#1a388d","business_id":"6","created_at":"2025-01-21 04:45:32","updated_at":"2025-01-21 04:45:32"},
+{"id":"25","status_name":"Customer Collected","status_color":"#008000","business_id":"6","created_at":"2025-01-21 04:46:13","updated_at":"2025-01-21 04:46:13"},
+{"id":"26","status_name":"Booked","status_color":"#2a2a2c","business_id":"6","created_at":"2025-02-04 14:07:23","updated_at":"2025-02-04 14:07:23"},
+{"id":"27","status_name":"Warranty","status_color":"#09d6f1","business_id":"6","created_at":"2025-02-22 14:52:05","updated_at":"2025-02-22 14:52:05"},
+{"id":"29","status_name":"Waiting for parts","status_color":"#7633db","business_id":"3","created_at":"2026-03-03 18:19:17","updated_at":"2026-03-03 18:19:17"},
+{"id":"30","status_name":"In progress","status_color":"#d92629","business_id":"5","created_at":"2025-01-11 06:30:32","updated_at":"2025-01-11 06:30:32"},
+{"id":"31","status_name":"Repaired","status_color":"#12bced","business_id":"5","created_at":"2025-01-21 04:36:22","updated_at":"2025-01-21 04:36:22"},
+{"id":"32","status_name":"Complete","status_color":"#00aaeb","business_id":"5","created_at":"2025-01-21 04:44:45","updated_at":"2025-01-21 04:44:45"},
+{"id":"33","status_name":"Can not be repaired","status_color":"#1a388d","business_id":"5","created_at":"2025-01-21 04:45:32","updated_at":"2025-01-21 04:45:32"},
+{"id":"34","status_name":"Customer Collected","status_color":"#008000","business_id":"5","created_at":"2025-01-21 04:46:13","updated_at":"2025-01-21 04:46:13"},
+{"id":"35","status_name":"Booked","status_color":"#2a2a2c","business_id":"5","created_at":"2025-02-04 14:07:23","updated_at":"2025-02-04 14:07:23"},
+{"id":"36","status_name":"Warranty","status_color":"#09d6f1","business_id":"5","created_at":"2025-02-22 14:52:05","updated_at":"2025-02-22 14:52:05"},
+{"id":"37","status_name":"Waiting for parts","status_color":"#7633db","business_id":"5","created_at":"2026-03-03 18:19:17","updated_at":"2026-03-03 18:19:17"}
+]
+}
+]

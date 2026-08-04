@@ -74,14 +74,23 @@ CREATE SEQUENCE IF NOT EXISTS repair_job_seq START 1;
 CREATE OR REPLACE FUNCTION generate_job_number(p_branch_id UUID)
 RETURNS TEXT AS $$
 DECLARE
-  v_branch_prefix TEXT;
-  v_seq           BIGINT;
+  v_business_prefix TEXT;
+  v_seq             BIGINT;
 BEGIN
-  SELECT UPPER(LEFT(name, 3)) INTO v_branch_prefix
-  FROM branches WHERE id = p_branch_id;
+  -- Extract initials from the business name (e.g., 'Phone Fix Broxburn' -> 'PFB')
+  SELECT UPPER(regexp_replace(b.name, '(\w)\w*\s*', '\1', 'g')) INTO v_business_prefix
+  FROM branches br
+  JOIN businesses b ON b.id = br.business_id
+  WHERE br.id = p_branch_id;
+
+  -- Fallback to branch prefix if business name is empty or results in no letters
+  IF v_business_prefix IS NULL OR v_business_prefix = '' THEN
+    SELECT UPPER(LEFT(name, 3)) INTO v_business_prefix
+    FROM branches WHERE id = p_branch_id;
+  END IF;
 
   v_seq := NEXTVAL('repair_job_seq');
-  RETURN v_branch_prefix || '-' || LPAD(v_seq::TEXT, 5, '0');
+  RETURN v_business_prefix || '-' || LPAD(v_seq::TEXT, 5, '0');
 END;
 $$ LANGUAGE plpgsql;
 

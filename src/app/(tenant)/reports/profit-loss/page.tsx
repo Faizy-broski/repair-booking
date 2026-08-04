@@ -25,9 +25,13 @@ interface ProfitLossData {
   // "Revenue" definition (booking-window: created in range, deposits
   // counted for still-open jobs) — not part of any total above.
   repair_revenue_booked?: number
-  // COGS breakdown — sales_cogs + repair_parts_cogs always sums to `cogs`.
+  // COGS breakdown — sales_cogs + repair_parts_cogs + repair_lab_fees always sums to `cogs`.
   sales_cogs?: number
   repair_parts_cogs?: number
+  // Paid to an outside third-party lab (e.g. data recovery, chip-level repair) —
+  // a pass-through cost, never billed to the customer, so it reduces profit
+  // the same way repair_parts_cogs does.
+  repair_lab_fees?: number
   // Repair Revenue breakdown — repair_revenue_pos + repair_revenue_direct
   // always sums to `repair_revenue`.
   repair_revenue_pos?: number
@@ -121,6 +125,7 @@ export default function ProfitLossReportPage() {
                 { label: 'Cost of Goods (COGS)',  value: -data.cogs,           indent: 1,  bold: false },
                 ...(data.sales_cogs !== undefined ? [{ label: 'Sales COGS',        value: -data.sales_cogs,        indent: 2, bold: false }] : []),
                 ...(data.repair_parts_cogs !== undefined ? [{ label: 'Repair Parts COGS', value: -data.repair_parts_cogs, indent: 2, bold: false }] : []),
+                ...(data.repair_lab_fees !== undefined ? [{ label: 'Repair Lab / 3rd-Party Fees', value: -data.repair_lab_fees, indent: 2, bold: false }] : []),
                 { label: 'Gross Profit',          value: data.gross_profit,    indent: 0, bold: true  },
                 { label: 'Operating Expenses',    value: -data.expenses,       indent: 1,  bold: false },
                 { label: 'Salaries',              value: -data.salaries,       indent: 1,  bold: false },
@@ -136,6 +141,14 @@ export default function ProfitLossReportPage() {
                 </div>
               ))}
             </div>
+            {!!data.repair_lab_fees && (
+              <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                <span>
+                  <strong>{formatCurrency(data.repair_lab_fees)}</strong> of this period&apos;s repair costs were paid to outside third-party labs (data recovery, chip-level repair, etc.) — a pass-through cost, not shop profit, already deducted from Gross/Net Profit above.
+                </span>
+              </div>
+            )}
             {data.repair_revenue_booked !== undefined && (
               <div className="mt-4 flex items-start gap-2 rounded-lg bg-surface-container-lowest px-3 py-2.5 text-xs text-on-surface-variant">
                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />

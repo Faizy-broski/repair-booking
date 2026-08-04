@@ -105,9 +105,11 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const { id } = use(params)
   const { activeBranch, branches, verticalTemplateSlug } = useAuthStore()
   const currSymbol = getCurrencySymbol()
-  // Simplified, repair-free product form is specific to the retail-store
-  // vertical template — independent of any module's enabled/disabled state.
-  const hasRepairs = verticalTemplateSlug !== 'retail-store'
+  // Simplified, repair-free product form (Category + Brand + Attributes, no
+  // Device Type/Model/Part Type) is shared by the retail-store and
+  // mobile-tyre-fitting vertical templates — independent of any module's
+  // enabled/disabled state.
+  const hasRepairs = verticalTemplateSlug !== 'retail-store' && verticalTemplateSlug !== 'mobile-tyre-fitting'
   const router = useRouter()
   const qc = useQueryClient()
 

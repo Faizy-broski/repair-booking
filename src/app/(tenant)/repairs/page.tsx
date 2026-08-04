@@ -27,6 +27,7 @@ import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { PatternLock } from '@/components/ui/pattern-lock'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { VehiclePicker, type VehicleValue } from '@/components/vehicles/vehicle-picker'
 
 interface SelectedCustomer {
   id: string
@@ -40,6 +41,7 @@ interface SelectedCustomer {
 
 interface RepairRow extends Repair {
   customers?: { first_name: string; last_name: string | null; phone: string | null; email: string | null } | null
+  vehicles?: { registration_number: string } | null
   is_rush?: boolean
 }
 
@@ -61,6 +63,9 @@ const EMPTY_JOB = {
   job_fee: '', estimated_cost: '', deposit_paid: '',
   due_date: '', customer_note: '', staff_note: '',
   status: '', assigned_to: '',
+  // Mobile tyre-fitting vertical only — the actual tyre (size/brand/price) is
+  // picked from inventory in Repair Parts below, not typed here.
+  location_notes: '', scheduled_start: '', scheduled_end: '',
   lock_type: '' as '' | 'passcode' | 'pattern',
   passcode: '',
   price_pending: false,
@@ -138,6 +143,7 @@ type DeviceData = {
 interface RepairLineItem {
   tempId: string
   product_id: string | null
+  variant_id: string | null
   name: string
   qty: number
   unit_price: number
@@ -145,6 +151,16 @@ interface RepairLineItem {
   max_stock: number | null
   discount_type: 'fixed' | 'percent'
   discount_value: number
+}
+
+// "Now" in the shape <input type="datetime-local"> expects (local time,
+// minute precision, no timezone) — used both as the `min` bound (so the
+// native picker can't scroll to a past date/time) and to validate the
+// selected value on change/submit.
+function nowForDatetimeLocal(): string {
+  const d = new Date()
+  d.setSeconds(0, 0)
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
 }
 
 function lineDiscountAmount(qty: number, unitPrice: number, discountType: 'fixed' | 'percent', discountValue: number) {
@@ -299,6 +315,7 @@ function exportPDF(repairs: RepairRow[]) {
 export default function RepairsPage() {
   const { activeBranch, verticalTemplateSlug } = useAuthStore()
   const isRetail = verticalTemplateSlug === 'retail-store'
+  const isTyreShop = verticalTemplateSlug === 'mobile-tyre-fitting'
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -331,6 +348,8 @@ export default function RepairsPage() {
   const [newCust, setNewCust] = useState(EMPTY_NEW_CUST)
   const [phoneError, setPhoneError] = useState('')
   const [jobData, setJobData] = useState(EMPTY_JOB)
+  const [selectedVehicle, setSelectedVehicle] = useState<VehicleValue | null>(null)
+  const [fitterConflict, setFitterConflict] = useState<{ id: string; job_number: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [step1Error, setStep1Error] = useState('')
   const [chargesError, setChargesError] = useState('')
@@ -349,14 +368,20 @@ export default function RepairsPage() {
   // Repair parts state
   const [repairParts, setRepairParts] = useState<RepairLineItem[]>([])
   const [partQuery, setPartQuery] = useState('')
-  const [partResults, setPartResults] = useState<Array<{ id: string; name: string; selling_price: number | null; cost_price: number | null; on_hand?: number; is_service?: boolean }>>([])
+  const [partResults, setPartResults] = useState<Array<{ id: string; name: string; selling_price: number | null; cost_price: number | null; on_hand?: number; is_service?: boolean; has_variants?: boolean; variant_count?: number }>>([])
   const [showPartDrop, setShowPartDrop] = useState(false)
   const [partSearchLoading, setPartSearchLoading] = useState(false)
   const partSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const partDropRef = useRef<HTMLDivElement>(null)
   const [quickPartPrice, setQuickPartPrice] = useState('')
   const [quickPartCost, setQuickPartCost] = useState('')
+  // Variant drill-down — set when a search result with variants is clicked;
+  // the dropdown swaps from search results to this product's variant list.
+  const [variantsFor, setVariantsFor] = useState<{ id: string; name: string } | null>(null)
+  const [variantOptions, setVariantOptions] = useState<Array<{ id: string; name: string; sku?: string | null; selling_price?: number | null; cost_price?: number | null; stock?: number | null }>>([])
+  const [variantsLoading, setVariantsLoading] = useState(false)
   const [deviceError, setDeviceError] = useState('')
+  const [dispatchError, setDispatchError] = useState('')
 
   // Retail-mode state
   const [retailCategories, setRetailCategories] = useState<{ id: string; name: string }[]>([])
@@ -377,7 +402,7 @@ export default function RepairsPage() {
   // Edit Job Sheet modal
   const [editOpen, setEditOpen] = useState(false)
   const [editRepair, setEditRepair] = useState<RepairRow | null>(null)
-  const [editData, setEditData] = useState({ due_date: '', estimated_cost: '', deposit_paid: '', payment_methods: [] as ('cash' | 'card' | 'store_credit' | 'loyalty_points')[], payment_amounts: { cash: '', card: '' }, status: '', credit_apply_input: '', loyalty_apply_input: '', discount_type: 'fixed' as 'fixed' | 'percent', discount_value: '' })
+  const [editData, setEditData] = useState({ due_date: '', estimated_cost: '', deposit_paid: '', payment_methods: [] as ('cash' | 'card' | 'store_credit' | 'loyalty_points')[], payment_amounts: { cash: '', card: '' }, status: '', credit_apply_input: '', loyalty_apply_input: '', discount_type: 'fixed' as 'fixed' | 'percent', discount_value: '', lab_fee: '' })
   const [editPaymentSplitError, setEditPaymentSplitError] = useState('')
   const [editSaving, setEditSaving] = useState(false)
   const [editErrors, setEditErrors] = useState<{ due_date?: string; estimated_cost?: string; deposit_paid?: string }>({})
@@ -661,6 +686,7 @@ export default function RepairsPage() {
       loyalty_apply_input: '',
       discount_type: (rAny.discount_type as 'fixed' | 'percent') ?? 'fixed',
       discount_value: rAny.discount_value != null ? String(rAny.discount_value) : '',
+      lab_fee: rAny.lab_fee != null ? String(rAny.lab_fee) : '',
     })
     setEditErrors({})
     setEditPaymentSplitError('')
@@ -705,6 +731,7 @@ export default function RepairsPage() {
             const raw = editData.discount_type === 'percent' ? gross * ((parseFloat(editData.discount_value) || 0) / 100) : (parseFloat(editData.discount_value) || 0)
             return Math.max(0, Math.min(gross, raw))
           })(),
+          lab_fee: parseFloat(editData.lab_fee) || 0,
           status: editData.status || undefined,
           custom_fields: {
             ...cf,
@@ -741,11 +768,14 @@ export default function RepairsPage() {
     setSelectedCustomer(null)
     setNewCust(EMPTY_NEW_CUST)
     setJobData(EMPTY_JOB)
+    setSelectedVehicle(null)
+    setFitterConflict(null)
     setStep1Error('')
     setPhoneError('')
     setChargesError('')
     setPaymentSplitError('')
     setDeviceError('')
+    setDispatchError('')
     setCustSuggestions([])
     setShowSuggestions(null)
     setRepairParts([])
@@ -777,10 +807,35 @@ export default function RepairsPage() {
     }
   }, [searchParams, pathname, router])
 
+  // Mobile tyre-fitting vertical: advisory-only double-booking check — never
+  // blocks saving, just warns so staff can confirm the fitter really is free.
+  useEffect(() => {
+    if (!isTyreShop || !jobData.assigned_to || !jobData.scheduled_start || !jobData.scheduled_end) {
+      setFitterConflict(null)
+      return
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/repairs/check-conflict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            assigned_to: jobData.assigned_to,
+            scheduled_start: new Date(jobData.scheduled_start).toISOString(),
+            scheduled_end: new Date(jobData.scheduled_end).toISOString(),
+          }),
+        })
+        const json = await res.json()
+        setFitterConflict(json.data?.conflict ?? null)
+      } catch { /* advisory only — ignore failures */ }
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [isTyreShop, jobData.assigned_to, jobData.scheduled_start, jobData.scheduled_end])
+
   /** Allow digits, +, spaces, hyphens, parentheses — min 6 digits, max 15 digits (E.164 standard) */
   function validatePhone(value: string): string {
     const trimmed = value.trim()
-    if (!trimmed) return 'Phone number is required.'
+    if (!trimmed) return ''
     if (/[a-zA-Z]/.test(trimmed)) return 'Phone number must not contain letters.'
     const digits = trimmed.replace(/\D/g, '')
     if (digits.length < 6) return 'Phone number is too short (minimum 6 digits).'
@@ -838,6 +893,8 @@ export default function RepairsPage() {
 
   function searchParts(q: string) {
     if (partSearchRef.current) clearTimeout(partSearchRef.current)
+    setVariantsFor(null)
+    setVariantOptions([])
     if (!q.trim()) { setPartResults([]); setShowPartDrop(false); return }
     setPartSearchLoading(true)
     partSearchRef.current = setTimeout(async () => {
@@ -853,29 +910,48 @@ export default function RepairsPage() {
     }, 300)
   }
 
-  function addPartFromInventory(p: { id: string; name: string; selling_price: number | null; cost_price: number | null; on_hand?: number; is_service?: boolean }) {
-    const maxStock = p.is_service ? null : (p.on_hand ?? 0)
+  // Drill into a variant-parent product's variants — mirrors
+  // ProductVariantPicker.loadVariants() (src/components/inventory/product-variant-picker.tsx),
+  // inline here instead of a modal so the fast live-search flow (incl. the
+  // free-text quick-add row) keeps working unchanged.
+  function loadPartVariants(product: { id: string; name: string }) {
+    setVariantsFor(product)
+    setVariantOptions([])
+    setVariantsLoading(true)
+    fetch(`/api/products/${product.id}/variants?branch_id=${activeBranch!.id}`)
+      .then((r) => r.json())
+      .then((j) => setVariantOptions(j.data ?? []))
+      .finally(() => setVariantsLoading(false))
+  }
+
+  function addPartFromInventory(
+    p: { id: string; name: string; selling_price?: number | null; cost_price?: number | null; on_hand?: number; is_service?: boolean },
+    variant?: { id: string; name: string; sku?: string | null; selling_price?: number | null; cost_price?: number | null; stock?: number | null } | null
+  ) {
+    const maxStock = variant ? (variant.stock ?? 0) : p.is_service ? null : (p.on_hand ?? 0)
+    const name = variant ? `${p.name} – ${variant.name}` : p.name
     setRepairParts((prev) => {
-      const existing = prev.find((r) => r.product_id === p.id)
+      const existing = prev.find((r) => r.product_id === p.id && r.variant_id === (variant?.id ?? null))
       if (existing) {
         const cap = existing.max_stock ?? Infinity
         if (existing.qty >= cap) {
           toast.error(`Only ${cap} in stock for "${existing.name}"`)
           return prev
         }
-        return prev.map((r) => r.product_id === p.id ? { ...r, qty: Math.min(r.qty + 1, cap) } : r)
+        return prev.map((r) => r === existing ? { ...r, qty: Math.min(r.qty + 1, cap) } : r)
       }
       if (maxStock !== null && maxStock <= 0) {
-        toast.error(`"${p.name}" is out of stock`)
+        toast.error(`"${name}" is out of stock`)
         return prev
       }
       return [...prev, {
         tempId: Math.random().toString(36).slice(2),
         product_id: p.id,
-        name: p.name,
+        variant_id: variant?.id ?? null,
+        name,
         qty: 1,
-        unit_price: p.selling_price ?? 0,
-        unit_cost: p.cost_price ?? 0,
+        unit_price: (variant ? variant.selling_price : p.selling_price) ?? 0,
+        unit_cost: (variant ? variant.cost_price : p.cost_price) ?? 0,
         max_stock: maxStock,
         discount_type: 'fixed',
         discount_value: 0,
@@ -884,6 +960,8 @@ export default function RepairsPage() {
     setPartQuery('')
     setPartResults([])
     setShowPartDrop(false)
+    setVariantsFor(null)
+    setVariantOptions([])
   }
 
   function addQuickPart() {
@@ -894,6 +972,7 @@ export default function RepairsPage() {
     setRepairParts((prev) => [...prev, {
       tempId: Math.random().toString(36).slice(2),
       product_id: null,
+      variant_id: null,
       name,
       qty: 1,
       unit_price: price,
@@ -926,8 +1005,13 @@ export default function RepairsPage() {
 
   async function createRepair() {
     if (!activeBranch) return
-    // Device / item selection required
-    if (isRetail) {
+    // Device / item / vehicle selection required
+    if (isTyreShop) {
+      if (!selectedVehicle || !selectedVehicle.registration_number.trim()) {
+        setDeviceError('A vehicle is required.')
+        return
+      }
+    } else if (isRetail) {
       if (!jobData.device_type) {
         setDeviceError('Category is required.')
         return
@@ -937,6 +1021,22 @@ export default function RepairsPage() {
       return
     }
     setDeviceError('')
+    if (isTyreShop && (jobData.scheduled_start || jobData.scheduled_end)) {
+      const now = nowForDatetimeLocal()
+      if (jobData.scheduled_start && jobData.scheduled_start < now) {
+        setDispatchError('Dispatch start cannot be in the past.')
+        return
+      }
+      if (jobData.scheduled_end && jobData.scheduled_end < now) {
+        setDispatchError('Dispatch end cannot be in the past.')
+        return
+      }
+      if (jobData.scheduled_start && jobData.scheduled_end && jobData.scheduled_end < jobData.scheduled_start) {
+        setDispatchError('Dispatch end must be after the start time.')
+        return
+      }
+    }
+    setDispatchError('')
     if (jobData.faults.length === 0) return
     if (!jobData.price_pending) {
       const totalVal = parseFloat(jobData.estimated_cost)
@@ -983,6 +1083,32 @@ export default function RepairsPage() {
       customerId = custJson.data.id
     }
 
+    // Mobile tyre-fitting vertical: resolve the vehicle — create it now if the
+    // staff picked "new vehicle" rather than an existing one on file.
+    let vehicleId = selectedVehicle?.id ?? null
+    if (isTyreShop && selectedVehicle && !vehicleId) {
+      const vehRes = await fetch('/api/vehicles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: customerId,
+          registration_number: selectedVehicle.registration_number,
+          make: selectedVehicle.make || null,
+          model: selectedVehicle.model || null,
+          colour: selectedVehicle.colour || null,
+          tyre_size: selectedVehicle.tyre_size || null,
+          notes: selectedVehicle.notes || null,
+        }),
+      })
+      const vehJson = await vehRes.json()
+      if (!vehRes.ok || !vehJson.data?.id) {
+        toast.error(vehJson.error?.message ?? 'Failed to save vehicle. Please try again.')
+        setSubmitting(false)
+        return
+      }
+      vehicleId = vehJson.data.id
+    }
+
     const total = parseFloat(jobData.estimated_cost) || 0
     const deposit = parseFloat(jobData.deposit_paid) || 0
     const faultText = jobData.faults.join(', ')
@@ -997,10 +1123,14 @@ export default function RepairsPage() {
         branch_id: activeBranch.id,
         customer_id: customerId,
         issue: faultText,
-        device_type: jobData.device_type || null,
-        device_brand: jobData.device_brand || null,
-        device_model: jobData.device_model || jobData.device_name || null,
+        device_type: isTyreShop ? null : (jobData.device_type || null),
+        device_brand: isTyreShop ? null : (jobData.device_brand || null),
+        device_model: isTyreShop ? null : (jobData.device_model || jobData.device_name || null),
         serial_number: jobData.imei || null,
+        vehicle_id: isTyreShop ? vehicleId : undefined,
+        location_notes: isTyreShop ? (jobData.location_notes || null) : undefined,
+        scheduled_start: isTyreShop ? (jobData.scheduled_start ? new Date(jobData.scheduled_start).toISOString() : null) : undefined,
+        scheduled_end: isTyreShop ? (jobData.scheduled_end ? new Date(jobData.scheduled_end).toISOString() : null) : undefined,
         estimated_cost: total || null,
         deposit_paid: deposit,
         discount_type: jobData.discount_type,
@@ -1024,6 +1154,7 @@ export default function RepairsPage() {
         },
         parts: repairParts.map((p) => ({
           product_id: p.product_id,
+          variant_id: p.variant_id,
           name: p.name,
           quantity: p.qty,
           unit_cost: p.unit_cost,
@@ -1321,15 +1452,21 @@ export default function RepairsPage() {
         ) : '—'
       }
     },
-    {
-      accessorKey: 'device_type', header: 'Type', cell: ({ getValue }) => (getValue() as string) || '—'
-    },
-    {
-      accessorKey: 'device_brand', header: 'Brand', cell: ({ getValue }) => (getValue() as string) || '—'
-    },
-    {
-      accessorKey: 'device_model', header: 'Model', cell: ({ getValue }) => (getValue() as string) || '—'
-    },
+    ...(isTyreShop ? [
+      {
+        id: 'vehicle', header: 'Vehicle', cell: ({ row }: { row: { original: RepairRow } }) => row.original.vehicles?.registration_number?.toUpperCase() || '—'
+      },
+    ] as ColumnDef<RepairRow>[] : [
+      {
+        accessorKey: 'device_type', header: 'Type', cell: ({ getValue }) => (getValue() as string) || '—'
+      },
+      {
+        accessorKey: 'device_brand', header: 'Brand', cell: ({ getValue }) => (getValue() as string) || '—'
+      },
+      {
+        accessorKey: 'device_model', header: 'Model', cell: ({ getValue }) => (getValue() as string) || '—'
+      },
+    ] as ColumnDef<RepairRow>[]),
     {
       accessorKey: 'issue', header: 'Fault', size: 180,
       cell: ({ getValue }) => {
@@ -1438,7 +1575,9 @@ export default function RepairsPage() {
     },
   ]
 
-  const TOGGLEABLE_COLS = ['customers', 'customer_phone', 'customer_email', 'device_type', 'device_brand', 'device_model', 'issue', 'status', 'actual_cost', 'created_at']
+  const TOGGLEABLE_COLS = isTyreShop
+    ? ['customers', 'customer_phone', 'customer_email', 'vehicle', 'tyre', 'issue', 'status', 'actual_cost', 'created_at']
+    : ['customers', 'customer_phone', 'customer_email', 'device_type', 'device_brand', 'device_model', 'issue', 'status', 'actual_cost', 'created_at']
   const COL_LABELS: Record<string, string> = {
     customers: 'Customer',
     customer_phone: 'Phone',
@@ -1446,6 +1585,8 @@ export default function RepairsPage() {
     device_type: 'Type',
     device_brand: 'Brand',
     device_model: 'Model',
+    vehicle: 'Vehicle',
+    tyre: 'Tyre',
     issue: 'Fault',
     status: 'Status',
     actual_cost: 'Cost',
@@ -1572,7 +1713,7 @@ export default function RepairsPage() {
             <>
               <p className="mt-3 flex items-center gap-1 text-xs font-medium text-green-600">
                 <TrendingUp className="h-3 w-3" />
-                revenue above, minus parts cost
+                revenue above, minus parts cost and lab fees
               </p>
               <p className="mt-1 text-[11px] text-on-surface-variant" title="Completed jobs only, by completion date — same definition as the Profit & Loss report">
                 {formatCurrency(repairStats.profit_completed)} completed this period (P&amp;L basis)
@@ -1865,7 +2006,7 @@ export default function RepairsPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => { setSelectedCustomer(null); setNewCust(EMPTY_NEW_CUST); setStep1Error(''); setPhoneError('') }}
+                  onClick={() => { setSelectedCustomer(null); setNewCust(EMPTY_NEW_CUST); setSelectedVehicle(null); setStep1Error(''); setPhoneError('') }}
                   className="shrink-0 rounded-md p-1 text-teal-600 hover:bg-teal-100 transition-colors"
                   title="Change customer"
                 >
@@ -1996,7 +2137,7 @@ export default function RepairsPage() {
               {/* Phone Number — autocomplete on type */}
               <div className="relative">
                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Phone Number <span className="text-red-400">*</span>
+                  Phone Number
                 </label>
                 <input
                   type="tel"
@@ -2127,10 +2268,29 @@ export default function RepairsPage() {
               {/* Row A: Device / Item identification */}
               <div>
                 <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
-                  <Smartphone className="h-2.5 w-2.5" /> {isRetail ? 'Item' : 'Device'}
+                  <Smartphone className="h-2.5 w-2.5" /> {isTyreShop ? 'Vehicle & Tyres' : isRetail ? 'Item' : 'Device'}
                 </p>
 
-                {isRetail ? (
+                {isTyreShop ? (
+                  /* ── Mobile tyre fitting: vehicle + tyre details + stranded location ── */
+                  <div className="space-y-2">
+                    <VehiclePicker
+                      customerId={selectedCustomer?.id ?? null}
+                      value={selectedVehicle}
+                      onChange={setSelectedVehicle}
+                    />
+                    <div>
+                      <label className={lbl}>Vehicle Location</label>
+                      <textarea
+                        rows={2}
+                        value={jobData.location_notes}
+                        onChange={(e) => setJobData((p) => ({ ...p, location_notes: e.target.value }))}
+                        placeholder="e.g. M25 Junction 10, northbound hard shoulder"
+                        className="w-full rounded-md border-2 border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20 resize-none"
+                      />
+                    </div>
+                  </div>
+                ) : isRetail ? (
                   /* ── Retail: Category → Brand → Item description + optional ref ── */
                   <div className="space-y-2">
                     <div className="grid grid-cols-2 gap-2">
@@ -2293,7 +2453,12 @@ export default function RepairsPage() {
                   <Wrench className="h-2.5 w-2.5" /> {isRetail ? 'Parts & Labour' : 'Repair Parts'}
                 </p>
 
-                {!isRetail && (!jobData.device_type || !jobData.device_brand || !jobData.device_model) && (
+                {isTyreShop && !selectedVehicle && (
+                  <p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-600">
+                    Select a vehicle above to add repair parts.
+                  </p>
+                )}
+                {!isRetail && !isTyreShop && (!jobData.device_type || !jobData.device_brand || !jobData.device_model) && (
                   <p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-600">
                     Select Device Type, Brand and Model above to add repair parts.
                   </p>
@@ -2310,7 +2475,7 @@ export default function RepairsPage() {
                         onFocus={() => { if (partResults.length > 0 || partQuery.trim()) setShowPartDrop(true) }}
                         placeholder="Search inventory parts…"
                         className={`${inp} pl-7`}
-                        disabled={!jobData.device_model}
+                        disabled={isTyreShop ? !selectedVehicle : !jobData.device_model}
                       />
                       {partSearchLoading && (
                         <div className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-transparent" />
@@ -2320,21 +2485,61 @@ export default function RepairsPage() {
 
                   {showPartDrop && (
                     <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+                      {variantsFor ? (
+                        <div>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => { e.preventDefault(); setVariantsFor(null); setVariantOptions([]) }}
+                            className="flex w-full items-center gap-1 border-b border-gray-100 px-3 py-2 text-left text-xs font-semibold text-gray-500 hover:text-gray-700"
+                          >
+                            <ChevronLeft className="h-3.5 w-3.5" /> {variantsFor.name} — select variant
+                          </button>
+                          <ul className="max-h-44 overflow-y-auto py-1">
+                            {variantsLoading ? (
+                              <li className="px-3 py-2 text-xs italic text-gray-400">Loading variants…</li>
+                            ) : variantOptions.length === 0 ? (
+                              <li className="px-3 py-2 text-xs italic text-gray-400">No variants found</li>
+                            ) : (
+                              variantOptions.map((v) => (
+                                <li key={v.id}>
+                                  <button
+                                    type="button"
+                                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
+                                    onMouseDown={(e) => { e.preventDefault(); addPartFromInventory(variantsFor, v) }}
+                                  >
+                                    <span className="min-w-0 flex-1 truncate text-gray-700">{v.name}</span>
+                                    <span className={`shrink-0 text-xs font-medium ${(v.stock ?? 0) > 0 ? 'text-gray-400' : 'text-red-500'}`}>
+                                      {(v.stock ?? 0) > 0 ? `${v.stock} in stock` : 'Out of stock'}
+                                    </span>
+                                    <span className="shrink-0 text-xs font-semibold text-teal-700">{formatCurrency(v.selling_price ?? 0)}</span>
+                                  </button>
+                                </li>
+                              ))
+                            )}
+                          </ul>
+                        </div>
+                      ) : (
                       <ul className="max-h-44 overflow-y-auto py-1">
                         {partResults.map((p) => (
                           <li key={p.id}>
                             <button
                               type="button"
                               className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
-                              onMouseDown={(e) => { e.preventDefault(); addPartFromInventory(p) }}
+                              onMouseDown={(e) => { e.preventDefault(); if (p.has_variants) loadPartVariants(p); else addPartFromInventory(p) }}
                             >
                               <span className="min-w-0 flex-1 truncate text-gray-700">{p.name}</span>
-                              {!p.is_service && (
-                                <span className={`shrink-0 text-xs font-medium ${(p.on_hand ?? 0) > 0 ? 'text-gray-400' : 'text-red-500'}`}>
-                                  {(p.on_hand ?? 0) > 0 ? `${p.on_hand} in stock` : 'Out of stock'}
-                                </span>
+                              {p.has_variants ? (
+                                <span className="shrink-0 text-xs font-semibold text-brand-teal">Select variant →</span>
+                              ) : (
+                                <>
+                                  {!p.is_service && (
+                                    <span className={`shrink-0 text-xs font-medium ${(p.on_hand ?? 0) > 0 ? 'text-gray-400' : 'text-red-500'}`}>
+                                      {(p.on_hand ?? 0) > 0 ? `${p.on_hand} in stock` : 'Out of stock'}
+                                    </span>
+                                  )}
+                                  <span className="shrink-0 text-xs font-semibold text-teal-700">{formatCurrency(p.selling_price ?? 0)}</span>
+                                </>
                               )}
-                              <span className="shrink-0 text-xs font-semibold text-teal-700">{formatCurrency(p.selling_price ?? 0)}</span>
                             </button>
                           </li>
                         ))}
@@ -2386,6 +2591,7 @@ export default function RepairsPage() {
                           </li>
                         )}
                       </ul>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2675,7 +2881,7 @@ export default function RepairsPage() {
                     </div>
                   </div>
                   <div>
-                    <label className={lbl}>Assigned To <span className="font-normal normal-case text-gray-300">(opt)</span></label>
+                    <label className={lbl}>{isTyreShop ? 'Fitter' : 'Assigned To'} <span className="font-normal normal-case text-gray-300">(opt)</span></label>
                     {activeBranch && (
                       <AsyncEmployeeSelect
                         branchId={activeBranch.id}
@@ -2686,7 +2892,55 @@ export default function RepairsPage() {
                       />
                     )}
                   </div>
+                  {isTyreShop && (
+                    <>
+                      <div>
+                        <label className={lbl}>Dispatch Start</label>
+                        <input
+                          type="datetime-local"
+                          min={nowForDatetimeLocal()}
+                          value={jobData.scheduled_start}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setJobData((p) => ({ ...p, scheduled_start: val }))
+                            setDispatchError(
+                              val && val < nowForDatetimeLocal() ? 'Dispatch start cannot be in the past.'
+                              : jobData.scheduled_end && val && val > jobData.scheduled_end ? 'Dispatch start must be before the end time.'
+                              : ''
+                            )
+                          }}
+                          className={`${inp} ${dispatchError ? 'border-red-400' : ''}`}
+                        />
+                      </div>
+                      <div>
+                        <label className={lbl}>Dispatch End</label>
+                        <input
+                          type="datetime-local"
+                          min={jobData.scheduled_start || nowForDatetimeLocal()}
+                          value={jobData.scheduled_end}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setJobData((p) => ({ ...p, scheduled_end: val }))
+                            setDispatchError(
+                              val && val < nowForDatetimeLocal() ? 'Dispatch end cannot be in the past.'
+                              : jobData.scheduled_start && val && val < jobData.scheduled_start ? 'Dispatch end must be after the start time.'
+                              : ''
+                            )
+                          }}
+                          className={`${inp} ${dispatchError ? 'border-red-400' : ''}`}
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
+                {isTyreShop && dispatchError && (
+                  <p className="mt-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-600">{dispatchError}</p>
+                )}
+                {isTyreShop && fitterConflict && (
+                  <p className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+                    ⚠ This fitter is already booked on job #{fitterConflict.job_number} during this time slot. You can still assign them — just confirm they&apos;re actually available.
+                  </p>
+                )}
                 <div className="mt-2">
                   <label className={lbl}>Payment Method <span className="font-normal normal-case text-gray-300">(opt, select multiple to split)</span></label>
                   <div className="flex flex-wrap gap-2">
@@ -2883,7 +3137,19 @@ export default function RepairsPage() {
                 </button>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => setModalOpen(false)}>Cancel</Button>
-                  <Button onClick={createRepair} loading={submitting} disabled={!jobData.device_type || (!isRetail && (!jobData.device_brand || !jobData.device_model)) || jobData.faults.length === 0 || (!jobData.price_pending && (!jobData.estimated_cost.trim() || isNaN(parseFloat(jobData.estimated_cost)) || parseFloat(jobData.estimated_cost) < 0))}>
+                  <Button
+                    onClick={createRepair}
+                    loading={submitting}
+                    disabled={
+                      (isTyreShop
+                        ? (!selectedVehicle || !selectedVehicle.registration_number.trim())
+                        : isRetail
+                          ? !jobData.device_type
+                          : (!jobData.device_type || !jobData.device_brand || !jobData.device_model))
+                      || jobData.faults.length === 0
+                      || (!jobData.price_pending && (!jobData.estimated_cost.trim() || isNaN(parseFloat(jobData.estimated_cost)) || parseFloat(jobData.estimated_cost) < 0))
+                    }
+                  >
                     Create Job
                   </Button>
                 </div>
@@ -2988,6 +3254,26 @@ export default function RepairsPage() {
                     {editData.discount_type === 'percent' ? '%' : '£'}
                   </button>
                 </div>
+              </div>
+
+              {/* Lab Fee — third-party cost, not billed to the customer */}
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <label className={lbl}>Lab / 3rd-Party Fee</label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">£</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editData.lab_fee}
+                    onChange={(e) => setEditData((p) => ({ ...p, lab_fee: e.target.value }))}
+                    placeholder="0.00"
+                    className={`${inp} pl-6 bg-white`}
+                  />
+                </div>
+                <p className="mt-1.5 text-xs text-amber-700">
+                  Paid to an outsourced lab — deducted from business revenue/profit in reports. Not billed to the customer and does not affect the charges below.
+                </p>
               </div>
 
               {/* Deposit */}

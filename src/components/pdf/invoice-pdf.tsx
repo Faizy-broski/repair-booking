@@ -8,6 +8,17 @@ function fmt(n: number, currency?: string) {
   return formatCurrency(n, currency)
 }
 
+// "cash" -> "Cash", "store_credit" -> "Store Credit"
+function paymentMethodLabel(method: string): string {
+  return method.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+}
+
+function paymentMethodText(methods: Array<{ method: string; amount: number }> | undefined, fmtFn: (n: number) => string): string {
+  if (!methods || methods.length === 0) return ''
+  if (methods.length === 1) return paymentMethodLabel(methods[0].method)
+  return methods.map((m) => `${paymentMethodLabel(m.method)} ${fmtFn(m.amount)}`).join(' + ')
+}
+
 // Only the labour/repair-fee line is hidden when show_final_amount_only is on —
 // parts keep showing their description and price. The line is identified by the
 // literal description getRepairInvoiceData() gives it ("Repair Fee").
@@ -55,6 +66,7 @@ function calcReceiptPageHeight(opts: {
   hasDiscount: boolean
   showTax: boolean
   hasPaid: boolean
+  hasPaymentMethod: boolean
   hasBalanceDue: boolean
   hasThankYou: boolean
   footerLines: string[]
@@ -97,8 +109,9 @@ function calcReceiptPageHeight(opts: {
 
   h += 14 // fourth divider
   h += 24 // grand total (fontSize 11 bold, marginTop 3)
-  if (opts.hasPaid)       h += 12 // paid row
-  if (opts.hasBalanceDue) h += 30 // balance-due colored row (padding 6, borderRadius 3, marginTop 4)
+  if (opts.hasPaid)           h += 12 // paid row
+  if (opts.hasPaymentMethod)  h += 12 // payment method row
+  if (opts.hasBalanceDue)     h += 30 // balance-due colored row (padding 6, borderRadius 3, marginTop 4)
 
   h += 14 // fifth divider (before footer)
   if (opts.hasThankYou) h += 20
@@ -163,6 +176,7 @@ export interface InvoicePdfProps {
   tax: number
   total: number
   amountPaid?: number
+  paymentMethods?: Array<{ method: string; amount: number }>
   notes?: string | null
   currency?: string
 }
@@ -174,7 +188,7 @@ export function InvoicePdf(props: InvoicePdfProps) {
     settings, invoiceNumber, status, issuedAt, dueAt,
     businessName, branchName, branchAddress, branchPhone, branchEmail,
     customerName, customerEmail, customerPhone, customerAddress,
-    items, subtotal, discount = 0, tax, total, amountPaid = 0,
+    items, subtotal, discount = 0, tax, total, amountPaid = 0, paymentMethods,
     notes, currency = 'GBP',
   } = props
 
@@ -490,6 +504,12 @@ export function InvoicePdf(props: InvoicePdfProps) {
               <Text style={[s.totalValue, { color: '#10b981' }]}>{fmt(amountPaid, currency)}</Text>
             </View>
           )}
+          {!!paymentMethods?.length && (
+            <View style={s.totalRow}>
+              <Text style={s.totalLabel}>Payment Method</Text>
+              <Text style={s.totalValue}>{paymentMethodText(paymentMethods, (n) => fmt(n, currency))}</Text>
+            </View>
+          )}
           {balanceDue > 0 ? (
             <View style={s.balanceBadge}>
               <Text style={s.balanceBadgeLabel}>Balance Due</Text>
@@ -545,7 +565,7 @@ function ReceiptPdf({
   settings, invoiceNumber, status, issuedAt,
   businessName, branchName, branchAddress, branchPhone,
   customerName,
-  items, subtotal, discount = 0, tax, total, amountPaid = 0,
+  items, subtotal, discount = 0, tax, total, amountPaid = 0, paymentMethods,
   family, bold, fmt, socialEntries,
 }: InvoicePdfProps & {
   family: string; bold: string
@@ -581,6 +601,7 @@ function ReceiptPdf({
     hasDiscount:      discount > 0,
     showTax:          !!(settings.show_tax_breakdown && tax > 0),
     hasPaid:          amountPaid > 0,
+    hasPaymentMethod: !!paymentMethods?.length,
     hasBalanceDue:    balanceDue > 0,
     hasThankYou:      !!settings.thank_you_message,
     footerLines:      uniqueFooterLines,
@@ -677,6 +698,7 @@ function ReceiptPdf({
         <View style={s.divider} />
         <View style={s.grandRow}><Text style={s.grandLabel}>Total</Text><Text style={s.grandValue}>{fmt(total)}</Text></View>
         {amountPaid > 0 && <View style={s.totalRow}><Text style={s.totalLabel}>Paid</Text><Text style={[s.totalValue, { color: '#10b981' }]}>{fmt(amountPaid)}</Text></View>}
+        {!!paymentMethods?.length && <View style={s.totalRow}><Text style={s.totalLabel}>Payment Method</Text><Text style={s.totalValue}>{paymentMethodText(paymentMethods, fmt)}</Text></View>}
         {balanceDue > 0 && (
           <View style={s.balanceRow}>
             <Text style={s.balanceLabel}>Balance Due</Text>

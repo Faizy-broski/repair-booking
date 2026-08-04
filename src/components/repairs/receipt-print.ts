@@ -29,6 +29,19 @@ function esc(s: string | null | undefined): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
+// "cash" -> "Cash", "store_credit" -> "Store Credit"
+function paymentMethodLabel(method: string): string {
+  return method.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+}
+
+// Formats the aggregated per-method payment totals as e.g. "Cash £10.00 + Card £10.00",
+// or just "Cash" when a single method covers the whole deposit.
+function paymentMethodText(methods: Array<{ method: string; amount: number }> | undefined, currency?: string): string {
+  if (!methods || methods.length === 0) return ''
+  if (methods.length === 1) return paymentMethodLabel(methods[0].method)
+  return methods.map((m) => `${paymentMethodLabel(m.method)} ${money(m.amount, currency)}`).join(' + ')
+}
+
 // Only the labour/repair-fee line is hidden when show_final_amount_only is on —
 // parts keep showing their description and price. Identified by the literal
 // description getRepairInvoiceData() gives it ("Repair Fee").
@@ -57,6 +70,7 @@ export interface ReceiptPrintData {
   tax?: number
   total: number
   amountPaid?: number
+  paymentMethods?: Array<{ method: string; amount: number }>
   currency?: string
 }
 
@@ -69,7 +83,7 @@ function buildHtml(d: ReceiptPrintData, debugMode = false): string {
   const {
     settings, invoiceNumber, status, issuedAt, dueAt,
     businessName, branchName, branchAddress, branchPhone, customerName, deviceName, deviceImei, faults,
-    items, subtotal, discount = 0, tax = 0, total, amountPaid = 0, currency = 'GBP',
+    items, subtotal, discount = 0, tax = 0, total, amountPaid = 0, paymentMethods, currency = 'GBP',
   } = d
 
   const pc       = settings.primary_color ?? '#0f766e'
@@ -301,6 +315,7 @@ ${isRepairReceipt ? `
     <hr>
     <div class="gr"><span class="gl">Total Charges</span><span class="gv">${money(total, currency)}</span></div>
     <div class="tr"><span class="tl">Deposit / Paid</span><span class="tv">${money(amountPaid, currency)}</span></div>
+    ${L(!!paymentMethods?.length, `<div class="tr"><span class="tl">Payment Method</span><span class="tv">${esc(paymentMethodText(paymentMethods, currency))}</span></div>`)}
     ${L(bal > 0, `<div class="bar"><span class="bl">Remaining</span><span class="bv">${money(bal, currency)}</span></div>`)}
   </div>
 </div>
@@ -616,6 +631,7 @@ export interface SlipPrintData {
   totalRepairCharges?: number
   deposit?: number
   remaining?: number
+  paymentMethods?: Array<{ method: string; amount: number }>
 }
 
 function buildSlipHtml(d: SlipPrintData): string {
@@ -631,12 +647,6 @@ function buildSlipHtml(d: SlipPrintData): string {
     : new Date().toLocaleDateString('en-GB')
 
   const faults = d.faults ?? []
-
-  const faultBadges = faults.length > 0
-    ? faults.map(f => `<span style="display:inline-block;padding:3px 6px;margin:2px;
-        background:#1a388d;color:#fff;font-size:10px;border-radius:4px;font-weight:bold;
-        -webkit-print-color-adjust:exact;print-color-adjust:exact">${f}</span>`).join('')
-    : '<span>No faults recorded</span>'
 
   const css = `
     @page { margin: 0; size: auto portrait }
@@ -674,6 +684,16 @@ function buildSlipHtml(d: SlipPrintData): string {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
   }
 
+  // Plain bold text, not a colored badge — a filled background prints as an
+  // illegible dithered block on thermal printers, which is why this used to
+  // render as an unreadable dark box on the physical slip.
+  const faultsText = faults.length > 0 ? faults.map((f) => esc(f)).join(', ') : 'N/A'
+
+  const paymentMethods = d.paymentMethods ?? []
+  const paymentText = paymentMethods.length === 1
+    ? paymentMethodLabel(paymentMethods[0].method)
+    : paymentMethods.map((m) => `${paymentMethodLabel(m.method)} £${m.amount.toFixed(2)}`).join(' + ')
+
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${css}</style></head><body>
 <div class="rcpt">
 <div class="head">
@@ -687,11 +707,12 @@ function buildSlipHtml(d: SlipPrintData): string {
   <div><strong>Ticket ID:</strong> T-${esc(d.jobNumber)}</div>
   <div><strong>Customer:</strong> ${esc(d.customerName)}</div>
   <div><strong>Make and Model:</strong> ${esc(d.deviceLabel)}</div>
-  <div><strong>Faults:</strong> ${faultBadges}</div>
+  <div><strong>Faults:</strong> <span style="font-weight:bold;">${faultsText}</span></div>
 </div>
 <div class="summary">
   <div class="sumrow"><span>Repair Charges:</span><span>£${(d.totalRepairCharges ?? 0).toFixed(2)}</span></div>
   <div class="sumrow"><span>Deposit:</span><span>£${(d.deposit ?? 0).toFixed(2)}</span></div>
+  ${paymentMethods.length > 0 ? `<div class="sumrow"><span>Payment Method:</span><span>${esc(paymentText)}</span></div>` : ''}
   <div class="sumrow"><span>Remaining:</span><span>£${(d.remaining ?? 0).toFixed(2)}</span></div>
 </div>
 <div class="footer">

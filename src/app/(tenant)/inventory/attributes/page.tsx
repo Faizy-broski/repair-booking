@@ -23,6 +23,8 @@ const PAGE_SIZE = 10
 export default function InventoryAttributesPage() {
   const { verticalTemplateSlug } = useAuthStore()
   const isRetail = verticalTemplateSlug === 'retail-store'
+  const isTyreShop = verticalTemplateSlug === 'mobile-tyre-fitting'
+  const useSimpleCatalog = isRetail || isTyreShop
   const pathname = usePathname()
 
   const [attributes, setAttributes]   = useState<Attribute[]>([])
@@ -145,7 +147,7 @@ export default function InventoryAttributesPage() {
     { label: 'Bin',             href: '/inventory/bin' },
     { label: 'Damage Returns',  href: '/inventory/damage-returns' },
     // { label: 'Stock Count', href: '/inventory/stock-count' },  // disabled
-    ...(isRetail ? [
+    ...(useSimpleCatalog ? [
       { label: 'Categories', href: '/inventory/categories' },
       { label: 'Attributes', href: '/inventory/attributes' },
     ] : []),

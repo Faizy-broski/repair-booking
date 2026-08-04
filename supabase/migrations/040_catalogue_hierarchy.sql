@@ -15,7 +15,7 @@ ALTER TABLE service_devices
 
 CREATE INDEX IF NOT EXISTS idx_svc_devices_brand ON service_devices(brand_id);
 
--- 3. Part Types table — linked to Model (service_devices)
+-- 3. Part Types table — linked to Model (service_devices) 
 --    e.g. "iPhone 15 Pro" → Screen, Battery, IC
 --    e.g. "ThinkPad X1" → Keyboard, Screen, Trackpad
 CREATE TABLE IF NOT EXISTS part_types (

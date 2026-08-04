@@ -11,7 +11,7 @@ export const RepairService = {
     const { page = 1, limit = 20, status, search, businessId, customerId } = params
     let q = adminSupabase
       .from('repairs')
-      .select('*, customers(first_name,last_name,phone,email)', { count: 'exact' })
+      .select('*, customers(first_name,last_name,phone,email), vehicles(registration_number)', { count: 'exact' })
       .order('is_rush', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1)
@@ -33,21 +33,19 @@ export const RepairService = {
     if (customerId) q = q.eq('customer_id', customerId)
     if (search) {
       const term = `%${escapeIlike(search)}%`
-      // Look up customer IDs that match email or phone so we can include them
-      const { data: matchedCustomers } = await adminSupabase
-        .from('customers')
-        .select('id')
-        .or(`email.ilike.${term},phone.ilike.${term}`)
-        .limit(50)
+      // Look up customer IDs (email/phone) and vehicle IDs (plate — mobile tyre
+      // fitting vertical) that match, so job search covers both.
+      const [{ data: matchedCustomers }, { data: matchedVehicles }] = await Promise.all([
+        adminSupabase.from('customers').select('id').or(`email.ilike.${term},phone.ilike.${term}`).limit(50),
+        adminSupabase.from('vehicles').select('id').ilike('registration_number', term).limit(50),
+      ])
       const customerIds = (matchedCustomers ?? []).map((c) => c.id)
+      const vehicleIds = (matchedVehicles ?? []).map((v) => v.id)
 
-      if (customerIds.length > 0) {
-        q = q.or(
-          `job_number.ilike.${term},device_model.ilike.${term},customer_id.in.(${customerIds.join(',')})`
-        )
-      } else {
-        q = q.or(`job_number.ilike.${term},device_model.ilike.${term}`)
-      }
+      const orClauses = [`job_number.ilike.${term}`, `device_model.ilike.${term}`]
+      if (customerIds.length > 0) orClauses.push(`customer_id.in.(${customerIds.join(',')})`)
+      if (vehicleIds.length > 0) orClauses.push(`vehicle_id.in.(${vehicleIds.join(',')})`)
+      q = q.or(orClauses.join(','))
     }
 
     const { data, error, count } = await q
@@ -61,7 +59,9 @@ export const RepairService = {
       .select(
         // customers(*) is intentional — detail view shows full customer profile
         // repair_status_history: exclude sms_sent and repair_id (redundant noise)
-        '*, customers(*), repair_items(*), repair_payments(id,amount,method,created_at), repair_status_history(id,new_status,old_status,note,created_at,email_sent,profiles!changed_by(full_name))'
+        // profiles!created_by: "booked by" stamp — ALL verticals, not tyre-specific
+        // vehicles(*): mobile tyre-fitting vertical only — null/harmless elsewhere
+        '*, customers(*), vehicles(*), profiles!created_by(full_name), repair_items(*), repair_payments(id,amount,method,created_at), repair_status_history(id,new_status,old_status,note,created_at,email_sent,profiles!changed_by(full_name))'
       )
       .eq('id', id)
     // branchId is null/empty for business owners who have access to all branches
@@ -69,6 +69,23 @@ export const RepairService = {
     const { data, error } = await q.single()
     if (error) throw error
     return data
+  },
+
+  // Soft double-booking check for the assigned fitter/technician: returns the
+  // conflicting job (if any) so the UI can warn but still let staff assign
+  // anyway — this never blocks create/update, it's purely advisory.
+  async checkFitterConflict(assignedTo: string, scheduledStart: string, scheduledEnd: string, excludeId?: string) {
+    let q = db('repairs')
+      .select('id, job_number, scheduled_start, scheduled_end, status')
+      .eq('assigned_to', assignedTo)
+      .not('scheduled_start', 'is', null)
+      .not('scheduled_end', 'is', null)
+      .lt('scheduled_start', scheduledEnd)
+      .gt('scheduled_end', scheduledStart)
+    if (excludeId) q = q.neq('id', excludeId)
+    const { data } = await q
+    const conflict = (data ?? []).find((r: { status: string }) => !isTerminalRepairStatus(r.status))
+    return conflict ?? null
   },
 
   async create(payload: Omit<InsertTables<'repairs'>, 'job_number'>) {

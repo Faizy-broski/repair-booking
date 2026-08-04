@@ -9,6 +9,7 @@ import {
   buildPosOverrideMap,
   computeRepairRevenue,
   computeRepairPartsCost,
+  computeRepairLabFeeCost,
   computeSalesCogs,
   type PosOverrideRow,
   type RepairRevenueRow,
@@ -79,14 +80,20 @@ export function computeDashboardFinancials(input: DashboardFinancialsInput): Das
 
   const salesCogs = computeSalesCogs(input.salesCogsRows)
   const repairsPartsCost = computeRepairPartsCost(input.repairsPartsRows)
+  // Same rows as repairsRevenueRows above — lab_fee lives directly on the
+  // repairs row, no extra join/query needed.
+  const repairsLabFeeCost = computeRepairLabFeeCost(input.repairsRevenueRows)
 
   return {
     total_sales: totalSales,
     total_expenses: totalExpenses,
     repairs_revenue: repairsRevenue,
+    // net_profit stays revenue-minus-expenses (matches its pre-existing
+    // definition, which already excludes repairsPartsCost too) — only the
+    // COGS-adjusted repairs_profit card is affected by lab fee, same as parts cost.
     net_profit: totalSales + repairsRevenueNotInPos - totalExpenses,
     sales_profit: totalSales - salesCogs,
-    repairs_profit: repairsRevenue - repairsPartsCost,
+    repairs_profit: repairsRevenue - repairsPartsCost - repairsLabFeeCost,
   }
 }
 

@@ -115,7 +115,7 @@ export const ReportController = {
 
     try {
       if (subtype === 'productivity') {
-        const data = await ReportService.getEmployeeProductivityReport(branchId, from, to)
+        const data = await ReportService.getEmployeeProductivityReport(branchId, from, to, ctx.businessId)
         return ok(data)
       }
       return badRequest('Unknown subtype')
@@ -141,6 +141,10 @@ export const ReportController = {
       }
       if (subtype === 'parts_consumption') {
         const data = await ReportService.getPartConsumptionReport(branchId, from, to)
+        return ok(data)
+      }
+      if (subtype === 'parts_consumption_by_brand') {
+        const data = await ReportService.getPartConsumptionByBrandReport(branchId, from, to)
         return ok(data)
       }
       if (subtype === 'adjustments') {

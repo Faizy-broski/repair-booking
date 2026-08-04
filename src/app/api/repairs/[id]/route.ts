@@ -7,9 +7,9 @@ export const GET = withMiddleware(
 )
 export const PATCH = withMiddleware(
   (req, ctx, { params }) => params.then((p) => RepairController.update(req, ctx, p.id)),
-  { requiredRole: 'staff' }
+  { requiredRole: 'staff', module: 'repairs' }
 )
 export const DELETE = withMiddleware(
   (req, ctx, { params }) => params.then((p) => RepairController.remove(req, ctx, p.id)),
-  { requiredRole: 'branch_manager' }
+  { requiredRole: 'branch_manager', module: 'repairs' }
 )

@@ -3,7 +3,7 @@ import { useState, use } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, User, Wrench, ShoppingBag, FileText, Phone, Mail, MapPin, Cpu, CreditCard, Star, Plus, Pencil, Trash2, Banknote, Download, Receipt } from 'lucide-react'
+import { ArrowLeft, User, Wrench, ShoppingBag, FileText, Phone, Mail, MapPin, Cpu, CreditCard, Star, Plus, Pencil, Trash2, Banknote, Download, Receipt, Car } from 'lucide-react'
 import { BrandSpinner } from '@/components/ui/brand-spinner'
 import { Button } from '@/components/ui/button'
 import { Badge, REPAIR_STATUS_VARIANTS } from '@/components/ui/badge'
@@ -15,7 +15,7 @@ import { toast } from 'sonner'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { useAuthStore } from '@/store/auth.store'
 
-type Tab = 'overview' | 'repairs' | 'sales' | 'invoices' | 'assets' | 'credits'
+type Tab = 'overview' | 'repairs' | 'sales' | 'invoices' | 'assets' | 'credits' | 'vehicles'
 
 interface CustomerDetail {
   id: string
@@ -52,6 +52,7 @@ interface CustomerDetail {
     status: string
     created_at: string
   }[]
+  vehicles: VehicleRow[]
   stats: {
     repair_count: number
     sale_count: number
@@ -72,6 +73,10 @@ interface Asset {
   serial_number: string | null; imei: string | null; color: string | null; is_active: boolean
   repairs?: { id: string; job_number: string; status: string; created_at: string }[]
 }
+interface VehicleRow {
+  id: string; registration_number: string; make: string | null; model: string | null
+  colour: string | null; tyre_size: string | null; notes: string | null
+}
 interface CreditTxn { id: string; amount: number; type: string; note: string | null; created_at: string }
 interface LoyaltyTxn { id: string; points: number; type: string; created_at: string }
 interface CreditPayment { id: string; amount: number; method: string; created_at: string; is_backfilled: boolean }
@@ -81,6 +86,7 @@ interface CreditPaymentSale {
 }
 
 const emptyAssetForm = { name: '', brand: '', model: '', serial_number: '', imei: '', color: '' }
+const emptyVehicleForm = { registration_number: '', make: '', model: '', colour: '', tyre_size: '', notes: '' }
 
 export default function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -91,11 +97,19 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   const [tab, setTab] = useState<Tab>(initialTab)
   const { verticalTemplateSlug } = useAuthStore()
   const isRetailStore = verticalTemplateSlug === 'retail-store'
+  const isTyreShop = verticalTemplateSlug === 'mobile-tyre-fitting'
 
   // Assets
   const [assetModal,  setAssetModal]  = useState<{ open: boolean; editing: Asset | null }>({ open: false, editing: null })
   const [assetForm,   setAssetForm]   = useState(emptyAssetForm)
   const [savingAsset, setSavingAsset] = useState(false)
+
+  // Vehicles
+  const [vehicleModal,  setVehicleModal]  = useState<{ open: boolean; editing: VehicleRow | null }>({ open: false, editing: null })
+  const [vehicleForm,   setVehicleForm]   = useState(emptyVehicleForm)
+  const [savingVehicle, setSavingVehicle] = useState(false)
+  const [confirmDeleteVehicle, setConfirmDeleteVehicle] = useState<string | null>(null)
+  const [isDeletingVehicle, setIsDeletingVehicle] = useState(false)
 
   // Store Credits
   const [addCreditModal, setAddCreditModal] = useState(false)
@@ -284,6 +298,38 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
     setIsDeletingAsset(false)
   }
 
+  async function saveVehicle() {
+    setSavingVehicle(true)
+    const { editing } = vehicleModal
+    const url    = editing ? `/api/vehicles/${editing.id}` : '/api/vehicles'
+    const method = editing ? 'PATCH' : 'POST'
+    const body   = editing ? vehicleForm : { ...vehicleForm, customer_id: id }
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    if (res.ok) {
+      toast.success(editing ? 'Vehicle updated.' : 'Vehicle added.')
+      setVehicleModal({ open: false, editing: null })
+      queryClient.invalidateQueries({ queryKey: ['customer-detail', id] })
+    } else {
+      toast.error('Failed to save vehicle.')
+    }
+    setSavingVehicle(false)
+  }
+
+  async function handleConfirmDeleteVehicle() {
+    if (!confirmDeleteVehicle) return
+    const targetId = confirmDeleteVehicle
+    setConfirmDeleteVehicle(null)
+    setIsDeletingVehicle(true)
+    const res = await fetch(`/api/vehicles/${targetId}`, { method: 'DELETE' })
+    if (res.ok) {
+      toast.success('Vehicle deleted successfully.')
+      queryClient.invalidateQueries({ queryKey: ['customer-detail', id] })
+    } else {
+      toast.error('Failed to delete vehicle.')
+    }
+    setIsDeletingVehicle(false)
+  }
+
   async function addCredit() {
     const amount = parseFloat(creditAmount)
     if (!amount || amount <= 0) return
@@ -340,6 +386,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
     { id: 'credits',   label: 'Credits & Points' },
     { id: 'invoices',  label: 'Invoices', count: customer.stats.invoice_count },
     ...(!isRetailStore ? [{ id: 'assets' as Tab, label: 'Devices', count: assets.length }] : []),
+    ...(isTyreShop ? [{ id: 'vehicles' as Tab, label: 'Vehicles', count: customer.vehicles.length }] : []),
   ]
 
   return (
@@ -557,6 +604,59 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => setConfirmDeleteAsset(a.id)}>
+                      <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Vehicles tab */}
+      {tab === 'vehicles' && (
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <Button size="sm" onClick={() => { setVehicleForm(emptyVehicleForm); setVehicleModal({ open: true, editing: null }) }}>
+              <Plus className="h-4 w-4" /> Add Vehicle
+            </Button>
+          </div>
+          {customer.vehicles.length === 0 ? (
+            <EmptyState message="No vehicles registered" />
+          ) : (
+            <div className="divide-y rounded-xl border border-gray-200 bg-white">
+              {customer.vehicles.map((v) => (
+                <div key={v.id} className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100">
+                      <Car className="h-4 w-4 text-gray-500" />
+                    </div>
+                    <div>
+                      <p className="font-mono font-medium text-gray-800">{v.registration_number}</p>
+                      <p className="text-xs text-gray-400">
+                        {[v.make, v.model].filter(Boolean).join(' ') || 'No make/model'}
+                        {v.tyre_size ? ` · ${v.tyre_size}` : ''}
+                        {v.colour ? ` · ${v.colour}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setVehicleForm({
+                          registration_number: v.registration_number,
+                          make: v.make ?? '', model: v.model ?? '',
+                          colour: v.colour ?? '', tyre_size: v.tyre_size ?? '', notes: v.notes ?? '',
+                        })
+                        setVehicleModal({ open: true, editing: v })
+                      }}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setConfirmDeleteVehicle(v.id)}>
                       <Trash2 className="h-3.5 w-3.5 text-red-400" />
                     </Button>
                   </div>
@@ -858,6 +958,33 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         </div>
       </Modal>
 
+      {/* Vehicle modal */}
+      <Modal
+        open={vehicleModal.open}
+        onClose={() => setVehicleModal({ open: false, editing: null })}
+        title={vehicleModal.editing ? 'Edit Vehicle' : 'Add Vehicle'}
+        size="sm"
+      >
+        <div className="space-y-3">
+          <Input label="Registration Number *" placeholder="AB12 CDE" value={vehicleForm.registration_number} onChange={(e) => setVehicleForm((f) => ({ ...f, registration_number: e.target.value }))} />
+          <div className="grid grid-cols-2 gap-2">
+            <Input label="Make"  value={vehicleForm.make}  onChange={(e) => setVehicleForm((f) => ({ ...f, make: e.target.value }))} />
+            <Input label="Model" value={vehicleForm.model} onChange={(e) => setVehicleForm((f) => ({ ...f, model: e.target.value }))} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Input label="Colour"    value={vehicleForm.colour}    onChange={(e) => setVehicleForm((f) => ({ ...f, colour: e.target.value }))} />
+            <Input label="Tyre Size" placeholder="205/55R16" value={vehicleForm.tyre_size} onChange={(e) => setVehicleForm((f) => ({ ...f, tyre_size: e.target.value }))} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
+            <textarea rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" value={vehicleForm.notes} onChange={(e) => setVehicleForm((f) => ({ ...f, notes: e.target.value }))} />
+          </div>
+          <Button className="w-full" onClick={saveVehicle} loading={savingVehicle} disabled={!vehicleForm.registration_number.trim()}>
+            Save Vehicle
+          </Button>
+        </div>
+      </Modal>
+
       {/* Add credit modal */}
       <Modal
         open={addCreditModal}
@@ -901,6 +1028,16 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         description="Are you sure you want to delete this device? This action cannot be undone."
         confirmLabel="Delete"
         loading={isDeletingAsset}
+      />
+
+      <ConfirmModal
+        open={!!confirmDeleteVehicle}
+        onClose={() => setConfirmDeleteVehicle(null)}
+        onConfirm={handleConfirmDeleteVehicle}
+        title="Delete Vehicle?"
+        description="Are you sure you want to delete this vehicle? Past job history is kept, but it won't be selectable for new jobs."
+        confirmLabel="Delete"
+        loading={isDeletingVehicle}
       />
     </div>
   )

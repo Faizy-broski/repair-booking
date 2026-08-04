@@ -1,7 +1,7 @@
 import { withMiddleware } from '@/backend/middleware'
 import { adminSupabase } from '@/backend/config/supabase'
 import { ok, serverError } from '@/backend/utils/api-response'
-import { isTerminalRepairStatus, buildPosOverrideMap, computeRepairRevenue, computeRepairPartsCost, filterCompletedRepairsInPeriod } from '@/backend/services/repair-financials.service'
+import { isTerminalRepairStatus, buildPosOverrideMap, computeRepairRevenue, computeRepairPartsCost, computeRepairLabFeeCost, filterCompletedRepairsInPeriod } from '@/backend/services/repair-financials.service'
 
 export const GET = withMiddleware(async (req, ctx) => {
   const branchId = req.nextUrl.searchParams.get('branch_id') ?? ctx.auth.branchId
@@ -26,7 +26,7 @@ export const GET = withMiddleware(async (req, ctx) => {
 
       // Period repairs — Total, Completed, Revenue, Profit are period-filtered
       db.from('repairs')
-        .select('id, status, created_at, deposit_paid, actual_cost, estimated_cost, discount_amount, refund_amount')
+        .select('id, status, created_at, deposit_paid, actual_cost, estimated_cost, discount_amount, refund_amount, lab_fee')
         .eq('branch_id', branchId)
         .gte('created_at', periodStart),
 
@@ -55,7 +55,7 @@ export const GET = withMiddleware(async (req, ctx) => {
       // same definition get_profit_loss (P&L report) uses. Exposed as
       // repairs_revenue_completed/repairs_profit_completed for cross-reference.
       db.from('repairs')
-        .select('id, status, updated_at, deposit_paid, actual_cost, estimated_cost, discount_amount, refund_amount')
+        .select('id, status, updated_at, deposit_paid, actual_cost, estimated_cost, discount_amount, refund_amount, lab_fee')
         .eq('branch_id', branchId)
         .gte('updated_at', periodStart),
 
@@ -101,6 +101,9 @@ export const GET = withMiddleware(async (req, ctx) => {
     const revenue = periodRepairs.reduce((sum: number, r: any) => sum + computeRepairRevenue(r, posRepairAmounts), 0)
 
     const partsCost = computeRepairPartsCost((partsRes.data ?? []) as any[])
+    // Same rows as periodRepairs above — lab_fee lives directly on the
+    // repairs row, no extra join/query needed.
+    const labFeeCost = computeRepairLabFeeCost(periodRepairs)
 
     // ── Secondary/reference figure: completed-in-period (matches P&L) ──────
     // Purely additive — does not change repairs_revenue/repairs_profit above.
@@ -115,6 +118,7 @@ export const GET = withMiddleware(async (req, ctx) => {
     const completedParts = ((completedPartsRes.data ?? []) as any[])
       .filter((item) => isTerminalRepairStatus(item.repairs?.status))
     const partsCostCompleted = computeRepairPartsCost(completedParts)
+    const labFeeCostCompleted = computeRepairLabFeeCost(completedRepairs)
 
     return ok({
       repairs_total:     periodRepairs.length,   // created in selected period
@@ -122,14 +126,19 @@ export const GET = withMiddleware(async (req, ctx) => {
       repairs_completed: completedJobs.length,    // created in period that are terminal
       repairs_urgent:    urgentJobs.length,
       repairs_revenue:   revenue,
-      repairs_profit:    revenue - partsCost,
+      repairs_profit:    revenue - partsCost - labFeeCost,
+      // Third-party lab fee, paid to an outside lab — not billed to the
+      // customer, so it's broken out here for visibility into why profit is
+      // lower than revenue minus parts cost alone.
+      repairs_lab_fees:  labFeeCost,
       repairs_cash_deposits:  cashDeposits,
       repairs_card_deposits:  cardDeposits,
       repairs_other_deposits: otherDeposits,
       // Reference figures only — completed-in-period, matching the P&L
       // report's definition. Do not replace repairs_revenue/repairs_profit.
       repairs_revenue_completed: revenueCompleted,
-      repairs_profit_completed:  revenueCompleted - partsCostCompleted,
+      repairs_profit_completed:  revenueCompleted - partsCostCompleted - labFeeCostCompleted,
+      repairs_lab_fees_completed: labFeeCostCompleted,
     })
   } catch (err) {
     return serverError('Failed to fetch repair stats', err)

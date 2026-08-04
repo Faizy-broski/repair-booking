@@ -5,11 +5,34 @@ import { StoreCreditService } from '@/backend/services/store-credit.service'
 import { LoyaltyService } from '@/backend/services/loyalty.service'
 import { CommissionService } from '@/backend/services/payroll.service'
 import { NotificationEngine } from '@/backend/services/notification-engine.service'
+import { NotificationTemplateService } from '@/backend/services/notification-template.service'
 import { adminSupabase } from '@/backend/config/supabase'
 import { ok, created, notFound, serverError, badRequest } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
+import { PdfCacheService } from '@/backend/services/pdf-cache.service'
+import { ShortLinkService } from '@/backend/services/short-link.service'
+import { buildWhatsAppInvoiceLink } from '@/lib/whatsapp-link'
 import { z } from 'zod'
+
+// wa.me links are opened by the customer at an unknown later time, so the PDF's
+// signed URL needs to outlive the normal 10-minute in-app preview TTL.
+const WHATSAPP_PDF_TTL_SECONDS = 60 * 60 * 24 * 7 // 7 days
+
+// Wraps a long signed URL (Supabase Storage signed URLs carry a big JWT token)
+// behind a short /s/{code} redirect — much friendlier in a WhatsApp message or
+// email body. Expires alongside the URL it points to. Falls back to the raw
+// URL if short-link creation fails for any reason (never block a send over this).
+async function shortenUrl(targetUrl: string, businessId: string, ttlSeconds: number): Promise<string> {
+  try {
+    const code = await ShortLinkService.create(targetUrl, businessId, new Date(Date.now() + ttlSeconds * 1000))
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://repairbooking.co.uk'
+    return `${appUrl}/s/${code}`
+  } catch (err) {
+    console.error('[shortenUrl] Failed to create short link, falling back to raw URL:', err)
+    return targetUrl
+  }
+}
 
 // ── Shared repair PDF generators ────────────────────────────────────────────
 // Server-rendered with a fixed page size so the print output is deterministic —
@@ -26,6 +49,19 @@ function pdfResponse(buffer: Buffer | Uint8Array, filename: string) {
       'Cache-Control': 'no-store',
     },
   })
+}
+
+// Aggregates the repair_payments ledger (one row per payment event) into one
+// total per tender type, so receipts can show "Cash £10.00 + Card £10.00"
+// instead of just a lump deposit figure.
+function aggregatePaymentMethods(payments: unknown): Array<{ method: string; amount: number }> {
+  if (!Array.isArray(payments) || payments.length === 0) return []
+  const totals = new Map<string, number>()
+  for (const p of payments as Array<{ method?: string; amount?: number }>) {
+    if (!p?.method) continue
+    totals.set(p.method, (totals.get(p.method) ?? 0) + Number(p.amount ?? 0))
+  }
+  return [...totals.entries()].map(([method, amount]) => ({ method, amount }))
 }
 
 // Assembles the plain-data shape shared by the server-rendered PDF (standard
@@ -125,6 +161,7 @@ async function getRepairInvoiceData(repairId: string, branchId: string | null, b
     tax:             0,
     total:           invoiceTotal,
     amountPaid:      Number(r.deposit_paid ?? 0),
+    paymentMethods:  aggregatePaymentMethods(r.repair_payments),
     notes:           r.notes ?? null,
     currency:        businessRow?.currency ?? 'GBP',
     jobNumber:       r.job_number as string,
@@ -229,6 +266,7 @@ async function getRepairSlipData(repairId: string, branchId: string | null, busi
     totalRepairCharges,
     deposit,
     remaining,
+    paymentMethods: aggregatePaymentMethods(r.repair_payments),
   }
 }
 
@@ -254,6 +292,14 @@ const createSchema = z.object({
   device_brand: z.string().optional().nullable(),
   device_model: z.string().optional().nullable(),
   serial_number: z.string().optional().nullable(),
+  // Mobile tyre-fitting vertical — nullable/unused for the device-repair vertical.
+  vehicle_id: z.string().uuid().optional().nullable(),
+  tyre_size: z.string().optional().nullable(),
+  tyre_quantity: z.number().int().min(0).optional().nullable(),
+  tyre_quality: z.string().optional().nullable(),
+  location_notes: z.string().optional().nullable(),
+  scheduled_start: z.string().datetime({ offset: true }).optional().nullable(),
+  scheduled_end: z.string().datetime({ offset: true }).optional().nullable(),
   issue: z.string().min(1),
   estimated_cost: z.number().min(0).optional().nullable(),
   deposit_paid: z.number().min(0).default(0),
@@ -268,12 +314,18 @@ const createSchema = z.object({
   discount_type: z.enum(['fixed', 'percent']).default('fixed'),
   discount_value: z.number().min(0).default(0),
   discount_amount: z.number().min(0).default(0),
+  // Third-party lab fee — paid to an outside lab, not billed to the
+  // customer. Set on edit once a job is known to need outsourcing;
+  // deducted from repairs revenue/profit in reporting, never from what the
+  // customer owes (estimated_cost/deposit_paid are untouched by this).
+  lab_fee: z.number().min(0).optional().default(0),
   payment_splits: z.array(z.object({
     method: z.enum(['cash', 'card', 'store_credit', 'loyalty_points']),
     amount: z.number().positive(),
   })).optional().default([]),
   parts: z.array(z.object({
     product_id: z.string().uuid().optional().nullable(),
+    variant_id: z.string().uuid().optional().nullable(),
     name: z.string(),
     quantity: z.number().int().min(1).default(1),
     unit_cost: z.number().min(0).default(0),
@@ -285,6 +337,13 @@ const createSchema = z.object({
 })
 
 const updateSchema = createSchema.partial().omit({ branch_id: true })
+
+const conflictSchema = z.object({
+  assigned_to: z.string().uuid(),
+  scheduled_start: z.string().datetime({ offset: true }),
+  scheduled_end: z.string().datetime({ offset: true }),
+  exclude_id: z.string().uuid().optional(),
+})
 
 const statusSchema = z.object({
   status: z.string().min(1),
@@ -404,6 +463,22 @@ export const RepairController = {
     }
   },
 
+  // Advisory-only: never blocks booking, just tells the UI whether the fitter
+  // is already scheduled elsewhere at this time so it can show a warning that
+  // staff can dismiss and assign anyway.
+  async checkConflict(request: NextRequest, ctx: RequestContext) {
+    const { data, error } = await validateBody(request, conflictSchema)
+    if (error) return error
+    try {
+      const conflict = await RepairService.checkFitterConflict(
+        data.assigned_to, data.scheduled_start, data.scheduled_end, data.exclude_id
+      )
+      return ok({ conflict })
+    } catch (err) {
+      return serverError('Failed to check fitter availability', err)
+    }
+  },
+
   async create(request: NextRequest, ctx: RequestContext) {
     const { data, error } = await validateBody(request, createSchema)
     if (error) return error
@@ -411,7 +486,7 @@ export const RepairController = {
     if (splitError) return badRequest(splitError)
     try {
       const { parts, store_credit_applied, loyalty_points_applied, payment_splits, ...repairPayload } = data
-      const repair = await RepairService.create(repairPayload)
+      const repair = await RepairService.create({ ...repairPayload, created_by: ctx.auth.userId })
 
       if (repair && payment_splits.length > 0) {
         await persistRepairPaymentSplits(ctx.businessId, repair.id, data.customer_id ?? null, ctx.auth.userId, [], payment_splits)
@@ -493,6 +568,7 @@ export const RepairController = {
         const items = allResolved.map(p => ({
           repair_id:      repair.id,
           product_id:     p.product_id,
+          variant_id:     p.variant_id ?? null,
           name:           p.name,
           quantity:       p.quantity,
           unit_cost:      p.unit_cost,
@@ -756,6 +832,114 @@ export const RepairController = {
       return pdfResponse(result.buffer, `slip-${result.jobNumber}.pdf`)
     } catch (err) {
       return serverError('Failed to generate slip PDF', err)
+    }
+  },
+
+  async getWhatsAppLink(_request: NextRequest, ctx: RequestContext, id: string) {
+    try {
+      const data = await getRepairInvoiceData(id, ctx.auth.branchId ?? null, ctx.businessId)
+      if (!data) return notFound('Repair not found')
+      if (!data.customerPhone) return badRequest('This customer has no phone number on file.')
+
+      const cachePath = PdfCacheService.cachePath('invoices', id)
+      const filename = `invoice-${data.jobNumber}.pdf`
+      let pdfUrl = await PdfCacheService.getSignedUrl(cachePath, filename, WHATSAPP_PDF_TTL_SECONDS)
+      if (!pdfUrl) {
+        const result = await buildRepairInvoiceBuffer(id, ctx.auth.branchId ?? null, ctx.businessId)
+        if (!result) return notFound('Repair not found')
+        pdfUrl = await PdfCacheService.store(cachePath, result.buffer, filename, WHATSAPP_PDF_TTL_SECONDS)
+      }
+      if (!pdfUrl) return serverError('Failed to prepare invoice PDF for sending')
+
+      const shortUrl = await shortenUrl(pdfUrl, ctx.businessId, WHATSAPP_PDF_TTL_SECONDS)
+      const link = buildWhatsAppInvoiceLink({
+        phone: data.customerPhone,
+        invoiceNumber: data.jobNumber,
+        total: data.total,
+        currency: data.currency,
+        pdfUrl: shortUrl,
+        businessName: data.businessName,
+      })
+      return ok({ url: link })
+    } catch (err) {
+      return serverError('Failed to build WhatsApp link', err)
+    }
+  },
+
+  // Emails the invoice to the customer — mirrors getWhatsAppLink's PDF-cache
+  // reuse (same cache path, so a WhatsApp send and an email send for the same
+  // invoice share one cached PDF/signed URL), but actually dispatches the
+  // email server-side via the notification engine instead of handing the
+  // staff member a pre-filled link to send themselves.
+  async sendInvoiceEmail(_request: NextRequest, ctx: RequestContext, id: string) {
+    try {
+      const data = await getRepairInvoiceData(id, ctx.auth.branchId ?? null, ctx.businessId)
+      if (!data) return notFound('Repair not found')
+      if (!data.customerEmail) return badRequest('This customer has no email address on file.')
+
+      const cachePath = PdfCacheService.cachePath('invoices', id)
+      const filename = `invoice-${data.jobNumber}.pdf`
+      let pdfUrl = await PdfCacheService.getSignedUrl(cachePath, filename, WHATSAPP_PDF_TTL_SECONDS)
+      if (!pdfUrl) {
+        const result = await buildRepairInvoiceBuffer(id, ctx.auth.branchId ?? null, ctx.businessId)
+        if (!result) return notFound('Repair not found')
+        pdfUrl = await PdfCacheService.store(cachePath, result.buffer, filename, WHATSAPP_PDF_TTL_SECONDS)
+      }
+      if (!pdfUrl) return serverError('Failed to prepare invoice PDF for sending')
+
+      // Ensure this business has an active "invoice_created" template — most
+      // businesses never visit Settings to create one, so NotificationEngine.fire
+      // would otherwise silently no-op. Seed a sensible default the first time
+      // this is used, same shape/tone as the ticket_created default template.
+      let template = await NotificationTemplateService.getByTrigger(ctx.businessId, 'invoice_created')
+      if (!template) {
+        template = await NotificationTemplateService.upsert(ctx.businessId, {
+          trigger_event: 'invoice_created',
+          channel: 'email',
+          subject: 'Your Invoice {{invoice_number}} from {{store_name}}',
+          email_body:
+            '<p style="margin:0 0 16px;font-size:15px;color:#374151;">Hi <strong>{{customer_name}}</strong>,</p>' +
+            '<p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.6;">Here is your invoice from {{store_name}}.</p>' +
+            '<table style="width:100%;border-collapse:collapse;margin:0 0 24px;font-size:14px;">' +
+            '<tr style="background:#f8fafc;"><td style="padding:10px 14px;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Invoice #</td>' +
+            '<td style="padding:10px 14px;font-weight:700;color:#111827;border-bottom:1px solid #e5e7eb;"><strong>{{invoice_number}}</strong></td></tr>' +
+            '<tr><td style="padding:10px 14px;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Total</td>' +
+            '<td style="padding:10px 14px;color:#374151;border-bottom:1px solid #e5e7eb;">{{total}}</td></tr>' +
+            '<tr style="background:#f8fafc;"><td style="padding:10px 14px;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;">Balance Due</td>' +
+            '<td style="padding:10px 14px;font-weight:700;color:#111827;">{{balance_due}}</td></tr>' +
+            '</table>' +
+            '<p style="margin:0 0 20px;"><a href="{{invoice_link}}" style="display:inline-block;padding:10px 20px;background:#0f766e;color:#ffffff;border-radius:6px;font-size:14px;font-weight:600;text-decoration:none;">View / Download Invoice</a></p>' +
+            '<p style="margin:0;font-size:14px;color:#6b7280;">Thank you for your business.</p>',
+          is_active: true,
+        })
+      }
+      if (!template?.is_active) return badRequest('Invoice email is disabled in Settings → Notifications for this business.')
+
+      const fmt = (n: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: data.currency }).format(n)
+      const balanceDue = Math.max(0, data.total - data.amountPaid)
+      const shortUrl = await shortenUrl(pdfUrl, ctx.businessId, WHATSAPP_PDF_TTL_SECONDS)
+
+      await NotificationEngine.fire('invoice_created', {
+        businessId: ctx.businessId,
+        branchId: ctx.auth.branchId ?? null,
+        relatedId: id,
+        relatedType: 'repair',
+        variables: {
+          customer_name: data.customerName,
+          invoice_number: data.jobNumber,
+          total: fmt(data.total),
+          balance_due: fmt(balanceDue),
+          due_date: data.dueAt ? new Date(data.dueAt).toLocaleDateString('en-GB') : '',
+          currency: data.currency,
+          store_name: data.businessName,
+          invoice_link: shortUrl,
+        },
+        recipient: { email: data.customerEmail, phone: null },
+      })
+
+      return ok({ sent: true })
+    } catch (err) {
+      return serverError('Failed to send invoice email', err)
     }
   },
 

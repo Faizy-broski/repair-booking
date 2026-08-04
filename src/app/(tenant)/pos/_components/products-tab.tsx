@@ -397,6 +397,11 @@ export function ProductsTab() {
   const router = useRouter()
   const { activeBranch, verticalTemplateSlug } = useAuthStore()
   const isRetail = verticalTemplateSlug === 'retail-store'
+  const isTyreShop = verticalTemplateSlug === 'mobile-tyre-fitting'
+  // Simplified catalog browse (by category, no Device Type/Brand/Model
+  // drill-down) — shared by Retail and Mobile Tyre Fitting. "Put on Sale"
+  // stays isRetail-only below (retail promo feature, not requested here).
+  const useSimpleCatalog = isRetail || isTyreShop
   const pos = usePosStore()
   const queryClient = useQueryClient()
   const prevBranchIdRef = useRef<string | null>(null)
@@ -840,7 +845,7 @@ export function ProductsTab() {
         <div className="flex min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex overflow-hidden rounded-lg border border-gray-200">
             {(
-              isRetail
+              useSimpleCatalog
                 ? (['all_products', 'by_category', 'custom_item'] as const)
                 : (['all_products', 'by_products', 'by_parts', 'custom_item'] as const)
             ).map((view, i) => {
@@ -931,7 +936,7 @@ export function ProductsTab() {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {(isRetail ? (['all', 'product'] as const) : (['all', 'product', 'part'] as const)).map(t => (
+              {(useSimpleCatalog ? (['all', 'product'] as const) : (['all', 'product', 'part'] as const)).map(t => (
                 <button
                   key={t}
                   onClick={() => setAllProductsItemType(t)}

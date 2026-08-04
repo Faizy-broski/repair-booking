@@ -3428,6 +3428,7 @@ export type Database = {
           branch_id: string
           collected_at: string | null
           created_at: string | null
+          created_by: string | null
           current_step_id: string | null
           custom_fields: Json | null
           customer_id: string | null
@@ -3444,11 +3445,19 @@ export type Database = {
           issue: string
           job_number: string
           label_ids: string[] | null
+          lab_fee: number
+          location_notes: string | null
           notify_customer: boolean | null
           payment_splits: Json
+          scheduled_end: string | null
+          scheduled_start: string | null
           serial_number: string | null
           status: string
+          tyre_quality: string | null
+          tyre_quantity: number | null
+          tyre_size: string | null
           updated_at: string | null
+          vehicle_id: string | null
           workflow_id: string | null
         }
         Insert: {
@@ -3458,6 +3467,7 @@ export type Database = {
           branch_id: string
           collected_at?: string | null
           created_at?: string | null
+          created_by?: string | null
           current_step_id?: string | null
           custom_fields?: Json | null
           customer_id?: string | null
@@ -3474,11 +3484,19 @@ export type Database = {
           issue: string
           job_number: string
           label_ids?: string[] | null
+          lab_fee?: number
+          location_notes?: string | null
           notify_customer?: boolean | null
           payment_splits?: Json
+          scheduled_end?: string | null
+          scheduled_start?: string | null
           serial_number?: string | null
           status?: string
+          tyre_quality?: string | null
+          tyre_quantity?: number | null
+          tyre_size?: string | null
           updated_at?: string | null
+          vehicle_id?: string | null
           workflow_id?: string | null
         }
         Update: {
@@ -3488,6 +3506,7 @@ export type Database = {
           branch_id?: string
           collected_at?: string | null
           created_at?: string | null
+          created_by?: string | null
           current_step_id?: string | null
           custom_fields?: Json | null
           customer_id?: string | null
@@ -3504,11 +3523,19 @@ export type Database = {
           issue?: string
           job_number?: string
           label_ids?: string[] | null
+          lab_fee?: number
+          location_notes?: string | null
           notify_customer?: boolean | null
           payment_splits?: Json
+          scheduled_end?: string | null
+          scheduled_start?: string | null
           serial_number?: string | null
           status?: string
+          tyre_quality?: string | null
+          tyre_quantity?: number | null
+          tyre_size?: string | null
           updated_at?: string | null
+          vehicle_id?: string | null
           workflow_id?: string | null
         }
         Relationships: [
@@ -3534,6 +3561,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "repairs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "repairs_current_step_id_fkey"
             columns: ["current_step_id"]
             isOneToOne: false
@@ -3545,6 +3579,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "repairs_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
             referencedColumns: ["id"]
           },
           {
@@ -4842,6 +4883,66 @@ export type Database = {
             columns: ["variant_id"]
             isOneToOne: false
             referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicles: {
+        Row: {
+          business_id: string
+          colour: string | null
+          created_at: string
+          customer_id: string
+          id: string
+          is_active: boolean
+          make: string | null
+          model: string | null
+          notes: string | null
+          registration_number: string
+          tyre_size: string | null
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          colour?: string | null
+          created_at?: string
+          customer_id: string
+          id?: string
+          is_active?: boolean
+          make?: string | null
+          model?: string | null
+          notes?: string | null
+          registration_number: string
+          tyre_size?: string | null
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          colour?: string | null
+          created_at?: string
+          customer_id?: string
+          id?: string
+          is_active?: boolean
+          make?: string | null
+          model?: string | null
+          notes?: string | null
+          registration_number?: string
+          tyre_size?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicles_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicles_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]

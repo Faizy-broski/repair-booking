@@ -1,0 +1,20 @@
+[
+{"type":"header","version":"5.2.2","comment":"Export to JSON plugin for PHPMyAdmin"},
+{"type":"database","name":"thesiztb_repairbooking"},
+{"type":"table","name":"roles","database":"thesiztb_repairbooking","data":
+[
+{"id":"1","name":"Admin#1","guard_name":"web","business_id":"1","is_default":"1","is_service_staff":"0","created_at":"2025-05-09 02:41:04","updated_at":"2025-05-09 02:41:04"},
+{"id":"2","name":"Cashier#1","guard_name":"web","business_id":"1","is_default":"0","is_service_staff":"0","created_at":"2025-05-09 02:41:04","updated_at":"2025-05-09 02:41:04"},
+{"id":"3","name":"Admin#2","guard_name":"web","business_id":"2","is_default":"1","is_service_staff":"0","created_at":"2025-05-16 02:49:36","updated_at":"2025-05-16 02:49:36"},
+{"id":"4","name":"Cashier#2","guard_name":"web","business_id":"2","is_default":"0","is_service_staff":"0","created_at":"2025-05-16 02:49:36","updated_at":"2025-05-16 02:49:36"},
+{"id":"5","name":"Admin#3","guard_name":"web","business_id":"3","is_default":"1","is_service_staff":"0","created_at":"2026-02-25 12:32:42","updated_at":"2026-02-25 12:32:42"},
+{"id":"6","name":"Cashier#3","guard_name":"web","business_id":"3","is_default":"0","is_service_staff":"0","created_at":"2026-02-25 12:32:42","updated_at":"2026-03-02 12:46:39"},
+{"id":"7","name":"Admin#4","guard_name":"web","business_id":"4","is_default":"1","is_service_staff":"0","created_at":"2026-02-25 18:32:20","updated_at":"2026-02-25 18:32:20"},
+{"id":"8","name":"Cashier#4","guard_name":"web","business_id":"4","is_default":"0","is_service_staff":"0","created_at":"2026-02-25 18:32:20","updated_at":"2026-02-25 18:32:20"},
+{"id":"11","name":"Admin#5","guard_name":"web","business_id":"5","is_default":"1","is_service_staff":"0","created_at":"2026-03-03 21:18:51","updated_at":"2026-03-03 21:18:51"},
+{"id":"12","name":"Cashier#5","guard_name":"web","business_id":"5","is_default":"0","is_service_staff":"0","created_at":"2026-03-03 21:18:51","updated_at":"2026-03-03 21:18:51"},
+{"id":"13","name":"Admin#6","guard_name":"web","business_id":"6","is_default":"1","is_service_staff":"0","created_at":"2026-03-05 17:13:39","updated_at":"2026-03-05 17:13:39"},
+{"id":"14","name":"Cashier#6","guard_name":"web","business_id":"6","is_default":"0","is_service_staff":"0","created_at":"2026-03-05 17:13:39","updated_at":"2026-03-05 17:13:39"}
+]
+}
+]

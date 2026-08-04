@@ -311,7 +311,7 @@ export const ReportService = {
     }))
   },
 
-  async getEmployeeProductivityReport(branchId: string, from: string, to: string) {
+  async getEmployeeProductivityReport(branchId: string, from: string, to: string, businessId: string) {
     const [repairsData, salesData, commissionsData] = await Promise.all([
       db('repairs')
         .select('assigned_to, status, actual_cost')
@@ -327,7 +327,7 @@ export const ReportService = {
         .neq('payment_status', 'refunded'),
       db('employee_commissions')
         .select('employee_id, commission_amount, reference_type')
-        .eq('business_id', '')
+        .eq('business_id', businessId)
         .gte('created_at', from)
         .lte('created_at', to),
     ])
@@ -356,17 +356,23 @@ export const ReportService = {
       byEmployee[c.employee_id].commission_total += c.commission_amount ?? 0
     }
 
-    // Fetch employee names
-    const profileIds = Object.keys(byEmployee)
-    const { data: profiles } = await db('profiles')
-      .select('id, first_name, last_name')
-      .in('id', profileIds)
+    // Fetch names. `repairs.assigned_to`/`employee_commissions.employee_id` FK to
+    // employees(id) (migration 028), while `sales.created_by` FKs profiles(id) —
+    // these are two different id spaces, so look each id up against both tables
+    // rather than assuming one covers all keys in byEmployee.
+    const ids = Object.keys(byEmployee)
+    const [{ data: employees }, { data: profiles }] = await Promise.all([
+      db('employees').select('id, first_name, last_name').in('id', ids),
+      db('profiles').select('id, full_name').in('id', ids),
+    ])
 
-    const profileMap = Object.fromEntries(((profiles ?? []) as any[]).map((p: any) => [p.id, `${p.first_name} ${p.last_name}`]))
+    const nameMap: Record<string, string> = {}
+    for (const e of (employees ?? []) as any[]) nameMap[e.id] = `${e.first_name} ${e.last_name ?? ''}`.trim()
+    for (const p of (profiles ?? []) as any[]) if (!nameMap[p.id]) nameMap[p.id] = p.full_name ?? p.id
 
     return Object.entries(byEmployee).map(([employee_id, stats]) => ({
       employee_id,
-      employee_name: profileMap[employee_id] ?? employee_id,
+      employee_name: nameMap[employee_id] ?? employee_id,
       ...stats,
     }))
   },
@@ -422,8 +428,10 @@ export const ReportService = {
     }
 
     const productIds = Object.keys(byProduct)
+    // brand_id/brands(name) are additive fields — existing consumers (inventory
+    // report page) render this as a flat table and simply ignore the extras.
     const { data: products } = await db('products')
-      .select('id, name, sku')
+      .select('id, name, sku, brand_id, brands(name)')
       .in('id', productIds)
 
     const productMap = Object.fromEntries(((products ?? []) as any[]).map((p: any) => [p.id, p]))
@@ -432,8 +440,25 @@ export const ReportService = {
       product_id,
       product_name: productMap[product_id]?.name ?? product_id,
       sku: productMap[product_id]?.sku,
+      brand_id: productMap[product_id]?.brand_id ?? null,
+      brand_name: productMap[product_id]?.brands?.name ?? 'Unbranded',
       ...stats,
     }))
+  },
+
+  // Same data as getPartConsumptionReport, rolled up by brand — powers "sales/
+  // usage by tyre brand" for the mobile tyre-fitting vertical (tyres are just
+  // inventory products with a brand_id, so no new schema is needed for this).
+  async getPartConsumptionByBrandReport(branchId: string, from: string, to: string) {
+    const rows = await ReportService.getPartConsumptionReport(branchId, from, to)
+    const byBrand: Record<string, { brand_name: string; quantity: number; total_cost: number }> = {}
+    for (const row of rows) {
+      const key = row.brand_id ?? 'unbranded'
+      if (!byBrand[key]) byBrand[key] = { brand_name: row.brand_name, quantity: 0, total_cost: 0 }
+      byBrand[key].quantity += row.quantity
+      byBrand[key].total_cost += row.total_cost
+    }
+    return Object.entries(byBrand).map(([brand_id, stats]) => ({ brand_id, ...stats }))
   },
 
   // Repairs still open (not in a terminal status) after `staleDays`, whose

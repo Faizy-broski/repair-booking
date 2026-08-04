@@ -69,11 +69,23 @@ interface Props {
   tax?: number
   total: number
   amountPaid?: number
+  paymentMethods?: Array<{ method: string; amount: number }>
   currency?: string
 }
 
 function money(n: number, currency?: string) {
   return formatCurrency(n, currency)
+}
+
+// "cash" -> "Cash", "store_credit" -> "Store Credit"
+function paymentMethodLabel(method: string): string {
+  return method.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+}
+
+function paymentMethodText(methods: Array<{ method: string; amount: number }> | undefined, currency?: string): string {
+  if (!methods || methods.length === 0) return ''
+  if (methods.length === 1) return paymentMethodLabel(methods[0].method)
+  return methods.map((m) => `${paymentMethodLabel(m.method)} ${money(m.amount, currency)}`).join(' + ')
 }
 
 // Only the labour/repair-fee line is hidden when show_final_amount_only is on —
@@ -87,7 +99,7 @@ function visibleItems<T extends { description: string }>(items: T[], settings: I
 export function RepairReceiptHtml({
   settings, invoiceNumber, status, issuedAt, dueAt,
   businessName, branchName, branchAddress, branchPhone, customerName, deviceName, deviceImei, faults,
-  items, subtotal, discount = 0, tax = 0, total, amountPaid = 0, currency = 'GBP',
+  items, subtotal, discount = 0, tax = 0, total, amountPaid = 0, paymentMethods, currency = 'GBP',
 }: Props) {
   const pc      = settings.primary_color ?? '#0f766e'
   const bal     = Math.max(0, total - amountPaid)
@@ -247,6 +259,12 @@ export function RepairReceiptHtml({
         <span style={s.totLbl}>Deposit / Paid</span>
         <span style={s.totVal}>{money(amountPaid, currency)}</span>
       </div>
+      {!!paymentMethods?.length && (
+        <div style={s.totRow}>
+          <span style={s.totLbl}>Payment Method</span>
+          <span style={s.totVal}>{paymentMethodText(paymentMethods, currency)}</span>
+        </div>
+      )}
       {bal > 0 && (
         <div style={s.balBar}>
           <span style={s.balLbl}>Remaining</span>

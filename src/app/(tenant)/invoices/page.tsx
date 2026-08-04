@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { Plus, Download, CreditCard, RotateCcw, Loader2, UserPlus, MoreVertical, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Download, CreditCard, RotateCcw, Loader2, UserPlus, MoreVertical, Pencil, Trash2, MessageCircle } from 'lucide-react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -83,6 +83,7 @@ export default function InvoicesPage() {
   const [paymentAmount, setPaymentAmount] = useState('')
   const [recordingPayment, setRecordingPayment] = useState(false)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [sendingWhatsAppId, setSendingWhatsAppId] = useState<string | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [newCustOpen, setNewCustOpen] = useState(false)
@@ -289,6 +290,21 @@ export default function InvoicesPage() {
     fetch(url, { redirect: 'manual' } as RequestInit).catch(() => {})
   }
 
+  async function sendWhatsApp(invoiceId: string) {
+    setSendingWhatsAppId(invoiceId)
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}/whatsapp-link`)
+      const json = await res.json()
+      if (!res.ok || !json.data?.url) {
+        toast.error(json.error?.message ?? 'Failed to prepare WhatsApp message.')
+        return
+      }
+      window.open(json.data.url, '_blank')
+    } finally {
+      setSendingWhatsAppId(null)
+    }
+  }
+
   async function downloadPdf(invoiceId: string) {
     setDownloadingId(invoiceId)
     // Only show the toast if it takes longer than 400ms (i.e. cache miss / first generation).
@@ -416,6 +432,15 @@ export default function InvoicesPage() {
                       ? <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
                       : <Download className="h-4 w-4 text-gray-400" />}
                     Download PDF
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    onSelect={() => sendWhatsApp(inv.id)}
+                    className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-50"
+                  >
+                    {sendingWhatsAppId === inv.id
+                      ? <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                      : <MessageCircle className="h-4 w-4 text-gray-400" />}
+                    Send via WhatsApp
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     onSelect={() => openEdit(inv)}

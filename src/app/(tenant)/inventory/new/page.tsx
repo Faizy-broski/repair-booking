@@ -57,9 +57,11 @@ function cartesian(attrs: { name: string; values: string[] }[]): Record<string, 
 export default function NewInventoryPage() {
   const { activeBranch, branches, verticalTemplateSlug } = useAuthStore()
   const currSymbol = getCurrencySymbol()
-  // Simplified, repair-free product form is specific to the retail-store
-  // vertical template — independent of any module's enabled/disabled state.
-  const hasRepairs = verticalTemplateSlug !== 'retail-store'
+  // Simplified, repair-free product form (Category + Brand + Attributes, no
+  // Device Type/Model/Part Type) is shared by the retail-store and
+  // mobile-tyre-fitting vertical templates — independent of any module's
+  // enabled/disabled state.
+  const hasRepairs = verticalTemplateSlug !== 'retail-store' && verticalTemplateSlug !== 'mobile-tyre-fitting'
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [saveAndNew, setSaveAndNew] = useState(false)

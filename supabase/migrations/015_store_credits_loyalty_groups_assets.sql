@@ -160,11 +160,20 @@ CREATE OR REPLACE FUNCTION merge_customers(
 ) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
+  -- Basic tables
   UPDATE repairs         SET customer_id = p_keep_id WHERE customer_id = p_drop_id;
   UPDATE sales           SET customer_id = p_keep_id WHERE customer_id = p_drop_id;
   UPDATE invoices        SET customer_id = p_keep_id WHERE customer_id = p_drop_id;
   UPDATE appointments    SET customer_id = p_keep_id WHERE customer_id = p_drop_id;
   UPDATE customer_assets SET customer_id = p_keep_id WHERE customer_id = p_drop_id;
+  
+  -- Additional tables
+  UPDATE gift_cards             SET customer_id = p_keep_id WHERE customer_id = p_drop_id;
+  UPDATE store_credit_transactions SET customer_id = p_keep_id WHERE customer_id = p_drop_id;
+  UPDATE loyalty_transactions   SET customer_id = p_keep_id WHERE customer_id = p_drop_id;
+  UPDATE repair_estimates       SET customer_id = p_keep_id WHERE customer_id = p_drop_id;
+  UPDATE special_orders         SET customer_id = p_keep_id WHERE customer_id = p_drop_id;
+  UPDATE trade_in_transactions  SET customer_id = p_keep_id WHERE customer_id = p_drop_id;
 
   -- Merge store credit balance into the kept customer (sum balances if both exist)
   INSERT INTO store_credits(business_id, customer_id, balance)

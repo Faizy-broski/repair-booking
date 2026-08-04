@@ -7,6 +7,12 @@ import { getPagination } from '@/backend/utils/pagination'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { PdfCacheService } from '@/backend/services/pdf-cache.service'
+import { buildWhatsAppInvoiceLink } from '@/lib/whatsapp-link'
+import { adminSupabase } from '@/backend/config/supabase'
+
+// wa.me links are opened by the customer at an unknown later time, so the PDF's
+// signed URL needs to outlive the normal 10-minute in-app preview TTL.
+const WHATSAPP_PDF_TTL_SECONDS = 60 * 60 * 24 * 7 // 7 days
 
 const lineItemSchema = z.object({
   description: z.string().min(1),
@@ -174,6 +180,39 @@ export const InvoiceController = {
       })
     } catch (err) {
       return serverError('Failed to generate PDF', err)
+    }
+  },
+
+  async getWhatsAppLink(_request: NextRequest, ctx: RequestContext, id: string) {
+    try {
+      const branchId = ctx.auth.branchId ?? null
+      const invoice = await InvoiceService.getById(id, branchId)
+      if (!invoice) return notFound('Invoice not found')
+      const customerPhone = (invoice as any).customers?.phone as string | null
+      if (!customerPhone) return badRequest('This customer has no phone number on file.')
+
+      const cachePath = PdfCacheService.cachePath('invoices', id)
+      const filename = `invoice-${(invoice as any).invoice_number}.pdf`
+      let pdfUrl = await PdfCacheService.getSignedUrl(cachePath, filename, WHATSAPP_PDF_TTL_SECONDS)
+      if (!pdfUrl) {
+        const buffer = await InvoiceService.generatePdf(id, ctx.businessId ?? undefined)
+        pdfUrl = await PdfCacheService.store(cachePath, buffer, filename, WHATSAPP_PDF_TTL_SECONDS)
+      }
+      if (!pdfUrl) return serverError('Failed to prepare invoice PDF for sending')
+
+      const { data: business } = await adminSupabase.from('businesses').select('name, currency').eq('id', ctx.businessId).single()
+
+      const link = buildWhatsAppInvoiceLink({
+        phone: customerPhone,
+        invoiceNumber: (invoice as any).invoice_number,
+        total: (invoice as any).total ?? 0,
+        currency: (business as any)?.currency ?? 'GBP',
+        pdfUrl,
+        businessName: (business as any)?.name ?? null,
+      })
+      return ok({ url: link })
+    } catch (err) {
+      return serverError('Failed to build WhatsApp link', err)
     }
   },
 }

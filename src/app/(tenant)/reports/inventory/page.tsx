@@ -13,10 +13,11 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import type { ColumnDef } from '@tanstack/react-table'
 
-type SubTab = 'summary' | 'low_stock' | 'parts_consumption' | 'adjustments' | 'stale_repairs'
+type SubTab = 'summary' | 'low_stock' | 'parts_consumption' | 'parts_consumption_by_brand' | 'adjustments' | 'stale_repairs'
 
 interface InventorySummaryRow { product_id: string; product_name: string; sku: string | null; category: string; quantity: number; cost_price: number; stock_value: number; retail_value: number }
-interface PartConsumptionRow  { product_id: string; product_name: string; sku: string | null; quantity: number; total_cost: number }
+interface PartConsumptionRow  { product_id: string; product_name: string; sku: string | null; brand_name: string; quantity: number; total_cost: number }
+interface BrandConsumptionRow { brand_id: string; brand_name: string; quantity: number; total_cost: number }
 interface AdjustmentRow       { id: string; product_id: string; quantity_change: number; reason: string | null; reference_type: string | null; created_at: string; products: { name: string; sku: string | null } | null }
 interface LowStockRow         { id: string; product_id: string; quantity: number; low_stock_alert: number; products?: { id: string; name: string; sku: string | null } | null }
 interface InventoryOverview   { low_stock_count: number; low_stock_items: LowStockRow[]; total_items: number; total_value: number }
@@ -75,8 +76,15 @@ export default function InventoryReportPage() {
   const partColumns: ColumnDef<PartConsumptionRow>[] = [
     { accessorKey: 'product_name', header: 'Part' },
     { accessorKey: 'sku',          header: 'SKU',        cell: ({ getValue }) => (getValue() as string) ?? '—' },
+    { accessorKey: 'brand_name',   header: 'Brand' },
     { accessorKey: 'quantity',     header: 'Qty Used' },
     { accessorKey: 'total_cost',   header: 'Total Cost', cell: ({ getValue }) => formatCurrency(getValue() as number) },
+  ]
+
+  const brandColumns: ColumnDef<BrandConsumptionRow>[] = [
+    { accessorKey: 'brand_name', header: 'Brand' },
+    { accessorKey: 'quantity',   header: 'Qty Used' },
+    { accessorKey: 'total_cost', header: 'Total Cost', cell: ({ getValue }) => formatCurrency(getValue() as number) },
   ]
 
   const staleRepairColumns: ColumnDef<StaleRepairRow>[] = [
@@ -106,6 +114,7 @@ export default function InventoryReportPage() {
   const exportCurrentTab = () => {
     if (subTab === 'summary')           exportExcel(detailData as unknown as Record<string, unknown>[], `inventory-summary-${dateFrom}-${dateTo}.xlsx`)
     if (subTab === 'parts_consumption') exportExcel(detailData as unknown as Record<string, unknown>[], `parts-usage-${dateFrom}-${dateTo}.xlsx`)
+    if (subTab === 'parts_consumption_by_brand') exportExcel(detailData as unknown as Record<string, unknown>[], `parts-usage-by-brand-${dateFrom}-${dateTo}.xlsx`)
     if (subTab === 'adjustments')       exportExcel(detailData as unknown as Record<string, unknown>[], `adjustments-${dateFrom}-${dateTo}.xlsx`)
     if (subTab === 'stale_repairs')     exportExcel(detailData as unknown as Record<string, unknown>[], `stale-repair-parts-${dateFrom}-${dateTo}.xlsx`)
     if (subTab === 'low_stock' && overview) exportExcel(overview.low_stock_items as unknown as Record<string, unknown>[], `low-stock-${dateFrom}-${dateTo}.xlsx`)
@@ -115,6 +124,7 @@ export default function InventoryReportPage() {
     { value: 'summary',           label: 'Summary'     },
     { value: 'low_stock',         label: 'Low Stock'   },
     { value: 'parts_consumption', label: 'Part Usage'  },
+    { value: 'parts_consumption_by_brand', label: 'By Brand' },
     { value: 'adjustments',       label: 'Adjustments' },
     { value: 'stale_repairs',     label: 'Stale Repairs' },
   ]
@@ -235,6 +245,11 @@ export default function InventoryReportPage() {
       {/* Part usage */}
       {subTab === 'parts_consumption' && (
         <DataTable data={detailData as PartConsumptionRow[]} columns={partColumns} isLoading={loading} emptyMessage="No part consumption data for this period." />
+      )}
+
+      {/* Part usage rolled up by brand — e.g. tyre brand breakdown for the mobile tyre-fitting vertical */}
+      {subTab === 'parts_consumption_by_brand' && (
+        <DataTable data={detailData as BrandConsumptionRow[]} columns={brandColumns} isLoading={loading} emptyMessage="No brand data for this period." />
       )}
 
       {/* Adjustments */}

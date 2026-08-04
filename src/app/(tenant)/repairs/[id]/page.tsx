@@ -2,7 +2,7 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Edit, Clock, ClipboardList, Receipt, BookOpen, Printer } from 'lucide-react'
+import { ArrowLeft, Edit, Clock, ClipboardList, Receipt, BookOpen, Printer, FlaskConical } from 'lucide-react'
 import { BrandSpinner } from '@/components/ui/brand-spinner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -47,12 +47,24 @@ interface RepairDetail {
   discount_type: 'fixed' | 'percent'
   discount_value: number
   discount_amount: number
+  lab_fee: number
   deposit_paid: number
   notify_customer: boolean
   created_at: string
   collected_at: string | null
   label_ids: string[]
   assigned_to: string | null
+  created_by: string | null // general purpose, all verticals — who booked the job
+  profiles: { full_name: string | null } | null // booked-by staff name, all verticals
+  // Mobile tyre-fitting vertical only
+  vehicle_id: string | null
+  tyre_size: string | null
+  tyre_quantity: number | null
+  tyre_quality: string | null
+  location_notes: string | null
+  scheduled_start: string | null
+  scheduled_end: string | null
+  vehicles: { registration_number: string; make: string | null; model: string | null; colour: string | null; tyre_size: string | null } | null
   customers: { first_name: string; last_name: string | null; email: string | null; phone: string | null } | null
   employees: { id: string; first_name: string; last_name: string | null } | null
   repair_items: {
@@ -87,6 +99,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
   const router = useRouter()
   const { activeBranch, verticalTemplateSlug } = useAuthStore()
   const isRetail = verticalTemplateSlug === 'retail-store'
+  const isTyreShop = verticalTemplateSlug === 'mobile-tyre-fitting'
   const queryClient = useQueryClient()
 
   // ── UI-only state ─────────────────────────────────────────────────────────────
@@ -342,9 +355,21 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Device / Item info */}
         <Card>
-          <CardHeader><CardTitle className="text-sm">{isRetail ? 'Item' : 'Device'}</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-sm">{isTyreShop ? 'Vehicle & Tyres' : isRetail ? 'Item' : 'Device'}</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
-            {isRetail ? (
+            {isTyreShop ? (
+              <>
+                <InfoRow label="Registration" value={repair.vehicles?.registration_number?.toUpperCase()} />
+                <InfoRow label="Make / Model" value={[repair.vehicles?.make, repair.vehicles?.model].filter(Boolean).join(' ') || null} />
+                <InfoRow label="Tyre Size" value={repair.tyre_size ?? repair.vehicles?.tyre_size} />
+                <InfoRow label="Quantity" value={repair.tyre_quantity ? String(repair.tyre_quantity) : null} />
+                <InfoRow label="Quality" value={repair.tyre_quality} />
+                <InfoRow label="Location" value={repair.location_notes} />
+                <InfoRow label="Dispatch Start" value={repair.scheduled_start ? formatDateTime(repair.scheduled_start) : null} />
+                <InfoRow label="Dispatch End" value={repair.scheduled_end ? formatDateTime(repair.scheduled_end) : null} />
+                <InfoRow label="Job" value={repair.issue} />
+              </>
+            ) : isRetail ? (
               <>
                 <InfoRow label="Category" value={repair.device_type} />
                 <InfoRow label="Brand" value={repair.device_brand} />
@@ -422,6 +447,16 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
               const balanceDue = Math.max(0, total - (repair.deposit_paid || 0))
               return <InfoRow label="Balance due" value={formatCurrency(balanceDue)} />
             })()}
+            {repair.lab_fee > 0 && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs">
+                <FlaskConical className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                <span className="text-amber-900">
+                  <span className="font-semibold">Lab / 3rd-Party Fee: {formatCurrency(repair.lab_fee)}</span>
+                  <br />
+                  Paid to an outsourced lab — deducted from business revenue/profit in reports, not part of the customer&apos;s balance above.
+                </span>
+              </div>
+            )}
             {repair.repair_payments && repair.repair_payments.length > 0 && (
               <div className="flex flex-wrap items-start gap-x-2 gap-y-1 py-0.5">
                 <span className="w-24 shrink-0 text-gray-400">Payments</span>
@@ -443,6 +478,14 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
               <InfoRow label="Loyalty points used" value={`${creditLoyaltyApplied.loyaltyPoints} pts`} />
             )}
             <InfoRow label="Due Date" value={repair.custom_fields?.due_date ? formatDate(repair.custom_fields.due_date) : null} />
+            {repair.profiles?.full_name && (
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <span className="w-24 shrink-0 text-gray-400">Booked by</span>
+                <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
+                  {repair.profiles.full_name}
+                </span>
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 py-0.5">
               <span className="w-24 shrink-0 text-gray-400">Assigned</span>
               <div className="flex flex-1 items-center gap-2">

@@ -17,11 +17,11 @@ export const PdfCacheService = {
    * This replaces the previous list() + createSignedUrl() pattern which was
    * two sequential round-trips (~300 ms + ~150 ms = ~450 ms).
    */
-  async getSignedUrl(path: string, filename: string): Promise<string | null> {
+  async getSignedUrl(path: string, filename: string, ttlSeconds: number = URL_TTL_SECONDS): Promise<string | null> {
     try {
       const { data, error } = await adminSupabase.storage
         .from(BUCKET)
-        .createSignedUrl(path, URL_TTL_SECONDS, { download: filename })
+        .createSignedUrl(path, ttlSeconds, { download: filename })
       if (error || !data?.signedUrl) return null
       return data.signedUrl
     } catch {
@@ -33,7 +33,7 @@ export const PdfCacheService = {
    * Uploads the PDF buffer and returns a fresh signed URL.
    * upsert:true handles concurrent cache-miss races gracefully.
    */
-  async store(path: string, buffer: Buffer, filename: string): Promise<string | null> {
+  async store(path: string, buffer: Buffer, filename: string, ttlSeconds: number = URL_TTL_SECONDS): Promise<string | null> {
     try {
       const { error } = await adminSupabase.storage.from(BUCKET).upload(path, buffer, {
         contentType: 'application/pdf',
@@ -43,7 +43,7 @@ export const PdfCacheService = {
       if (error) return null
       const { data } = await adminSupabase.storage
         .from(BUCKET)
-        .createSignedUrl(path, URL_TTL_SECONDS, { download: filename })
+        .createSignedUrl(path, ttlSeconds, { download: filename })
       return data?.signedUrl ?? null
     } catch {
       return null

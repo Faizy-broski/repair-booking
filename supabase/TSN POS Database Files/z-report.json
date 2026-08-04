@@ -1,0 +1,10 @@
+[
+{"type":"header","version":"5.2.2","comment":"Export to JSON plugin for PHPMyAdmin"},
+{"type":"database","name":"thesiztb_repairbooking"},
+{"type":"table","name":"z-report","database":"thesiztb_repairbooking","data":
+[
+{"id":"1","date":"2026-03-02","start_time":"2026-03-02 16:17 PM","end_time":"2026-03-02 16:17 PM","started_by":"","ended_by":"","invoice_url":"https:\/\/repairbooking.co.uk\/admin\/z_report\/67567.pdf","created_at":"2026-03-02 11:17:27","updated_at":"2026-03-02 11:17:27"},
+{"id":"2","date":"2026-03-05","start_time":"2026-03-05 15:17 PM","end_time":"2026-03-05 15:17 PM","started_by":"","ended_by":"","invoice_url":"https:\/\/repairbooking.co.uk\/admin\/z_report\/46961.pdf","created_at":"2026-03-05 10:17:08","updated_at":"2026-03-05 10:17:08"}
+]
+}
+]

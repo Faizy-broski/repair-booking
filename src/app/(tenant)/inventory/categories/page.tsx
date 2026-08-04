@@ -13,6 +13,8 @@ interface Category { id: string; name: string; parent_id: string | null }
 export default function CategoriesPage() {
   const { verticalTemplateSlug } = useAuthStore()
   const isRetail  = verticalTemplateSlug === 'retail-store'
+  const isTyreShop = verticalTemplateSlug === 'mobile-tyre-fitting'
+  const useSimpleCatalog = isRetail || isTyreShop
   const pathname  = usePathname()
 
   const [categories, setCategories] = useState<Category[]>([])
@@ -72,7 +74,7 @@ export default function CategoriesPage() {
     { label: 'Bin',             href: '/inventory/bin' },
     { label: 'Damage Returns',  href: '/inventory/damage-returns' },
     // { label: 'Stock Count', href: '/inventory/stock-count' },  // disabled
-    ...(isRetail ? [
+    ...(useSimpleCatalog ? [
       { label: 'Categories', href: '/inventory/categories' },
       { label: 'Attributes', href: '/inventory/attributes' },
     ] : []),
