@@ -3,6 +3,7 @@ import type { InsertTables, UpdateTables } from '@/types/database'
 import { escapeIlike } from '@/backend/utils/search'
 import { normalizePhone } from '@/backend/utils/phone'
 import { normalizePlate } from '@/backend/services/vehicle.service'
+import { buildPosOverrideMap, computeRepairRevenue } from '@/backend/services/repair-financials.service'
 
 export const CustomerService = {
   // Used by the call-intake ("find or create by phone") flow — a shared/reused
@@ -71,7 +72,7 @@ export const CustomerService = {
   },
 
   async getDetail(id: string, businessId: string) {
-    const [customerRes, repairsRes, salesRes, invoicesRes, vehiclesRes] = await Promise.all([
+    const [customerRes, repairsRes, salesRes, invoicesRes, vehiclesRes, posRepairSaleItemsRes] = await Promise.all([
       adminSupabase
         .from('customers')
         .select('*')
@@ -80,7 +81,7 @@ export const CustomerService = {
         .single(),
       adminSupabase
         .from('repairs')
-        .select('id, job_number, status, device_brand, device_model, vehicle_id, tyre_size, tyre_quantity, created_at, actual_cost, estimated_cost, discount_amount')
+        .select('id, job_number, status, device_brand, device_model, vehicle_id, tyre_size, tyre_quantity, created_at, actual_cost, estimated_cost, discount_amount, deposit_paid, refund_amount')
         .eq('customer_id', id)
         .order('created_at', { ascending: false })
         .limit(50),
@@ -103,11 +104,28 @@ export const CustomerService = {
         .eq('customer_id', id)
         .eq('is_active', true)
         .order('created_at', { ascending: false }),
+      // Amounts actually charged through POS for this customer's repair-linked
+      // line items — a repair paid off through the till is already counted in
+      // the sales sum below, so it must be excluded from repair revenue to
+      // avoid double-counting (same rule as computeDashboardFinancials).
+      (adminSupabase as any)
+        .from('sale_items')
+        .select('repair_id, total, sales!inner(is_refund), repairs!inner(customer_id)')
+        .eq('repairs.customer_id', id)
+        .not('repair_id', 'is', null),
     ])
 
     if (customerRes.error) throw customerRes.error
 
+    const posOverrideMap = buildPosOverrideMap((posRepairSaleItemsRes.data ?? []) as any[])
+    // Only repairs NOT paid through the till are incremental spend here — a
+    // POS-paid repair is already a `sales` row, folded into totalSpend below.
+    const repairsRevenueNotInPos = (repairsRes.data ?? []).reduce((s: number, r: any) => {
+      if (posOverrideMap.has(r.id)) return s
+      return s + computeRepairRevenue(r, posOverrideMap)
+    }, 0)
     const totalSpend = (salesRes.data ?? []).reduce((s: number, r: { total: number | null }) => s + (r.total ?? 0), 0)
+      + repairsRevenueNotInPos
 
     return {
       ...customerRes.data,

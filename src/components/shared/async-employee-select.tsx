@@ -1,9 +1,9 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Search, X } from 'lucide-react'
+import { Search, X, Plus, Loader2 } from 'lucide-react'
 
-interface EmployeeOption {
+export interface EmployeeOption {
   id: string
   first_name: string
   last_name: string | null
@@ -24,6 +24,21 @@ interface AsyncEmployeeSelectProps {
   openUpward?: boolean
   /** Extra class names on the outer wrapper */
   className?: string
+  /**
+   * When provided, shows a "+ New" quick-create row in the dropdown so an
+   * employee who isn't in the system yet can be added on the spot instead of
+   * blocking the flow on a trip to the Employees page. Opt-in — existing call
+   * sites are unaffected unless they pass this.
+   */
+  onCreateNew?: (name: string) => Promise<EmployeeOption | null>
+  createLabel?: string
+  /**
+   * Set this after selecting/creating an employee from OUTSIDE this component
+   * (e.g. a standalone "+ New Fitter" button elsewhere on the page) so the
+   * "selected" pill below reflects it. The component reads it once and does
+   * not otherwise use it — `value`/`onChange` stay the source of truth.
+   */
+  externalSelection?: EmployeeOption | null
 }
 
 /**
@@ -43,6 +58,9 @@ export function AsyncEmployeeSelect({
   placeholder = 'Type to search employees…',
   openUpward = false,
   className,
+  onCreateNew,
+  createLabel = 'New',
+  externalSelection,
 }: AsyncEmployeeSelectProps) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -50,6 +68,7 @@ export function AsyncEmployeeSelect({
   const [debouncedQ, setDebouncedQ] = useState('')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [creating, setCreating] = useState(false)
 
   // Debounce input → debouncedQ (300 ms)
   useEffect(() => {
@@ -62,6 +81,15 @@ export function AsyncEmployeeSelect({
   useEffect(() => {
     if (!value) { setSelected(null); setQuery('') }
   }, [value])
+
+  // Reflect a selection made outside this component (e.g. a standalone
+  // "+ New Fitter" button elsewhere on the page).
+  useEffect(() => {
+    if (externalSelection && externalSelection.id === value) {
+      setSelected(externalSelection)
+      setOpen(false)
+    }
+  }, [externalSelection, value])
 
   const { data: results = [], isFetching } = useQuery({
     queryKey: ['employee-search', branchId, debouncedQ],
@@ -100,6 +128,18 @@ export function AsyncEmployeeSelect({
     setQuery('')
     onChange('')
     onEmployeeChange?.(null)
+  }
+
+  async function createNew() {
+    const name = query.trim()
+    if (!name || !onCreateNew || creating) return
+    setCreating(true)
+    try {
+      const emp = await onCreateNew(name)
+      if (emp) selectEmployee(emp)
+    } finally {
+      setCreating(false)
+    }
   }
 
   return (
@@ -165,6 +205,18 @@ export function AsyncEmployeeSelect({
                 {emp.role && <span className="text-xs text-on-surface-variant capitalize">· {emp.role.replace(/_/g, ' ')}</span>}
               </button>
             ))
+          )}
+          {onCreateNew && query.trim().length > 0 && (
+            <button
+              type="button"
+              onMouseDown={e => e.preventDefault()}
+              onClick={createNew}
+              disabled={creating}
+              className="flex w-full items-center gap-2 border-t border-outline-variant px-3 py-2.5 text-left text-sm font-medium text-brand-teal hover:bg-teal-50 transition-colors disabled:opacity-60"
+            >
+              {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+              {createLabel} &quot;{query.trim()}&quot;
+            </button>
           )}
         </div>
       )}

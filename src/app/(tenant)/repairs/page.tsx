@@ -5,7 +5,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Plus, Search, LayoutGrid, List, Wrench, Banknote, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail, Send, RefreshCw, MoreHorizontal, Wallet, Star, CreditCard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
-import { AsyncEmployeeSelect } from '@/components/shared/async-employee-select'
+import { AsyncEmployeeSelect, type EmployeeOption } from '@/components/shared/async-employee-select'
 import { Modal } from '@/components/ui/modal'
 import { KanbanBoard } from '@/components/repairs/kanban-board'
 import { CreatableCombobox } from '@/components/ui/creatable-combobox'
@@ -57,6 +57,13 @@ interface RepairListResponse {
 }
 
 const EMPTY_NEW_CUST = { first_name: '', last_name: '', business_name: '', email: '', phone: '', address: '' }
+
+// Mobile tyre-fitting vertical: common extras staff add to almost every job.
+// These are just presets/shortcuts — not a fixed list. Any extra not shown here
+// can still be added the same way as any other part, via the inventory search
+// box below (search-and-add if it's already a catalogue item, or type a new
+// name to quick-add it as a one-off line — same mechanism these presets use).
+const TYRE_EXTRAS_PRESETS = ['Wheel Balancing', 'Valve Replacement', 'Tyre Disposal']
 const EMPTY_JOB = {
   device_name: '', device_type: '', device_brand: '', device_model: '',
   imei: '', faults: [] as string[],
@@ -375,6 +382,19 @@ export default function RepairsPage() {
   const partDropRef = useRef<HTMLDivElement>(null)
   const [quickPartPrice, setQuickPartPrice] = useState('')
   const [quickPartCost, setQuickPartCost] = useState('')
+  // Tyre-shop "Add More" — lets staff add a one-off extra by name/price without
+  // going through the inventory search box (for anything not already stocked
+  // and not one of the preset chips above it).
+  const [showCustomExtra, setShowCustomExtra] = useState(false)
+  const [customExtraName, setCustomExtraName] = useState('')
+  const [customExtraPrice, setCustomExtraPrice] = useState('')
+  // Tyre-shop "+ New Fitter" — standalone button beside the Fitter field
+  // (separate from AsyncEmployeeSelect's own inline create-in-dropdown option,
+  // which is easy to miss since it only appears after typing a search query).
+  const [showNewFitter, setShowNewFitter] = useState(false)
+  const [newFitterName, setNewFitterName] = useState('')
+  const [newFitterCreating, setNewFitterCreating] = useState(false)
+  const [newFitterSelection, setNewFitterSelection] = useState<EmployeeOption | null>(null)
   // Variant drill-down — set when a search result with variants is clicked;
   // the dropdown swaps from search results to this product's variant list.
   const [variantsFor, setVariantsFor] = useState<{ id: string; name: string } | null>(null)
@@ -415,6 +435,10 @@ export default function RepairsPage() {
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false)
 
   const [selectedInvoiceRepair, setSelectedInvoiceRepair] = useState<RepairRow | null>(null)
+  // True only when the invoice modal was auto-opened right after job creation
+  // (shows the "Job Created Successfully" banner) — false for the normal
+  // manual "Invoice" row action.
+  const [justCreatedInvoice, setJustCreatedInvoice] = useState(false)
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -596,6 +620,7 @@ export default function RepairsPage() {
 
   function handleOpenInvoice(r: RepairRow) {
     setSelectedInvoiceRepair(r)
+    setJustCreatedInvoice(false)
     setInvoiceModalOpen(true)
   }
 
@@ -697,8 +722,12 @@ export default function RepairsPage() {
     if (!editRepair) return
     // Validate required fields
     const errs: { due_date?: string; estimated_cost?: string; deposit_paid?: string } = {}
-    if (!editData.due_date) errs.due_date = 'Due date is required.'
-    else if (editData.due_date < new Date().toISOString().split('T')[0]) errs.due_date = 'Due date cannot be in the past.'
+    // Tyre jobs use scheduled_start/scheduled_end (dispatch slot) instead of a
+    // generic due date, so it isn't collected/required for that vertical.
+    if (!isTyreShop) {
+      if (!editData.due_date) errs.due_date = 'Due date is required.'
+      else if (editData.due_date < new Date().toISOString().split('T')[0]) errs.due_date = 'Due date cannot be in the past.'
+    }
     const costVal = parseFloat(editData.estimated_cost)
     if (editData.estimated_cost.trim() === '' || isNaN(costVal) || costVal < 0)
       errs.estimated_cost = 'Total Repair Charges is required and must be a valid amount.'
@@ -987,6 +1016,116 @@ export default function RepairsPage() {
     setShowPartDrop(false)
   }
 
+  // Tyre-shop preset extra (Wheel Balancing / Valve Replacement / Tyre Disposal).
+  // If the business already stocks a matching inventory product/service under
+  // this name, use it (so pricing + stock decrement stay in sync with Inventory).
+  // Otherwise falls back to a zero-priced ad-hoc line the same way typing a new
+  // name into the parts search and quick-adding it already works — staff can
+  // fill in the price inline afterwards.
+  async function addPresetExtra(name: string) {
+    const existing = repairParts.find((r) => r.name.toLowerCase() === name.toLowerCase())
+    if (existing) {
+      setRepairParts((prev) => prev.map((r) => {
+        if (r !== existing) return r
+        const cap = r.max_stock ?? Infinity
+        if (r.qty >= cap) {
+          toast.error(`Only ${cap} in stock for "${r.name}"`)
+          return r
+        }
+        return { ...r, qty: Math.min(r.qty + 1, cap) }
+      }))
+      return
+    }
+    if (activeBranch) {
+      try {
+        const params = new URLSearchParams({ branch_id: activeBranch.id, search: name, limit: '5' })
+        const res = await fetch(`/api/products?${params}`)
+        const json = await res.json()
+        const match = (json.data ?? []).find((p: { name: string }) => p.name.toLowerCase() === name.toLowerCase())
+        if (match) { addPartFromInventory(match); return }
+      } catch { /* fall through to ad-hoc line below */ }
+    }
+    setRepairParts((prev) => [...prev, {
+      tempId: Math.random().toString(36).slice(2),
+      product_id: null,
+      variant_id: null,
+      name,
+      qty: 1,
+      unit_price: 0,
+      unit_cost: 0,
+      max_stock: null,
+      discount_type: 'fixed',
+      discount_value: 0,
+    }])
+  }
+
+  // Tyre-shop "instant fitter" — creates a real employee (role: Fitter) on the
+  // spot from just a typed name, so booking a job never blocks on a trip to
+  // the Employees page first. Splits on the first space; a single word is
+  // taken as the first name with no surname.
+  async function createInstantFitter(name: string) {
+    if (!activeBranch) return null
+    const [first, ...rest] = name.trim().split(/\s+/)
+    try {
+      const res = await fetch('/api/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          branch_id: activeBranch.id,
+          first_name: first,
+          last_name: rest.join(' ') || null,
+          role: 'Fitter',
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json.data?.id) {
+        toast.error(json.error?.message ?? 'Failed to create fitter. Please try again.')
+        return null
+      }
+      return { id: json.data.id, first_name: json.data.first_name, last_name: json.data.last_name ?? null, role: json.data.role ?? 'Fitter' }
+    } catch {
+      toast.error('Failed to create fitter. Please try again.')
+      return null
+    }
+  }
+
+  async function submitNewFitter() {
+    const name = newFitterName.trim()
+    if (!name || newFitterCreating) return
+    setNewFitterCreating(true)
+    try {
+      const emp = await createInstantFitter(name)
+      if (emp) {
+        setJobData((p) => ({ ...p, assigned_to: emp.id }))
+        setNewFitterSelection(emp)
+        setNewFitterName('')
+        setShowNewFitter(false)
+      }
+    } finally {
+      setNewFitterCreating(false)
+    }
+  }
+
+  function addCustomExtra() {
+    const name = customExtraName.trim()
+    if (!name) return
+    setRepairParts((prev) => [...prev, {
+      tempId: Math.random().toString(36).slice(2),
+      product_id: null,
+      variant_id: null,
+      name,
+      qty: 1,
+      unit_price: parseFloat(customExtraPrice) || 0,
+      unit_cost: 0,
+      max_stock: null,
+      discount_type: 'fixed',
+      discount_value: 0,
+    }])
+    setCustomExtraName('')
+    setCustomExtraPrice('')
+    setShowCustomExtra(false)
+  }
+
   function handleCustSuggestionSelect(c: SelectedCustomer) {
     setSelectedCustomer(c)
     setNewCust({
@@ -1178,8 +1317,17 @@ export default function RepairsPage() {
         queryClient.invalidateQueries({ queryKey: ['inventory-stats'] })
         queryClient.invalidateQueries({ queryKey: ['inventory'] })
       }
-      toast.success('Repair job created.')
       if (j.data?.credit_apply_warning) toast.error(j.data.credit_apply_warning)
+      // Auto-open the invoice modal (in "just created" mode) instead of a
+      // plain toast, so staff can immediately Print/Email/WhatsApp it — the
+      // banner inside is the success signal. Built from data already in
+      // scope (POST response + the customer form state) — no extra GET.
+      const custInfo = selectedCustomer
+        ? { first_name: selectedCustomer.first_name, last_name: selectedCustomer.last_name, phone: selectedCustomer.phone, email: selectedCustomer.email }
+        : { first_name: newCust.first_name, last_name: newCust.last_name || null, phone: newCust.phone || null, email: newCust.email || null }
+      setSelectedInvoiceRepair({ id: j.data?.id, job_number: j.data?.job_number, customers: custInfo } as unknown as RepairRow)
+      setJustCreatedInvoice(true)
+      setInvoiceModalOpen(true)
     } else {
       const j = await res.json().catch(() => ({}))
       const errMsg = typeof j.error === 'string' ? j.error : (j.error?.message ?? 'Failed to create repair. Please try again.')
@@ -1696,7 +1844,7 @@ export default function RepairsPage() {
         <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm">
           <div className="flex items-start justify-between gap-2 sm:gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Profit</p>
+              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Repair Margin</p>
               {repairStats ? (
                 <p className={`mt-2 text-base sm:text-xl lg:text-2xl font-bold truncate ${repairStats.repairs_profit >= 0 ? 'text-green-600' : 'text-error'}`} title={formatCurrency(repairStats.repairs_profit)}>
                   {formatCurrency(repairStats.repairs_profit)}
@@ -1713,9 +1861,9 @@ export default function RepairsPage() {
             <>
               <p className="mt-3 flex items-center gap-1 text-xs font-medium text-green-600">
                 <TrendingUp className="h-3 w-3" />
-                revenue above, minus parts cost and lab fees
+                revenue above, minus parts cost and lab fees (excludes business expenses &amp; salaries)
               </p>
-              <p className="mt-1 text-[11px] text-on-surface-variant" title="Completed jobs only, by completion date — same definition as the Profit & Loss report">
+              <p className="mt-1 text-[11px] text-on-surface-variant" title="Completed jobs only, by completion date — same revenue rule as the P&amp;L report, but this margin excludes business expenses &amp; salaries (see Net Profit on Reports for the full P&amp;L figure)">
                 {formatCurrency(repairStats.profit_completed)} completed this period (P&amp;L basis)
               </p>
             </>
@@ -1814,8 +1962,9 @@ export default function RepairsPage() {
 
       <RepairInvoiceModal
         open={invoiceModalOpen}
-        onClose={() => setInvoiceModalOpen(false)}
+        onClose={() => { setInvoiceModalOpen(false); setJustCreatedInvoice(false) }}
         repair={selectedInvoiceRepair}
+        justCreated={justCreatedInvoice}
       />
 
       {/* ── List header ── */}
@@ -2450,18 +2599,90 @@ export default function RepairsPage() {
               {/* REPAIR PARTS */}
               <div>
                 <p className="mb-1.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
-                  <Wrench className="h-2.5 w-2.5" /> {isRetail ? 'Parts & Labour' : 'Repair Parts'}
+                  <Wrench className="h-2.5 w-2.5" /> {isTyreShop ? 'Tyres & Extras' : isRetail ? 'Parts & Labour' : 'Repair Parts'}
                 </p>
 
                 {isTyreShop && !selectedVehicle && (
                   <p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-600">
-                    Select a vehicle above to add repair parts.
+                    Select a vehicle above to add tyres & extras.
                   </p>
                 )}
                 {!isRetail && !isTyreShop && (!jobData.device_type || !jobData.device_brand || !jobData.device_model) && (
                   <p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-600">
                     Select Device Type, Brand and Model above to add repair parts.
                   </p>
+                )}
+
+                {/* Quick-add presets — shortcuts onto the same parts list below.
+                    Not an exhaustive list: anything else can still be typed into
+                    the search box beneath and quick-added the same way. */}
+                {isTyreShop && selectedVehicle && (
+                  <div className="mb-2 space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {TYRE_EXTRAS_PRESETS.map((name) => (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => addPresetExtra(name)}
+                          className="flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:border-brand-teal hover:bg-teal-50 hover:text-brand-teal transition-colors"
+                        >
+                          <Plus className="h-3 w-3" /> {name}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setShowCustomExtra((v) => !v)}
+                        title="Add another extra"
+                        className="flex items-center gap-1 rounded-full bg-brand-teal px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-brand-teal/90 transition-colors"
+                      >
+                        <Plus className="h-3 w-3" /> Add More
+                      </button>
+                    </div>
+                    {showCustomExtra && (
+                      <div className="flex items-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2">
+                        <div className="flex-1">
+                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">Extra Name</label>
+                          <input
+                            autoFocus
+                            type="text"
+                            value={customExtraName}
+                            onChange={(e) => setCustomExtraName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && addCustomExtra()}
+                            placeholder="e.g. Puncture Repair"
+                            className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-brand-teal focus:outline-none"
+                          />
+                        </div>
+                        <div className="w-24">
+                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">Price {getCurrencySymbol()}</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={customExtraPrice}
+                            onChange={(e) => setCustomExtraPrice(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && addCustomExtra()}
+                            placeholder="0.00"
+                            className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-brand-teal focus:outline-none"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={addCustomExtra}
+                          disabled={!customExtraName.trim()}
+                          className="h-8 shrink-0 rounded-md bg-gray-900 px-3 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
+                        >
+                          Add
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowCustomExtra(false); setCustomExtraName(''); setCustomExtraPrice('') }}
+                          className="h-8 w-8 shrink-0 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 flex items-center justify-center"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {/* Parts search input */}
@@ -2732,7 +2953,9 @@ export default function RepairsPage() {
                       placeholder="Select or type fault…"
                     />
                   </div>
-                  <div>
+                  {/* Due Date is redundant for tyre jobs — Dispatch Start/End below
+                      already says when the fitter is scheduled to attend. */}
+                  {!isTyreShop && <div>
                     <label className={lbl}>Due Date</label>
                     <input
                       type="date"
@@ -2741,7 +2964,7 @@ export default function RepairsPage() {
                       onChange={(e) => setJobData((p) => ({ ...p, due_date: e.target.value }))}
                       className={inp}
                     />
-                  </div>
+                  </div>}
                   <div>
                     <label className={lbl}>Status</label>
                     <select value={jobData.status} onChange={(e) => setJobData((p) => ({ ...p, status: e.target.value }))} className={sel}>
@@ -2759,8 +2982,10 @@ export default function RepairsPage() {
                 <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
                   <Banknote className="h-2.5 w-2.5" /> Financials & Assignment
                 </p>
-                {/* Price Pending toggle */}
-                <label className="mb-2 flex cursor-pointer items-center gap-2.5 w-fit">
+                {/* Price Pending toggle — device-repair verticals only. A tyre job always
+                    has a known price (tyres/labour are priced up front), so "no fault
+                    found" has no equivalent here. */}
+                {!isTyreShop && <label className="mb-2 flex cursor-pointer items-center gap-2.5 w-fit">
                   <div
                     onClick={() => setJobData((p) => ({ ...p, price_pending: !p.price_pending, estimated_cost: !p.price_pending ? '' : p.estimated_cost, deposit_paid: !p.price_pending ? '' : p.deposit_paid }))}
                     className={`relative flex h-5 w-9 items-center rounded-full transition-colors ${pricePending ? 'bg-amber-500' : 'bg-gray-300'}`}
@@ -2772,7 +2997,7 @@ export default function RepairsPage() {
                       <span className="flex items-center gap-1 text-amber-600"><span>⚠</span> Issue Not Found — Price TBD</span>
                     ) : 'No fault found / Price TBD'}
                   </span>
-                </label>
+                </label>}
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                   {/* Job Fee (labour) */}
                   <div>
@@ -2881,7 +3106,19 @@ export default function RepairsPage() {
                     </div>
                   </div>
                   <div>
-                    <label className={lbl}>{isTyreShop ? 'Fitter' : 'Assigned To'} <span className="font-normal normal-case text-gray-300">(opt)</span></label>
+                    <div className="mb-0.5 flex items-center justify-between">
+                      <label className={`${lbl} !mb-0`}>{isTyreShop ? 'Fitter' : 'Assigned To'} <span className="font-normal normal-case text-gray-300">(opt)</span></label>
+                      {isTyreShop && (
+                        <button
+                          type="button"
+                          onClick={() => setShowNewFitter((v) => !v)}
+                          title="Add a new fitter"
+                          className="flex items-center gap-0.5 rounded-full bg-brand-teal px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm hover:bg-brand-teal/90 transition-colors"
+                        >
+                          <Plus className="h-2.5 w-2.5" /> New
+                        </button>
+                      )}
+                    </div>
                     {activeBranch && (
                       <AsyncEmployeeSelect
                         branchId={activeBranch.id}
@@ -2889,7 +3126,38 @@ export default function RepairsPage() {
                         onChange={(id) => setJobData((p) => ({ ...p, assigned_to: id }))}
                         label=""
                         placeholder="Search employee..."
+                        onCreateNew={isTyreShop ? createInstantFitter : undefined}
+                        createLabel="Add fitter"
+                        externalSelection={newFitterSelection}
                       />
+                    )}
+                    {showNewFitter && (
+                      <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2">
+                        <input
+                          autoFocus
+                          type="text"
+                          value={newFitterName}
+                          onChange={(e) => setNewFitterName(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && submitNewFitter()}
+                          placeholder="Fitter name…"
+                          className="h-8 flex-1 rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-brand-teal focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={submitNewFitter}
+                          disabled={!newFitterName.trim() || newFitterCreating}
+                          className="h-8 shrink-0 rounded-md bg-gray-900 px-3 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
+                        >
+                          {newFitterCreating ? 'Adding…' : 'Add'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowNewFitter(false); setNewFitterName('') }}
+                          className="h-8 w-8 shrink-0 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 flex items-center justify-center"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     )}
                   </div>
                   {isTyreShop && (
@@ -3059,10 +3327,11 @@ export default function RepairsPage() {
                 </div>
               </div>
 
-              {!isRetail && <div className="h-px bg-gray-100" />}
+              {!isRetail && !isTyreShop && <div className="h-px bg-gray-100" />}
 
-              {/* Row D: Lock / Passcode / Pattern — repair shops only */}
-              {!isRetail && <div>
+              {/* Row D: Lock / Passcode / Pattern — device-repair shops only.
+                  Not applicable to retail (no device) or tyre jobs (no device to lock). */}
+              {!isRetail && !isTyreShop && <div>
                 <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
                   <Lock className="h-2.5 w-2.5" /> Device Lock
                 </p>
@@ -3176,8 +3445,9 @@ export default function RepairsPage() {
                 <input readOnly value={editRepair.job_number} className="h-10 w-full rounded-lg border border-gray-200 bg-gray-100 px-3 text-sm text-gray-500 cursor-not-allowed" />
               </div>
 
-              {/* Due Date */}
-              <div>
+              {/* Due Date — not applicable to tyre jobs, which use the dispatch
+                  slot (scheduled_start/scheduled_end) for timing instead. */}
+              {!isTyreShop && <div>
                 <label className={lbl}>Due Date <span className="text-red-500">*</span></label>
                 <input
                   type="date"
@@ -3195,7 +3465,7 @@ export default function RepairsPage() {
                   className={`${inp} ${editErrors.due_date ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20' : ''}`}
                 />
                 {editErrors.due_date && <p className="mt-1 text-xs text-red-500">{editErrors.due_date}</p>}
-              </div>
+              </div>}
 
               {/* Total Repair Charges */}
               <div>

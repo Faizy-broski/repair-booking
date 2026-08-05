@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Modal } from '@/components/ui/modal'
 import { Button } from '@/components/ui/button'
-import { Printer, FileText, Loader2, Mail } from 'lucide-react'
+import { Printer, FileText, Loader2, Mail, Check } from 'lucide-react'
 import { RepairReceiptHtml } from './repair-receipt-html'
 import { printReceipt, previewReceiptHtml, type ReceiptPrintData } from './receipt-print'
 import { toast } from 'sonner'
@@ -21,6 +21,10 @@ interface Props {
   open: boolean
   onClose: () => void
   repair: any
+  /** Show a "Job Created Successfully" banner above the preview — set when
+   * this modal is auto-opened right after creating the job, rather than
+   * opened manually later from the table's "Invoice" action. */
+  justCreated?: boolean
 }
 
 // Paper sizes that print through the HTML popup path (thermal roll printers)
@@ -32,7 +36,7 @@ const THERMAL_SIZES = ['Receipt80', 'Receipt58', 'Custom']
 // not reliably honoured by the browser's native PDF print dialog on thermal
 // printers (paper size silently falls back to Letter/A4 and shrinks the whole
 // page). Standard paper sizes (A4/A5/Letter) keep using the server PDF.
-export function RepairInvoiceModal({ open, onClose, repair }: Props) {
+export function RepairInvoiceModal({ open, onClose, repair, justCreated }: Props) {
   const [data, setData]       = useState<ReceiptPrintData | null>(null)
   const [pdfUrl, setPdfUrl]   = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -139,6 +143,17 @@ export function RepairInvoiceModal({ open, onClose, repair }: Props) {
 
   return (
     <Modal open={open} onClose={onClose} title={`Invoice - ${repair.job_number}`} size="xl">
+      {justCreated && (
+        <div className="mb-4 flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100">
+            <Check className="h-5 w-5 text-green-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-green-800">Job Created Successfully</p>
+            <p className="text-xs text-green-600">Job #{repair.job_number} — share the invoice below, or close to keep going.</p>
+          </div>
+        </div>
+      )}
       <div className="flex flex-col h-[75vh]">
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-500">

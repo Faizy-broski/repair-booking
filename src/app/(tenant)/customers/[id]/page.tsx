@@ -68,6 +68,32 @@ const INVOICE_STATUS_COLOR: Record<string, string> = {
   refunded: 'bg-gray-100 text-gray-600',
 }
 
+// Unified "Invoices" tab: repairs, POS sales, and manually-created custom
+// invoices are three separate, disconnected records in this app (no shared
+// ledger table joins them — see repair-financials.service.ts /
+// invoice.service.ts) but each already has its own on-the-fly PDF endpoint.
+// This type merges all three into one date-sorted list at render time.
+type DocumentKind = 'repair' | 'sale' | 'invoice'
+interface CustomerDocument {
+  kind: DocumentKind
+  id: string
+  number: string
+  amount: number
+  date: string
+  status: string | null
+  downloadUrl: string
+}
+const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {
+  repair:  'Repair',
+  sale:    'Sale',
+  invoice: 'Invoice',
+}
+const DOCUMENT_KIND_COLOR: Record<DocumentKind, string> = {
+  repair:  'bg-purple-100 text-purple-700',
+  sale:    'bg-blue-100 text-blue-700',
+  invoice: 'bg-gray-100 text-gray-700',
+}
+
 interface Asset {
   id: string; name: string; brand: string | null; model: string | null
   serial_number: string | null; imei: string | null; color: string | null; is_active: boolean
@@ -252,6 +278,60 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
     (sum, s) => sum + (Number(s.total) - Number(s.amount_paid ?? 0)), 0
   )
 
+  // Merged, newest-first list backing the "Invoices" tab — see CustomerDocument
+  // comment above for why this can't just be `customer.invoices`.
+  const documents: CustomerDocument[] = customer ? [
+    ...customer.repairs.map((r): CustomerDocument => ({
+      kind: 'repair',
+      id: r.id,
+      number: r.job_number,
+      amount: r.actual_cost ?? Math.max(0, (r.estimated_cost ?? 0) - (r.discount_amount ?? 0)),
+      date: r.created_at,
+      status: r.status,
+      downloadUrl: `/api/repairs/${r.id}/pdf`,
+    })),
+    ...customer.sales.map((s): CustomerDocument => ({
+      kind: 'sale',
+      id: s.id,
+      number: s.sale_number ?? s.id.slice(-8),
+      amount: s.total,
+      date: s.created_at,
+      status: s.payment_status,
+      downloadUrl: `/api/pos/sales/${s.id}/pdf`,
+    })),
+    ...customer.invoices.map((inv): CustomerDocument => ({
+      kind: 'invoice',
+      id: inv.id,
+      number: inv.invoice_number,
+      amount: inv.total,
+      date: inv.created_at,
+      status: inv.status,
+      downloadUrl: `/api/invoices/${inv.id}/pdf`,
+    })),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : []
+
+  // Reuses the same fetch→blob→download pattern as downloadPaymentReceipt
+  // above, generalized to whichever PDF endpoint the document kind owns.
+  async function downloadCustomerDocument(doc: CustomerDocument) {
+    if (downloadingReceiptId) return
+    setDownloadingReceiptId(doc.id)
+    try {
+      const res = await fetch(doc.downloadUrl)
+      if (!res.ok) { toast.error('Failed to generate document'); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${doc.kind}-${doc.number.replace(/[^a-zA-Z0-9-]/g, '')}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Failed to download document')
+    } finally {
+      setDownloadingReceiptId(null)
+    }
+  }
+
   async function saveAsset() {
     setSavingAsset(true)
     const { editing } = assetModal
@@ -384,7 +464,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
     ...(!isRetailStore ? [{ id: 'repairs' as Tab, label: 'Repairs', count: customer.stats.repair_count }] : []),
     { id: 'sales',     label: 'Sales',    count: customer.stats.sale_count },
     { id: 'credits',   label: 'Credits & Points' },
-    { id: 'invoices',  label: 'Invoices', count: customer.stats.invoice_count },
+    { id: 'invoices',  label: 'Invoices', count: customer.stats.repair_count + customer.stats.sale_count + customer.stats.invoice_count },
     ...(!isRetailStore ? [{ id: 'assets' as Tab, label: 'Devices', count: assets.length }] : []),
     ...(isTyreShop ? [{ id: 'vehicles' as Tab, label: 'Vehicles', count: customer.vehicles.length }] : []),
   ]
@@ -532,23 +612,43 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         </div>
       )}
 
-      {/* Invoices tab */}
+      {/* Invoices tab — unified view of every money document: repairs, POS
+          sales, and manually-created custom invoices, each downloadable via
+          the same PDF endpoint its own page already uses. */}
       {tab === 'invoices' && (
         <div className="space-y-2">
-          {customer.invoices.length === 0 ? (
-            <EmptyState message="No invoices yet" />
+          {documents.length === 0 ? (
+            <EmptyState message="No invoices, sales, or repairs yet" />
           ) : (
-            customer.invoices.map((inv) => (
-              <div key={inv.id} className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-3">
-                <div>
-                  <p className="font-mono text-sm font-semibold text-gray-700">{inv.invoice_number}</p>
-                  <p className="text-xs text-gray-400">{formatDateTime(inv.created_at)}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${INVOICE_STATUS_COLOR[inv.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                    {inv.status}
+            documents.map((doc) => (
+              <div key={`${doc.kind}-${doc.id}`} className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white p-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${DOCUMENT_KIND_COLOR[doc.kind]}`}>
+                    {DOCUMENT_KIND_LABEL[doc.kind]}
                   </span>
-                  <p className="text-sm font-bold text-gray-900">{formatCurrency(inv.total)}</p>
+                  <div className="min-w-0">
+                    <p className="truncate font-mono text-sm font-semibold text-gray-700">{doc.number}</p>
+                    <p className="text-xs text-gray-400">{formatDateTime(doc.date)}</p>
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  {doc.status && (
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${INVOICE_STATUS_COLOR[doc.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {doc.status.replace('_', ' ')}
+                    </span>
+                  )}
+                  <p className="text-sm font-bold text-gray-900">{formatCurrency(doc.amount)}</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={downloadingReceiptId === doc.id}
+                    onClick={() => downloadCustomerDocument(doc)}
+                    className="disabled:cursor-wait"
+                  >
+                    {downloadingReceiptId === doc.id
+                      ? <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                      : <Download className="h-4 w-4" />}
+                  </Button>
                 </div>
               </div>
             ))
