@@ -28,6 +28,19 @@ function subPeriod(stripeSub: Stripe.Subscription): { start: string | null; end:
   return { start: ts(start), end: ts(end) }
 }
 
+// In Stripe API >= 2026-02-25 (Clover), an invoice's subscription link moved
+// from the root `invoice.subscription` field to `invoice.parent.subscription_details.subscription`.
+// The root field is confirmed `undefined` in this API version even for genuinely
+// subscription-driven invoices — read both locations so this doesn't silently
+// break invoice.payment_succeeded/invoice.payment_failed syncing for every business.
+function invoiceSubId(invoice: Stripe.Invoice): string | null {
+  const nested = (invoice as any).parent?.subscription_details?.subscription as string | undefined
+  if (nested) return nested
+  return typeof invoice.subscription === 'string'
+    ? invoice.subscription
+    : (invoice.subscription as Stripe.Subscription | null)?.id ?? null
+}
+
 // ── Webhook handler ───────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
@@ -432,9 +445,7 @@ export async function POST(request: NextRequest) {
   // invoice.payment_failed had put it into past_due.
   if (event.type === 'invoice.payment_succeeded') {
     const invoice = event.data.object as Stripe.Invoice
-    const stripeSubId = typeof invoice.subscription === 'string'
-      ? invoice.subscription
-      : (invoice.subscription as Stripe.Subscription | null)?.id ?? null
+    const stripeSubId = invoiceSubId(invoice)
 
     if (stripeSubId) {
       const lines = (invoice as any).lines?.data?.[0]
@@ -465,9 +476,7 @@ export async function POST(request: NextRequest) {
   // (after all retries are exhausted), handled by customer.subscription.deleted.
   if (event.type === 'invoice.payment_failed') {
     const invoice = event.data.object as Stripe.Invoice
-    const stripeSubId = typeof invoice.subscription === 'string'
-      ? invoice.subscription
-      : (invoice.subscription as Stripe.Subscription | null)?.id ?? null
+    const stripeSubId = invoiceSubId(invoice)
 
     if (!stripeSubId) return NextResponse.json({ received: true })
 

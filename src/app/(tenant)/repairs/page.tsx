@@ -1604,6 +1604,14 @@ export default function RepairsPage() {
       {
         id: 'vehicle', header: 'Vehicle', cell: ({ row }: { row: { original: RepairRow } }) => row.original.vehicles?.registration_number?.toUpperCase() || '—'
       },
+      {
+        id: 'tyre', header: 'Tyre', cell: ({ row }: { row: { original: RepairRow } }) => {
+          const size = row.original.tyre_size
+          const qty = row.original.tyre_quantity
+          if (!size && !qty) return '—'
+          return <span className="text-xs text-gray-700">{size || '—'}{qty ? ` ×${qty}` : ''}</span>
+        }
+      },
     ] as ColumnDef<RepairRow>[] : [
       {
         accessorKey: 'device_type', header: 'Type', cell: ({ getValue }) => (getValue() as string) || '—'
@@ -1657,7 +1665,23 @@ export default function RepairsPage() {
         )
       }
     },
-    {
+    isTyreShop ? {
+      id: 'scheduled', header: 'Scheduled', size: 120, cell: ({ row }: { row: { original: RepairRow } }) => {
+        const start = row.original.scheduled_start
+        if (!start) return '—'
+        const s = new Date(start)
+        const end = row.original.scheduled_end ? new Date(row.original.scheduled_end) : null
+        const time = (d: Date) => d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+        return (
+          <div className="text-[11px] leading-tight">
+            <div className="font-semibold text-gray-900">
+              {s.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+            </div>
+            <div className="text-gray-500">{time(s)}{end ? `–${time(end)}` : ''}</div>
+          </div>
+        )
+      }
+    } : {
       id: 'due_date', header: 'Due Date', size: 120, cell: ({ row }) => {
         const cf = (row.original.custom_fields as any) ?? {}
         if (!cf.due_date) return '—'
