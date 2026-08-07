@@ -1,22 +1,17 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Layers, Search } from 'lucide-react'
+import { Plus, Edit2, Trash2, Layers, Search, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { useAuthStore } from '@/store/auth.store'
+import { useRouter } from 'next/navigation'
+import { InventoryNav } from '@/components/inventory/inventory-nav'
 
 interface Category { id: string; name: string; parent_id: string | null }
 
 export default function CategoriesPage() {
-  const { verticalTemplateSlug } = useAuthStore()
-  const isRetail  = verticalTemplateSlug === 'retail-store'
-  const isTyreShop = verticalTemplateSlug === 'mobile-tyre-fitting'
-  const useSimpleCatalog = isRetail || isTyreShop
-  const pathname  = usePathname()
-
+  const router = useRouter()
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading]       = useState(true)
   const [search, setSearch]         = useState('')
@@ -67,41 +62,23 @@ export default function CategoriesPage() {
     setDeleteCat(null); fetchCategories()
   }
 
-  const NAV = [
-    { label: 'Products',        href: '/inventory' },
-    { label: 'Purchase Orders', href: '/inventory/purchase-orders' },
-    { label: 'Suppliers',       href: '/inventory/suppliers' },
-    { label: 'Bin',             href: '/inventory/bin' },
-    { label: 'Damage Returns',  href: '/inventory/damage-returns' },
-    // { label: 'Stock Count', href: '/inventory/stock-count' },  // disabled
-    ...(useSimpleCatalog ? [
-      { label: 'Categories', href: '/inventory/categories' },
-      { label: 'Attributes', href: '/inventory/attributes' },
-    ] : []),
-  ]
-
   return (
     <div className="space-y-4">
-      {/* Sub-navigation */}
-      <div className="flex overflow-x-auto gap-1 border-b border-gray-200 pb-3 no-scrollbar">
-        {NAV.map(({ label, href }) => (
-          <Link key={href} href={href}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              (href === '/inventory' ? pathname === '/inventory' : pathname.startsWith(href))
-                ? 'bg-brand-teal text-white' : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >{label}</Link>
-        ))}
-      </div>
+      <InventoryNav />
 
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Categories</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Organise products into categories. Assign attributes to a category when creating them under{' '}
-            <Link href="/inventory/attributes" className="text-brand-teal underline">Attributes</Link>.
-          </p>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-gray-500 hover:text-gray-900">
+            <ArrowLeft className="h-5 w-5" strokeWidth={3} />
+          </Button>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Categories</h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Organise products into categories. Assign attributes to a category when creating them under{' '}
+              <Link href="/inventory/attributes" className="text-brand-teal underline">Attributes</Link>.
+            </p>
+          </div>
         </div>
         <Button onClick={openCreate}><Plus className="h-4 w-4" /> Add Category</Button>
       </div>

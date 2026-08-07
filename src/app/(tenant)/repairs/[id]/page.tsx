@@ -316,8 +316,8 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => router.back()} className="shrink-0">
-            <ArrowLeft className="h-4 w-4" />
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 shrink-0 text-gray-500 hover:text-gray-900">
+            <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
           </Button>
           <div className="flex-1 min-w-0">
             <h1 className="truncate text-lg font-bold text-gray-900 sm:text-xl">Job #{repair.job_number}</h1>

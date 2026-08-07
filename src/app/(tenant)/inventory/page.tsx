@@ -18,6 +18,7 @@ import { ScanButton } from '@/components/scanner/scan-button'
 import { ScannerModal } from '@/components/scanner/scanner-modal'
 import { BarcodeModal } from '@/components/inventory/barcode-modal'
 import { BulkBarcodeModal } from '@/components/inventory/bulk-barcode-modal'
+import { InventoryNav } from '@/components/inventory/inventory-nav'
 
 interface ProductRow {
   id: string
@@ -990,33 +991,7 @@ export default function InventoryPage() {
 
   return (
     <div className="space-y-4">
-      {/* Sub-navigation */}
-      <div className="flex overflow-x-auto gap-1 border-b border-gray-200 pb-3 no-scrollbar">
-        {[
-          { label: 'Products',        href: '/inventory' },
-          { label: 'Purchase Orders', href: '/inventory/purchase-orders' },
-          { label: 'Suppliers',       href: '/inventory/suppliers' },
-          { label: 'Bin',             href: '/inventory/bin' },
-          { label: 'Damage Returns',  href: '/inventory/damage-returns' },
-          // { label: 'Stock Count', href: '/inventory/stock-count' },  // disabled
-          ...(useSimpleCatalog ? [
-            { label: 'Categories',    href: '/inventory/categories' },
-            { label: 'Attributes',    href: '/inventory/attributes' },
-          ] : []),
-        ].map(({ label, href }) => (
-          <Link
-            key={href}
-            href={href}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              (href === '/inventory' ? pathname === '/inventory' : pathname.startsWith(href))
-                ? 'bg-brand-teal text-white'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            {label}
-          </Link>
-        ))}
-      </div>
+      <InventoryNav />
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1106,7 +1081,7 @@ export default function InventoryPage() {
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-gray-500 truncate">{s.label}</p>
                   {s.value !== null ? (
-                    <p className="mt-2 text-base sm:text-xl lg:text-2xl font-bold text-gray-900 break-words leading-tight" title={String(s.value)}>{s.value}</p>
+                    <p className="mt-2 text-sm sm:text-base lg:text-lg font-bold text-gray-900 leading-tight tracking-tight tabular-nums whitespace-nowrap" title={String(s.value)}>{s.value}</p>
                   ) : (
                     <div className="mt-2 h-8 w-24 rounded bg-gray-100 animate-pulse" />
                   )}

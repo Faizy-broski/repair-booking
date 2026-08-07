@@ -145,8 +145,8 @@ export default function DamageReturnDetailPage({ params }: { params: Promise<{ i
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => router.push('/inventory/damage-returns')}>
-          <ArrowLeft className="h-4 w-4" />
+        <Button variant="ghost" size="icon" onClick={() => router.push('/inventory/damage-returns')} className="h-8 w-8 text-gray-500 hover:text-gray-900">
+          <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-2">

@@ -1,16 +1,16 @@
 'use client'
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { RotateCcw, Archive } from 'lucide-react'
+import { RotateCcw, Archive, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/data-table'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { confirmToast } from '@/lib/confirm-toast'
+import { InventoryNav } from '@/components/inventory/inventory-nav'
 import type { ColumnDef } from '@tanstack/react-table'
 
 interface BinItemRow {
@@ -29,7 +29,7 @@ interface BinItemRow {
 
 export default function BinPage() {
   const { activeBranch } = useAuthStore()
-  const pathname = usePathname()
+  const router = useRouter()
   const queryClient = useQueryClient()
   const [statusFilter, setStatusFilter] = useState<'binned' | 'restored'>('binned')
   const [restoringId, setRestoringId] = useState<string | null>(null)
@@ -112,30 +112,14 @@ export default function BinPage() {
 
   return (
     <div className="space-y-4">
-      {/* Sub-navigation */}
-      <div className="flex overflow-x-auto gap-1 border-b border-gray-200 pb-3 no-scrollbar">
-        {[
-          { label: 'Products',        href: '/inventory' },
-          { label: 'Purchase Orders', href: '/inventory/purchase-orders' },
-          { label: 'Suppliers',       href: '/inventory/suppliers' },
-          { label: 'Bin',             href: '/inventory/bin' },
-          { label: 'Damage Returns',  href: '/inventory/damage-returns' },
-        ].map(({ label, href }) => (
-          <Link
-            key={href}
-            href={href}
-            className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              pathname === href ? 'bg-brand-teal text-white' : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            {label}
-          </Link>
-        ))}
-      </div>
+      <InventoryNav />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 shrink-0 text-gray-500 hover:text-gray-900">
+            <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
+          </Button>
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100">
             <Archive className="h-6 w-6 text-amber-600" />
           </div>
           <div>

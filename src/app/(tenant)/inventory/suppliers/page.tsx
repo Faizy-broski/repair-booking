@@ -7,7 +7,7 @@ import { confirmToast } from '@/lib/confirm-toast'
 import {
   Plus, Pencil, Trash2, Truck, Search, Loader2, CreditCard,
   RefreshCw, Banknote, CheckCircle2, AlertCircle,
-  Mail, Phone, MapPin, Users,
+  Mail, Phone, MapPin, Users, ArrowLeft,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +18,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/shared/data-table'
+import { InventoryNav } from '@/components/inventory/inventory-nav'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -242,12 +243,19 @@ export default function SuppliersPage() {
 
   return (
     <div className="space-y-4">
+      <InventoryNav />
+
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Suppliers</h1>
-          <p className="text-sm text-gray-500">
-            {view === 'suppliers' ? `${suppliers.length} suppliers` : 'Received purchase orders and outstanding balances owed to suppliers'}
-          </p>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-gray-500 hover:text-gray-900">
+            <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
+          </Button>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Suppliers</h1>
+            <p className="text-sm text-gray-500">
+              {view === 'suppliers' ? `${suppliers.length} suppliers` : 'Received purchase orders and outstanding balances owed to suppliers'}
+            </p>
+          </div>
         </div>
         {view === 'suppliers' ? (
           <Button onClick={() => openModal()}>

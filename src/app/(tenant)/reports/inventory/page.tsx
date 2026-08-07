@@ -135,7 +135,7 @@ export default function InventoryReportPage() {
         <div className="flex items-center gap-3">
           <Link href="/reports">
             <button className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container transition-colors">
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-5 w-5" strokeWidth={3} />
             </button>
           </Link>
           <div>

@@ -1,14 +1,14 @@
 'use client'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { Undo2, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/data-table'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { InventoryNav } from '@/components/inventory/inventory-nav'
 import type { ColumnDef } from '@tanstack/react-table'
 
 interface SupplierReturnRow {
@@ -30,7 +30,6 @@ const STATUS_FILTERS = ['all', 'draft', 'shipped', 'resolved', 'cancelled'] as c
 
 export default function DamageReturnsPage() {
   const { activeBranch } = useAuthStore()
-  const pathname = usePathname()
   const router = useRouter()
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>('all')
 
@@ -72,26 +71,7 @@ export default function DamageReturnsPage() {
 
   return (
     <div className="space-y-4">
-      {/* Sub-navigation */}
-      <div className="flex overflow-x-auto gap-1 border-b border-gray-200 pb-3 no-scrollbar">
-        {[
-          { label: 'Products',        href: '/inventory' },
-          { label: 'Purchase Orders', href: '/inventory/purchase-orders' },
-          { label: 'Suppliers',       href: '/inventory/suppliers' },
-          { label: 'Bin',             href: '/inventory/bin' },
-          { label: 'Damage Returns',  href: '/inventory/damage-returns' },
-        ].map(({ label, href }) => (
-          <Link
-            key={href}
-            href={href}
-            className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              pathname === href ? 'bg-brand-teal text-white' : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            {label}
-          </Link>
-        ))}
-      </div>
+      <InventoryNav />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">

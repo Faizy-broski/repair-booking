@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/ui/modal'
 import { ProductVariantPicker } from '@/components/inventory/product-variant-picker'
+import { InventoryNav } from '@/components/inventory/inventory-nav'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
 import { DataTable } from '@/components/shared/data-table'
 import { useAuthStore } from '@/store/auth.store'
@@ -406,10 +407,12 @@ export default function PurchaseOrdersPage() {
 
   return (
     <div className="space-y-4">
+      <InventoryNav />
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-gray-500 hover:text-gray-900">
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-5 w-5" strokeWidth={3} />
           </Button>
           <div>
             <h1 className="text-xl font-bold text-gray-900">Purchase Orders</h1>

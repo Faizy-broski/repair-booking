@@ -611,8 +611,8 @@ export default function SalesPage() {
         page: String(page + 1),
         limit: String(pageSize),
       })
-      if (dateFrom) params.set('from', dateFrom)
-      if (dateTo) params.set('to', dateTo)
+      if (dateFrom) params.set('from', `${dateFrom}T00:00:00`)
+      if (dateTo) params.set('to', `${dateTo}T23:59:59`)
       if (statusFilter) params.set('status', statusFilter)
       if (typeFilter) params.set('type', typeFilter)
       if (search) params.set('search', search)
@@ -629,8 +629,8 @@ export default function SalesPage() {
     queryKey: ['sales-stats', activeBranch?.id, dateFrom, dateTo, statusFilter],
     queryFn: async () => {
       const params = new URLSearchParams({ branch_id: activeBranch!.id })
-      if (dateFrom) params.set('from', dateFrom)
-      if (dateTo) params.set('to', dateTo)
+      if (dateFrom) params.set('from', `${dateFrom}T00:00:00`)
+      if (dateTo) params.set('to', `${dateTo}T23:59:59`)
       if (statusFilter) params.set('status', statusFilter)
       const res = await fetch(`/api/pos/sales/stats?${params}`)
       const json = await res.json()

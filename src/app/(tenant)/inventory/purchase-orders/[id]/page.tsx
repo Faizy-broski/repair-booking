@@ -217,8 +217,8 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
+        <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-gray-500 hover:text-gray-900">
+          <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-2">
