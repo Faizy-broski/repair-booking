@@ -11,7 +11,7 @@ export const RepairService = {
     const { page = 1, limit = 20, status, search, businessId, customerId } = params
     let q = adminSupabase
       .from('repairs')
-      .select('*, customers(first_name,last_name,phone,email), vehicles(registration_number)', { count: 'exact' })
+      .select('*, customers(first_name,last_name,phone,email), vehicles(registration_number), employees!assigned_to(first_name,last_name)', { count: 'exact' })
       .order('is_rush', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1)

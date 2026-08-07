@@ -141,7 +141,11 @@ export function VehiclePicker({ customerId, value, onChange }: VehiclePickerProp
       {loading ? (
         <p className="text-xs text-gray-400">Loading vehicles…</p>
       ) : vehicles.length > 0 && !showNew ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="space-y-1.5">
+          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+            Select a vehicle <span className="text-red-500">*</span>
+          </p>
+          <div className="flex flex-wrap gap-2">
           {vehicles.map((v) => (
             <button
               key={v.id}
@@ -160,6 +164,7 @@ export function VehiclePicker({ customerId, value, onChange }: VehiclePickerProp
           >
             <Plus className="h-3 w-3" /> New vehicle
           </button>
+          </div>
         </div>
       ) : (
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">

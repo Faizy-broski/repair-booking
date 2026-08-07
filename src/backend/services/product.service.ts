@@ -79,12 +79,23 @@ export const ProductService = {
   // here (never restocked since the FIFO rollout, or never variant-scoped)
   // simply won't appear in the map — callers fall back to cost_price for
   // those, unchanged from before.
-  async getBatchValuationByBranch(branchId: string) {
-    const { data, error } = await db
+  // `productIds` narrows the scan to just those products (e.g. a search
+  // result page) instead of the whole branch's cost-layer history — pass
+  // nothing to get today's full-branch behaviour unchanged (valuation
+  // reports need every product; a search dropdown only needs its own rows).
+  async getBatchValuationByBranch(branchId: string, productIds?: string[]) {
+    // Scoped to zero products (e.g. an empty search result page) → nothing to
+    // look up. Also avoids sending `.in('product_id', [])`, which is worth
+    // steering clear of rather than relying on how the query builder handles it.
+    if (productIds && productIds.length === 0) return new Map()
+
+    let q = db
       .from('inventory_cost_layers')
       .select('product_id, variant_id, quantity, unit_cost')
       .eq('branch_id', branchId)
       .order('received_at', { ascending: true })
+    if (productIds) q = q.in('product_id', productIds)
+    const { data, error } = await q
     if (error) throw error
 
     const map = new Map<string, { totalValue: number; totalQty: number; nextUnitCost: number }>()
@@ -182,10 +193,13 @@ export const ProductService = {
     brandId?: string; supplierId?: string; valuation?: string
     hideOutOfStock?: boolean; itemType?: string; modelId?: string; partType?: string
     barcode?: string; lowStockOnly?: boolean // exact match on barcode or sku — used by scanner (not ilike)
+    /** Skip the exact COUNT(*) — for callers (e.g. a quick-search dropdown) that
+     * never read the total and don't need the extra scan every keystroke. */
+    skipCount?: boolean
   }) {
     const { page = 1, limit = 20, search, categoryId, branchId, includeInactive, includeDrafts,
             brandId, supplierId, valuation, hideOutOfStock, itemType, modelId, partType,
-            barcode, lowStockOnly } = params
+            barcode, lowStockOnly, skipCount } = params
 
     const inventorySelect = branchId
       ? `*, categories(name), brands(name), inventory!left(quantity, low_stock_alert, branch_id, variant_id), product_variants(id), suppliers(name), service_devices(name), branch_products!inner(is_enabled)`
@@ -193,7 +207,7 @@ export const ProductService = {
 
     let q = db
       .from('products')
-      .select(inventorySelect, { count: 'exact' })
+      .select(inventorySelect, skipCount ? undefined : { count: 'exact' })
       .eq('business_id', businessId)
       .order('created_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1)
@@ -227,32 +241,42 @@ export const ProductService = {
     const { data, error, count } = await q
     if (error) throw error
 
-    // FIFO batch costs, keyed by product_id — lets the "Unit Cost" column show
-    // the real next-to-sell batch cost instead of the raw (possibly stale)
-    // cost_price scalar. Product-level only (see getBatchValuationByBranch);
-    // variant products fall back to their own cost_price, unchanged.
-    const batchValuation = branchId ? await ProductService.getBatchValuationByBranch(branchId) : new Map()
+    // Both enrichment queries below are only ever looked up by these rows'
+    // own product IDs (see the .map() further down) — scoping to them turns
+    // "fetch the whole branch's cost/discount history" into "fetch this
+    // page's", and running them together halves the round-trip latency.
+    const productIds = (data ?? []).map((p: { id: string }) => p.id)
 
-    // Active discount allocations, keyed by product_id — one query for the
-    // whole page instead of one per row. discountMap carries the full detail
-    // for base-product-level rows (variant_id NULL); productsWithVariantDiscount
-    // is just a "does ANY variant of this product have an active discount"
-    // flag, used to show a SALE indicator on the card even though the exact
-    // price/quantity varies per variant (shown in the variant popover instead).
+    const [batchValuation, discounts] = await Promise.all([
+      // FIFO batch costs, keyed by product_id — lets the "Unit Cost" column show
+      // the real next-to-sell batch cost instead of the raw (possibly stale)
+      // cost_price scalar. Product-level only (see getBatchValuationByBranch);
+      // variant products fall back to their own cost_price, unchanged.
+      branchId ? ProductService.getBatchValuationByBranch(branchId, productIds) : Promise.resolve(new Map()),
+      // Active discount allocations, keyed by product_id — one query for the
+      // whole page instead of one per row.
+      branchId && productIds.length > 0
+        ? db.from('product_discount_allocations')
+          .select('product_id, variant_id, discount_price, quantity_remaining')
+          .eq('branch_id', branchId)
+          .eq('status', 'active')
+          .in('product_id', productIds)
+          .then((r: { data: any[] | null }) => r.data)
+        : Promise.resolve(null),
+    ])
+
+    // discountMap carries the full detail for base-product-level rows
+    // (variant_id NULL); productsWithVariantDiscount is just a "does ANY
+    // variant of this product have an active discount" flag, used to show a
+    // SALE indicator on the card even though the exact price/quantity varies
+    // per variant (shown in the variant popover instead).
     const discountMap = new Map<string, { discount_price: number; quantity_remaining: number }>()
     const productsWithVariantDiscount = new Set<string>()
-    if (branchId) {
-      const { data: discounts } = await db
-        .from('product_discount_allocations')
-        .select('product_id, variant_id, discount_price, quantity_remaining')
-        .eq('branch_id', branchId)
-        .eq('status', 'active')
-      for (const d of (discounts ?? []) as any[]) {
-        if (d.variant_id) {
-          productsWithVariantDiscount.add(d.product_id)
-        } else {
-          discountMap.set(d.product_id, { discount_price: d.discount_price, quantity_remaining: d.quantity_remaining })
-        }
+    for (const d of (discounts ?? []) as any[]) {
+      if (d.variant_id) {
+        productsWithVariantDiscount.add(d.product_id)
+      } else {
+        discountMap.set(d.product_id, { discount_price: d.discount_price, quantity_remaining: d.quantity_remaining })
       }
     }
 

@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { verifyImpersonationJwt } from '@/lib/impersonation'
 
-const PUBLIC_PATHS = ['/api/auth/', '/api/webhooks/', '/api/public/', '/book/', '/s/', '/_next/', '/favicon.ico', '/images/', '/api/google-reviews/oauth/callback']
+// '/api/webhooks/' is a legacy path kept for safety; the real Stripe webhook
+// now lives at /api/stripe/webhook (see src/app/api/stripe/webhook/route.ts) —
+// it must be exempted by exact route, not swept in by a broader '/api/stripe/'
+// prefix, since other stripe routes (upgrade, checkout, etc.) are user-initiated
+// and authenticate themselves via cookies rather than relying on this middleware.
+const PUBLIC_PATHS = ['/api/auth/', '/api/webhooks/', '/api/stripe/webhook', '/api/public/', '/book/', '/s/', '/_next/', '/favicon.ico', '/images/', '/api/google-reviews/oauth/callback']
 
 // Cache business existence checks so we don't hit the DB on every request.
 // Business records change rarely (creation, suspension). The cache expires

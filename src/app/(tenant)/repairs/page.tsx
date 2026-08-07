@@ -42,6 +42,7 @@ interface SelectedCustomer {
 interface RepairRow extends Repair {
   customers?: { first_name: string; last_name: string | null; phone: string | null; email: string | null } | null
   vehicles?: { registration_number: string } | null
+  employees?: { first_name: string; last_name: string | null } | null
   is_rush?: boolean
 }
 
@@ -379,15 +380,28 @@ export default function RepairsPage() {
   const [showPartDrop, setShowPartDrop] = useState(false)
   const [partSearchLoading, setPartSearchLoading] = useState(false)
   const partSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const partSearchAbortRef = useRef<AbortController | null>(null)
   const partDropRef = useRef<HTMLDivElement>(null)
   const [quickPartPrice, setQuickPartPrice] = useState('')
   const [quickPartCost, setQuickPartCost] = useState('')
+  // Tyre-shop only: lets staff record a size against an ad-hoc quick-added
+  // part/extra (e.g. a tyre bought in for this job that isn't in inventory) —
+  // folded into the line item's name since repair_items has no dedicated
+  // size column, same free-text approach the name field already uses.
+  const [quickPartTyreSize, setQuickPartTyreSize] = useState('')
   // Tyre-shop "Add More" — lets staff add a one-off extra by name/price without
   // going through the inventory search box (for anything not already stocked
   // and not one of the preset chips above it).
   const [showCustomExtra, setShowCustomExtra] = useState(false)
   const [customExtraName, setCustomExtraName] = useState('')
   const [customExtraPrice, setCustomExtraPrice] = useState('')
+  const [customExtraTyreSize, setCustomExtraTyreSize] = useState('')
+  // "+ Tyre" preset — unlike the other presets, a tyre always needs a size
+  // before it means anything, so this one opens a small prompt instead of
+  // adding instantly.
+  const [showNewTyre, setShowNewTyre] = useState(false)
+  const [newTyreSize, setNewTyreSize] = useState('')
+  const [newTyrePrice, setNewTyrePrice] = useState('')
   // Tyre-shop "+ New Fitter" — standalone button beside the Fitter field
   // (separate from AsyncEmployeeSelect's own inline create-in-dropdown option,
   // which is easy to miss since it only appears after typing a search query).
@@ -694,6 +708,37 @@ export default function RepairsPage() {
     }
   }
 
+  // Quick-set from the Payment column dropdown. Only Paid/Unpaid are offered
+  // here — Paid sets the amount paid to the full total, Unpaid sets it to
+  // zero. A specific partial amount still goes through the existing Edit Job
+  // modal's Deposit field, same as today; this doesn't add a new status
+  // field, it just writes deposit_paid (the same field Edit Job already
+  // writes) to one of its two "obvious" values.
+  async function handlePaymentStatusChange(repairId: string, newStatus: 'Paid' | 'Unpaid', total: number) {
+    const newDeposit = newStatus === 'Paid' ? total : 0
+    const previousData = queryClient.getQueryData<RepairListResponse>(repairsQueryKey)
+
+    queryClient.setQueryData<RepairListResponse>(repairsQueryKey, (old) => {
+      if (!old?.data) return old
+      return { ...old, data: old.data.map((r: RepairRow) => r.id === repairId ? { ...r, deposit_paid: newDeposit } : r) }
+    })
+
+    const res = await fetch(`/api/repairs/${repairId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deposit_paid: newDeposit }),
+    })
+
+    if (!res.ok) {
+      if (previousData) queryClient.setQueryData(repairsQueryKey, previousData)
+      toast.error('Failed to update payment status.')
+    } else {
+      queryClient.invalidateQueries({ queryKey: repairsBaseKey })
+      invalidateStats()
+      toast.success(`Marked as ${newStatus}.`)
+    }
+  }
+
   // Fetch supporting data replaced by React Query above
 
   function openEdit(r: RepairRow) {
@@ -927,14 +972,23 @@ export default function RepairsPage() {
     if (!q.trim()) { setPartResults([]); setShowPartDrop(false); return }
     setPartSearchLoading(true)
     partSearchRef.current = setTimeout(async () => {
+      // Cancel a still-in-flight previous search before firing this one, so a
+      // slow older request can't resolve later and overwrite a newer query's
+      // results (no debounce-timer clear alone can prevent that once fetch
+      // has actually started).
+      partSearchAbortRef.current?.abort()
+      const ctrl = new AbortController()
+      partSearchAbortRef.current = ctrl
       try {
-        const params = new URLSearchParams({ branch_id: activeBranch!.id, search: q, limit: '8' })
-        const res = await fetch(`/api/products?${params}`)
+        const params = new URLSearchParams({ branch_id: activeBranch!.id, search: q, limit: '8', skip_count: 'true' })
+        const res = await fetch(`/api/products?${params}`, { signal: ctrl.signal })
         const json = await res.json()
         setPartResults(json.data ?? [])
         setShowPartDrop(true)
+      } catch (e) {
+        if ((e as Error).name !== 'AbortError') throw e
       } finally {
-        setPartSearchLoading(false)
+        if (partSearchAbortRef.current === ctrl) setPartSearchLoading(false)
       }
     }, 300)
   }
@@ -994,10 +1048,12 @@ export default function RepairsPage() {
   }
 
   function addQuickPart() {
-    const name = partQuery.trim()
+    const rawName = partQuery.trim()
+    const size = quickPartTyreSize.trim()
+    const name = isTyreShop && size ? `${rawName} — ${size}` : rawName
     const price = parseFloat(quickPartPrice) || 0
     const cost  = parseFloat(quickPartCost)  || 0
-    if (!name) return
+    if (!rawName) return
     setRepairParts((prev) => [...prev, {
       tempId: Math.random().toString(36).slice(2),
       product_id: null,
@@ -1013,6 +1069,7 @@ export default function RepairsPage() {
     setPartQuery('')
     setQuickPartPrice('')
     setQuickPartCost('')
+    setQuickPartTyreSize('')
     setShowPartDrop(false)
   }
 
@@ -1106,14 +1163,35 @@ export default function RepairsPage() {
     }
   }
 
-  function addCustomExtra() {
-    const name = customExtraName.trim()
-    if (!name) return
+  function addNewTyre() {
+    const size = newTyreSize.trim()
+    if (!size) return
     setRepairParts((prev) => [...prev, {
       tempId: Math.random().toString(36).slice(2),
       product_id: null,
       variant_id: null,
-      name,
+      name: size,
+      qty: 1,
+      unit_price: parseFloat(newTyrePrice) || 0,
+      unit_cost: 0,
+      max_stock: null,
+      discount_type: 'fixed',
+      discount_value: 0,
+    }])
+    setNewTyreSize('')
+    setNewTyrePrice('')
+    setShowNewTyre(false)
+  }
+
+  function addCustomExtra() {
+    const rawName = customExtraName.trim()
+    const size = customExtraTyreSize.trim()
+    if (!rawName) return
+    setRepairParts((prev) => [...prev, {
+      tempId: Math.random().toString(36).slice(2),
+      product_id: null,
+      variant_id: null,
+      name: size ? `${rawName} — ${size}` : rawName,
       qty: 1,
       unit_price: parseFloat(customExtraPrice) || 0,
       unit_cost: 0,
@@ -1123,6 +1201,7 @@ export default function RepairsPage() {
     }])
     setCustomExtraName('')
     setCustomExtraPrice('')
+    setCustomExtraTyreSize('')
     setShowCustomExtra(false)
   }
 
@@ -1605,11 +1684,10 @@ export default function RepairsPage() {
         id: 'vehicle', header: 'Vehicle', cell: ({ row }: { row: { original: RepairRow } }) => row.original.vehicles?.registration_number?.toUpperCase() || '—'
       },
       {
-        id: 'tyre', header: 'Tyre', cell: ({ row }: { row: { original: RepairRow } }) => {
-          const size = row.original.tyre_size
-          const qty = row.original.tyre_quantity
-          if (!size && !qty) return '—'
-          return <span className="text-xs text-gray-700">{size || '—'}{qty ? ` ×${qty}` : ''}</span>
+        id: 'assigned_to', header: 'Fitter', cell: ({ row }: { row: { original: RepairRow } }) => {
+          const e = row.original.employees
+          if (!e) return <span className="text-gray-400">Unassigned</span>
+          return <span className="text-xs text-gray-700">{e.first_name} {e.last_name ?? ''}</span>
         }
       },
     ] as ColumnDef<RepairRow>[] : [
@@ -1666,16 +1744,21 @@ export default function RepairsPage() {
       }
     },
     isTyreShop ? {
-      id: 'scheduled', header: 'Scheduled', size: 120, cell: ({ row }: { row: { original: RepairRow } }) => {
+      id: 'scheduled', header: 'Scheduled', size: 130, cell: ({ row }: { row: { original: RepairRow } }) => {
         const start = row.original.scheduled_start
         if (!start) return '—'
         const s = new Date(start)
         const end = row.original.scheduled_end ? new Date(row.original.scheduled_end) : null
         const time = (d: Date) => d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+        const date = (d: Date) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+        // A dispatch slot spanning past midnight (e.g. a late job booked from
+        // 7 Aug into 8 Aug) needs both dates shown — otherwise it looks like a
+        // same-day booking that just happens to end "before" it starts.
+        const spansDays = !!end && s.toDateString() !== end.toDateString()
         return (
           <div className="text-[11px] leading-tight">
             <div className="font-semibold text-gray-900">
-              {s.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+              {spansDays ? `${date(s)} – ${date(end!)}` : date(s)}
             </div>
             <div className="text-gray-500">{time(s)}{end ? `–${time(end)}` : ''}</div>
           </div>
@@ -1706,7 +1789,52 @@ export default function RepairsPage() {
         return `~${formatCurrency(net)}`
       }
     },
-    { 
+    {
+      // Derived, not stored — deposit_paid is a running cumulative total paid
+      // to date (repair.controller.ts treats every update's deposit_paid as
+      // the new total, not a delta), so Paid/Partial/Unpaid falls straight
+      // out of comparing it to the same net total the Cost column shows.
+      id: 'payment_status', header: 'Payment', size: 100, cell: ({ row }: { row: { original: RepairRow } }) => {
+        const r = row.original
+        const total = r.actual_cost ?? (r.estimated_cost ? Math.max(0, r.estimated_cost - ((r as any).discount_amount ?? 0)) : null)
+        if (total == null) return '—'
+        const paid = r.deposit_paid ?? 0
+        const status = paid <= 0 ? 'Unpaid' : paid >= total - 0.01 ? 'Paid' : 'Partial'
+        const styles: Record<string, string> = {
+          Paid: 'bg-green-100 text-green-700',
+          Partial: 'bg-amber-100 text-amber-700',
+          Unpaid: 'bg-gray-100 text-gray-500',
+        }
+        return (
+          <div className="relative group inline-block">
+            {/* Paid/Unpaid are one-click (just writes deposit_paid to the full
+                total or zero). Partial needs an actual amount, so picking it
+                opens Edit Job instead — same Deposit field staff already use. */}
+            <select
+              value={status}
+              onChange={(e) => {
+                e.stopPropagation()
+                if (e.target.value === 'Partial') openEdit(r)
+                else handlePaymentStatusChange(r.id, e.target.value as 'Paid' | 'Unpaid', total)
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+            >
+              <option value="Unpaid">Unpaid</option>
+              <option value="Partial">Partial</option>
+              <option value="Paid">Paid</option>
+            </select>
+            <span
+              className={`inline-flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-all group-hover:ring-2 group-hover:ring-offset-1 group-hover:ring-blue-400 ${styles[status]}`}
+            >
+              {status}
+              <ChevronDown className="ml-1 h-3 w-3 opacity-70" />
+            </span>
+          </div>
+        )
+      }
+    },
+    {
       accessorKey: 'created_at', header: 'Created', size: 110, cell: ({ getValue }) => {
         const d = new Date(getValue() as string)
         return (
@@ -1748,8 +1876,8 @@ export default function RepairsPage() {
   ]
 
   const TOGGLEABLE_COLS = isTyreShop
-    ? ['customers', 'customer_phone', 'customer_email', 'vehicle', 'tyre', 'issue', 'status', 'actual_cost', 'created_at']
-    : ['customers', 'customer_phone', 'customer_email', 'device_type', 'device_brand', 'device_model', 'issue', 'status', 'actual_cost', 'created_at']
+    ? ['customers', 'customer_phone', 'customer_email', 'vehicle', 'assigned_to', 'issue', 'status', 'actual_cost', 'payment_status', 'created_at']
+    : ['customers', 'customer_phone', 'customer_email', 'device_type', 'device_brand', 'device_model', 'issue', 'status', 'actual_cost', 'payment_status', 'created_at']
   const COL_LABELS: Record<string, string> = {
     customers: 'Customer',
     customer_phone: 'Phone',
@@ -1758,10 +1886,11 @@ export default function RepairsPage() {
     device_brand: 'Brand',
     device_model: 'Model',
     vehicle: 'Vehicle',
-    tyre: 'Tyre',
+    assigned_to: 'Fitter',
     issue: 'Fault',
     status: 'Status',
     actual_cost: 'Cost',
+    payment_status: 'Payment',
     created_at: 'Created',
   }
   // Hide phone/email by default — user can toggle on from Columns menu
@@ -2643,6 +2772,13 @@ export default function RepairsPage() {
                 {isTyreShop && selectedVehicle && (
                   <div className="mb-2 space-y-1.5">
                     <div className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setShowNewTyre((v) => !v)}
+                        className="flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:border-brand-teal hover:bg-teal-50 hover:text-brand-teal transition-colors"
+                      >
+                        <Plus className="h-3 w-3" /> Tyre Size
+                      </button>
                       {TYRE_EXTRAS_PRESETS.map((name) => (
                         <button
                           key={name}
@@ -2676,6 +2812,17 @@ export default function RepairsPage() {
                             className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-brand-teal focus:outline-none"
                           />
                         </div>
+                        <div className="w-28">
+                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">Tyre Size</label>
+                          <input
+                            type="text"
+                            value={customExtraTyreSize}
+                            onChange={(e) => setCustomExtraTyreSize(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && addCustomExtra()}
+                            placeholder="205/55R16"
+                            className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-brand-teal focus:outline-none"
+                          />
+                        </div>
                         <div className="w-24">
                           <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">Price {getCurrencySymbol()}</label>
                           <input
@@ -2699,7 +2846,51 @@ export default function RepairsPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => { setShowCustomExtra(false); setCustomExtraName(''); setCustomExtraPrice('') }}
+                          onClick={() => { setShowCustomExtra(false); setCustomExtraName(''); setCustomExtraPrice(''); setCustomExtraTyreSize('') }}
+                          className="h-8 w-8 shrink-0 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 flex items-center justify-center"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                    {showNewTyre && (
+                      <div className="flex items-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2">
+                        <div className="flex-1">
+                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">Tyre Size <span className="text-red-400">*</span></label>
+                          <input
+                            autoFocus
+                            type="text"
+                            value={newTyreSize}
+                            onChange={(e) => setNewTyreSize(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && addNewTyre()}
+                            placeholder="e.g. 205/55R16"
+                            className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-brand-teal focus:outline-none"
+                          />
+                        </div>
+                        <div className="w-24">
+                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">Price {getCurrencySymbol()}</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={newTyrePrice}
+                            onChange={(e) => setNewTyrePrice(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && addNewTyre()}
+                            placeholder="0.00"
+                            className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-brand-teal focus:outline-none"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={addNewTyre}
+                          disabled={!newTyreSize.trim()}
+                          className="h-8 shrink-0 rounded-md bg-gray-900 px-3 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
+                        >
+                          Add
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowNewTyre(false); setNewTyreSize(''); setNewTyrePrice('') }}
                           className="h-8 w-8 shrink-0 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 flex items-center justify-center"
                         >
                           <X className="h-3.5 w-3.5" />
@@ -2726,6 +2917,17 @@ export default function RepairsPage() {
                         <div className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-transparent" />
                       )}
                     </div>
+                    {isTyreShop && (
+                      <button
+                        type="button"
+                        onClick={() => setShowCustomExtra((v) => !v)}
+                        disabled={!selectedVehicle}
+                        title="Add a product/extra manually"
+                        className="flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-brand-teal px-3 text-xs font-semibold text-white shadow-sm hover:bg-brand-teal/90 disabled:opacity-40 transition-colors"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add Product
+                      </button>
+                    )}
                   </div>
 
                   {showPartDrop && (
@@ -2792,6 +2994,19 @@ export default function RepairsPage() {
                           <li className="border-t border-gray-100">
                             <div className="flex flex-col gap-1.5 px-3 py-2">
                               <span className="text-xs italic text-gray-500">Add &quot;{partQuery.trim()}&quot;</span>
+                              {isTyreShop && (
+                                <div className="flex flex-col gap-0.5">
+                                  <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Tyre Size</span>
+                                  <input
+                                    type="text"
+                                    value={quickPartTyreSize}
+                                    onChange={(e) => setQuickPartTyreSize(e.target.value)}
+                                    placeholder="e.g. 205/55R16"
+                                    className="h-7 w-full rounded border border-gray-200 bg-gray-50 px-2 text-xs text-gray-900"
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                  />
+                                </div>
+                              )}
                               <div className="flex items-center gap-2">
                                 <div className="flex flex-1 flex-col gap-0.5">
                                   <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Cost {getCurrencySymbol()}</span>
@@ -3550,25 +3765,29 @@ export default function RepairsPage() {
                 </div>
               </div>
 
-              {/* Lab Fee — third-party cost, not billed to the customer */}
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                <label className={lbl}>Lab / 3rd-Party Fee</label>
-                <div className="relative">
-                  <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">£</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={editData.lab_fee}
-                    onChange={(e) => setEditData((p) => ({ ...p, lab_fee: e.target.value }))}
-                    placeholder="0.00"
-                    className={`${inp} pl-6 bg-white`}
-                  />
+              {/* Lab Fee — third-party cost, not billed to the customer.
+                  Device-repair concept (outsourced lab) — no equivalent for
+                  tyre jobs, which don't send anything out to a lab. */}
+              {!isTyreShop && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <label className={lbl}>Lab / 3rd-Party Fee</label>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">£</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editData.lab_fee}
+                      onChange={(e) => setEditData((p) => ({ ...p, lab_fee: e.target.value }))}
+                      placeholder="0.00"
+                      className={`${inp} pl-6 bg-white`}
+                    />
+                  </div>
+                  <p className="mt-1.5 text-xs text-amber-700">
+                    Paid to an outsourced lab — deducted from business revenue/profit in reports. Not billed to the customer and does not affect the charges below.
+                  </p>
                 </div>
-                <p className="mt-1.5 text-xs text-amber-700">
-                  Paid to an outsourced lab — deducted from business revenue/profit in reports. Not billed to the customer and does not affect the charges below.
-                </p>
-              </div>
+              )}
 
               {/* Deposit */}
               <div>

@@ -93,6 +93,7 @@ export const ProductController = {
         itemType: searchParams.get('item_type') ?? undefined,
         modelId: searchParams.get('model_id') ?? undefined,
         partType: searchParams.get('part_type') ?? undefined,
+        skipCount: searchParams.get('skip_count') === 'true',
       })
       return ok(data, { page, limit, total: count ?? 0 })
     } catch (err) {
