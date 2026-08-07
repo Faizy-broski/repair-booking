@@ -333,6 +333,11 @@ const createSchema = z.object({
     discount_type: z.enum(['fixed', 'percent']).default('fixed'),
     discount_value: z.number().min(0).default(0),
     discount_amount: z.number().min(0).default(0),
+    // A job-level extra (e.g. Wheel Balancing/Valve Replacement/Tyre Disposal
+    // presets, or a custom one-off charge) — never resolved into a catalog
+    // Product/inventory row, unlike a regular quick-added part (see below).
+    // Default false preserves today's behaviour for every existing caller.
+    is_extra: z.boolean().optional().default(false),
   })).optional().default([]),
 })
 
@@ -495,7 +500,12 @@ export const RepairController = {
       // Save repair items (parts) if any
       if (parts && parts.length > 0 && repair) {
         const knownParts   = parts.filter(p => p.product_id)
-        const quickAddParts = parts.filter(p => !p.product_id)
+        // Extras (Wheel Balancing/Valve Replacement/Tyre Disposal presets, or
+        // a custom one-off charge) never touch the product catalog — they're
+        // just a named/priced line item on this job, same as a labour charge.
+        // Only genuine quick-added parts go through catalog resolution below.
+        const extraLineItems = parts.filter(p => !p.product_id && p.is_extra)
+        const quickAddParts = parts.filter(p => !p.product_id && !p.is_extra)
 
         // Resolve quick-add parts: single batch lookup instead of N sequential queries
         const resolvedQuickAdd: typeof parts = []
@@ -564,7 +574,7 @@ export const RepairController = {
           }
         }
 
-        const allResolved = [...knownParts, ...resolvedQuickAdd]
+        const allResolved = [...knownParts, ...resolvedQuickAdd, ...extraLineItems]
         const items = allResolved.map(p => ({
           repair_id:      repair.id,
           product_id:     p.product_id,

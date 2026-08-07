@@ -159,6 +159,12 @@ interface RepairLineItem {
   max_stock: number | null
   discount_type: 'fixed' | 'percent'
   discount_value: number
+  /** A job-level extra (Wheel Balancing/Valve Replacement/Tyre Disposal
+   * presets, "Add More", "+ Tyre Size") — never becomes a catalog Product on
+   * the backend, unlike a regular quick-added part. Undefined/false for
+   * anything picked from or typed into "Search inventory parts…", which
+   * keeps today's behaviour of becoming a trackable part. */
+  is_extra?: boolean
 }
 
 // "Now" in the shape <input type="datetime-local"> expects (local time,
@@ -1080,27 +1086,13 @@ export default function RepairsPage() {
   // name into the parts search and quick-adding it already works — staff can
   // fill in the price inline afterwards.
   async function addPresetExtra(name: string) {
+    // Always a plain extra — never looked up against or linked to the real
+    // product catalog, regardless of whether a product with this name
+    // happens to exist (it doesn't need to; an extra has no stock concept).
     const existing = repairParts.find((r) => r.name.toLowerCase() === name.toLowerCase())
     if (existing) {
-      setRepairParts((prev) => prev.map((r) => {
-        if (r !== existing) return r
-        const cap = r.max_stock ?? Infinity
-        if (r.qty >= cap) {
-          toast.error(`Only ${cap} in stock for "${r.name}"`)
-          return r
-        }
-        return { ...r, qty: Math.min(r.qty + 1, cap) }
-      }))
+      setRepairParts((prev) => prev.map((r) => r === existing ? { ...r, qty: r.qty + 1 } : r))
       return
-    }
-    if (activeBranch) {
-      try {
-        const params = new URLSearchParams({ branch_id: activeBranch.id, search: name, limit: '5' })
-        const res = await fetch(`/api/products?${params}`)
-        const json = await res.json()
-        const match = (json.data ?? []).find((p: { name: string }) => p.name.toLowerCase() === name.toLowerCase())
-        if (match) { addPartFromInventory(match); return }
-      } catch { /* fall through to ad-hoc line below */ }
     }
     setRepairParts((prev) => [...prev, {
       tempId: Math.random().toString(36).slice(2),
@@ -1113,6 +1105,7 @@ export default function RepairsPage() {
       max_stock: null,
       discount_type: 'fixed',
       discount_value: 0,
+      is_extra: true,
     }])
   }
 
@@ -1177,6 +1170,7 @@ export default function RepairsPage() {
       max_stock: null,
       discount_type: 'fixed',
       discount_value: 0,
+      is_extra: true,
     }])
     setNewTyreSize('')
     setNewTyrePrice('')
@@ -1198,6 +1192,7 @@ export default function RepairsPage() {
       max_stock: null,
       discount_type: 'fixed',
       discount_value: 0,
+      is_extra: true,
     }])
     setCustomExtraName('')
     setCustomExtraPrice('')
@@ -1380,6 +1375,7 @@ export default function RepairsPage() {
           discount_type: p.discount_type,
           discount_value: p.discount_value,
           discount_amount: lineDiscountAmount(p.qty, p.unit_price, p.discount_type, p.discount_value),
+          is_extra: p.is_extra ?? false,
         })),
       }),
     })
