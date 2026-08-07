@@ -403,7 +403,9 @@ export async function POST(request: NextRequest) {
     // If we don't recognise the price, keep the existing planId
     const supabase = getAdminSupabase() as any
     const { data: existing } = await supabase
-      .from('subscriptions').select('plan_id').eq('business_id', businessId).maybeSingle()
+      .from('subscriptions')
+      .select('plan_id, is_custom, custom_max_branches, custom_max_users, custom_max_products, custom_max_services, custom_price_monthly')
+      .eq('business_id', businessId).maybeSingle()
 
     const resolvedPlanId = planId ?? existing?.plan_id
     if (!resolvedPlanId) {
@@ -422,6 +424,23 @@ export async function POST(request: NextRequest) {
       .update({ is_active: dbStatus !== 'canceled' })
       .eq('id', businessId)
 
+    // Ad-hoc Custom Plan prices (built via price_data) never match a `plans` row,
+    // so `planId` resolves to null for them — that's the signal this subscription
+    // is still on its existing custom deal, not a real catalog-plan downgrade.
+    // Without this, every subscription.updated event would silently wipe
+    // is_custom/custom_price_monthly back to the shared placeholder's catalog
+    // price (confirmed: this is exactly what happened to a real business once
+    // webhook delivery started working — see plan notes).
+    const customOverrides = (!planId && existing?.is_custom)
+      ? {
+          maxBranches:  existing.custom_max_branches,
+          maxUsers:     existing.custom_max_users,
+          maxProducts:  existing.custom_max_products,
+          maxServices:  existing.custom_max_services,
+          priceMonthly: existing.custom_price_monthly,
+        }
+      : undefined
+
     await SubscriptionSyncService.upsert({
       businessId,
       planId:           resolvedPlanId,
@@ -432,6 +451,7 @@ export async function POST(request: NextRequest) {
       currentPeriodStart: subPeriod(stripeSub).start,
       currentPeriodEnd:   subPeriod(stripeSub).end,
       livemode:         event.livemode,
+      customOverrides,
     })
 
     await invalidateBusinessCache(businessId)

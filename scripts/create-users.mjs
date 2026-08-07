@@ -75,6 +75,27 @@ const USERS = [
     mainBranchName: 'Kokab Shoes - Main',
     password: '1234abcd',
   },
+  {
+    fullName: 'Sami',
+    businessName: 'RAS Mobile Tyres UK',
+    subdomain: 'ras-mobile-tyres',
+    email: 'sami@rasmobiletyres.com',
+    phone: '+447554452474',
+    mainBranchName: 'RAS Mobile Tyres UK - Main',
+    password: '1234abcd',
+    planName: 'Starter',
+    verticalSlug: 'mobile-tyre-fitting',
+  },
+]
+
+const TYRE_FAULTS = [
+  { name: 'Tyre Burst',                sort_order: 1 },
+  { name: 'Puncture / Flat Tyre',      sort_order: 2 },
+  { name: 'Slow Puncture',             sort_order: 3 },
+  { name: 'Worn Tread / Bald Tyre',    sort_order: 4 },
+  { name: 'Sidewall Damage',           sort_order: 5 },
+  { name: 'Wheel Alignment Issue',     sort_order: 6 },
+  { name: 'Wheel Balancing Required',  sort_order: 7 },
 ]
 
 const DEFAULT_STATUSES = [
@@ -127,20 +148,21 @@ async function createUser(payload) {
   const userId = authData.user.id
   console.log(`  Auth user created: ${userId}`)
 
-  // 3. Look up Growth plan
-  const { data: growthPlan, error: planError } = await supabase
+  // 3. Look up the requested plan (defaults to Growth, matching existing entries)
+  const planName = payload.planName ?? 'growth'
+  const { data: plan, error: planError } = await supabase
     .from('plans')
     .select('id')
-    .ilike('name', 'growth')
+    .ilike('name', planName)
     .eq('is_active', true)
     .maybeSingle()
 
-  if (planError || !growthPlan) {
-    console.error('  [ERROR] Growth plan not found:', planError?.message ?? 'no row returned')
+  if (planError || !plan) {
+    console.error(`  [ERROR] "${planName}" plan not found:`, planError?.message ?? 'no row returned')
     await supabase.auth.admin.deleteUser(userId)
     return
   }
-  console.log(`  Growth plan found: ${growthPlan.id}`)
+  console.log(`  ${planName} plan found: ${plan.id}`)
 
   // 4. Create business (immediately active)
   const trialEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
@@ -166,7 +188,7 @@ async function createUser(payload) {
   }
   console.log(`  Business created: ${business.id}`)
 
-  // 5. Create active Growth plan subscription
+  // 5. Create active plan subscription
   const periodStart = new Date().toISOString()
   const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
@@ -174,7 +196,7 @@ async function createUser(payload) {
     .from('subscriptions')
     .insert({
       business_id: business.id,
-      plan_id: growthPlan.id,
+      plan_id: plan.id,
       status: 'active',
       billing_cycle: 'monthly',
       current_period_start: periodStart,
@@ -184,7 +206,7 @@ async function createUser(payload) {
   if (subError) {
     console.warn('  [WARN] Subscription creation failed (non-fatal):', subError.message)
   } else {
-    console.log('  Growth plan subscription activated')
+    console.log(`  ${planName} plan subscription activated`)
   }
 
   // 6. Create main branch
@@ -235,15 +257,57 @@ async function createUser(payload) {
     console.log('  Repair statuses seeded')
   }
 
-  // 9. Seed common faults
+  // 9. Seed common faults (tyre-relevant set for the tyre-fitting vertical,
+  // generic device-repair set otherwise)
+  const faultSet = payload.verticalSlug === 'mobile-tyre-fitting' ? TYRE_FAULTS : DEFAULT_FAULTS
   const { error: faultError } = await supabase
     .from('repair_faults')
-    .insert(DEFAULT_FAULTS.map(f => ({ ...f, business_id: business.id })))
+    .insert(faultSet.map(f => ({ ...f, business_id: business.id })))
 
   if (faultError) {
     console.warn('  [WARN] Faults seed failed (non-fatal):', faultError.message)
   } else {
     console.log('  Repair faults seeded')
+  }
+
+  // 10. Apply vertical template, if requested (module access + faults/categories
+  // already vertical-appropriate above)
+  if (payload.verticalSlug) {
+    const { data: template } = await supabase
+      .from('business_vertical_templates')
+      .select('*')
+      .eq('slug', payload.verticalSlug)
+      .single()
+
+    if (!template) {
+      console.warn(`  [WARN] Vertical template "${payload.verticalSlug}" not found`)
+    } else {
+      const modules = template.modules_enabled || []
+      const rows = modules.map(mod => ({
+        business_id: business.id,
+        module: mod,
+        is_enabled: true,
+        settings_override: (template.module_settings || {})[mod] || {},
+        updated_at: new Date().toISOString(),
+      }))
+      if (rows.length > 0) {
+        await supabase.from('business_module_access').upsert(rows, { onConflict: 'business_id,module' })
+      }
+      await supabase.from('businesses').update({
+        vertical_template_id: template.id,
+        vertical_template_version: template.version ?? 1,
+        updated_at: new Date().toISOString(),
+      }).eq('id', business.id)
+      await supabase.from('vertical_template_apply_log').insert({
+        template_id: template.id,
+        business_id: business.id,
+        applied_by: null,
+        apply_mode: 'initial',
+        modules_applied: modules,
+        diff_snapshot: { modules_count: modules.length, mode: 'initial' },
+      })
+      console.log(`  Applied vertical template: ${template.name} (${modules.join(', ')})`)
+    }
   }
 
   console.log(`  Done. Login: ${payload.email} / ${payload.password}`)

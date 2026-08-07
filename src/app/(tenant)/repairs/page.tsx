@@ -1938,7 +1938,7 @@ export default function RepairsPage() {
             <div className="min-w-0 flex-1">
               <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Total Repairs</p>
               {repairStats ? (
-                <p className="mt-2 text-base sm:text-2xl lg:text-3xl font-bold text-on-surface truncate" title={String(repairStats.total_repairs)}>{repairStats.total_repairs}</p>
+                <p className="mt-2 text-sm sm:text-base lg:text-lg font-bold text-on-surface whitespace-nowrap" title={String(repairStats.total_repairs)}>{repairStats.total_repairs}</p>
               ) : (
                 <div className="mt-2 h-8 w-24 rounded bg-surface-container animate-pulse" />
               )}
@@ -1964,7 +1964,7 @@ export default function RepairsPage() {
             <div className="min-w-0 flex-1">
               <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Revenue</p>
               {repairStats ? (
-                <p className="mt-2 text-base sm:text-xl lg:text-2xl font-bold text-on-surface truncate" title={formatCurrency(repairStats.total_sales)}>{formatCurrency(repairStats.total_sales)}</p>
+                <p className="mt-2 text-sm sm:text-base lg:text-lg font-bold text-on-surface whitespace-nowrap" title={formatCurrency(repairStats.total_sales)}>{formatCurrency(repairStats.total_sales)}</p>
               ) : (
                 <div className="mt-2 h-8 w-28 rounded bg-surface-container animate-pulse" />
               )}
@@ -1995,7 +1995,7 @@ export default function RepairsPage() {
             <div className="min-w-0 flex-1">
               <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Repair Margin</p>
               {repairStats ? (
-                <p className={`mt-2 text-base sm:text-xl lg:text-2xl font-bold truncate ${repairStats.repairs_profit >= 0 ? 'text-green-600' : 'text-error'}`} title={formatCurrency(repairStats.repairs_profit)}>
+                <p className={`mt-2 text-sm sm:text-base lg:text-lg font-bold whitespace-nowrap ${repairStats.repairs_profit >= 0 ? 'text-green-600' : 'text-error'}`} title={formatCurrency(repairStats.repairs_profit)}>
                   {formatCurrency(repairStats.repairs_profit)}
                 </p>
               ) : (
@@ -2028,7 +2028,7 @@ export default function RepairsPage() {
             <div className="min-w-0 flex-1">
               <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Open Jobs</p>
               {repairStats ? (
-                <p className="mt-2 text-base sm:text-2xl lg:text-3xl font-bold text-on-surface truncate" title={String(repairStats.repairs_open)}>{repairStats.repairs_open}</p>
+                <p className="mt-2 text-sm sm:text-base lg:text-lg font-bold text-on-surface whitespace-nowrap" title={String(repairStats.repairs_open)}>{repairStats.repairs_open}</p>
               ) : (
                 <div className="mt-2 h-8 w-16 rounded bg-surface-container animate-pulse" />
               )}
@@ -2053,7 +2053,7 @@ export default function RepairsPage() {
             <div className="min-w-0 flex-1">
               <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Completed Jobs</p>
               {repairStats ? (
-                <p className="mt-2 text-base sm:text-2xl lg:text-3xl font-bold text-on-surface truncate" title={String(repairStats.repairs_completed)}>{repairStats.repairs_completed}</p>
+                <p className="mt-2 text-sm sm:text-base lg:text-lg font-bold text-on-surface whitespace-nowrap" title={String(repairStats.repairs_completed)}>{repairStats.repairs_completed}</p>
               ) : (
                 <div className="mt-2 h-8 w-12 rounded bg-surface-container animate-pulse" />
               )}
