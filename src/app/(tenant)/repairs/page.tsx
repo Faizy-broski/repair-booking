@@ -2005,7 +2005,7 @@ export default function RepairsPage() {
               {repairStats ? (
                 <div className="mt-2 space-y-0.5">
                   <p className="flex items-center justify-between gap-2 text-xs sm:text-sm" title="Updates once a job is marked complete — matches Reports' Total Revenue">
-                    <span className="truncate text-on-surface-variant">Completed (P&amp;L)</span>
+                    <span className="truncate text-on-surface-variant">P&amp;L</span>
                     <span className="shrink-0 whitespace-nowrap font-bold text-on-surface">{formatCurrency(repairStats.revenue_completed)}</span>
                   </p>
                   <p className="flex items-center justify-between gap-2 text-xs sm:text-sm" title="Updates as soon as a new job is booked, even before it's finished">
@@ -2032,7 +2032,7 @@ export default function RepairsPage() {
               {repairStats ? (
                 <div className="mt-2 space-y-0.5">
                   <p className="flex items-center justify-between gap-2 text-xs sm:text-sm" title="Revenue minus parts cost and lab fees for jobs completed this period — excludes business expenses &amp; salaries (see Net Profit on Reports for the full P&amp;L figure)">
-                    <span className="truncate text-on-surface-variant">Completed (P&amp;L)</span>
+                    <span className="truncate text-on-surface-variant">P&amp;L</span>
                     <span className={`shrink-0 whitespace-nowrap font-bold ${repairStats.profit_completed >= 0 ? 'text-green-600' : 'text-error'}`}>{formatCurrency(repairStats.profit_completed)}</span>
                   </p>
                   <p className="flex items-center justify-between gap-2 text-xs sm:text-sm" title="Updates as soon as a new job is booked, even before it's finished">
