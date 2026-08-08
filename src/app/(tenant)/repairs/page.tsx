@@ -1965,7 +1965,10 @@ export default function RepairsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
+      {/* Capped at 3 columns (not 4/6 on wider screens) — beyond that, cards
+          get too narrow for their labels/values to fit without truncating,
+          even short ones like "Booked" or the "TOTAL REPAIRS" title itself. */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         {/* Total Repairs */}
         <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm">
           <div className="flex items-start justify-between gap-2 sm:gap-3">
