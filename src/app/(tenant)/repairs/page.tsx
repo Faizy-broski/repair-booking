@@ -720,7 +720,13 @@ export default function RepairsPage() {
   // modal's Deposit field, same as today; this doesn't add a new status
   // field, it just writes deposit_paid (the same field Edit Job already
   // writes) to one of its two "obvious" values.
-  async function handlePaymentStatusChange(repairId: string, newStatus: 'Paid' | 'Unpaid', total: number) {
+  //
+  // Marking Paid also records the payment method (see the inline Cash/Card
+  // prompt this triggers, below) as a repair_payments ledger entry — without
+  // it the system has no way to know which method was used, which is why the
+  // Deposits by Method dashboard tile stays at zero for jobs marked paid this
+  // way. Unpaid needs no method (nothing was paid) and stays one-click.
+  async function handlePaymentStatusChange(repairId: string, newStatus: 'Paid' | 'Unpaid', total: number, priorDeposit: number, method?: 'cash' | 'card') {
     const newDeposit = newStatus === 'Paid' ? total : 0
     const previousData = queryClient.getQueryData<RepairListResponse>(repairsQueryKey)
 
@@ -729,10 +735,13 @@ export default function RepairsPage() {
       return { ...old, data: old.data.map((r: RepairRow) => r.id === repairId ? { ...r, deposit_paid: newDeposit } : r) }
     })
 
+    const paymentDue = newStatus === 'Paid' ? Math.max(0, newDeposit - priorDeposit) : 0
+    const payment_splits = method && paymentDue > 0 ? [{ method, amount: paymentDue }] : []
+
     const res = await fetch(`/api/repairs/${repairId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ deposit_paid: newDeposit }),
+      body: JSON.stringify({ deposit_paid: newDeposit, payment_splits }),
     })
 
     if (!res.ok) {
@@ -1801,32 +1810,57 @@ export default function RepairsPage() {
           Partial: 'bg-amber-100 text-amber-700',
           Unpaid: 'bg-gray-100 text-gray-500',
         }
+        const item = 'flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors'
         return (
-          <div className="relative group inline-block">
-            {/* Paid/Unpaid are one-click (just writes deposit_paid to the full
-                total or zero). Partial needs an actual amount, so picking it
-                opens Edit Job instead — same Deposit field staff already use. */}
-            <select
-              value={status}
-              onChange={(e) => {
-                e.stopPropagation()
-                if (e.target.value === 'Partial') openEdit(r)
-                else handlePaymentStatusChange(r.id, e.target.value as 'Paid' | 'Unpaid', total)
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-            >
-              <option value="Unpaid">Unpaid</option>
-              <option value="Partial">Partial</option>
-              <option value="Paid">Paid</option>
-            </select>
-            <span
-              className={`inline-flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-all group-hover:ring-2 group-hover:ring-offset-1 group-hover:ring-blue-400 ${styles[status]}`}
-            >
-              {status}
-              <ChevronDown className="ml-1 h-3 w-3 opacity-70" />
-            </span>
-          </div>
+          <DropdownMenu.Root>
+            {/* Unpaid is one-click (writes deposit_paid to zero). Partial needs
+                an actual amount, so picking it opens Edit Job instead — same
+                Deposit field staff already use. Paid needs a Cash/Card pick:
+                without knowing the method, the Deposits by Method dashboard
+                tile has nothing to attribute the payment to. */}
+            <DropdownMenu.Trigger asChild onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+              <span
+                className={`inline-flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-all hover:ring-2 hover:ring-offset-1 hover:ring-blue-400 ${styles[status]}`}
+              >
+                {status}
+                <ChevronDown className="ml-1 h-3 w-3 opacity-70" />
+              </span>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content
+                className="z-50 w-32 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden p-0 animate-in fade-in zoom-in-95 duration-100"
+                sideOffset={5}
+                align="start"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <DropdownMenu.Item className={item} onSelect={() => handlePaymentStatusChange(r.id, 'Unpaid', total, paid)}>
+                  Unpaid
+                </DropdownMenu.Item>
+                <DropdownMenu.Item className={item} onSelect={() => openEdit(r)}>
+                  Partial
+                </DropdownMenu.Item>
+                <DropdownMenu.Sub>
+                  <DropdownMenu.SubTrigger className={item}>
+                    Paid
+                    <ChevronDown className="ml-auto h-3 w-3 -rotate-90 opacity-70" />
+                  </DropdownMenu.SubTrigger>
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.SubContent
+                      className="z-50 w-28 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden p-0 animate-in fade-in zoom-in-95 duration-100"
+                      sideOffset={2}
+                    >
+                      <DropdownMenu.Item className={item} onSelect={() => handlePaymentStatusChange(r.id, 'Paid', total, paid, 'cash')}>
+                        Cash
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item className={item} onSelect={() => handlePaymentStatusChange(r.id, 'Paid', total, paid, 'card')}>
+                        Card
+                      </DropdownMenu.Item>
+                    </DropdownMenu.SubContent>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Sub>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
         )
       }
     },
@@ -1958,67 +1992,62 @@ export default function RepairsPage() {
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />
         </div>
 
-        {/* Revenue */}
+        {/* Revenue — same row layout as Deposits by Method below: neither
+            figure is "the" number, they update at different moments
+            (booking vs completion), so both get equal bold weight instead of
+            one hero + one footnote. Rows use justify-between + shrink-0 on
+            the value so growing amounts push the layout wider without
+            wrapping or crowding the label. */}
         <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm">
           <div className="flex items-start justify-between gap-2 sm:gap-3">
             <div className="min-w-0 flex-1">
               <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Revenue</p>
               {repairStats ? (
-                <p className="mt-2 text-sm sm:text-base lg:text-lg font-bold text-on-surface whitespace-nowrap" title={formatCurrency(repairStats.total_sales)}>{formatCurrency(repairStats.total_sales)}</p>
+                <div className="mt-2 space-y-0.5">
+                  <p className="flex items-center justify-between gap-2 text-xs sm:text-sm" title="Updates once a job is marked complete — matches Reports' Total Revenue">
+                    <span className="truncate text-on-surface-variant">Completed (P&amp;L)</span>
+                    <span className="shrink-0 whitespace-nowrap font-bold text-on-surface">{formatCurrency(repairStats.revenue_completed)}</span>
+                  </p>
+                  <p className="flex items-center justify-between gap-2 text-xs sm:text-sm" title="Updates as soon as a new job is booked, even before it's finished">
+                    <span className="truncate text-on-surface-variant">Booked</span>
+                    <span className="shrink-0 whitespace-nowrap font-bold text-on-surface">{formatCurrency(repairStats.total_sales)}</span>
+                  </p>
+                </div>
               ) : (
-                <div className="mt-2 h-8 w-28 rounded bg-surface-container animate-pulse" />
+                <div className="mt-2 h-8 w-24 rounded bg-surface-container animate-pulse" />
               )}
             </div>
             <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl bg-tertiary-container/40">
               <Banknote className="h-4 w-4 sm:h-5 sm:w-5 text-tertiary" />
             </div>
           </div>
-          {repairStats ? (
-            <>
-              <p className="mt-3 flex items-center gap-1 text-xs font-medium text-tertiary">
-                <TrendingUp className="h-3 w-3" />
-                booked this period (deposits + actuals)
-              </p>
-              <p className="mt-1 text-[11px] text-on-surface-variant" title="Completed jobs only, by completion date — same definition as the Profit & Loss report">
-                {formatCurrency(repairStats.revenue_completed)} completed this period (P&amp;L basis)
-              </p>
-            </>
-          ) : (
-            <div className="mt-3 h-4 w-20 rounded bg-surface-container animate-pulse" />
-          )}
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-tertiary" />
         </div>
 
-        {/* Profit */}
+        {/* Profit — same row layout as Revenue/Deposits by Method above. */}
         <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm">
           <div className="flex items-start justify-between gap-2 sm:gap-3">
             <div className="min-w-0 flex-1">
               <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Repair Margin</p>
               {repairStats ? (
-                <p className={`mt-2 text-sm sm:text-base lg:text-lg font-bold whitespace-nowrap ${repairStats.repairs_profit >= 0 ? 'text-green-600' : 'text-error'}`} title={formatCurrency(repairStats.repairs_profit)}>
-                  {formatCurrency(repairStats.repairs_profit)}
-                </p>
+                <div className="mt-2 space-y-0.5">
+                  <p className="flex items-center justify-between gap-2 text-xs sm:text-sm" title="Revenue minus parts cost and lab fees for jobs completed this period — excludes business expenses &amp; salaries (see Net Profit on Reports for the full P&amp;L figure)">
+                    <span className="truncate text-on-surface-variant">Completed (P&amp;L)</span>
+                    <span className={`shrink-0 whitespace-nowrap font-bold ${repairStats.profit_completed >= 0 ? 'text-green-600' : 'text-error'}`}>{formatCurrency(repairStats.profit_completed)}</span>
+                  </p>
+                  <p className="flex items-center justify-between gap-2 text-xs sm:text-sm" title="Updates as soon as a new job is booked, even before it's finished">
+                    <span className="truncate text-on-surface-variant">Booked</span>
+                    <span className={`shrink-0 whitespace-nowrap font-bold ${repairStats.repairs_profit >= 0 ? 'text-green-600' : 'text-error'}`}>{formatCurrency(repairStats.repairs_profit)}</span>
+                  </p>
+                </div>
               ) : (
-                <div className="mt-2 h-8 w-28 rounded bg-surface-container animate-pulse" />
+                <div className="mt-2 h-8 w-24 rounded bg-surface-container animate-pulse" />
               )}
             </div>
             <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl bg-green-50">
               <TrendingUp className="h-4 w-4 sm:h-5 w-5 text-green-600" />
             </div>
           </div>
-          {repairStats ? (
-            <>
-              <p className="mt-3 flex items-center gap-1 text-xs font-medium text-green-600">
-                <TrendingUp className="h-3 w-3" />
-                revenue above, minus parts cost and lab fees (excludes business expenses &amp; salaries)
-              </p>
-              <p className="mt-1 text-[11px] text-on-surface-variant" title="Completed jobs only, by completion date — same revenue rule as the P&amp;L report, but this margin excludes business expenses &amp; salaries (see Net Profit on Reports for the full P&amp;L figure)">
-                {formatCurrency(repairStats.profit_completed)} completed this period (P&amp;L basis)
-              </p>
-            </>
-          ) : (
-            <div className="mt-3 h-4 w-24 rounded bg-surface-container animate-pulse" />
-          )}
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-green-500" />
         </div>
 

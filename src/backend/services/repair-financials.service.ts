@@ -78,12 +78,15 @@ export function computeRepairRevenue(repair: RepairRevenueRow, posOverrideMap: M
 }
 
 // Completed-in-period view of "repair revenue" — recognizes a job on the
-// date it's actually finished (updated_at), not the date it was booked.
-// This is the same rule get_profit_loss uses (migration 152). It's exposed
-// as an ADDITIONAL, separate figure alongside the existing booking-window
-// revenue/profit (see repairs/stats/route.ts and dashboard.controller.ts) —
-// it never replaces them, so no currently-displayed number changes.
-export function filterCompletedRepairsInPeriod<T extends { status?: string | null; updated_at?: string | null }>(
+// date it's actually finished (completed_at, migration 182 — set once by a
+// DB trigger the moment status transitions to terminal), not the date it
+// was booked, and not updated_at (which bumps on any edit, so it isn't a
+// stable completion signal). This is the same rule get_profit_loss uses
+// (migration 183). It's exposed as an ADDITIONAL, separate figure alongside
+// the existing booking-window revenue/profit (see repairs/stats/route.ts and
+// dashboard.controller.ts) — it never replaces them, so no currently-
+// displayed number changes.
+export function filterCompletedRepairsInPeriod<T extends { status?: string | null; completed_at?: string | null }>(
   repairs: T[],
   periodStart: string,
   periodEnd?: string
@@ -92,8 +95,8 @@ export function filterCompletedRepairsInPeriod<T extends { status?: string | nul
   const end   = periodEnd ? new Date(periodEnd).getTime() : Date.now()
   return repairs.filter((r) => {
     if (!isTerminalRepairStatus(r.status)) return false
-    if (!r.updated_at) return false
-    const t = new Date(r.updated_at).getTime()
+    if (!r.completed_at) return false
+    const t = new Date(r.completed_at).getTime()
     return t >= start && t <= end
   })
 }

@@ -51,18 +51,20 @@ export const GET = withMiddleware(async (req, ctx) => {
         .gte('created_at', periodStart),
 
       // ── Additional/secondary figure only (does not affect repairs_revenue/
-      // repairs_profit above): completed-in-period, by completion date — the
-      // same definition get_profit_loss (P&L report) uses. Exposed as
+      // repairs_profit above): completed-in-period, by completion date
+      // (completed_at, migration 182 — set once by a DB trigger, not bumped
+      // by unrelated edits the way updated_at was) — the same definition
+      // get_profit_loss (P&L report) uses. Exposed as
       // repairs_revenue_completed/repairs_profit_completed for cross-reference.
       db.from('repairs')
-        .select('id, status, updated_at, deposit_paid, actual_cost, estimated_cost, discount_amount, refund_amount, lab_fee')
+        .select('id, status, completed_at, deposit_paid, actual_cost, estimated_cost, discount_amount, refund_amount, lab_fee')
         .eq('branch_id', branchId)
-        .gte('updated_at', periodStart),
+        .gte('completed_at', periodStart),
 
       db.from('repair_items')
-        .select('quantity, unit_cost, repairs!inner(branch_id, updated_at, status, deposit_paid)')
+        .select('quantity, unit_cost, repairs!inner(branch_id, completed_at, status, deposit_paid)')
         .eq('repairs.branch_id', branchId)
-        .gte('repairs.updated_at', periodStart),
+        .gte('repairs.completed_at', periodStart),
 
       // POS override for the completed-in-period figure — unrestricted by
       // sale date (matches get_profit_loss): a repair's lifetime POS total

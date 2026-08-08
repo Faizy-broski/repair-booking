@@ -81,7 +81,7 @@ export default function ReportsOverviewPage() {
 
   const statsCards = [
     { label: 'Total Revenue', value: formatCurrency(stats.total_revenue), icon: Banknote, color: 'text-green-600', bg: 'bg-green-50' },
-    { label: 'Transactions',  value: String(stats.total_transactions),    icon: ShoppingCart, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'POS Transactions',  value: String(stats.total_transactions),    icon: ShoppingCart, color: 'text-blue-600', bg: 'bg-blue-50', title: 'Sales rung up through POS checkout only — repair payments taken directly in the Repairs module aren’t counted here.' },
     { label: 'Repairs',       value: String(stats.total_repairs),         icon: Wrench,       color: 'text-purple-600', bg: 'bg-purple-50' },
     {
       label: 'Net Profit',
@@ -139,7 +139,7 @@ export default function ReportsOverviewPage() {
       {/* Summary stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {statsCards.map((card) => (
-          <div key={card.label} className="rounded-xl border border-outline-variant bg-surface p-4">
+          <div key={card.label} className="rounded-xl border border-outline-variant bg-surface p-4" title={(card as { title?: string }).title}>
             <div className="flex items-start justify-between gap-2">
               <p className="text-sm font-medium text-on-surface-variant leading-tight">{card.label}</p>
               <div className={`rounded-lg p-2 shrink-0 ${card.bg}`}>
