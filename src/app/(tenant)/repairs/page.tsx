@@ -382,7 +382,7 @@ export default function RepairsPage() {
   // Repair parts state
   const [repairParts, setRepairParts] = useState<RepairLineItem[]>([])
   const [partQuery, setPartQuery] = useState('')
-  const [partResults, setPartResults] = useState<Array<{ id: string; name: string; selling_price: number | null; cost_price: number | null; on_hand?: number; is_service?: boolean; has_variants?: boolean; variant_count?: number }>>([])
+  const [partResults, setPartResults] = useState<Array<{ id: string; name: string; selling_price: number | null; cost_price: number | null; next_batch_cost?: number | null; on_hand?: number; is_service?: boolean; has_variants?: boolean; variant_count?: number }>>([])
   const [showPartDrop, setShowPartDrop] = useState(false)
   const [partSearchLoading, setPartSearchLoading] = useState(false)
   const partSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1023,7 +1023,7 @@ export default function RepairsPage() {
   }
 
   function addPartFromInventory(
-    p: { id: string; name: string; selling_price?: number | null; cost_price?: number | null; on_hand?: number; is_service?: boolean },
+    p: { id: string; name: string; selling_price?: number | null; cost_price?: number | null; next_batch_cost?: number | null; on_hand?: number; is_service?: boolean },
     variant?: { id: string; name: string; sku?: string | null; selling_price?: number | null; cost_price?: number | null; stock?: number | null } | null
   ) {
     const maxStock = variant ? (variant.stock ?? 0) : p.is_service ? null : (p.on_hand ?? 0)
@@ -1049,7 +1049,7 @@ export default function RepairsPage() {
         name,
         qty: 1,
         unit_price: (variant ? variant.selling_price : p.selling_price) ?? 0,
-        unit_cost: (variant ? variant.cost_price : p.cost_price) ?? 0,
+        unit_cost: (variant ? variant.cost_price : (p.next_batch_cost ?? p.cost_price)) ?? 0,
         max_stock: maxStock,
         discount_type: 'fixed',
         discount_value: 0,

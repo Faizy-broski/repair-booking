@@ -257,7 +257,7 @@ export default function NewDamageReturnPage() {
                 name: variant ? `${product.name} – ${variant.name}` : product.name,
                 sku: variant?.sku ?? '',
                 quantity: 1,
-                unit_cost: variant?.cost_price ?? product.cost_price ?? 0,
+                unit_cost: variant?.cost_price ?? product.next_batch_cost ?? product.cost_price ?? 0,
                 reason: '',
               }])
             }}

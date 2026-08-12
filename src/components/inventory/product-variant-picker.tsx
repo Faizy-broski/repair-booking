@@ -9,6 +9,7 @@ interface PickerProduct {
   name: string
   selling_price?: number | null
   cost_price?: number | null
+  next_batch_cost?: number | null
   has_variants?: boolean
 }
 
@@ -99,7 +100,7 @@ export function ProductVariantPicker({ open, onClose, onSelect, branchId, title 
                   className="flex flex-col items-start rounded-lg border p-2.5 text-left text-sm hover:border-brand-teal hover:bg-brand-teal-light/20 transition-colors"
                 >
                   <span className="font-medium">{v.name}</span>
-                  <span className="text-xs text-gray-500">Cost: {formatCurrency(v.cost_price ?? variantFor.cost_price ?? 0)}</span>
+                  <span className="text-xs text-gray-500">Cost: {formatCurrency(v.cost_price ?? variantFor.next_batch_cost ?? variantFor.cost_price ?? 0)}</span>
                   {v.stock != null && <span className="text-[10px] text-gray-400">{v.stock} in stock</span>}
                 </button>
               ))}
@@ -130,7 +131,7 @@ export function ProductVariantPicker({ open, onClose, onSelect, branchId, title 
                   className="flex flex-col items-start rounded-lg border p-2.5 text-left text-sm hover:border-brand-teal hover:bg-brand-teal-light/20 transition-colors"
                 >
                   <span className="font-medium truncate w-full">{p.name}</span>
-                  <span className="text-xs text-gray-500">Cost: {formatCurrency(p.cost_price ?? 0)}</span>
+                  <span className="text-xs text-gray-500">Cost: {formatCurrency(p.next_batch_cost ?? p.cost_price ?? 0)}</span>
                   {p.has_variants && <span className="text-[10px] text-brand-teal">Select variant →</span>}
                 </button>
               ))}
