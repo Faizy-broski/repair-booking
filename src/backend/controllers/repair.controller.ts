@@ -889,12 +889,14 @@ export const RepairController = {
 
       const cachePath = PdfCacheService.cachePath('invoices', id)
       const filename = `invoice-${data.jobNumber}.pdf`
+
+      // Always render the buffer (not just on a cache miss) — it's needed to
+      // attach the actual PDF to the email, not just link to it.
+      const result = await buildRepairInvoiceBuffer(id, ctx.auth.branchId ?? null, ctx.businessId)
+      if (!result) return notFound('Repair not found')
+
       let pdfUrl = await PdfCacheService.getSignedUrl(cachePath, filename, WHATSAPP_PDF_TTL_SECONDS)
-      if (!pdfUrl) {
-        const result = await buildRepairInvoiceBuffer(id, ctx.auth.branchId ?? null, ctx.businessId)
-        if (!result) return notFound('Repair not found')
-        pdfUrl = await PdfCacheService.store(cachePath, result.buffer, filename, WHATSAPP_PDF_TTL_SECONDS)
-      }
+      if (!pdfUrl) pdfUrl = await PdfCacheService.store(cachePath, result.buffer, filename, WHATSAPP_PDF_TTL_SECONDS)
       if (!pdfUrl) return serverError('Failed to prepare invoice PDF for sending')
 
       // Ensure this business has an active "invoice_created" template — most
@@ -945,6 +947,7 @@ export const RepairController = {
           invoice_link: shortUrl,
         },
         recipient: { email: data.customerEmail, phone: null },
+        attachments: [{ filename, content: result.buffer, contentType: 'application/pdf' }],
       })
 
       return ok({ sent: true })

@@ -20,7 +20,7 @@
 
 import { adminSupabase } from '@/backend/config/supabase'
 import { NotificationTemplateService, type TriggerEvent } from './notification-template.service'
-import { EmailService } from './email.service'
+import { EmailService, type EmailAttachment } from './email.service'
 import { SmsService, type SmsConfig } from './sms.service'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -36,6 +36,8 @@ export interface NotificationPayload {
     email?: string | null
     phone?: string | null
   }
+  /** Email-only. e.g. an invoice PDF — ignored for SMS dispatch. */
+  attachments?: EmailAttachment[]
 }
 
 // ── Macro Resolver ────────────────────────────────────────────────────────────
@@ -246,6 +248,7 @@ export const NotificationEngine = {
           storeEmail:   variables.store_email || bizInfo.email,
           replyTo:      bizInfo.replyToEmail ?? undefined,
           primaryColor: bizInfo.primaryColor,
+          attachments:  payload.attachments,
         })
           .then(() => {
             logEntry(businessId, branchId ?? null, template.id, triggerEvent, 'email',

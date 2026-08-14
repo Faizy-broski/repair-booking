@@ -185,6 +185,12 @@ export interface NewBusinessAlertPayload {
   registeredAt: string
 }
 
+export interface EmailAttachment {
+  filename: string
+  content: Buffer
+  contentType?: string
+}
+
 export interface TemplatedEmailPayload {
   to: string
   subject: string
@@ -199,6 +205,8 @@ export interface TemplatedEmailPayload {
   primaryColor?: string
   /** Reply-To address — used on platform SMTP only so customer replies reach the business inbox. */
   replyTo?: string
+  /** File(s) to attach, e.g. an invoice PDF — passed straight through to nodemailer. */
+  attachments?: EmailAttachment[]
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -238,6 +246,7 @@ export const EmailService = {
           to:      payload.to,
           subject: payload.subject,
           html:    wrappedHtml,
+          ...(payload.attachments ? { attachments: payload.attachments } : {}),
         })
         console.log(`[EmailService] Business SMTP sent OK — messageId=${info.messageId}`)
       } catch (err) {
@@ -262,6 +271,7 @@ export const EmailService = {
           subject: payload.subject,
           html:    wrappedHtml,
           ...(replyTo ? { replyTo } : {}),
+          ...(payload.attachments ? { attachments: payload.attachments } : {}),
         })
         console.log(`[EmailService] Global SMTP sent OK — messageId=${info.messageId}${replyTo ? ` replyTo=${replyTo}` : ''}`)
       } catch (err) {
