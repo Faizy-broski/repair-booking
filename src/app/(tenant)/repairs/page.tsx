@@ -28,6 +28,7 @@ import { PatternLock } from '@/components/ui/pattern-lock'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { VehiclePicker, type VehicleValue } from '@/components/vehicles/vehicle-picker'
+import { buildPaymentSplits, paymentSplitTotal } from '@/lib/payment-splits'
 
 interface SelectedCustomer {
   id: string
@@ -185,35 +186,6 @@ function lineDiscountAmount(qty: number, unitPrice: number, discountType: 'fixed
 
 function lineNetTotal(qty: number, unitPrice: number, discountType: 'fixed' | 'percent', discountValue: number) {
   return qty * unitPrice - lineDiscountAmount(qty, unitPrice, discountType, discountValue)
-}
-
-type PaymentSplit = { method: 'cash' | 'card' | 'store_credit' | 'loyalty_points'; amount: number }
-
-function buildPaymentSplits(
-  paymentMethods: string[],
-  paymentAmounts: { cash: string; card: string },
-  creditApplyInput: string,
-  loyaltyApplyInput: string,
-  loyaltyRate: number
-): PaymentSplit[] {
-  const splits: PaymentSplit[] = []
-  if (paymentMethods.includes('cash') && (parseFloat(paymentAmounts.cash) || 0) > 0) {
-    splits.push({ method: 'cash', amount: parseFloat(paymentAmounts.cash) })
-  }
-  if (paymentMethods.includes('card') && (parseFloat(paymentAmounts.card) || 0) > 0) {
-    splits.push({ method: 'card', amount: parseFloat(paymentAmounts.card) })
-  }
-  if (paymentMethods.includes('store_credit') && (parseFloat(creditApplyInput) || 0) > 0) {
-    splits.push({ method: 'store_credit', amount: parseFloat(creditApplyInput) })
-  }
-  if (paymentMethods.includes('loyalty_points') && (parseFloat(loyaltyApplyInput) || 0) > 0) {
-    splits.push({ method: 'loyalty_points', amount: (parseFloat(loyaltyApplyInput) || 0) * loyaltyRate })
-  }
-  return splits
-}
-
-function paymentSplitTotal(splits: PaymentSplit[]) {
-  return splits.reduce((s, x) => s + x.amount, 0)
 }
 
 // Job Fee (labour) + net parts total (after per-line discounts), minus the overall

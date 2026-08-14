@@ -93,7 +93,8 @@ export interface RepairDetailsForm {
   assigned_to: string
   lock_type: '' | 'passcode' | 'pattern'
   passcode: string
-  payment_method: '' | 'cash' | 'card' | 'store_credit' | 'loyalty_points'
+  payment_methods: ('cash' | 'card' | 'store_credit' | 'loyalty_points')[]
+  payment_amounts: { cash: string; card: string }
   credit_apply_input: string
   loyalty_apply_input: string
   is_rush: boolean

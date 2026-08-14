@@ -339,6 +339,7 @@ ${L(settings.show_tax_breakdown && tax > 0, `<div class="tr"><span class="tl">Ta
 <hr>
 <div class="gr"><span class="gl">Total Charges</span><span class="gv">${money(total, currency)}</span></div>
 <div class="tr"><span class="tl">Amount Paid</span><span class="tv">${money(amountPaid, currency)}</span></div>
+${L(!!paymentMethods?.length, `<div class="tr"><span class="tl">Payment Method</span><span class="tv">${esc(paymentMethodText(paymentMethods, currency))}</span></div>`)}
 ${L(bal > 0, `<div class="bar"><span class="bl">Balance Due</span><span class="bv">${money(bal, currency)}</span></div>`)}
 `}
 <div class="ft">

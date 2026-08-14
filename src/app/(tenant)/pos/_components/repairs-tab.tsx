@@ -13,6 +13,7 @@ import { CustomFieldRenderer, useCustomFieldDefs } from '@/components/shared/cus
 import { AsyncEmployeeSelect } from '@/components/shared/async-employee-select'
 import { toast } from 'sonner'
 import { printRepairInvoiceById } from '@/components/repairs/receipt-print'
+import { buildPaymentSplits, paymentSplitTotal } from '@/lib/payment-splits'
 import { TASK_TYPE_OPTIONS, type RepairDetailsForm, type RepairLineItem } from '../_types'
 
 interface RepairCustomStatus { id: string; name: string; color: string }
@@ -29,7 +30,7 @@ const EMPTY_DETAILS: RepairDetailsForm = {
   faults: [], job_fee: '', estimated_cost: '', deposit_paid: '', price_pending: false,
   due_date: '', status: '', assigned_to: '',
   lock_type: '', passcode: '',
-  payment_method: '', credit_apply_input: '', loyalty_apply_input: '',
+  payment_methods: [], payment_amounts: { cash: '', card: '' }, credit_apply_input: '', loyalty_apply_input: '',
   is_rush: false, physical_location: '', task_type: 'In-Store', device_network: '',
 }
 
@@ -413,6 +414,13 @@ export function RepairsTab() {
     try {
       const total   = parseFloat(repairDetails.estimated_cost) || 0
       const deposit = parseFloat(repairDetails.deposit_paid) || 0
+      // Tells the backend which tender(s) the deposit was paid with, so it can
+      // record repair_payments row(s) — without this the printed receipt has
+      // nothing to show on its "Payment Method" line even though one was picked.
+      const payment_splits = buildPaymentSplits(
+        repairDetails.payment_methods, repairDetails.payment_amounts,
+        repairDetails.credit_apply_input, repairDetails.loyalty_apply_input, loyaltyRate
+      )
       const payload = {
         branch_id: activeBranch.id,
         customer_id: pos.customer?.id ?? null,
@@ -429,15 +437,18 @@ export function RepairsTab() {
         passcode: repairDetails.passcode.trim() || null,
         notify_customer: !!pos.customer,
         is_rush: repairDetails.is_rush,
-        store_credit_applied: repairDetails.payment_method === 'store_credit' ? (parseFloat(repairDetails.credit_apply_input) || 0) : undefined,
-        loyalty_points_applied: repairDetails.payment_method === 'loyalty_points' ? (parseInt(repairDetails.loyalty_apply_input) || 0) : undefined,
+        store_credit_applied: repairDetails.payment_methods.includes('store_credit') ? (parseFloat(repairDetails.credit_apply_input) || 0) : undefined,
+        loyalty_points_applied: repairDetails.payment_methods.includes('loyalty_points') ? (parseInt(repairDetails.loyalty_apply_input) || 0) : undefined,
+        payment_splits,
         custom_fields: {
           due_date: repairDetails.due_date || null,
           physical_location: repairDetails.physical_location || null,
           task_type: repairDetails.task_type || null,
           device_network: repairDetails.device_network || null,
           price_pending: repairDetails.price_pending || undefined,
-          payment_method: repairDetails.payment_method || null,
+          payment_method: repairDetails.payment_methods.length === 1
+            ? repairDetails.payment_methods[0]
+            : repairDetails.payment_methods.length > 1 ? 'split' : null,
           ...repairCustomFields,
         },
         parts: repairParts.map(p => ({ product_id: p.product_id, name: p.name, quantity: p.qty, unit_cost: p.unit_cost, unit_price: p.unit_price })),
@@ -877,19 +888,27 @@ export function RepairsTab() {
             </div>
 
             <div className="mt-3">
-              <label className={lbl}>Payment Method <span className="font-normal normal-case text-gray-300">(opt)</span></label>
+              <label className={lbl}>Payment Method <span className="font-normal normal-case text-gray-300">(opt, select multiple to split)</span></label>
               <div className="flex flex-wrap gap-2">
                 {(['cash', 'card', 'store_credit', 'loyalty_points'] as const).map(m => {
                   const disabled = (m === 'store_credit' || m === 'loyalty_points') && !pos.customer
+                  const active = repairDetails.payment_methods.includes(m)
                   return (
                     <button
                       key={m}
                       type="button"
                       disabled={disabled}
                       title={disabled ? 'Select a customer first' : undefined}
-                      onClick={() => !disabled && setRepairDetails(p => ({ ...p, payment_method: p.payment_method === m ? '' : m }))}
+                      onClick={() => !disabled && setRepairDetails(p => {
+                        const active = p.payment_methods.includes(m)
+                        const payment_methods = active ? p.payment_methods.filter(x => x !== m) : [...p.payment_methods, m]
+                        const payment_amounts = m === 'cash' || m === 'card' ? { ...p.payment_amounts, [m]: active ? '' : p.payment_amounts[m] } : p.payment_amounts
+                        const credit_apply_input = m === 'store_credit' && active ? '' : p.credit_apply_input
+                        const loyalty_apply_input = m === 'loyalty_points' && active ? '' : p.loyalty_apply_input
+                        return { ...p, payment_methods, payment_amounts, credit_apply_input, loyalty_apply_input }
+                      })}
                       className={`flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
-                        repairDetails.payment_method === m
+                        active
                           ? 'border-gray-900 bg-gray-900 text-white'
                           : disabled
                             ? 'border-gray-100 text-gray-300 cursor-not-allowed'
@@ -904,7 +923,29 @@ export function RepairsTab() {
                 })}
               </div>
 
-              {repairDetails.payment_method === 'store_credit' && (
+              {repairDetails.payment_methods.includes('cash') && (
+                <div className="mt-2">
+                  <input
+                    type="number" min="0" step="0.01" placeholder="Cash amount"
+                    value={repairDetails.payment_amounts.cash}
+                    onChange={(e) => setRepairDetails(p => ({ ...p, payment_amounts: { ...p.payment_amounts, cash: e.target.value } }))}
+                    className={inp}
+                  />
+                </div>
+              )}
+
+              {repairDetails.payment_methods.includes('card') && (
+                <div className="mt-2">
+                  <input
+                    type="number" min="0" step="0.01" placeholder="Card amount"
+                    value={repairDetails.payment_amounts.card}
+                    onChange={(e) => setRepairDetails(p => ({ ...p, payment_amounts: { ...p.payment_amounts, card: e.target.value } }))}
+                    className={inp}
+                  />
+                </div>
+              )}
+
+              {repairDetails.payment_methods.includes('store_credit') && (
                 <div className="mt-2 space-y-1.5">
                   {creditBalance !== null && (
                     <p className="text-xs text-gray-500">Available balance: <span className="font-semibold text-gray-800">{formatCurrency(creditBalance)}</span></p>
@@ -925,7 +966,7 @@ export function RepairsTab() {
                 </div>
               )}
 
-              {repairDetails.payment_method === 'loyalty_points' && (
+              {repairDetails.payment_methods.includes('loyalty_points') && (
                 <div className="mt-2 space-y-1.5">
                   {loyaltyBalance !== null && (
                     <p className="text-xs text-gray-500">
@@ -948,6 +989,18 @@ export function RepairsTab() {
                   </div>
                 </div>
               )}
+
+              {repairDetails.payment_methods.length > 0 && (() => {
+                const splits = buildPaymentSplits(repairDetails.payment_methods, repairDetails.payment_amounts, repairDetails.credit_apply_input, repairDetails.loyalty_apply_input, loyaltyRate)
+                const applied = paymentSplitTotal(splits)
+                const due = parseFloat(repairDetails.deposit_paid) || 0
+                const remaining = due - applied
+                return (
+                  <p className={`mt-2 text-xs font-medium ${Math.abs(remaining) < 0.01 ? 'text-green-600' : 'text-amber-600'}`}>
+                    Applied {formatCurrency(applied)} / {formatCurrency(due)} {Math.abs(remaining) >= 0.01 && `· Remaining ${formatCurrency(remaining)}`}
+                  </p>
+                )
+              })()}
             </div>
           </div>
 

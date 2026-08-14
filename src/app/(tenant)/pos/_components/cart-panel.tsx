@@ -324,6 +324,11 @@ export function CartPanel({ mobileView }: Props) {
         tax:           taxAmt,
         total,
         amountPaid:    amountPaid ?? total,
+        // Same split-vs-single derivation SaleReceiptPdf uses for its "Payment"
+        // field, so the thermal and PDF receipts always agree on this line.
+        paymentMethods: paymentMethod === 'split' && paymentSplits?.length
+          ? paymentSplits.map(s => ({ method: s.method, amount: s.amount }))
+          : [{ method: paymentMethod, amount: amountPaid ?? total }],
         currency,
       }
       printThermalReceipt(data, preWin)
