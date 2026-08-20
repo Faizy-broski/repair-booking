@@ -145,7 +145,12 @@ export function CashMovementModal({
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">
-            {isCashOut ? 'Description' : 'Notes'} <span className="text-xs font-normal text-gray-400">(optional)</span>
+            {isCashOut ? 'Description' : 'Notes'}{' '}
+            {isCashOut && purpose === 'none' ? (
+              <span className="text-xs font-normal text-gray-400">(required)</span>
+            ) : (
+              <span className="text-xs font-normal text-gray-400">(optional)</span>
+            )}
           </label>
           <textarea
             rows={2}
@@ -178,7 +183,7 @@ export function CashMovementModal({
 
             {purpose === 'none' && (
               <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
-                ⚠ Plain cash out will not be reflected in your reports.
+                ⚠ Plain cash out will not be reflected in your reports. Add a note above explaining what it's for.
               </p>
             )}
 
@@ -199,6 +204,9 @@ export function CashMovementModal({
                     createLabel="Add category"
                     inline
                   />
+                )}
+                {!categoryId.trim() && !cashMovementNotes.trim() && (
+                  <p className="mt-2 text-xs text-amber-600">Select a category or add a description above — an expense cash-out needs a reason before it can be recorded.</p>
                 )}
               </div>
             )}
@@ -255,7 +263,9 @@ export function CashMovementModal({
             loading={cashMovementSaving}
             disabled={
               !cashMovementAmount || parseFloat(cashMovementAmount) <= 0 ||
-              (isCashOut && purpose === 'buyback' && (!buybackName.trim() || !buybackSellingPrice || parseFloat(buybackSellingPrice) < 0 || barcodeConflict))
+              (isCashOut && purpose === 'buyback' && (!buybackName.trim() || !buybackSellingPrice || parseFloat(buybackSellingPrice) < 0 || barcodeConflict)) ||
+              (isCashOut && purpose === 'expense' && !categoryId.trim() && !cashMovementNotes.trim()) ||
+              (isCashOut && purpose === 'none' && !cashMovementNotes.trim())
             }
             onClick={() => handleCashMovement(
               isCashOut && purpose === 'expense' ? categoryId || null : null,
