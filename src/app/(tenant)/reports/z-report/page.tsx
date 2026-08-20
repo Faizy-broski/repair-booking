@@ -96,6 +96,42 @@ function ZReportPageInner() {
     staleTime: 0,
   })
 
+  // register_sessions' sales/expected-cash columns are only populated by
+  // close_register_session() at close time -- for a still-open session
+  // they're genuinely NULL in the DB. Pull the live preview instead so this
+  // modal doesn't show a misleading £0.00/"—" for an open register (the POS
+  // page's Close Register modal already shows the correct live figure here).
+  const isDetailSessionOpen = detailSession?.status === 'open'
+  const { data: liveExpected, isLoading: liveExpectedLoading } = useQuery<any>({
+    queryKey: ['session-expected-cash', detailSession?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/pos/session/${detailSession!.id}/expected-cash`)
+      const json = await res.json()
+      return json.data ?? null
+    },
+    enabled: !!detailSession?.id && isDetailSessionOpen,
+    staleTime: 0,
+  })
+  const useLive = isDetailSessionOpen && !!liveExpected
+  const display = detailSession ? {
+    total_sales:              useLive ? liveExpected.total_sales : detailSession.total_sales,
+    transaction_count:        useLive ? liveExpected.transaction_count : detailSession.transaction_count,
+    repair_sales:             useLive ? liveExpected.repair_sales : detailSession.repair_sales,
+    repair_transaction_count: useLive ? liveExpected.repair_transaction_count : detailSession.repair_transaction_count,
+    repair_refunds:           useLive ? liveExpected.repair_refunds : detailSession.repair_refunds,
+    cash_sales:                useLive ? liveExpected.cash_sales : detailSession.cash_sales,
+    card_sales:                useLive ? liveExpected.card_sales : detailSession.card_sales,
+    other_sales:               useLive ? liveExpected.other_sales : detailSession.other_sales,
+    total_refunds:             useLive ? liveExpected.total_refunds : detailSession.total_refunds,
+    repair_cash_sales:         useLive ? liveExpected.repair_cash_sales : detailSession.repair_cash_sales,
+    repair_card_sales:         useLive ? liveExpected.repair_card_sales : detailSession.repair_card_sales,
+    repair_other_sales:        useLive ? liveExpected.repair_other_sales : detailSession.repair_other_sales,
+    opening_float:             detailSession.opening_float,
+    expected_cash:             useLive ? liveExpected.expected_cash : detailSession.expected_cash,
+    closing_cash:              detailSession.closing_cash,
+    variance:                  detailSession.variance,
+  } : null
+
   const zReportSessionId = zReportData?.session_id
   const { data: zReportMovements = [] } = useQuery<any[]>({
     queryKey: ['session-movements', zReportSessionId],
@@ -245,7 +281,7 @@ function ZReportPageInner() {
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-gray-400 italic">Variance reflects cash-drawer (product, cash-paid) transactions only — Repair Sales above are informational and not included in this reconciliation.</p>
+          <p className="mt-2 text-[11px] text-gray-400 italic">Reflects cash-drawer transactions: product/service sales and repair deposits paid in cash. Repair balances collected outside POS aren't captured with a payment method today, so they're excluded here.</p>
 
           {zReportMovements.length > 0 && (
             <div className="mt-4 rounded-lg border border-blue-200 bg-white p-3">
@@ -330,12 +366,25 @@ function ZReportPageInner() {
 
       {/* Session Detail Modal */}
       <Modal open={!!detailSession} onClose={() => setDetailSession(null)} title="Session Z-Report" size="xl">
-        {detailSession && (
+        {detailSession && display && (
           <div className="space-y-5 text-sm">
             <div className="flex justify-between text-xs text-on-surface-variant">
               <span>Opened: {new Date(detailSession.opened_at).toLocaleString()}</span>
-              <span>{detailSession.closed_at ? `Closed: ${new Date(detailSession.closed_at).toLocaleString()}` : 'Still open'}</span>
+              <span className="flex items-center gap-2">
+                {detailSession.closed_at ? `Closed: ${new Date(detailSession.closed_at).toLocaleString()}` : 'Still open'}
+                {isDetailSessionOpen && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                    {liveExpectedLoading ? 'Loading live figures…' : 'Live — register still open'}
+                  </span>
+                )}
+              </span>
             </div>
+
+            {isDetailSessionOpen && !liveExpectedLoading && !liveExpected && (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                Couldn't load live figures for this open session — the numbers below may be incomplete until it's closed.
+              </p>
+            )}
 
             {/* Sales breakdown: product vs repair */}
             <div>
@@ -343,21 +392,21 @@ function ZReportPageInner() {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="rounded-xl border border-outline-variant bg-surface p-4">
                   <p className="text-xs font-medium text-on-surface-variant">Product Sales</p>
-                  <p className="mt-1 text-xl font-semibold text-on-surface">{formatCurrency(detailSession.total_sales ?? 0)}</p>
-                  <p className="mt-0.5 text-xs text-on-surface-variant">{detailSession.transaction_count ?? 0} transactions</p>
+                  <p className="mt-1 text-xl font-semibold text-on-surface">{formatCurrency(display.total_sales ?? 0)}</p>
+                  <p className="mt-0.5 text-xs text-on-surface-variant">{display.transaction_count ?? 0} transactions</p>
                 </div>
                 <div className="rounded-xl border border-outline-variant bg-surface p-4">
                   <p className="text-xs font-medium text-on-surface-variant">Repair Sales</p>
-                  <p className="mt-1 text-xl font-semibold text-on-surface">{formatCurrency(detailSession.repair_sales ?? 0)}</p>
-                  <p className="mt-0.5 text-xs text-on-surface-variant">{detailSession.repair_transaction_count ?? 0} transactions</p>
-                  {(detailSession.repair_refunds ?? 0) > 0 && (
-                    <p className="mt-0.5 text-xs text-red-600">-{formatCurrency(detailSession.repair_refunds ?? 0)} refunded</p>
+                  <p className="mt-1 text-xl font-semibold text-on-surface">{formatCurrency(display.repair_sales ?? 0)}</p>
+                  <p className="mt-0.5 text-xs text-on-surface-variant">{display.repair_transaction_count ?? 0} transactions</p>
+                  {(display.repair_refunds ?? 0) > 0 && (
+                    <p className="mt-0.5 text-xs text-red-600">-{formatCurrency(display.repair_refunds ?? 0)} refunded</p>
                   )}
                 </div>
                 <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
                   <p className="text-xs font-medium text-blue-700">Grand Total</p>
                   <p className="mt-1 text-xl font-semibold text-blue-900">
-                    {formatCurrency((detailSession.total_sales ?? 0) + (detailSession.repair_sales ?? 0) - (detailSession.repair_refunds ?? 0))}
+                    {formatCurrency((display.total_sales ?? 0) + (display.repair_sales ?? 0) - (display.repair_refunds ?? 0))}
                   </p>
                 </div>
               </div>
@@ -368,10 +417,10 @@ function ZReportPageInner() {
               <div className="rounded-xl bg-surface-container-low p-4 space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant mb-3">Product Sales Detail</p>
                 {([
-                  ['Cash Sales',   detailSession.cash_sales,   false],
-                  ['Card Sales',   detailSession.card_sales,   false],
-                  ['Other Sales',  detailSession.other_sales,  false],
-                  ['Refunds',      detailSession.total_refunds, true],
+                  ['Cash Sales',   display.cash_sales,   false],
+                  ['Card Sales',   display.card_sales,   false],
+                  ['Other Sales',  display.other_sales,  false],
+                  ['Refunds',      display.total_refunds, true],
                 ] as [string, number | null, boolean][]).map(([label, val, isNeg]) => (
                   <div key={label} className="flex justify-between">
                     <span className="text-on-surface-variant">{label}</span>
@@ -385,10 +434,10 @@ function ZReportPageInner() {
               <div className="rounded-xl bg-surface-container-low p-4 space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant mb-3">Repair Sales Detail</p>
                 {([
-                  ['Cash Sales',        detailSession.repair_cash_sales,  false],
-                  ['Card Sales',        detailSession.repair_card_sales,  false],
-                  ['Other (pickup etc)', detailSession.repair_other_sales, false],
-                  ['Refunds',           detailSession.repair_refunds,     true],
+                  ['Cash Sales',        display.repair_cash_sales,  false],
+                  ['Card Sales',        display.repair_card_sales,  false],
+                  ['Other (pickup etc)', display.repair_other_sales, false],
+                  ['Refunds',           display.repair_refunds,     true],
                 ] as [string, number | null, boolean][]).map(([label, val, isNeg]) => (
                   <div key={label} className="flex justify-between">
                     <span className="text-on-surface-variant">{label}</span>
@@ -403,22 +452,22 @@ function ZReportPageInner() {
               <div className="rounded-xl bg-surface-container-low p-4 space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant mb-3">Cash Reconciliation</p>
                 {([
-                  ['Opening Float',  detailSession.opening_float, false],
-                  ['Expected Cash',  detailSession.expected_cash, false],
-                  ['Closing Cash',   detailSession.closing_cash,  false],
+                  ['Opening Float',  display.opening_float, false],
+                  ['Expected Cash',  display.expected_cash, false],
+                  ['Closing Cash',   display.closing_cash,  false],
                 ] as [string, number | null, boolean][]).map(([label, val]) => (
                   <div key={label} className="flex justify-between">
                     <span className="text-on-surface-variant">{label}</span>
                     <span className="text-on-surface">{val != null ? formatCurrency(val) : '—'}</span>
                   </div>
                 ))}
-                <div className={`flex justify-between font-semibold border-t border-outline-variant pt-2 mt-1 ${(detailSession.variance ?? 0) !== 0 ? 'text-red-600' : 'text-green-600'}`}>
+                <div className={`flex justify-between font-semibold border-t border-outline-variant pt-2 mt-1 ${(display.variance ?? 0) !== 0 ? 'text-red-600' : 'text-green-600'}`}>
                   <span>Variance (Over/Short)</span>
-                  <span>{detailSession.variance != null ? formatCurrency(detailSession.variance) : '—'}</span>
+                  <span>{display.variance != null ? formatCurrency(display.variance) : (isDetailSessionOpen ? 'Register still open' : '—')}</span>
                 </div>
               </div>
             </div>
-            <p className="-mt-3 text-xs text-on-surface-variant italic">Cash Reconciliation reflects product (cash-paid) transactions only — Repair Sales above are informational and excluded from this reconciliation.</p>
+            <p className="-mt-3 text-xs text-on-surface-variant italic">Reflects cash-drawer transactions: product/service sales and repair deposits paid in cash. Repair balances collected outside POS aren't captured with a payment method today, so they're excluded here.</p>
 
             <div className="rounded-xl bg-surface-container-low p-4 space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant mb-3">Cash Movements</p>
