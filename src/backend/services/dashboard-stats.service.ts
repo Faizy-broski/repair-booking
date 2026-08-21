@@ -23,18 +23,20 @@ export interface CashMovementRow {
   purpose?: string | null
 }
 
-// Cash In adds to Sales revenue, Cash Out subtracts — except 'expense'
-// purpose cash-outs (already counted via total_expenses) and
-// 'gift_card_sale' purpose cash-ins (deferred revenue, not revenue — a gift
-// card sale is a liability until redeemed, same reason store_credit/
-// loyalty_points sales are excluded from the register's cash_sales; see
-// migration 187).
+// Cash In adds to Sales revenue, Cash Out subtracts — except cash-outs
+// tagged 'expense' (already counted via total_expenses), 'plain' (the Cash
+// In/Out UI explicitly promises these have no report effect), or 'buyback'
+// (its cost is recognized as COGS when the item is later resold instead —
+// counting it here too would double it, see migration 195), and cash-ins
+// tagged 'gift_card_sale' (deferred revenue, not revenue — a gift card sale
+// is a liability until redeemed, same reason store_credit/loyalty_points
+// sales are excluded from the register's cash_sales; see migration 187).
 export function computeCashNet(rows: CashMovementRow[]): number {
   return rows.reduce(
     (s, r) => s + (
       r.type === 'cash_in'
         ? (r.purpose === 'gift_card_sale' ? 0 : (r.amount ?? 0))
-        : (r.purpose === 'expense' ? 0 : -(r.amount ?? 0))
+        : (r.purpose === 'expense' || r.purpose === 'plain' || r.purpose === 'buyback' ? 0 : -(r.amount ?? 0))
     ),
     0
   )

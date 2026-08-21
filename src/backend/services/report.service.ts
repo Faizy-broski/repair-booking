@@ -186,12 +186,14 @@ export const ReportService = {
       const revenue = ((salesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + (r.is_refund ? -r.total : r.total), 0)
       const expenses = ((expensesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.amount, 0)
       const salaries = ((salariesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.amount, 0)
-      // Cash In adds to Sales revenue, Cash Out subtracts — except 'expense'
-      // purpose cash-outs (already counted via the expenses table above) and
-      // 'gift_card_sale' purpose cash-ins (deferred revenue, not revenue —
-      // see migration 187).
+      // Cash In adds to Sales revenue, Cash Out subtracts — except cash-outs
+      // tagged 'expense' (already counted via the expenses table above),
+      // 'plain' (UI explicitly promises these have no report effect), or
+      // 'buyback' (its cost is recognized as COGS at resale instead — see
+      // migration 195), and cash-ins tagged 'gift_card_sale' (deferred
+      // revenue, not revenue — see migration 187).
       const cashNet = ((cashMovementsRes.data ?? []) as any[]).reduce(
-        (s: number, r: any) => s + (r.type === 'cash_in' ? (r.purpose === 'gift_card_sale' ? 0 : r.amount) : (r.purpose === 'expense' ? 0 : -r.amount)), 0
+        (s: number, r: any) => s + (r.type === 'cash_in' ? (r.purpose === 'gift_card_sale' ? 0 : r.amount) : (r.purpose === 'expense' || r.purpose === 'plain' || r.purpose === 'buyback' ? 0 : -r.amount)), 0
       )
       const totalRevenue = revenue + cashNet
       return {
