@@ -176,18 +176,22 @@ export const ReportService = {
     if (error) {
       // Fallback to JS aggregation if function not migrated yet
       const [salesRes, expensesRes, salariesRes, cashMovementsRes] = await Promise.all([
-        db('sales').select('total, discount, tax').eq('branch_id', branchId).gte('created_at', from).lte('created_at', to),
+        db('sales').select('total, discount, tax, is_refund').eq('branch_id', branchId).gte('created_at', from).lte('created_at', to),
         db('expenses').select('amount').eq('branch_id', branchId).gte('expense_date', from).lte('expense_date', to),
         db('salaries').select('amount').eq('branch_id', branchId).gte('pay_date', from).lte('pay_date', to),
         db('cash_movements').select('type, amount, purpose').eq('branch_id', branchId).gte('created_at', from).lte('created_at', to),
       ])
-      const revenue = ((salesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.total, 0)
+      // Refund rows store a POSITIVE total with is_refund=true as the flag
+      // (migration 188) — sign by is_refund to net them out of revenue.
+      const revenue = ((salesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + (r.is_refund ? -r.total : r.total), 0)
       const expenses = ((expensesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.amount, 0)
       const salaries = ((salariesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.amount, 0)
       // Cash In adds to Sales revenue, Cash Out subtracts — except 'expense'
-      // purpose cash-outs, already counted via the expenses table above.
+      // purpose cash-outs (already counted via the expenses table above) and
+      // 'gift_card_sale' purpose cash-ins (deferred revenue, not revenue —
+      // see migration 187).
       const cashNet = ((cashMovementsRes.data ?? []) as any[]).reduce(
-        (s: number, r: any) => s + (r.type === 'cash_in' ? r.amount : (r.purpose === 'expense' ? 0 : -r.amount)), 0
+        (s: number, r: any) => s + (r.type === 'cash_in' ? (r.purpose === 'gift_card_sale' ? 0 : r.amount) : (r.purpose === 'expense' ? 0 : -r.amount)), 0
       )
       const totalRevenue = revenue + cashNet
       return {
@@ -209,14 +213,16 @@ export const ReportService = {
     if (branchList.length === 0) return []
 
     const { data: salesRows } = await db('sales')
-      .select('branch_id, total')
+      .select('branch_id, total, is_refund')
       .in('branch_id', branchList.map((b: any) => b.id))
       .gte('created_at', from)
       .lte('created_at', to)
 
+    // Refund rows store a POSITIVE total with is_refund=true as the flag
+    // (migration 188) — sign by is_refund to net them out of revenue.
     const totalsByBranch = ((salesRows ?? []) as any[]).reduce(
       (acc: Record<string, number>, r: any) => {
-        acc[r.branch_id] = (acc[r.branch_id] ?? 0) + r.total
+        acc[r.branch_id] = (acc[r.branch_id] ?? 0) + (r.is_refund ? -r.total : r.total)
         return acc
       }, {}
     )
@@ -289,19 +295,34 @@ export const ReportService = {
 
   async getPaymentMethodsReport(branchId: string, from: string, to: string) {
     const { data, error } = await db('sales')
-      .select('payment_method, total')
+      .select('payment_method, total, payment_splits')
       .eq('branch_id', branchId)
       .neq('payment_status', 'refunded')
       .gte('created_at', from)
       .lte('created_at', to)
     if (error) throw error
 
+    // A split-tender sale's payment_method is the literal string 'split' —
+    // grouping by that raw column lumps its whole total into one "split"
+    // slice instead of breaking it into the cash/card (etc.) legs it's
+    // actually made of. Expand it via payment_splits instead, same fix
+    // applied to the register stats (register_session_expected /
+    // close_register_session, migration 189).
     const byMethod: Record<string, { total: number; count: number }> = {}
     for (const sale of data ?? []) {
-      const method = sale.payment_method ?? 'unknown'
-      if (!byMethod[method]) byMethod[method] = { total: 0, count: 0 }
-      byMethod[method].total += sale.total
-      byMethod[method].count += 1
+      if (sale.payment_method === 'split' && Array.isArray(sale.payment_splits) && sale.payment_splits.length > 0) {
+        for (const leg of sale.payment_splits as { method: string; amount: number }[]) {
+          const method = leg.method ?? 'unknown'
+          if (!byMethod[method]) byMethod[method] = { total: 0, count: 0 }
+          byMethod[method].total += Number(leg.amount) || 0
+          byMethod[method].count += 1
+        }
+      } else {
+        const method = sale.payment_method ?? 'unknown'
+        if (!byMethod[method]) byMethod[method] = { total: 0, count: 0 }
+        byMethod[method].total += sale.total
+        byMethod[method].count += 1
+      }
     }
 
     return Object.entries(byMethod).map(([payment_method, { total, count }]) => ({
@@ -628,7 +649,7 @@ export const ReportService = {
     return { ...data, expenses }
   },
 
-  async closeSession(sessionId: string, closingCash: number, closingNote?: string) {
+  async closeSession(sessionId: string, closingCash: number, closingNote?: string, closingCardTotal = 0) {
     const { data: session } = await db('register_sessions')
       .select('business_id, branch_id, opened_at')
       .eq('id', sessionId)
@@ -637,6 +658,7 @@ export const ReportService = {
     const { data, error } = await (adminSupabase as any).rpc('close_register_session', {
       p_session_id: sessionId,
       p_closing_cash: closingCash,
+      p_closing_card_total: closingCardTotal,
       p_closing_note: closingNote ?? null,
     })
     if (error) throw error

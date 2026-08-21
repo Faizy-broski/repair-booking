@@ -138,6 +138,7 @@ export function CashMovementModal({
 
         <Input
           label="Amount"
+          required
           type="number" min="0" step="0.01" placeholder="0.00"
           value={cashMovementAmount}
           onChange={e => setCashMovementAmount(e.target.value)}
@@ -147,13 +148,14 @@ export function CashMovementModal({
           <label className="mb-1 block text-sm font-medium text-gray-700">
             {isCashOut ? 'Description' : 'Notes'}{' '}
             {isCashOut && purpose === 'none' ? (
-              <span className="text-xs font-normal text-gray-400">(required)</span>
+              <span className="text-red-500">*</span>
             ) : (
               <span className="text-xs font-normal text-gray-400">(optional)</span>
             )}
           </label>
           <textarea
             rows={2}
+            required={isCashOut && purpose === 'none'}
             placeholder={isCashOut ? 'e.g. Rent payment, petty cash for supplies…' : 'e.g. Petty cash for change'}
             value={cashMovementNotes}
             onChange={e => setCashMovementNotes(e.target.value)}
@@ -215,12 +217,14 @@ export function CashMovementModal({
               <div className="space-y-3">
                 <Input
                   label="Product Name"
+                  required
                   placeholder="e.g. iPhone 12 (used, from customer)"
                   value={buybackName}
                   onChange={e => setBuybackName(e.target.value)}
                 />
                 <Input
                   label="Selling Price"
+                  required
                   type="number" min="0" step="0.01" placeholder="0.00"
                   value={buybackSellingPrice}
                   onChange={e => setBuybackSellingPrice(e.target.value)}

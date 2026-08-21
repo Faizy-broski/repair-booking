@@ -24,16 +24,24 @@ export interface CashMovementRow {
 }
 
 // Cash In adds to Sales revenue, Cash Out subtracts — except 'expense'
-// purpose cash-outs, which are already counted via total_expenses.
+// purpose cash-outs (already counted via total_expenses) and
+// 'gift_card_sale' purpose cash-ins (deferred revenue, not revenue — a gift
+// card sale is a liability until redeemed, same reason store_credit/
+// loyalty_points sales are excluded from the register's cash_sales; see
+// migration 187).
 export function computeCashNet(rows: CashMovementRow[]): number {
   return rows.reduce(
-    (s, r) => s + (r.type === 'cash_in' ? (r.amount ?? 0) : (r.purpose === 'expense' ? 0 : -(r.amount ?? 0))),
+    (s, r) => s + (
+      r.type === 'cash_in'
+        ? (r.purpose === 'gift_card_sale' ? 0 : (r.amount ?? 0))
+        : (r.purpose === 'expense' ? 0 : -(r.amount ?? 0))
+    ),
     0
   )
 }
 
 export interface DashboardFinancialsInput {
-  saleTotals: { total: number | null }[]
+  saleTotals: { total: number | null; is_refund?: boolean | null }[]
   expenseAmounts: { amount: number | null }[]
   cashMovements: CashMovementRow[]
   repairsRevenueRows: RepairRevenueRow[]
@@ -55,8 +63,10 @@ export function computeDashboardFinancials(input: DashboardFinancialsInput): Das
   const cashNet = computeCashNet(input.cashMovements)
   // Cash In/Out is baked directly into total_sales so every consumer of this
   // stat (the "Sales Revenue" card, net_profit, sales_profit) reflects it
-  // automatically.
-  const totalSales = input.saleTotals.reduce((s, r) => s + (r.total ?? 0), 0) + cashNet
+  // automatically. Refund rows store a POSITIVE total with is_refund=true as
+  // the flag (migration 188) — sign by is_refund to net them out of revenue,
+  // rather than assuming the old negative-total convention.
+  const totalSales = input.saleTotals.reduce((s, r) => s + (r.is_refund ? -(r.total ?? 0) : (r.total ?? 0)), 0) + cashNet
   const totalExpenses = input.expenseAmounts.reduce((s, r) => s + (r.amount ?? 0), 0)
 
   const posRepairAmounts = buildPosOverrideMap(input.posRepairOverrideRows)
@@ -117,25 +127,31 @@ export interface TenderSaleRow {
   payment_method: string
   total: number | null
   payment_splits?: { method: string; amount: number }[] | null
+  is_refund?: boolean | null
 }
 
 // Cash/card breakdown for "Today's Cash Revenue" / "Today's Card Revenue".
-// Not refund-filtered: a same-day refund carries a negative total (see
-// process_refund) and correctly nets itself out of today's tender total.
+// Not refund-filtered by the caller's query — instead explicitly signed here
+// via is_refund, so a same-day refund nets itself out of today's tender
+// total. (Previously relied on a refund row's `total` being stored negative,
+// per the old process_refund() convention — migration 188 changed refund
+// rows to always store a POSITIVE total with is_refund=true as the flag, so
+// this now negates explicitly instead of trusting the raw sign.)
 export function computeTenderBreakdown(rows: TenderSaleRow[]): { cash: number; card: number } {
   let cash = 0
   let card = 0
   for (const sale of rows) {
+    const sign = sale.is_refund ? -1 : 1
     const total = sale.total ?? 0
     if (sale.payment_method === 'split' && sale.payment_splits?.length) {
       for (const s of sale.payment_splits) {
-        if (s.method === 'cash') cash += s.amount
-        else if (s.method === 'card') card += s.amount
+        if (s.method === 'cash') cash += sign * s.amount
+        else if (s.method === 'card') card += sign * s.amount
       }
     } else if (sale.payment_method === 'cash') {
-      cash += total
+      cash += sign * total
     } else if (sale.payment_method === 'card') {
-      card += total
+      card += sign * total
     }
   }
   return { cash, card }

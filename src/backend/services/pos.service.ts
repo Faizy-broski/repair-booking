@@ -88,8 +88,9 @@ export function computeSalesStats(rows: SalesStatsSaleRow[], cashRows: SalesStat
     sales_count: sales.length,
     revenue: sales.reduce((s, r) => s + Number(r.total), 0),
     refund_count: refunds.length,
-    // Refund rows store `total` negative (see process_refund) — take the
-    // magnitude so this stays a positive figure, consistent with
+    // Refund rows store `total` as a positive magnitude with is_refund=true
+    // as the flag (see process_refund, migration 188) — Math.abs() here is
+    // just defensive (safe either sign), consistent with
     // RepairService.getRevenueStats().refundAmount, which the caller adds in.
     refund_amount: refunds.reduce((s, r) => s + Math.abs(Number(r.total)), 0),
     cash_total: 0,
@@ -345,7 +346,7 @@ export const PosService = {
     // Fetch refund records separately to avoid unreliable self-join
     const { data: refundRecords } = await adminSupabase
       .from('sales')
-      .select('id, is_refund, total, sale_items(name, quantity)')
+      .select('id, is_refund, total, sale_items(name, quantity, total, is_amount_refund)')
       .eq('original_sale_id', id)
       .eq('is_refund', true)
 

@@ -20,10 +20,12 @@ describe('groupDailySales — Use case: Sales Report Avg. Order Value KPI', () =
   it('regression: a sale fully refunded the same day nets revenue to 0 without dragging Avg. Order to 0', () => {
     // Previously the refund row was counted as its own "transaction," so a
     // $100 sale + its refund averaged to $0 across "2 transactions" instead
-    // of reporting the $100 sale that actually happened.
+    // of reporting the $100 sale that actually happened. Refund rows store a
+    // POSITIVE total with is_refund=true as the flag (migration 188) — not a
+    // negative total — so groupDailySales must sign by is_refund itself.
     const rows = groupDailySales([
       { total: 100, created_at: '2026-08-01T09:00:00Z', is_refund: false },
-      { total: -100, created_at: '2026-08-01T16:00:00Z', is_refund: true },
+      { total: 100, created_at: '2026-08-01T16:00:00Z', is_refund: true },
     ], [])
     expect(rows[0].total_sales).toBe(0)          // revenue still nets to zero
     expect(rows[0].transaction_count).toBe(1)    // but only 1 real sale happened
@@ -34,11 +36,24 @@ describe('groupDailySales — Use case: Sales Report Avg. Order Value KPI', () =
     const rows = groupDailySales([
       { total: 100, created_at: '2026-08-01T09:00:00Z', is_refund: false },
       { total: 50,  created_at: '2026-08-01T11:00:00Z', is_refund: false },
-      { total: -20, created_at: '2026-08-01T16:00:00Z', is_refund: true }, // partial refund on an earlier sale
+      { total: 20,  created_at: '2026-08-01T16:00:00Z', is_refund: true }, // partial refund on an earlier sale
     ], [])
     expect(rows[0].total_sales).toBe(130)         // 100 + 50 - 20
     expect(rows[0].transaction_count).toBe(2)     // 2 real sales, refund excluded
     expect(rows[0].avg_order_value).toBe(65)      // 130 / 2, not 130 / 3
+  })
+
+  it('regression (migration 188): a refund with a POSITIVE total nets out correctly, not doubled', () => {
+    // Before this fix, groupDailySales() summed raw totals and relied on the
+    // caller sending refunds as negative — since migration 188, refunds are
+    // always positive with is_refund=true, so a naive sum would have shown
+    // 220 (100 + 100 + 20) here instead of the correct net 180.
+    const rows = groupDailySales([
+      { total: 100, created_at: '2026-08-01T09:00:00Z', is_refund: false },
+      { total: 100, created_at: '2026-08-01T11:00:00Z', is_refund: false },
+      { total: 20,  created_at: '2026-08-01T16:00:00Z', is_refund: true },
+    ], [])
+    expect(rows[0].total_sales).toBe(180)
   })
 
   it('buckets rows by calendar day', () => {

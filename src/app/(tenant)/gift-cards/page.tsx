@@ -40,7 +40,9 @@ export default function GiftCardsPage() {
   const [formExpiry, setFormExpiry] = useState('')
   const [formCustomerIds, setFormCustomerIds] = useState<string[]>([])
   const [formAllCustomers, setFormAllCustomers] = useState(true)
+  const [formPaymentMethod, setFormPaymentMethod] = useState<'cash' | 'card' | 'other'>('cash')
   const [formSubmitting, setFormSubmitting] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
   const [custDropdownOpen, setCustDropdownOpen] = useState(false)
   const [custSearch, setCustSearch] = useState('')
 
@@ -75,6 +77,7 @@ export default function GiftCardsPage() {
     e.preventDefault()
     if (!activeBranch || !formValue) return
     setFormSubmitting(true)
+    setFormError(null)
     const res = await fetch('/api/gift-cards', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -84,12 +87,16 @@ export default function GiftCardsPage() {
         customer_id: formAllCustomers ? null : (formCustomerIds[0] ?? null),
         customer_ids: formAllCustomers ? [] : formCustomerIds,
         expires_at: formExpiry || null,
+        payment_method: formPaymentMethod,
       }),
     })
     if (res.ok) {
-      setFormValue(''); setFormExpiry(''); setFormCustomerIds([]); setFormAllCustomers(true)
+      setFormValue(''); setFormExpiry(''); setFormCustomerIds([]); setFormAllCustomers(true); setFormPaymentMethod('cash')
       setSheetOpen(false)
       queryClient.invalidateQueries({ queryKey: ['gift-cards', activeBranch.id] })
+    } else {
+      const json = await res.json().catch(() => null)
+      setFormError(json?.error?.message ?? json?.message ?? 'Failed to create gift card.')
     }
     setFormSubmitting(false)
   }
@@ -263,7 +270,7 @@ export default function GiftCardsPage() {
         </div>
       )}
 
-      <InlineFormSheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Create Gift Card">
+      <InlineFormSheet open={sheetOpen} onClose={() => { setSheetOpen(false); setFormError(null) }} title="Create Gift Card">
         <form onSubmit={onCreate} className="space-y-4">
           <Input
             label="Value (£)"
@@ -273,6 +280,31 @@ export default function GiftCardsPage() {
             value={formValue}
             onChange={e => setFormValue(e.target.value)}
           />
+
+          {/* Payment method — cash sales record a cash movement against the
+              open register session so Expected Cash reflects the money taken. */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Payment Method</label>
+            <div className="flex gap-2">
+              {(['cash', 'card', 'other'] as const).map((method) => (
+                <button
+                  key={method}
+                  type="button"
+                  onClick={() => setFormPaymentMethod(method)}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
+                    formPaymentMethod === method
+                      ? 'border-brand-teal bg-brand-teal/10 text-brand-teal'
+                      : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                  }`}
+                >
+                  {method}
+                </button>
+              ))}
+            </div>
+            {formPaymentMethod === 'cash' && (
+              <p className="mt-1 text-xs text-gray-400">Requires an open register — the amount will be added to Expected Cash.</p>
+            )}
+          </div>
 
           {/* Customer multi-select */}
           <div>
@@ -366,6 +398,7 @@ export default function GiftCardsPage() {
 
           <Input label="Expiry Date (optional)" type="date" value={formExpiry} onChange={e => setFormExpiry(e.target.value)} />
           <p className="text-xs text-gray-400">A unique code will be auto-generated</p>
+          {formError && <p className="text-sm text-red-600">{formError}</p>}
           <Button type="submit" className="w-full" loading={formSubmitting} disabled={!formValue}>Create Gift Card</Button>
         </form>
       </InlineFormSheet>

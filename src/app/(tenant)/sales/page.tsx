@@ -38,7 +38,7 @@ interface SaleRow {
   // Ledger-only fields (present on rows from /api/pos/sales/ledger)
   record_type?: 'sale' | 'refund' | 'exchange' | 'cash_in' | 'cash_out'
   reference?: string
-  purpose?: 'plain' | 'expense' | 'buyback' | null
+  purpose?: 'plain' | 'expense' | 'buyback' | 'trade_in' | 'gift_card_sale' | null
   product_name?: string | null
 }
 
@@ -65,7 +65,7 @@ interface SaleItem {
 
 interface SaleDetail extends SaleRow {
   sale_items: SaleItem[]
-  refund_records?: { id: string; is_refund: boolean; total: number; sale_items: { name: string; quantity: number }[] }[]
+  refund_records?: { id: string; is_refund: boolean; total: number; sale_items: { name: string; quantity: number; total: number; is_amount_refund: boolean }[] }[]
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -73,6 +73,9 @@ interface SaleDetail extends SaleRow {
 const PAYMENT_LABELS: Record<string, string> = {
   cash: 'Cash', card: 'Card', gift_card: 'Gift Card', split: 'Split', voucher: 'Voucher',
   on_account: 'On Account', ebay: 'eBay', deliveroo: 'Deliveroo', website: 'Website',
+}
+const PURPOSE_LABELS: Record<string, string> = {
+  plain: 'Plain', expense: 'Expense', buyback: 'Buyback', trade_in: 'Trade-In', gift_card_sale: 'Gift Card Sale',
 }
 const STATUS_COLORS: Record<string, string> = {
   paid: 'bg-green-100 text-green-800',
@@ -286,6 +289,10 @@ export default function SalesPage() {
               unit_price: effectiveUnitPrice,
               total: effectiveUnitPrice * refundQtys[i.id],
               is_service: false,
+              // A real quantity-based return, not an amount-mode refund
+              // (migration 193) — the server's quantity-remaining guard
+              // must stay active for this.
+              is_amount_refund: false,
             }
           })
         if (!items.length) throw new Error('Select at least one item to refund')
@@ -301,11 +308,23 @@ export default function SalesPage() {
             return {
               product_id: saleItem?.product_id ?? null,
               variant_id: saleItem?.variant_id ?? null,
-              name: saleItem ? `${saleItem.name} (amount refund)` : 'Amount Refund',
+              // Keep the item's real name (not "<name> (amount refund)") --
+              // getAlreadyRefunded()/process_refund() both match refund line
+              // items back to the original sale by exact name, so mangling
+              // it here made "already refunded" always read as 0 for
+              // amount-mode refunds, letting the same item be refunded past
+              // what was actually left (migration 191 + this fix).
+              name: saleItem ? saleItem.name : 'Amount Refund',
               quantity: 1,
               unit_price: amt,
               total: amt,
               is_service: true,
+              // Dummy quantity=1 isn't a real unit count — tells the server
+              // to skip the quantity-remaining guard and track this by
+              // value instead (migration 193; previously conflated with
+              // is_service, which broke the guard for real service items
+              // refunded on the OTHER refund page).
+              is_amount_refund: true,
             }
           })
         subtotal = amountTotal
@@ -458,13 +477,30 @@ export default function SalesPage() {
     return Math.max(0, editSubtotal() - editForm.discount + editForm.tax)
   }
 
+  // Refunded QUANTITY for "Return Items" mode — only counts real unit
+  // returns (is_amount_refund = false). Amount-mode refunds carry a dummy
+  // quantity of 1 that doesn't represent a real returned unit, so counting
+  // them here would make the item read as "fully refunded" (and get hidden
+  // from Return Items entirely) after even a small partial amount refund.
   function getAlreadyRefunded(item: SaleItem): number {
     if (!detail?.refund_records) return 0
     return detail.refund_records
       .filter(r => r.is_refund)
       .flatMap(r => r.sale_items)
-      .filter(s => s.name === item.name)
+      .filter(s => s.name === item.name && !s.is_amount_refund)
       .reduce((sum, s) => sum + s.quantity, 0)
+  }
+
+  // Refunded VALUE for one item, across BOTH modes — used to cap "Refund
+  // Amount" mode's per-item input at what's actually still left, and to
+  // show "£X of £Y already refunded" instead of a binary all-or-nothing flag.
+  function getAlreadyRefundedAmount(item: SaleItem): number {
+    if (!detail?.refund_records) return 0
+    return detail.refund_records
+      .filter(r => r.is_refund)
+      .flatMap(r => r.sale_items)
+      .filter(s => s.name === item.name)
+      .reduce((sum, s) => sum + Number(s.total), 0)
   }
 
   function getAlreadyRefundedTotal(): number {
@@ -476,13 +512,28 @@ export default function SalesPage() {
     const initial: Record<string, number> = {}
     detail.sale_items?.forEach(i => {
       const remaining = i.quantity - getAlreadyRefunded(i)
-      initial[i.id] = remaining
+      // An item already touched by a prior "Refund Amount" partial refund is
+      // blocked from Return Items entirely (see the render below) -- default
+      // its quantity to 0 too, so "Refund Total" doesn't silently include a
+      // full-price refund for an item the user can no longer select.
+      initial[i.id] = getAlreadyRefundedAmount(i) > 0 ? 0 : remaining
     })
     setRefundQtys(initial)
+    // Refund Amount mode: pre-fill the box for any item that ALREADY has a
+    // prior partial refund with exactly what's left (rather than making the
+    // user look it up and type it in themselves). Items with no refund
+    // history yet stay blank, same as before — this only kicks in once
+    // there's actually a "remaining balance" to show.
+    const initialAmounts: Record<string, number> = {}
+    detail.sale_items?.forEach(i => {
+      const alreadyRefundedAmt = getAlreadyRefundedAmount(i)
+      const itemMax = Math.max(0, Number(i.total) - alreadyRefundedAmt)
+      if (alreadyRefundedAmt > 0 && itemMax > 0) initialAmounts[i.id] = itemMax
+    })
     setRefundReason('')
     setRefundPaymentMethod('cash')
     setRefundMode('items')
-    setRefundItemAmounts({})
+    setRefundItemAmounts(initialAmounts)
     setRefundOpen(true)
   }
 
@@ -1257,12 +1308,21 @@ export default function SalesPage() {
                   <div className="divide-y rounded-md border">
                     {(detail.sale_items ?? []).map(item => {
                       const alreadyRefunded = getAlreadyRefunded(item)
+                      const alreadyRefundedAmt = getAlreadyRefundedAmount(item)
                       const remaining = item.quantity - alreadyRefunded
-                      if (remaining <= 0) return (
+                      // A prior "Refund Amount" partial refund on this item blocks Return
+                      // Items entirely -- Return Items always refunds a FULL unit at its
+                      // full price, which would overpay on top of the amount already
+                      // given back. Use Refund Amount mode again for the rest instead.
+                      if (remaining <= 0 || alreadyRefundedAmt > 0) return (
                         <div key={item.id} className="flex items-center justify-between px-3 py-2 opacity-40">
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate line-through">{item.name}</p>
-                            <p className="text-xs text-red-500">Already refunded</p>
+                            <p className="text-xs text-red-500">
+                              {alreadyRefundedAmt >= Number(item.total)
+                                ? 'Already refunded'
+                                : `${formatCurrency(alreadyRefundedAmt)} of ${formatCurrency(Number(item.total))} already refunded — use Refund Amount for the rest`}
+                            </p>
                           </div>
                         </div>
                       )
@@ -1273,7 +1333,6 @@ export default function SalesPage() {
                             <p className="text-xs text-gray-500">
                               {formatCurrency(Number(item.total) / item.quantity)} × {item.quantity}
                               {Number(item.discount) > 0 && <span className="ml-1 text-green-600">(-{formatCurrency(Number(item.discount))} disc)</span>}
-                              {alreadyRefunded > 0 && <span className="ml-1 text-orange-500">({alreadyRefunded} already refunded)</span>}
                             </p>
                           </div>
                           <div className="ml-3 flex items-center gap-2">
@@ -1307,9 +1366,18 @@ export default function SalesPage() {
                   <p className="text-sm text-gray-500">Enter the amount to refund per item. Stock will <strong>not</strong> be restocked.</p>
                   <div className="divide-y rounded-md border">
                     {(detail.sale_items ?? []).map(item => {
-                      const itemMax = Number(item.total)
+                      const alreadyRefundedAmt = getAlreadyRefundedAmount(item)
+                      const itemMax = Math.max(0, Number(item.total) - alreadyRefundedAmt)
                       const itemAmt = refundItemAmounts[item.id] ?? 0
                       const currencySymbol = formatCurrency(0).replace(/[\d.,\s]/g, '').trim() || '€'
+                      if (itemMax <= 0) return (
+                        <div key={item.id} className="flex items-center justify-between px-3 py-2.5 opacity-40">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate line-through">{item.name}</p>
+                            <p className="text-xs text-red-500">Already refunded</p>
+                          </div>
+                        </div>
+                      )
                       return (
                         <div key={item.id} className="flex items-center gap-3 px-3 py-2.5">
                           <div className="flex-1 min-w-0">
@@ -1317,6 +1385,7 @@ export default function SalesPage() {
                             <p className="text-xs text-gray-500">
                               {formatCurrency(Number(item.unit_price))} × {item.quantity}
                               {' · '}<span className="text-gray-400">max {formatCurrency(itemMax)}</span>
+                              {alreadyRefundedAmt > 0 && <span className="ml-1 text-orange-500">({formatCurrency(alreadyRefundedAmt)} already refunded)</span>}
                             </p>
                           </div>
                           <div className="relative w-28 shrink-0">
@@ -1712,7 +1781,7 @@ export default function SalesPage() {
               <div><span className="text-gray-500">Method</span><br />{PAYMENT_LABELS[cashDetailRow.payment_method] ?? cashDetailRow.payment_method}</div>
               <div>
                 <span className="text-gray-500">Purpose</span><br />
-                {cashDetailRow.purpose === 'expense' ? 'Expense' : cashDetailRow.purpose === 'buyback' ? 'Buyback' : 'Plain'}
+                {PURPOSE_LABELS[cashDetailRow.purpose ?? 'plain'] ?? 'Plain'}
               </div>
               {cashDetailRow.purpose === 'buyback' && (
                 <div className="col-span-2">
@@ -1820,11 +1889,20 @@ export default function SalesPage() {
                   <div className="divide-y rounded-md border max-h-72 overflow-y-auto">
                     {(detail.sale_items ?? []).map(item => {
                       const alreadyRefunded = getAlreadyRefunded(item)
+                      const alreadyRefundedAmt = getAlreadyRefundedAmount(item)
                       const remaining = item.quantity - alreadyRefunded
-                      if (remaining <= 0) return (
+                      // An item touched by a prior "Refund Amount" partial refund can't
+                      // be exchanged either — process_exchange counts that refund's dummy
+                      // quantity as a full unit consumed and rejects the exchange at the
+                      // end anyway, after several steps of work. Block it up front instead.
+                      if (remaining <= 0 || alreadyRefundedAmt > 0) return (
                         <div key={item.id} className="flex items-center px-3 py-2 opacity-40">
                           <p className="flex-1 text-sm line-through truncate">{item.name}</p>
-                          <span className="text-xs text-red-500">Fully returned</span>
+                          <span className="text-xs text-red-500">
+                            {alreadyRefundedAmt > 0 && remaining > 0
+                              ? `${formatCurrency(alreadyRefundedAmt)} already refunded — not available for exchange`
+                              : 'Fully returned'}
+                          </span>
                         </div>
                       )
                       const qty = exchangeReturnQtys[item.id] ?? 0

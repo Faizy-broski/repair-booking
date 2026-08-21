@@ -61,6 +61,7 @@ export default function PosPage() {
   // ── Close register modal ──────────────────────────────────────────────────────
   const [closeRegisterModal, setCloseRegisterModal] = useState(false)
   const [closingDenoms, setClosingDenoms] = useState<Record<string, number>>({})
+  const [closingCardTotal, setClosingCardTotal] = useState('')
   const [closingNote, setClosingNote] = useState('')
   const [zReport, setZReport] = useState<ZReport | null>(null)
   const [expectedCash, setExpectedCash] = useState<number | null>(null)
@@ -70,7 +71,9 @@ export default function PosPage() {
   const [sessionStats, setSessionStats] = useState<{
     total_sales: number; repair_sales: number; total_refunds: number; repair_refunds: number
     store_credit_sales: number; loyalty_points_sales: number; on_account_sales: number
-    repair_store_credit_sales: number; repair_loyalty_points_sales: number
+    repair_cash_sales: number; repair_card_sales: number
+    repair_store_credit_sales: number; repair_loyalty_points_sales: number; repair_other_sales: number
+    cash_sales: number; card_sales: number; other_sales: number
     cash_in: number; cash_out: number; buyback_out: number
     credit_repayments_cash: number; credit_repayments_total: number
     expected_cash: number; opening_float: number; expenses?: number
@@ -236,7 +239,10 @@ export default function PosPage() {
       { value: 0.10 }, { value: 0.05 }, { value: 0.02 }, { value: 0.01 },
     ]
     const total = DENOMINATIONS.reduce((sum, d) => sum + (closingDenoms[String(d.value)] ?? 0) * d.value, 0)
-    const hasDiscrepancy = expectedCash !== null && Math.abs(total - expectedCash) > 0.01
+    const cardTotal = parseFloat(closingCardTotal) || 0
+    // Expected Cash now includes card takings (see migration 190), so the
+    // counted-cash total needs the entered card total added before comparing.
+    const hasDiscrepancy = expectedCash !== null && Math.abs((total + cardTotal) - expectedCash) > 0.01
     if (hasDiscrepancy && !closingNote.trim()) return
     setSessionProcessing(true)
     const res = await fetch('/api/pos/session/close', {
@@ -244,6 +250,7 @@ export default function PosPage() {
       body: JSON.stringify({
         session_id: pos.session.id,
         closing_cash: total || 0,
+        closing_card_total: cardTotal,
         closing_note: closingNote || undefined,
       }),
     })
@@ -253,6 +260,7 @@ export default function PosPage() {
       pos.setSession(null)
       pos.setSessionLoaded(false)
       setClosingDenoms({})
+      setClosingCardTotal('')
       setClosingNote('')
       setExpectedCash(null)
     } else if (j?.error?.message?.includes('Session already closed')) {
@@ -260,6 +268,7 @@ export default function PosPage() {
       pos.setSession(null)
       pos.setSessionLoaded(false)
       setClosingDenoms({})
+      setClosingCardTotal('')
       setClosingNote('')
       setExpectedCash(null)
       await fetchSession()
@@ -353,6 +362,8 @@ export default function PosPage() {
           sessionProcessing={sessionProcessing}
           closingDenoms={closingDenoms}
           setClosingDenoms={setClosingDenoms}
+          closingCardTotal={closingCardTotal}
+          setClosingCardTotal={setClosingCardTotal}
           closingNote={closingNote}
           setClosingNote={setClosingNote}
           handleCloseRegister={handleCloseRegister}
@@ -517,6 +528,8 @@ export default function PosPage() {
         sessionProcessing={sessionProcessing}
         closingDenoms={closingDenoms}
         setClosingDenoms={setClosingDenoms}
+        closingCardTotal={closingCardTotal}
+        setClosingCardTotal={setClosingCardTotal}
         closingNote={closingNote}
         setClosingNote={setClosingNote}
         handleCloseRegister={handleCloseRegister}

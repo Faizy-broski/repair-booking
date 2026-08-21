@@ -19,10 +19,13 @@ interface SalesRow { date: string; total_sales: number; transaction_count: numbe
 interface CashMovementRow {
   type: 'cash_in' | 'cash_out'
   amount: number
-  purpose: 'plain' | 'expense' | 'buyback'
+  purpose: 'plain' | 'expense' | 'buyback' | 'trade_in' | 'gift_card_sale'
   notes: string | null
   created_at: string
   profiles: { full_name: string | null } | null
+}
+const PURPOSE_LABELS: Record<string, string> = {
+  plain: 'Plain', expense: 'Expense', buyback: 'Buyback', trade_in: 'Trade-In', gift_card_sale: 'Gift Card Sale',
 }
 
 function firstOfMonth() { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] }
@@ -130,8 +133,8 @@ export default function SalesReportPage() {
                     <span className={`text-xs font-semibold ${m.type === 'cash_in' ? 'text-green-600' : 'text-orange-600'}`}>
                       {m.type === 'cash_in' ? '+ Cash In' : '− Cash Out'}
                     </span>
-                    <span className="rounded-full bg-surface-container px-2 py-0.5 text-[10px] font-medium capitalize text-on-surface-variant">
-                      {m.purpose}
+                    <span className="rounded-full bg-surface-container px-2 py-0.5 text-[10px] font-medium text-on-surface-variant">
+                      {PURPOSE_LABELS[m.purpose] ?? m.purpose}
                     </span>
                     {m.purpose === 'plain' && (
                       <span className="text-[10px] italic text-amber-600">(not in P&amp;L)</span>

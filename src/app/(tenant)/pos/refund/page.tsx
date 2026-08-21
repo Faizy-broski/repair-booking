@@ -170,6 +170,12 @@ function RefundPageInner() {
         discount: (refundPrices[item.id] ?? item.unit_price) * discountRate,
         total: -((refundPrices[item.id] ?? item.unit_price) * (refundQtys[item.id] ?? item.quantity)),
         is_service: item.is_service ?? false,
+        // Always a real quantity-based return on this page (no Amount mode
+        // exists here) — explicit false so the server's quantity-remaining
+        // guard always applies, regardless of whether the underlying catalog
+        // item happens to be a service (migration 193; previously the guard
+        // was skipped for service items due to that unrelated flag).
+        is_amount_refund: false,
       })),
     }
 

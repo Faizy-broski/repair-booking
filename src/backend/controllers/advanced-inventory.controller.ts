@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { type RequestContext } from '@/backend/middleware'
 import { validateBody } from '@/backend/utils/validate'
-import { ok, created, serverError } from '@/backend/utils/api-response'
+import { ok, created, badRequest, serverError } from '@/backend/utils/api-response'
 import { getPagination } from '@/backend/utils/pagination'
 import {
   SerialService,
@@ -185,7 +185,7 @@ export const TradeInController = {
     catch (err) { return serverError('Failed to fetch trade-ins', err) }
   },
 
-  async create(req: NextRequest, _ctx: RequestContext) {
+  async create(req: NextRequest, ctx: RequestContext) {
     const schema = z.object({
       business_id:     z.string().uuid(),
       branch_id:       z.string().uuid(),
@@ -200,7 +200,10 @@ export const TradeInController = {
     })
     const { data, error } = await validateBody(req, schema)
     if (error) return error
-    try { return created(await TradeInService.create(data)) }
-    catch (err) { return serverError('Failed to record trade-in', err) }
+    try { return created(await TradeInService.create({ ...data, cashier_id: ctx.auth.userId })) }
+    catch (err: any) {
+      if (err?.message?.includes('Open the register')) return badRequest(err.message)
+      return serverError('Failed to record trade-in', err)
+    }
   },
 }

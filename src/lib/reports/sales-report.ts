@@ -27,11 +27,13 @@ export function groupDailySales(sales: SalesReportSaleRow[], cashMovements: Sale
   for (const s of sales) {
     const d = s.created_at?.split('T')[0] ?? ''
     if (!grouped[d]) grouped[d] = { total: 0, count: 0 }
-    grouped[d].total += s.total ?? 0
-    // Refund rows carry a negative total (netted into revenue below) but
-    // aren't a distinct "order" — counting them here understates Avg. Order
-    // Value (a $100 sale + its full refund used to average to $0 across "2
-    // transactions" instead of $100 across 1).
+    // Refund rows store a POSITIVE total with is_refund=true as the flag
+    // (see process_refund, migration 188) — sign by is_refund to net them
+    // out of revenue, rather than assuming the old negative-total convention.
+    grouped[d].total += s.is_refund ? -(s.total ?? 0) : (s.total ?? 0)
+    // A refund isn't a distinct "order" — counting it here would understate
+    // Avg. Order Value (a $100 sale + its full refund would average to $0
+    // across "2 transactions" instead of $100 across 1).
     if (!s.is_refund) grouped[d].count += 1
   }
 

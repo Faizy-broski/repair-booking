@@ -22,7 +22,7 @@ describe('computeSalesStats', () => {
   it('excludes refund rows from sales_count/revenue', () => {
     const rows = [
       saleRow({ total: 100 }),
-      saleRow({ total: -40, is_refund: true }),
+      saleRow({ total: 40, is_refund: true }),
     ]
     const stats = computeSalesStats(rows, [])
     expect(stats.sales_count).toBe(1)
@@ -30,20 +30,21 @@ describe('computeSalesStats', () => {
     expect(stats.refund_count).toBe(1)
   })
 
-  it('reports refund_amount as a positive magnitude even though refund totals are stored negative', () => {
-    // process_refund (migration 010) inserts refund sale rows with a
-    // negative `total`. refund_amount must still come out positive so it's
-    // consistent with RepairService.getRevenueStats().refundAmount, which
-    // getSalesStats adds on top of this.
-    const rows = [saleRow({ total: -75, is_refund: true })]
+  it('reports refund_amount as a positive magnitude', () => {
+    // process_refund (migration 188) always stores refund sale rows' `total`
+    // as a positive magnitude, with is_refund=true as the flag. refund_amount
+    // must still come out positive so it's consistent with
+    // RepairService.getRevenueStats().refundAmount, which getSalesStats adds
+    // on top of this.
+    const rows = [saleRow({ total: 75, is_refund: true })]
     const stats = computeSalesStats(rows, [])
     expect(stats.refund_amount).toBe(75)
   })
 
   it('sums multiple refunds to a positive total', () => {
     const rows = [
-      saleRow({ total: -20, is_refund: true }),
-      saleRow({ total: -30, is_refund: true }),
+      saleRow({ total: 20, is_refund: true }),
+      saleRow({ total: 30, is_refund: true }),
     ]
     const stats = computeSalesStats(rows, [])
     expect(stats.refund_amount).toBe(50)
@@ -53,7 +54,7 @@ describe('computeSalesStats', () => {
     const rows = [
       saleRow({ total: 40, payment_method: 'cash' }),
       saleRow({ total: 60, payment_method: 'card' }),
-      saleRow({ total: -10, payment_method: 'cash', is_refund: true }),
+      saleRow({ total: 10, payment_method: 'cash', is_refund: true }),
     ]
     const stats = computeSalesStats(rows, [])
     expect(stats.cash_total).toBe(40)

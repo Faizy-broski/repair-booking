@@ -64,16 +64,18 @@ export const BusinessService = {
         { data: productsData },
         { data: customersData },
       ] = await Promise.all([
-        adminSupabase.from('sales').select('branch_id, total').in('branch_id', allBranchIds),
+        (adminSupabase as any).from('sales').select('branch_id, total, is_refund').in('branch_id', allBranchIds),
         adminSupabase.from('repairs').select('branch_id, actual_cost').in('branch_id', allBranchIds),
-        adminSupabase.from('branch_products').select('branch_id').in('branch_id', allBranchIds).eq('is_enabled', true),
+        (adminSupabase as any).from('branch_products').select('branch_id').in('branch_id', allBranchIds).eq('is_enabled', true),
         adminSupabase.from('customers').select('branch_id').in('branch_id', allBranchIds),
       ])
 
       for (const s of salesData ?? []) {
         const bizId = branchToBusinessMap[s.branch_id]; if (!bizId) continue
         if (!statsMap[bizId]) statsMap[bizId] = initStat()
-        statsMap[bizId].salesRevenue += s.total ?? 0
+        // Refund rows store a POSITIVE total with is_refund=true as the flag
+        // (migration 188) — sign by is_refund to net them out of revenue.
+        statsMap[bizId].salesRevenue += (s as any).is_refund ? -(s.total ?? 0) : (s.total ?? 0)
       }
       for (const r of repairsData ?? []) {
         const bizId = branchToBusinessMap[r.branch_id]; if (!bizId) continue
@@ -185,15 +187,17 @@ export const BusinessService = {
         { data: customersData },
         { data: staffData },
       ] = await Promise.all([
-        adminSupabase.from('sales').select('branch_id, total').in('branch_id', branchIds),
+        (adminSupabase as any).from('sales').select('branch_id, total, is_refund').in('branch_id', branchIds),
         adminSupabase.from('repairs').select('branch_id').in('branch_id', branchIds),
-        adminSupabase.from('branch_products').select('branch_id, products!inner(id)').in('branch_id', branchIds).eq('is_enabled', true).eq('products.is_active', true),
+        (adminSupabase as any).from('branch_products').select('branch_id, products!inner(id)').in('branch_id', branchIds).eq('is_enabled', true).eq('products.is_active', true),
         adminSupabase.from('customers').select('branch_id').in('branch_id', branchIds),
         adminSupabase.from('profiles').select('branch_id').in('branch_id', branchIds).neq('role', 'business_owner'),
       ])
 
       for (const s of salesData ?? []) {
-        const rev = s.total ?? 0
+        // Refund rows store a POSITIVE total with is_refund=true as the flag
+        // (migration 188) — sign by is_refund to net them out of revenue.
+        const rev = (s as any).is_refund ? -(s.total ?? 0) : (s.total ?? 0)
         totalRevenue += rev
         branchRevenueMap[s.branch_id] = (branchRevenueMap[s.branch_id] ?? 0) + rev
       }

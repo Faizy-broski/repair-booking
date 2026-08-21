@@ -86,10 +86,29 @@ export const TradeInService = {
     business_id: string; branch_id: string; product_id: string; variant_id?: string | null
     condition_grade: string; trade_in_value: number
     serial_number?: string; imei?: string; notes?: string; customer_id?: string
+    cashier_id?: string
   }) {
+    // Cash physically leaves the till here — require an open register session
+    // so that cash is tracked, same as the POS's own Cash Out -> Buyback flow
+    // (see migration 186). Block up front, before any inventory changes.
+    const { cashier_id, ...tradeInPayload } = payload
+    let sessionId: string | null = null
+    if (payload.trade_in_value > 0) {
+      const { data: session } = await adminSupabase
+        .from('register_sessions')
+        .select('id')
+        .eq('branch_id', payload.branch_id)
+        .eq('status', 'open')
+        .maybeSingle()
+      if (!session) {
+        throw new Error('Open the register before recording a trade-in that pays out cash.')
+      }
+      sessionId = (session as any).id
+    }
+
     const { data, error } = await adminSupabase
       .from('trade_in_transactions')
-      .insert(payload)
+      .insert(tradeInPayload)
       .select()
       .single()
     if (error) throw error
@@ -151,6 +170,25 @@ export const TradeInService = {
         p_new_qty: 1,
         p_new_cost: trade_in_value,
       })
+    }
+
+    if (sessionId) {
+      if (!cashier_id) throw new Error('cashier_id is required to record a cash trade-in payout.')
+      // cash_movements isn't in the generated Supabase types (same gap other
+      // services route around, e.g. ReportService's `db()` helper) — cast to
+      // bypass it rather than fight the type generator.
+      const { error: cashError } = await (adminSupabase as any).from('cash_movements').insert({
+        session_id: sessionId,
+        branch_id,
+        business_id: payload.business_id,
+        cashier_id,
+        type: 'cash_out',
+        amount: trade_in_value,
+        payment_type: 'cash',
+        purpose: 'trade_in',
+        notes: `Trade-in payout — ${payload.serial_number || payload.imei || 'device'}`,
+      })
+      if (cashError) throw cashError
     }
 
     return data

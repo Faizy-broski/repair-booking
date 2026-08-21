@@ -41,6 +41,7 @@ export interface ZReport {
   credit_repayments_total?: number
   opening_float?: number
   closing_cash?: number
+  closing_card_total?: number
   expected_cash?: number
   variance?: number
   repair_sales?: number

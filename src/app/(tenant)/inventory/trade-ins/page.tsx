@@ -40,6 +40,7 @@ export default function TradeInsPage() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [form,      setForm]      = useState(emptyForm)
   const [saving,    setSaving]    = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     if (!activeBranch) return
@@ -56,7 +57,8 @@ export default function TradeInsPage() {
   async function save() {
     if (!activeBranch || !profile) return
     setSaving(true)
-    await fetch('/api/inventory/trade-ins', {
+    setSaveError(null)
+    const res = await fetch('/api/inventory/trade-ins', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -71,10 +73,15 @@ export default function TradeInsPage() {
         notes: form.notes || undefined,
       }),
     })
-    setModalOpen(false)
-    setForm(emptyForm)
+    if (res.ok) {
+      setModalOpen(false)
+      setForm(emptyForm)
+      fetchData()
+    } else {
+      const json = await res.json().catch(() => null)
+      setSaveError(json?.error?.message ?? 'Failed to record trade-in.')
+    }
     setSaving(false)
-    fetchData()
   }
 
   const columns: ColumnDef<TradeIn>[] = [
@@ -144,7 +151,7 @@ export default function TradeInsPage() {
         emptyMessage="No trade-in transactions yet."
       />
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Record Trade-In" size="sm">
+      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setSaveError(null) }} title="Record Trade-In" size="sm">
         <div className="space-y-3">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Device / Product *</label>
@@ -239,6 +246,13 @@ export default function TradeInsPage() {
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             />
           </div>
+
+          {form.trade_in_value > 0 && (
+            <p className="text-xs text-gray-400">
+              This will remove {formatCurrency(form.trade_in_value)} from the register&apos;s expected cash.
+            </p>
+          )}
+          {saveError && <p className="text-sm text-red-600">{saveError}</p>}
 
           <Button
             className="w-full"

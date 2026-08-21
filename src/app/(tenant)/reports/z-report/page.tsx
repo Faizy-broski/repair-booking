@@ -10,10 +10,12 @@ import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { DateRangeBar } from '../_components/date-range-bar'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import type { ZReport } from '../../pos/_types'
 
 interface RegisterSession {
   id: string; cashier_id: string; opening_float: number; closing_cash: number | null
+  closing_card_total: number | null
   expected_cash: number | null; variance: number | null; total_sales: number | null
   total_refunds: number | null; cash_sales: number | null; card_sales: number | null
   other_sales: number | null; transaction_count: number | null
@@ -46,9 +48,10 @@ async function exportZReportExcel(sessions: RegisterSession[], filename: string)
     'Repair Other Sales':    s.repair_other_sales ?? 0,
     'Repair Refunds':        s.repair_refunds ?? 0,
     'Repair Transactions':   s.repair_transaction_count ?? 0,
-    'Grand Total':           (s.total_sales ?? 0) + (s.repair_sales ?? 0) - (s.repair_refunds ?? 0),
+    'Grand Total':           (s.total_sales ?? 0) + (s.repair_sales ?? 0) - (s.repair_refunds ?? 0) - (s.total_refunds ?? 0),
     'Expected Cash':         s.expected_cash ?? 0,
     'Closing Cash':          s.closing_cash ?? 0,
+    'Card Total':            s.closing_card_total ?? 0,
     'Variance (Over/Short)': s.variance ?? 0,
   }))
 
@@ -80,6 +83,8 @@ function ZReportPageInner() {
   const [closeModal, setCloseModal] = useState(false)
   const [openingFloat, setOpeningFloat] = useState('')
   const [closingCash, setClosingCash] = useState('')
+  const [closingCardTotal, setClosingCardTotal] = useState('')
+  const [closingNote, setClosingNote] = useState('')
   const [sessionLoading, setSessionLoading] = useState(false)
   const [zReportData, setZReportData] = useState<ZReport | null>(null)
   const [detailSession, setDetailSession] = useState<RegisterSession | null>(null)
@@ -129,6 +134,7 @@ function ZReportPageInner() {
     opening_float:             detailSession.opening_float,
     expected_cash:             useLive ? liveExpected.expected_cash : detailSession.expected_cash,
     closing_cash:              detailSession.closing_cash,
+    closing_card_total:        detailSession.closing_card_total,
     variance:                  detailSession.variance,
   } : null
 
@@ -194,15 +200,25 @@ function ZReportPageInner() {
     setSessionLoading(true)
     const res = await fetch('/api/pos/session/close', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session_id: currentSession.id, closing_cash: parseFloat(closingCash) || 0 }),
+      body: JSON.stringify({
+        session_id: currentSession.id,
+        closing_cash: parseFloat(closingCash) || 0,
+        closing_card_total: parseFloat(closingCardTotal) || 0,
+        closing_note: closingNote || undefined,
+      }),
     })
     if (res.ok) {
       const json = await res.json()
       setZReportData(json.data)
       setCloseModal(false)
       setClosingCash('')
+      setClosingCardTotal('')
+      setClosingNote('')
       queryClient.invalidateQueries({ queryKey: ['report-pos-session', activeBranch?.id] })
       queryClient.invalidateQueries({ queryKey: ['report-sessions', activeBranch?.id] })
+    } else {
+      const json = await res.json().catch(() => null)
+      toast.error(json?.error?.message ?? 'Failed to close register.')
     }
     setSessionLoading(false)
   }
@@ -258,7 +274,7 @@ function ZReportPageInner() {
             <div className="grid grid-cols-3 gap-2 text-sm">
               <div><p className="text-xs text-gray-500">Product Sales</p><p className="font-semibold text-gray-900">{formatCurrency(zReportData.total_sales ?? 0)}</p></div>
               <div><p className="text-xs text-gray-500">Repair Sales</p><p className="font-semibold text-gray-900">{formatCurrency(zReportData.repair_sales ?? 0)}</p></div>
-              <div><p className="text-xs text-gray-500">Total</p><p className="font-semibold text-blue-900">{formatCurrency(zReportData.grand_total ?? (zReportData.total_sales ?? 0) + (zReportData.repair_sales ?? 0) - (zReportData.repair_refunds ?? 0))}</p></div>
+              <div><p className="text-xs text-gray-500">Total</p><p className="font-semibold text-blue-900">{formatCurrency(zReportData.grand_total ?? (zReportData.total_sales ?? 0) + (zReportData.repair_sales ?? 0) - (zReportData.repair_refunds ?? 0) - (zReportData.total_refunds ?? 0))}</p></div>
             </div>
           </div>
 
@@ -271,6 +287,7 @@ function ZReportPageInner() {
               { label: 'Transactions',   value: zReportData.transaction_count, isCurrency: false },
               { label: 'Expected Cash',  value: zReportData.expected_cash },
               { label: 'Closing Cash',   value: zReportData.closing_cash },
+              { label: 'Card Total',     value: zReportData.closing_card_total },
               { label: 'Variance',       value: zReportData.variance, highlight: true },
             ] as { label: string; value: number | undefined; isCurrency?: boolean; highlight?: boolean }[]).map(({ label, value, isCurrency = true, highlight }) => (
               <div key={label} className={`rounded-lg border bg-white p-3 ${highlight && (value ?? 0) !== 0 ? 'border-red-300' : 'border-gray-200'}`}>
@@ -406,7 +423,7 @@ function ZReportPageInner() {
                 <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
                   <p className="text-xs font-medium text-blue-700">Grand Total</p>
                   <p className="mt-1 text-xl font-semibold text-blue-900">
-                    {formatCurrency((display.total_sales ?? 0) + (display.repair_sales ?? 0) - (display.repair_refunds ?? 0))}
+                    {formatCurrency((display.total_sales ?? 0) + (display.repair_sales ?? 0) - (display.repair_refunds ?? 0) - (display.total_refunds ?? 0))}
                   </p>
                 </div>
               </div>
@@ -455,6 +472,7 @@ function ZReportPageInner() {
                   ['Opening Float',  display.opening_float, false],
                   ['Expected Cash',  display.expected_cash, false],
                   ['Closing Cash',   display.closing_cash,  false],
+                  ['Card Total',     display.closing_card_total, false],
                 ] as [string, number | null, boolean][]).map(([label, val]) => (
                   <div key={label} className="flex justify-between">
                     <span className="text-on-surface-variant">{label}</span>
@@ -532,6 +550,21 @@ function ZReportPageInner() {
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface">Cash in Drawer (£)</label>
             <input type="number" min="0" step="0.01" value={closingCash} onChange={(e) => setClosingCash(e.target.value)} placeholder="0.00" className="h-10 w-full rounded-lg border border-outline px-3 text-sm bg-surface text-on-surface" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-on-surface">Card Total (£)</label>
+            <input type="number" min="0" step="0.01" value={closingCardTotal} onChange={(e) => setClosingCardTotal(e.target.value)} placeholder="0.00" className="h-10 w-full rounded-lg border border-outline px-3 text-sm bg-surface text-on-surface" />
+            <p className="mt-1 text-xs text-on-surface-variant">Today's total card payments from your card machine's report — Expected Cash includes card takings.</p>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-on-surface">Reason for discrepancy (required only if counted cash + card doesn't match Expected Cash)</label>
+            <textarea
+              rows={2}
+              value={closingNote}
+              onChange={(e) => setClosingNote(e.target.value)}
+              placeholder="e.g. Till float short from earlier float top-up"
+              className="w-full rounded-lg border border-outline px-3 py-2 text-sm bg-surface text-on-surface"
+            />
           </div>
           <Button className="w-full" loading={sessionLoading} onClick={handleCloseSession}>Generate Z-Report & Close</Button>
         </div>

@@ -33,6 +33,13 @@ describe('computeCashNet', () => {
       { type: 'cash_out', amount: 40, purpose: 'expense' },
     ])).toBe(0)
   })
+
+  it('does not add cash_in rows with purpose "gift_card_sale" (deferred revenue, not revenue)', () => {
+    expect(computeCashNet([
+      { type: 'cash_in', amount: 25, purpose: 'gift_card_sale' },
+      { type: 'cash_in', amount: 50, purpose: 'plain' },
+    ])).toBe(50)
+  })
 })
 
 describe('computeDashboardFinancials — Use case: a normal trading day', () => {
@@ -91,9 +98,11 @@ describe('computeDashboardFinancials — Use case: refund lowers revenue but mus
   it('a $100 sale later fully refunded nets to zero sales_profit, not negative', () => {
     // The refund's sale_items row is excluded from salesCogsRows entirely by
     // the caller's query (`.eq('sales.is_refund', false)`), matching how
-    // computeSalesCogs is meant to be fed.
+    // computeSalesCogs is meant to be fed. Refund rows store a POSITIVE
+    // total with is_refund=true as the flag (migration 188), not a negative
+    // total — computeDashboardFinancials must sign by is_refund itself.
     const stats = computeDashboardFinancials(baseInput({
-      saleTotals: [{ total: 100 }, { total: -100 }], // sale + its refund
+      saleTotals: [{ total: 100, is_refund: false }, { total: 100, is_refund: true }], // sale + its refund
       salesCogsRows: [{ quantity: 1, unit_cost: 40, sales: { is_refund: false } }], // original sale only
     }))
 
@@ -105,7 +114,7 @@ describe('computeDashboardFinancials — Use case: refund lowers revenue but mus
     // If the caller forgot to filter is_refund at the query level,
     // computeSalesCogs still defends against it (see repair-financials.service.test.ts).
     const stats = computeDashboardFinancials(baseInput({
-      saleTotals: [{ total: 100 }, { total: -100 }],
+      saleTotals: [{ total: 100, is_refund: false }, { total: 100, is_refund: true }],
       salesCogsRows: [
         { quantity: 1, unit_cost: 40, sales: { is_refund: false } },
         { quantity: 1, unit_cost: null, products: { cost_price: 40 }, sales: { is_refund: true } },
@@ -258,12 +267,21 @@ describe('computeTenderBreakdown — Use case: end-of-day cash vs card revenue',
     expect(card).toBe(75)
   })
 
-  it('a same-day cash refund (negative total) nets back out of today\'s cash revenue', () => {
+  it('a same-day cash refund nets back out of today\'s cash revenue (is_refund flag, not sign — see migration 188)', () => {
     const { cash } = computeTenderBreakdown([
       { payment_method: 'cash', total: 100 },
-      { payment_method: 'cash', total: -100 },
+      { payment_method: 'cash', total: 100, is_refund: true },
     ])
     expect(cash).toBe(0)
+  })
+
+  it('a same-day split-tender refund nets both legs back out', () => {
+    const { cash, card } = computeTenderBreakdown([
+      { payment_method: 'split', total: 100, payment_splits: [{ method: 'cash', amount: 25 }, { method: 'card', amount: 75 }] },
+      { payment_method: 'split', total: 100, payment_splits: [{ method: 'cash', amount: 25 }, { method: 'card', amount: 75 }], is_refund: true },
+    ])
+    expect(cash).toBe(0)
+    expect(card).toBe(0)
   })
 
   it('ignores tender types that are neither cash nor card (e.g. gift_card, on_account)', () => {

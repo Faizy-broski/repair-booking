@@ -21,6 +21,7 @@ const openSessionSchema = z.object({
 const closeSessionSchema = z.object({
   session_id: z.string().uuid(),
   closing_cash: z.number().min(0),
+  closing_card_total: z.number().min(0).default(0),
   closing_note: z.string().optional(),
 })
 
@@ -217,11 +218,11 @@ export const ReportController = {
     try {
       const note = parsed.data.closing_note?.trim()
       const preview = await ReportService.previewExpectedCash(parsed.data.session_id)
-      const diff = parsed.data.closing_cash - (preview?.expected_cash ?? 0)
+      const diff = (parsed.data.closing_cash + parsed.data.closing_card_total) - (preview?.expected_cash ?? 0)
       if (Math.abs(diff) > 0.01 && !note) {
         return badRequest('A reason note is required when the counted cash does not match the expected amount.')
       }
-      const data = await ReportService.closeSession(parsed.data.session_id, parsed.data.closing_cash, parsed.data.closing_note)
+      const data = await ReportService.closeSession(parsed.data.session_id, parsed.data.closing_cash, parsed.data.closing_note, parsed.data.closing_card_total)
       return ok(data)
     } catch (err: any) {
       return serverError(err?.message ?? 'Failed to close session', err)

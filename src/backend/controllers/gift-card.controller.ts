@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { type RequestContext } from '@/backend/middleware'
 import { GiftCardService } from '@/backend/services/gift-card.service'
-import { ok, created, notFound, serverError } from '@/backend/utils/api-response'
+import { ok, created, notFound, badRequest, serverError } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
 import { z } from 'zod'
@@ -12,6 +12,7 @@ const createSchema = z.object({
   customer_id: z.string().uuid().optional().nullable(),
   customer_ids: z.array(z.string().uuid()).optional().nullable(),
   expires_at: z.string().optional().nullable(),
+  payment_method: z.enum(['cash', 'card', 'other']).default('cash'),
 })
 
 const updateSchema = z.object({
@@ -52,9 +53,13 @@ export const GiftCardController = {
     if (error) return error
     const { branch_id, ...rest } = data
     try {
-      const card = await GiftCardService.create(branch_id, rest)
+      const card = await GiftCardService.create(branch_id, rest, {
+        businessId: ctx.businessId,
+        cashierId: ctx.auth.userId,
+      })
       return created(card)
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.message?.includes('Open the register')) return badRequest(err.message)
       return serverError('Failed to create gift card', err)
     }
   },

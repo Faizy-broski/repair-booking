@@ -43,7 +43,7 @@ export const DashboardController = {
         posRepairAmountsRes,
         cashMovementsRes,
       ] = await Promise.all([
-        adminSupabase.from('sales').select('id, total, created_at').eq('branch_id', branchId).gte('created_at', periodStart),
+        adminSupabase.from('sales').select('id, total, created_at, is_refund').eq('branch_id', branchId).gte('created_at', periodStart),
         adminSupabase.from('expenses').select('amount').eq('branch_id', branchId).gte('expense_date', periodStart),
         (adminSupabase as any).from('repairs').select('*', { count: 'exact', head: true }).eq('branch_id', branchId) as Promise<{ count: number | null; error: unknown }>,
         // Open/Urgent Jobs — always all-time current state, never filtered by
@@ -57,7 +57,7 @@ export const DashboardController = {
         adminSupabase.from('repairs').select('id, status, deposit_paid, actual_cost, estimated_cost, discount_amount, refund_amount, lab_fee').eq('branch_id', branchId).gte('created_at', periodStart),
         adminSupabase.from('sale_items').select('quantity, unit_cost, product_id, products!product_id(cost_price), sales!inner(branch_id, created_at, is_refund)').eq('sales.branch_id', branchId).eq('sales.is_refund', false).gte('sales.created_at', periodStart),
         adminSupabase.from('repair_items').select('quantity, unit_cost, repairs!inner(branch_id, created_at, status, deposit_paid)').eq('repairs.branch_id', branchId).gte('repairs.created_at', periodStart),
-        adminSupabase.from('sales').select('total, payment_method, payment_splits').eq('branch_id', branchId).gte('created_at', todayStart),
+        adminSupabase.from('sales').select('total, payment_method, payment_splits, is_refund').eq('branch_id', branchId).gte('created_at', todayStart),
         // Amounts actually charged through POS for repair-linked line items —
         // takes priority over the repairs-table fallback below.
         (adminSupabase as any).from('sale_items').select('repair_id, total, sales!inner(is_refund, branch_id, created_at)').eq('sales.branch_id', branchId).gte('sales.created_at', periodStart).not('repair_id', 'is', null),
@@ -175,12 +175,14 @@ export const DashboardController = {
       const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
       const { data: rawSales } = await adminSupabase
         .from('sales')
-        .select('branch_id, total')
+        .select('branch_id, total, is_refund')
         .in('branch_id', branches.map(b => b.id))
         .gte('created_at', startOfMonth)
 
+      // Refund rows store a POSITIVE total with is_refund=true as the flag
+      // (migration 188) — sign by is_refund to net them out of revenue.
       const totalsByBranch = (rawSales ?? []).reduce((acc, row) => {
-        acc[row.branch_id] = (acc[row.branch_id] ?? 0) + (row.total ?? 0)
+        acc[row.branch_id] = (acc[row.branch_id] ?? 0) + ((row as any).is_refund ? -(row.total ?? 0) : (row.total ?? 0))
         return acc
       }, {} as Record<string, number>)
 
@@ -225,7 +227,7 @@ export const DashboardController = {
         // Sales in selected period
         adminSupabase
           .from('sales')
-          .select('id, total, created_at')
+          .select('id, total, created_at, is_refund')
           .eq('branch_id', branchId)
           .gte('created_at', periodStart),
 
@@ -397,12 +399,14 @@ export const DashboardController = {
           const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
           const { data: rawSales } = await adminSupabase
             .from('sales')
-            .select('branch_id, total')
+            .select('branch_id, total, is_refund')
             .in('branch_id', branches.map(b => b.id))
             .gte('created_at', startOfMonth)
 
+          // Refund rows store a POSITIVE total with is_refund=true as the
+          // flag (migration 188) — sign by is_refund to net them out.
           const totalsByBranch = (rawSales ?? []).reduce((acc, row) => {
-            acc[row.branch_id] = (acc[row.branch_id] ?? 0) + (row.total ?? 0)
+            acc[row.branch_id] = (acc[row.branch_id] ?? 0) + ((row as any).is_refund ? -(row.total ?? 0) : (row.total ?? 0))
             return acc
           }, {} as Record<string, number>)
 
