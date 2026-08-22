@@ -121,7 +121,7 @@ export default function ProfitLossReportPage() {
                 { label: 'Repair Revenue (Completed)', value: data.repair_revenue,  indent: 0, bold: false },
                 ...(data.repair_revenue_pos !== undefined ? [{ label: 'Paid via POS',    value: data.repair_revenue_pos,    indent: 2, bold: false }] : []),
                 ...(data.repair_revenue_direct !== undefined ? [{ label: 'Paid Directly (not via POS)', value: data.repair_revenue_direct, indent: 2, bold: false }] : []),
-                ...(data.other_income !== undefined ? [{ label: 'Other Income (Cash Movements)', value: data.other_income, indent: 0, bold: false }] : []),
+                ...(data.other_income !== undefined ? [{ label: 'Other Cash Movements', value: data.other_income, indent: 0, bold: false }] : []),
                 { label: 'Cost of Goods (COGS)',  value: -data.cogs,           indent: 1,  bold: false },
                 ...(data.sales_cogs !== undefined ? [{ label: 'Sales COGS',        value: -data.sales_cogs,        indent: 2, bold: false }] : []),
                 ...(data.repair_parts_cogs !== undefined ? [{ label: 'Repair Parts COGS', value: -data.repair_parts_cogs, indent: 2, bold: false }] : []),

@@ -21,16 +21,45 @@ function baseInput(overrides: Partial<DashboardFinancialsInput> = {}): Dashboard
 }
 
 describe('computeCashNet', () => {
-  it('adds cash_in and subtracts cash_out', () => {
+  it('adds cash_in and subtracts a cash_out with no special purpose', () => {
     expect(computeCashNet([
       { type: 'cash_in', amount: 50 },
-      { type: 'cash_out', amount: 20, purpose: 'plain' },
+      { type: 'cash_out', amount: 20 },
     ])).toBe(30)
   })
 
   it('does not subtract cash_out rows with purpose "expense" (already counted in total_expenses)', () => {
     expect(computeCashNet([
       { type: 'cash_out', amount: 40, purpose: 'expense' },
+    ])).toBe(0)
+  })
+
+  // Fixed: 'plain' cash-outs used to subtract like any other cash-out, but
+  // the Cash In/Out UI explicitly promises "Plain cash out will not be
+  // reflected in your reports" — this was a real bug (see migration 195).
+  it('does not subtract cash_out rows with purpose "plain" (UI promises no report effect)', () => {
+    expect(computeCashNet([
+      { type: 'cash_in', amount: 50 },
+      { type: 'cash_out', amount: 20, purpose: 'plain' },
+    ])).toBe(50)
+  })
+
+  // Fixed: buyback cash-outs used to subtract immediately, then subtract
+  // AGAIN as COGS when the bought-back item was resold — double-counted as
+  // a loss. Now excluded here; its cost is recognized once, as COGS at
+  // resale, same as any other purchased inventory (see migration 195).
+  it('does not subtract cash_out rows with purpose "buyback" (recognized as COGS at resale instead)', () => {
+    expect(computeCashNet([
+      { type: 'cash_out', amount: 30, purpose: 'buyback' },
+    ])).toBe(0)
+  })
+
+  // Same bug as buyback, found afterward — a trade-in payout also sets the
+  // item's cost basis, so its cost also hits COGS at resale (see migration
+  // 196).
+  it('does not subtract cash_out rows with purpose "trade_in" (recognized as COGS at resale instead)', () => {
+    expect(computeCashNet([
+      { type: 'cash_out', amount: 30, purpose: 'trade_in' },
     ])).toBe(0)
   })
 
@@ -179,12 +208,16 @@ describe('computeDashboardFinancials — Use case: cash drawer adjustments', () 
     expect(stats.net_profit).toBe(250)
   })
 
-  it('a buyback cash-out reduces total_sales', () => {
+  // Fixed: a buyback cash-out used to reduce total_sales immediately, then
+  // reduce it again via COGS when the bought-back item was resold — double
+  // counted as a loss. It's now excluded here; its cost only shows up once,
+  // as COGS at resale (see migration 195).
+  it('a buyback cash-out does NOT reduce total_sales (its cost is recognized as COGS at resale instead)', () => {
     const stats = computeDashboardFinancials(baseInput({
       saleTotals: [{ total: 200 }],
       cashMovements: [{ type: 'cash_out', amount: 30, purpose: 'buyback' }],
     }))
-    expect(stats.total_sales).toBe(170)
+    expect(stats.total_sales).toBe(200)
   })
 
   it('an expense-purpose cash-out is excluded from total_sales (it is already in total_expenses)', () => {

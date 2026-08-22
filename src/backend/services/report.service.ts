@@ -189,11 +189,11 @@ export const ReportService = {
       // Cash In adds to Sales revenue, Cash Out subtracts — except cash-outs
       // tagged 'expense' (already counted via the expenses table above),
       // 'plain' (UI explicitly promises these have no report effect), or
-      // 'buyback' (its cost is recognized as COGS at resale instead — see
-      // migration 195), and cash-ins tagged 'gift_card_sale' (deferred
-      // revenue, not revenue — see migration 187).
+      // 'buyback'/'trade_in' (both recognized as COGS at resale instead —
+      // see migrations 195/196), and cash-ins tagged 'gift_card_sale'
+      // (deferred revenue, not revenue — see migration 187).
       const cashNet = ((cashMovementsRes.data ?? []) as any[]).reduce(
-        (s: number, r: any) => s + (r.type === 'cash_in' ? (r.purpose === 'gift_card_sale' ? 0 : r.amount) : (r.purpose === 'expense' || r.purpose === 'plain' || r.purpose === 'buyback' ? 0 : -r.amount)), 0
+        (s: number, r: any) => s + (r.type === 'cash_in' ? (r.purpose === 'gift_card_sale' ? 0 : r.amount) : (r.purpose === 'expense' || r.purpose === 'plain' || r.purpose === 'buyback' || r.purpose === 'trade_in' ? 0 : -r.amount)), 0
       )
       const totalRevenue = revenue + cashNet
       return {

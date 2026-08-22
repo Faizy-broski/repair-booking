@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/ui/modal'
 import { useAuthStore } from '@/store/auth.store'
+import { useModuleConfigStore } from '@/store/module-config.store'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { DateRangeBar } from '../_components/date-range-bar'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import type { ZReport } from '../../pos/_types'
+import { channelLabel, type ZReport } from '../../pos/_types'
 
 interface RegisterSession {
   id: string; cashier_id: string; opening_float: number; closing_cash: number | null
@@ -19,8 +20,17 @@ interface RegisterSession {
   expected_cash: number | null; variance: number | null; total_sales: number | null
   total_refunds: number | null; cash_sales: number | null; card_sales: number | null
   other_sales: number | null; transaction_count: number | null
+  // Riseteck-only: other_sales broken down by individual custom channel
+  // (eBay/Deliveroo/Website) — null/empty for every other business. See
+  // Part 12 of the plan / migration 198.
+  other_sales_breakdown: Record<string, number> | null
   repair_sales: number | null; repair_refunds: number | null; repair_transaction_count: number | null
   repair_cash_sales: number | null; repair_card_sales: number | null; repair_other_sales: number | null
+  // Repair revenue collected directly via the Repairs module, excluding any
+  // repair paid through the POS cart (already inside cash_sales/card_sales
+  // above) — combining these gives a correct combined total. See Part 11 /
+  // migration 197.
+  repair_cash_deposits: number | null; repair_card_deposits: number | null
   opened_at: string; closed_at: string | null; status: string
 }
 
@@ -48,6 +58,10 @@ async function exportZReportExcel(sessions: RegisterSession[], filename: string)
     'Repair Other Sales':    s.repair_other_sales ?? 0,
     'Repair Refunds':        s.repair_refunds ?? 0,
     'Repair Transactions':   s.repair_transaction_count ?? 0,
+    // Product + Repair combined — the one figure to check against the till
+    // count and the card machine's own report. See Part 11 of the plan.
+    'Total Cash Sales':      (s.cash_sales ?? 0) + (s.repair_cash_deposits ?? 0),
+    'Total Card Sales':      (s.card_sales ?? 0) + (s.repair_card_deposits ?? 0),
     'Grand Total':           (s.total_sales ?? 0) + (s.repair_sales ?? 0) - (s.repair_refunds ?? 0) - (s.total_refunds ?? 0),
     'Expected Cash':         s.expected_cash ?? 0,
     'Closing Cash':          s.closing_cash ?? 0,
@@ -77,6 +91,9 @@ async function exportZReportExcel(sessions: RegisterSession[], filename: string)
 function ZReportPageInner() {
   const { activeBranch } = useAuthStore()
   const queryClient = useQueryClient()
+  // Riseteck-only: custom split-payment channels (eBay/Deliveroo/Website).
+  // Empty for every other business. See Part 12 of the plan.
+  const customChannels: string[] = useModuleConfigStore().getConfig('pos')?.custom_payment_channels ?? []
   const [dateFrom, setDateFrom] = useState(firstOfMonth)
   const [dateTo, setDateTo] = useState(today)
   const [openModal, setOpenModal] = useState(false)
@@ -127,10 +144,13 @@ function ZReportPageInner() {
     cash_sales:                useLive ? liveExpected.cash_sales : detailSession.cash_sales,
     card_sales:                useLive ? liveExpected.card_sales : detailSession.card_sales,
     other_sales:               useLive ? liveExpected.other_sales : detailSession.other_sales,
+    other_sales_breakdown:     useLive ? liveExpected.other_sales_breakdown : detailSession.other_sales_breakdown,
     total_refunds:             useLive ? liveExpected.total_refunds : detailSession.total_refunds,
     repair_cash_sales:         useLive ? liveExpected.repair_cash_sales : detailSession.repair_cash_sales,
     repair_card_sales:         useLive ? liveExpected.repair_card_sales : detailSession.repair_card_sales,
     repair_other_sales:        useLive ? liveExpected.repair_other_sales : detailSession.repair_other_sales,
+    repair_cash_deposits:      useLive ? liveExpected.repair_cash_deposits : detailSession.repair_cash_deposits,
+    repair_card_deposits:      useLive ? liveExpected.repair_card_deposits : detailSession.repair_card_deposits,
     opening_float:             detailSession.opening_float,
     expected_cash:             useLive ? liveExpected.expected_cash : detailSession.expected_cash,
     closing_cash:              detailSession.closing_cash,
@@ -180,6 +200,29 @@ function ZReportPageInner() {
     enabled: !!activeBranch,
     staleTime: 0,
   })
+
+  // This form previously showed no Expected Cash at all before submitting —
+  // staff had to guess whether a discrepancy note would be required. It also
+  // has the same staleness gap the POS page's Close Register modal had (Part
+  // 10): counting a full drawer takes time, and any sale/repair
+  // payment/cash movement recorded during that time moves the real Expected
+  // Cash. Polling here (like the POS page now does) keeps it visibly live
+  // instead of frozen at whatever it was when the modal opened.
+  const { data: closeModalExpected, isLoading: closeModalExpectedLoading } = useQuery<any>({
+    queryKey: ['close-modal-expected-cash', currentSession?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/pos/session/${currentSession!.id}/expected-cash`)
+      const json = await res.json()
+      return json.data ?? null
+    },
+    enabled: !!currentSession?.id && closeModal,
+    staleTime: 0,
+    refetchInterval: closeModal ? 15000 : false,
+  })
+  const closeModalVerifiedTotal = (parseFloat(closingCash) || 0) + (parseFloat(closingCardTotal) || 0)
+  const closeModalDifference = typeof closeModalExpected?.expected_cash === 'number'
+    ? closeModalVerifiedTotal - closeModalExpected.expected_cash
+    : null
 
   async function handleOpenSession() {
     setSessionLoading(true)
@@ -282,8 +325,18 @@ function ZReportPageInner() {
             {([
               { label: 'Opening Float',  value: zReportData.opening_float },
               { label: 'Total Refunds',  value: zReportData.total_refunds },
-              { label: 'Cash Sales',     value: zReportData.cash_sales },
-              { label: 'Card Sales',     value: zReportData.card_sales },
+              // Product + Repair combined — the one figure to check against
+              // the till count and the card machine's own report.
+              { label: 'Total Cash Sales', value: (zReportData.cash_sales ?? 0) + (zReportData.repair_cash_deposits ?? 0) },
+              { label: 'Total Card Sales', value: (zReportData.card_sales ?? 0) + (zReportData.repair_card_deposits ?? 0) },
+              { label: 'Product Cash Sales', value: zReportData.cash_sales },
+              { label: 'Product Card Sales', value: zReportData.card_sales },
+              // Riseteck-only: always shows eBay/Deliveroo/Website as their
+              // own tiles (even at £0), instead of a lumped "Other" figure.
+              // See Part 12 of the plan.
+              ...customChannels.map(
+                (m) => ({ label: channelLabel(m), value: zReportData.other_sales_breakdown?.[m] ?? 0 })
+              ),
               { label: 'Transactions',   value: zReportData.transaction_count, isCurrency: false },
               { label: 'Expected Cash',  value: zReportData.expected_cash },
               { label: 'Closing Cash',   value: zReportData.closing_cash },
@@ -429,14 +482,35 @@ function ZReportPageInner() {
               </div>
             </div>
 
+            {/* Total cash/card taken this shift, product + repair combined --
+                the one figure to check against the till count and the card
+                machine's own report. Computed exactly the way Expected Cash
+                itself combines these two numbers, so it can never disagree
+                with it. See Part 11 of the plan. */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-teal-300 bg-teal-50 p-4">
+                <p className="text-xs font-medium text-teal-700">Total Cash Sales</p>
+                <p className="mt-1 text-xl font-semibold text-teal-700">{formatCurrency((display.cash_sales ?? 0) + (display.repair_cash_deposits ?? 0))}</p>
+              </div>
+              <div className="rounded-xl border border-sky-300 bg-sky-50 p-4">
+                <p className="text-xs font-medium text-sky-700">Total Card Sales</p>
+                <p className="mt-1 text-xl font-semibold text-sky-700">{formatCurrency((display.card_sales ?? 0) + (display.repair_card_deposits ?? 0))}</p>
+              </div>
+            </div>
+
             {/* Product sales detail + repair sales detail + cash reconciliation */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="rounded-xl bg-surface-container-low p-4 space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-on-surface-variant mb-3">Product Sales Detail</p>
                 {([
-                  ['Cash Sales',   display.cash_sales,   false],
-                  ['Card Sales',   display.card_sales,   false],
-                  ['Other Sales',  display.other_sales,  false],
+                  ['Product Cash Sales', display.cash_sales,   false],
+                  ['Product Card Sales', display.card_sales,   false],
+                  // Riseteck-only: always shows eBay/Deliveroo/Website as
+                  // their own rows (even at £0), instead of a lumped
+                  // "Other Sales" figure. See Part 12 of the plan.
+                  ...(customChannels.length > 0
+                    ? customChannels.map((m) => [channelLabel(m), display.other_sales_breakdown?.[m] ?? 0, false] as [string, number | null, boolean])
+                    : [['Other Sales', display.other_sales, false] as [string, number | null, boolean]]),
                   ['Refunds',      display.total_refunds, true],
                 ] as [string, number | null, boolean][]).map(([label, val, isNeg]) => (
                   <div key={label} className="flex justify-between">
@@ -555,6 +629,25 @@ function ZReportPageInner() {
             <label className="mb-1 block text-sm font-medium text-on-surface">Card Total (£)</label>
             <input type="number" min="0" step="0.01" value={closingCardTotal} onChange={(e) => setClosingCardTotal(e.target.value)} placeholder="0.00" className="h-10 w-full rounded-lg border border-outline px-3 text-sm bg-surface text-on-surface" />
             <p className="mt-1 text-xs text-on-surface-variant">Today's total card payments from your card machine's report — Expected Cash includes card takings.</p>
+          </div>
+          <div className="rounded-lg bg-surface-container px-3 py-2.5 text-sm">
+            <div className="flex items-center justify-between text-on-surface-variant">
+              <span>Expected Cash</span>
+              <span className="font-semibold text-on-surface">
+                {closeModalExpectedLoading ? 'Calculating…' : formatCurrency(closeModalExpected?.expected_cash ?? 0)}
+              </span>
+            </div>
+            <div className="mt-1 flex items-center justify-between font-semibold text-on-surface">
+              <span>Verified Total</span>
+              <span>{formatCurrency(closeModalVerifiedTotal)}</span>
+            </div>
+            {closeModalDifference !== null && (
+              <div className={`mt-1 flex items-center justify-between border-t border-outline-variant pt-1 text-sm font-semibold ${closeModalDifference < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                <span>Difference</span>
+                <span>{formatCurrency(closeModalDifference)}</span>
+              </div>
+            )}
+            <p className="mt-1.5 text-xs text-on-surface-variant italic">Live — updates automatically while this stays open, in case a sale or payment comes in while you're counting.</p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface">Reason for discrepancy (required only if counted cash + card doesn't match Expected Cash)</label>

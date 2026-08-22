@@ -5,14 +5,24 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
 import { formatCurrency } from '@/lib/utils'
-import { DENOMINATIONS, denomTotal, type ZReport } from '../../_types'
+import { useModuleConfigStore } from '@/store/module-config.store'
+import { DENOMINATIONS, denomTotal, channelLabel, type ZReport } from '../../_types'
 
 interface SessionStats {
   total_sales: number; repair_sales: number; total_refunds: number; repair_refunds: number
   store_credit_sales: number; loyalty_points_sales: number; on_account_sales: number
   repair_cash_sales: number; repair_card_sales: number
+  // Repair revenue collected via the Repairs module directly, excluding any
+  // repair paid through the POS cart (already inside cash_sales/card_sales
+  // below) — combining these gives a correct combined total with no double
+  // counting. See Part 11 of the plan / migration 197.
+  repair_cash_deposits: number; repair_card_deposits: number
   repair_store_credit_sales: number; repair_loyalty_points_sales: number; repair_other_sales: number
   cash_sales: number; card_sales: number; other_sales: number
+  // Riseteck-only: other_sales broken down by individual custom channel
+  // (eBay/Deliveroo/Website). Empty for every other business. See Part 12
+  // of the plan / migration 198.
+  other_sales_breakdown?: Record<string, number>
   cash_in: number; cash_out: number; buyback_out: number
   credit_repayments_cash: number; credit_repayments_total: number
   expected_cash: number; opening_float: number; expenses?: number
@@ -32,14 +42,25 @@ interface Props {
   handleCloseRegister: () => void
   expectedCash: number | null
   expectedCashLoading: boolean
+  // True if Expected Cash changed after this modal was opened (a new sale,
+  // repair payment, or cash movement was recorded while staff were counting
+  // the drawer) — see Part 10 of the plan.
+  expectedCashChangedSinceOpen: boolean
   sessionStats: SessionStats | null
 }
 
 export function CloseRegisterModal({
   open, onClose, zReport, sessionProcessing,
   closingDenoms, setClosingDenoms, closingCardTotal, setClosingCardTotal, closingNote, setClosingNote, handleCloseRegister,
-  expectedCash, expectedCashLoading, sessionStats,
+  expectedCash, expectedCashLoading, expectedCashChangedSinceOpen, sessionStats,
 }: Props) {
+  // Riseteck-only: always show one tile per configured custom channel
+  // (eBay/Deliveroo/Website), even at £0, instead of switching between a
+  // lumped "Other" tile and individual ones depending on whether any were
+  // used this shift — consistent and predictable either way. Empty for
+  // every other business, which keeps seeing the plain "Other" tile
+  // exactly as before. See Part 12 of the plan.
+  const customChannels: string[] = useModuleConfigStore().getConfig('pos')?.custom_payment_channels ?? []
   const verifiedTotal = denomTotal(closingDenoms) + (parseFloat(closingCardTotal) || 0)
   const difference = expectedCash !== null ? verifiedTotal - expectedCash : null
   const hasDiscrepancy = difference !== null && Math.abs(difference) > 0.01
@@ -74,16 +95,41 @@ export function CloseRegisterModal({
             </div>
           </div>
 
+          {/* Total cash/card taken this shift, product + repair combined --
+              the one figure to check against the till count and the card
+              machine's own report. Computed exactly the way Expected Cash
+              itself combines these two numbers, so it can never disagree
+              with it. See Part 11 of the plan. */}
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Total Tendered (Product + Repair)</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-teal-300 bg-teal-50 p-4">
+                <p className="text-xs font-medium text-teal-700">Total Cash Sales</p>
+                <p className="mt-1 text-xl font-semibold text-teal-700">{formatCurrency((zReport.cash_sales ?? 0) + (zReport.repair_cash_deposits ?? 0))}</p>
+              </div>
+              <div className="rounded-xl border border-sky-300 bg-sky-50 p-4">
+                <p className="text-xs font-medium text-sky-700">Total Card Sales</p>
+                <p className="mt-1 text-xl font-semibold text-sky-700">{formatCurrency((zReport.card_sales ?? 0) + (zReport.repair_card_deposits ?? 0))}</p>
+              </div>
+            </div>
+          </div>
+
           {/* Cash flow for the shift */}
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Cash Flow</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Cash Flow (Product Sales Only — see Repair Sales Detail below for repair tenders)</p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {([
-                ['Cash Sales',     zReport.cash_sales ?? 0],
-                ['Card Sales',     zReport.card_sales ?? 0],
+                ['Product Cash Sales', zReport.cash_sales ?? 0],
+                ['Product Card Sales', zReport.card_sales ?? 0],
                 ['Store Credit',   zReport.store_credit_sales ?? 0],
                 ['Loyalty Points', zReport.loyalty_points_sales ?? 0],
-                ['Other',          zReport.other_sales ?? 0],
+                // Riseteck-only: always shows eBay/Deliveroo/Website as
+                // their own tiles (even at £0) instead of one lumped
+                // "Other" tile. Every other business still sees the plain
+                // "Other" tile exactly as before. See Part 12 of the plan.
+                ...(customChannels.length > 0
+                  ? customChannels.map((m) => [channelLabel(m), zReport.other_sales_breakdown?.[m] ?? 0] as [string, number])
+                  : [['Other', zReport.other_sales ?? 0] as [string, number]]),
                 ['Refunds',        -(zReport.total_refunds ?? 0)],
               ] as [string, number][]).map(([l, v]) => (
                 <div key={l} className="rounded-xl border border-gray-200 bg-white p-3">
@@ -314,16 +360,37 @@ export function CloseRegisterModal({
                       </div>
                     </div>
 
+                    {/* Total cash/card taken this shift so far, product +
+                        repair combined -- see the post-close view's comment
+                        above for why this is computed this specific way. */}
+                    <div>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Total Tendered (Product + Repair)</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-xl border border-teal-300 bg-teal-50 p-4">
+                          <p className="text-xs font-medium text-teal-700">Total Cash Sales</p>
+                          <p className="mt-1 text-xl font-semibold text-teal-700">{formatCurrency((sessionStats.cash_sales ?? 0) + (sessionStats.repair_cash_deposits ?? 0))}</p>
+                        </div>
+                        <div className="rounded-xl border border-sky-300 bg-sky-50 p-4">
+                          <p className="text-xs font-medium text-sky-700">Total Card Sales</p>
+                          <p className="mt-1 text-xl font-semibold text-sky-700">{formatCurrency((sessionStats.card_sales ?? 0) + (sessionStats.repair_card_deposits ?? 0))}</p>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Cash flow for the shift so far */}
                     <div>
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Cash Flow</p>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Cash Flow (Product Sales Only — see Repair Sales Detail below for repair tenders)</p>
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                         {([
-                          ['Cash Sales',     sessionStats.cash_sales ?? 0],
-                          ['Card Sales',     sessionStats.card_sales ?? 0],
+                          ['Product Cash Sales', sessionStats.cash_sales ?? 0],
+                          ['Product Card Sales', sessionStats.card_sales ?? 0],
                           ['Store Credit',   sessionStats.store_credit_sales ?? 0],
                           ['Loyalty Points', sessionStats.loyalty_points_sales ?? 0],
-                          ['Other',          sessionStats.other_sales ?? 0],
+                          // Riseteck-only breakdown -- see comment in the
+                          // post-close view above.
+                          ...(customChannels.length > 0
+                            ? customChannels.map((m) => [channelLabel(m), sessionStats.other_sales_breakdown?.[m] ?? 0] as [string, number])
+                            : [['Other', sessionStats.other_sales ?? 0] as [string, number]]),
                           ['Refunds',        -(sessionStats.total_refunds ?? 0)],
                         ] as [string, number][]).map(([l, v]) => (
                           <div key={l} className="rounded-xl border border-gray-200 bg-white p-3">
@@ -417,6 +484,11 @@ export function CloseRegisterModal({
               </div>
             )}
           </div>
+          {expectedCashChangedSinceOpen && (
+            <p className="-mt-2 text-xs text-amber-700">
+              ⚠ Expected Cash updated since you opened this screen — a new sale, repair payment, or cash movement was recorded while you were counting. The figures above are live and reflect it.
+            </p>
+          )}
 
           <div>
             <label className={`mb-1 block text-xs font-medium ${hasDiscrepancy ? 'text-amber-700' : 'text-gray-600'}`}>

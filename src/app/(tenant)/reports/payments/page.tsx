@@ -14,6 +14,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from 'recharts'
 import type { ColumnDef } from '@tanstack/react-table'
+import { channelLabel } from '../../pos/_types'
 
 interface PaymentRow { payment_method: string; total: number; count: number }
 
@@ -42,7 +43,7 @@ export default function PaymentsReportPage() {
   const totalTxns    = data.reduce((s, r) => s + r.count, 0)
 
   const columns: ColumnDef<PaymentRow>[] = [
-    { accessorKey: 'payment_method', header: 'Method', cell: ({ getValue }) => <span className="capitalize">{(getValue() as string).replace(/_/g, ' ')}</span> },
+    { accessorKey: 'payment_method', header: 'Method', cell: ({ getValue }) => <span>{channelLabel(getValue() as string)}</span> },
     { accessorKey: 'count',          header: 'Transactions' },
     { accessorKey: 'total',          header: 'Revenue', cell: ({ getValue }) => formatCurrency(getValue() as number) },
   ]
@@ -86,7 +87,7 @@ export default function PaymentsReportPage() {
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie data={data} dataKey="total" nameKey="payment_method" cx="50%" cy="50%" outerRadius={75}
-                  label={({ payment_method, percent }) => `${payment_method.replace(/_/g,' ')} ${((percent ?? 0) * 100).toFixed(0)}%`}>
+                  label={({ payment_method, percent }) => `${channelLabel(payment_method)} ${((percent ?? 0) * 100).toFixed(0)}%`}>
                   {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Tooltip formatter={(v: unknown) => formatCurrency(v as number)} />
@@ -99,7 +100,7 @@ export default function PaymentsReportPage() {
               <BarChart data={data} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" tick={{ fontSize: 11 }} />
-                <YAxis dataKey="payment_method" type="category" tick={{ fontSize: 11 }} width={80} tickFormatter={(v) => v.replace(/_/g,' ')} />
+                <YAxis dataKey="payment_method" type="category" tick={{ fontSize: 11 }} width={80} tickFormatter={(v) => channelLabel(v)} />
                 <Tooltip />
                 <Bar dataKey="count" fill="#8b5cf6" radius={[0, 4, 4, 0]} name="Transactions" />
               </BarChart>

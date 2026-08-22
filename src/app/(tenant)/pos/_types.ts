@@ -33,6 +33,10 @@ export interface ZReport {
   store_credit_sales?: number
   loyalty_points_sales?: number
   other_sales?: number
+  // Riseteck-only: other_sales broken down by individual custom channel
+  // (eBay/Deliveroo/Website) — empty/undefined for every other business.
+  // See Part 12 of the plan / migration 198.
+  other_sales_breakdown?: Record<string, number>
   transaction_count?: number
   cash_in?: number
   cash_out?: number
@@ -49,6 +53,16 @@ export interface ZReport {
   repair_transaction_count?: number
   repair_cash_sales?: number
   repair_card_sales?: number
+  // Repair revenue collected via the Repairs module directly (deposits,
+  // top-ups, direct-collection payments) — deliberately excludes any repair
+  // paid through the POS cart, since that portion is already inside
+  // cash_sales/card_sales above. Combining these with cash_sales/card_sales
+  // gives a correct "Total Cash/Card Sales" figure with no double-counting
+  // — see Part 11 of the plan (migration 197 exposed repair_cash_deposits;
+  // repair_card_deposits was already exposed by migration 190 but never
+  // added to this type until now).
+  repair_cash_deposits?: number
+  repair_card_deposits?: number
   repair_store_credit_sales?: number
   repair_loyalty_points_sales?: number
   repair_other_sales?: number
@@ -116,4 +130,28 @@ export const DENOMINATIONS = [
 
 export function denomTotal(denoms: Record<string, number>): number {
   return DENOMINATIONS.reduce((sum, d) => sum + (denoms[String(d.value)] ?? 0) * d.value, 0)
+}
+
+// Display label for a payment/split-tender method. Covers the built-in
+// methods plus Riseteck's custom split-payment channels (eBay, Deliveroo,
+// Website — gated via business_module_access.settings_override.
+// custom_payment_channels, see supabase/migrations/106_custom_payment_
+// channels.sql). Was previously duplicated as a local CHANNEL_LABELS map in
+// cart-panel.tsx; shared here so the same labels render consistently in the
+// End Shift screen, live stats bar, Z-Report, and Reports > Payments page
+// (see Part 12 of the plan). Falls back to simple title-case for any other
+// custom channel a business might be granted later, so a future channel
+// name doesn't need another code change to display sensibly.
+const CHANNEL_LABEL_OVERRIDES: Record<string, string> = {
+  cash: 'Cash', card: 'Card', ebay: 'eBay', deliveroo: 'Deliveroo', website: 'Website',
+  gift_card: 'Gift Card', store_credit: 'Store Credit', loyalty_points: 'Loyalty Points',
+  on_account: 'On Account',
+}
+export function channelLabel(method: string): string {
+  if (CHANNEL_LABEL_OVERRIDES[method]) return CHANNEL_LABEL_OVERRIDES[method]
+  return method
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .join(' ')
 }

@@ -22,7 +22,7 @@ import { DEFAULT_INVOICE_SETTINGS } from '@/types/invoice-settings'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import type { Customer, Product } from '@/types/database'
-import type { ProductWithStock } from '../_types'
+import { channelLabel, type ProductWithStock } from '../_types'
 import { ScannerModal } from '@/components/scanner/scanner-modal'
 import { useBarcodeLookup, type ProductWithStock as ScannedProduct } from '@/hooks/use-barcode-lookup'
 
@@ -81,9 +81,6 @@ export function CartPanel({ mobileView }: Props) {
   const { isModuleEnabled, getConfig } = useModuleConfigStore()
   const posConfig = getConfig('pos')
   const customChannels: string[] = posConfig?.custom_payment_channels ?? []
-  const CHANNEL_LABELS: Record<string, string> = {
-    cash: 'Cash', card: 'Card', ebay: 'eBay', deliveroo: 'Deliveroo', website: 'Website',
-  }
   const splitChannels = ['cash', 'card', ...customChannels]
   // "Served By" + per-sale commission entry is specific to the retail-store
   // vertical template, independent of any module's enabled/disabled state.
@@ -1290,7 +1287,7 @@ export function CartPanel({ mobileView }: Props) {
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Split Amounts</p>
                   {splitChannels.map(m => (
                     <div key={m} className="flex items-center gap-3">
-                      <span className="w-20 shrink-0 text-sm text-gray-600 font-medium">{CHANNEL_LABELS[m] ?? m}</span>
+                      <span className="w-20 shrink-0 text-sm text-gray-600 font-medium">{channelLabel(m)}</span>
                       <input
                         type="number" min="0" step="0.01" placeholder="0.00"
                         value={splits[m] ?? ''} onChange={e => setSplits(s => ({ ...s, [m]: e.target.value }))}

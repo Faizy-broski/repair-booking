@@ -5,7 +5,8 @@ import { useAuthStore } from '@/store/auth.store'
 import { usePosStore } from '@/store/pos.store'
 import { formatCurrency } from '@/lib/utils'
 import { usePinPrompt } from '@/components/ui/pin-prompt'
-import type { RegisterSession, ZReport } from './_types'
+import { useModuleConfigStore } from '@/store/module-config.store'
+import { channelLabel, type RegisterSession, type ZReport } from './_types'
 
 import { Button } from '@/components/ui/button'
 import { RegisterGate } from './_components/register-gate'
@@ -32,6 +33,9 @@ export default function PosPage() {
   ]
   const pos = usePosStore()
   const { PinModal } = usePinPrompt()
+  // Riseteck-only: custom split-payment channels (eBay/Deliveroo/Website).
+  // Empty for every other business. See Part 12 of the plan.
+  const customChannels: string[] = useModuleConfigStore().getConfig('pos')?.custom_payment_channels ?? []
 
   // ── Tab ───────────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<PosTab>('products')
@@ -65,15 +69,25 @@ export default function PosPage() {
   const [closingNote, setClosingNote] = useState('')
   const [zReport, setZReport] = useState<ZReport | null>(null)
   const [expectedCash, setExpectedCash] = useState<number | null>(null)
-  const [expectedCashLoading, setExpectedCashLoading] = useState(false)
+  // Captures Expected Cash the instant the modal opens, so we can tell staff
+  // if it moved (a new sale/repair/cash movement landed) while they were
+  // counting the drawer — see Part 10: the modal used to fetch this once and
+  // never again, so the number on screen could silently go stale for as long
+  // as counting a full drawer takes.
+  const expectedCashAtOpenRef = useRef<number | null>(null)
+  const [expectedCashChangedSinceOpen, setExpectedCashChangedSinceOpen] = useState(false)
 
   // ── Live session stats (net sales / repair / product / credit / cash in-out) ──
   const [sessionStats, setSessionStats] = useState<{
     total_sales: number; repair_sales: number; total_refunds: number; repair_refunds: number
     store_credit_sales: number; loyalty_points_sales: number; on_account_sales: number
     repair_cash_sales: number; repair_card_sales: number
+    repair_cash_deposits: number; repair_card_deposits: number
     repair_store_credit_sales: number; repair_loyalty_points_sales: number; repair_other_sales: number
     cash_sales: number; card_sales: number; other_sales: number
+    // Riseteck-only: other_sales broken down by individual custom channel
+    // (eBay/Deliveroo/Website) — empty for every other business.
+    other_sales_breakdown?: Record<string, number>
     cash_in: number; cash_out: number; buyback_out: number
     credit_repayments_cash: number; credit_repayments_total: number
     expected_cash: number; opening_float: number; expenses?: number
@@ -98,6 +112,24 @@ export default function PosPage() {
   const refreshSessionStats = useCallback(() => {
     if (pos.session) fetchSessionStats(pos.session.id)
   }, [pos.session, fetchSessionStats])
+
+  // Keep `expectedCash` in lockstep with sessionStats (already live — 30s
+  // poll + realtime push on sales/repairs/cash_movements above) instead of
+  // the old one-shot fetch taken only when the Close Register modal opened.
+  // If it moves while the modal is open, flag it so staff know their count
+  // may already be stale rather than silently disagreeing with the server.
+  useEffect(() => {
+    const next = sessionStats?.expected_cash ?? null
+    setExpectedCash(next)
+    if (
+      closeRegisterModal &&
+      expectedCashAtOpenRef.current !== null &&
+      next !== null &&
+      Math.abs(next - expectedCashAtOpenRef.current) > 0.01
+    ) {
+      setExpectedCashChangedSinceOpen(true)
+    }
+  }, [sessionStats, closeRegisterModal])
 
   useRealtime({ table: 'sales', filterColumn: 'branch_id', filterValue: activeBranch?.id, onInsert: refreshSessionStats, onUpdate: refreshSessionStats })
   useRealtime({ table: 'repairs', filterColumn: 'branch_id', filterValue: activeBranch?.id, onInsert: refreshSessionStats, onUpdate: refreshSessionStats })
@@ -217,18 +249,15 @@ export default function PosPage() {
     setSessionProcessing(false)
   }
 
-  async function openCloseRegisterModal() {
+  function openCloseRegisterModal() {
+    // No fetch needed here anymore -- sessionStats (and the expectedCash
+    // that mirrors it) is already kept live in the background the whole
+    // time the register is open, via the 30s poll + realtime subscriptions
+    // above. We just snapshot the value staff are looking at right now, so
+    // we can tell them later if it moved while they were counting.
+    expectedCashAtOpenRef.current = sessionStats?.expected_cash ?? null
+    setExpectedCashChangedSinceOpen(false)
     setCloseRegisterModal(true)
-    if (!pos.session) return
-    setExpectedCashLoading(true)
-    try {
-      const res = await fetch(`/api/pos/session/${pos.session.id}/expected-cash`)
-      const j = await res.json()
-      setExpectedCash(res.ok ? (j.data?.expected_cash ?? null) : null)
-    } catch {
-      setExpectedCash(null)
-    }
-    setExpectedCashLoading(false)
   }
 
   async function handleCloseRegister() {
@@ -240,9 +269,26 @@ export default function PosPage() {
     ]
     const total = DENOMINATIONS.reduce((sum, d) => sum + (closingDenoms[String(d.value)] ?? 0) * d.value, 0)
     const cardTotal = parseFloat(closingCardTotal) || 0
+
+    // One last fresh read of Expected Cash right before submitting -- staff
+    // may have spent several minutes counting the drawer since this modal
+    // opened, and sessionStats can be up to ~30s behind even with realtime.
+    // This makes sure the "must add a note" gate below (and the number the
+    // client sees) matches, as closely as possible, what the server
+    // independently recomputes and enforces on submit. See Part 10.
+    let freshExpectedCash = expectedCash
+    try {
+      const res = await fetch(`/api/pos/session/${pos.session.id}/expected-cash`)
+      const j = await res.json()
+      if (res.ok && typeof j.data?.expected_cash === 'number') {
+        freshExpectedCash = j.data.expected_cash
+        setExpectedCash(freshExpectedCash)
+      }
+    } catch { /* fall back to the last-known value if this fails */ }
+
     // Expected Cash now includes card takings (see migration 190), so the
     // counted-cash total needs the entered card total added before comparing.
-    const hasDiscrepancy = expectedCash !== null && Math.abs((total + cardTotal) - expectedCash) > 0.01
+    const hasDiscrepancy = freshExpectedCash !== null && Math.abs((total + cardTotal) - freshExpectedCash) > 0.01
     if (hasDiscrepancy && !closingNote.trim()) return
     setSessionProcessing(true)
     const res = await fetch('/api/pos/session/close', {
@@ -368,7 +414,8 @@ export default function PosPage() {
           setClosingNote={setClosingNote}
           handleCloseRegister={handleCloseRegister}
           expectedCash={expectedCash}
-          expectedCashLoading={expectedCashLoading}
+          expectedCashLoading={!sessionStats}
+          expectedCashChangedSinceOpen={expectedCashChangedSinceOpen}
           sessionStats={sessionStats}
         />
       </>
@@ -436,6 +483,20 @@ export default function PosPage() {
               {([
                 ['Net Sales',      netSales,                                'text-brand-teal-dark', 'bg-brand-teal'],
                 ['Product Sales',  productSales,                            'text-blue-700',   'bg-blue-500'],
+                // Product + Repair combined, tendered by cash/card — the one
+                // figure to check against the till count and the card
+                // machine's own report. Computed the same way Expected Cash
+                // itself combines these two numbers, so it can never
+                // disagree with it. See Part 11 of the plan.
+                ['Cash Sales',     (sessionStats.cash_sales ?? 0) + (sessionStats.repair_cash_deposits ?? 0), 'text-teal-700', 'bg-teal-500'],
+                ['Card Sales',     (sessionStats.card_sales ?? 0) + (sessionStats.repair_card_deposits ?? 0), 'text-sky-700', 'bg-sky-500'],
+                // Riseteck-only: always shows eBay/Deliveroo/Website as
+                // their own tiles (even at £0) when configured, instead of
+                // nothing at all (this bar never had an "Other" tile
+                // before). See Part 12 of the plan.
+                ...customChannels.map(
+                  (m) => [channelLabel(m), sessionStats.other_sales_breakdown?.[m] ?? 0, 'text-fuchsia-700', 'bg-fuchsia-500'] as [string, number, string, string]
+                ),
                 ['Credit Sales',   creditSales,                             'text-purple-700', 'bg-purple-500'],
                 ['Repair Sales',   repairSales,                             'text-indigo-700', 'bg-indigo-500'],
                 ['Credit Repaid',  sessionStats.credit_repayments_cash ?? 0, 'text-cyan-700',  'bg-cyan-500'],
@@ -534,7 +595,8 @@ export default function PosPage() {
         setClosingNote={setClosingNote}
         handleCloseRegister={handleCloseRegister}
         expectedCash={expectedCash}
-        expectedCashLoading={expectedCashLoading}
+        expectedCashLoading={!sessionStats}
+        expectedCashChangedSinceOpen={expectedCashChangedSinceOpen}
         sessionStats={sessionStats}
       />
 
