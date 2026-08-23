@@ -289,7 +289,15 @@ export default function PosPage() {
     // Expected Cash now includes card takings (see migration 190), so the
     // counted-cash total needs the entered card total added before comparing.
     const hasDiscrepancy = freshExpectedCash !== null && Math.abs((total + cardTotal) - freshExpectedCash) > 0.01
-    if (hasDiscrepancy && !closingNote.trim()) return
+    if (hasDiscrepancy && !closingNote.trim()) {
+      // Was a silent no-op before — staff would click End Shift, see
+      // nothing happen (no toast, no spinner), and conclude the button
+      // was broken. The fresh Expected Cash re-check above (Part 10) makes
+      // this more likely to trigger right at submit time than before, so
+      // it needs an explicit, visible explanation now, not silence.
+      toast.error('The counted total doesn\'t match Expected Cash. Add a note explaining the difference below, then try again.')
+      return
+    }
     setSessionProcessing(true)
     const res = await fetch('/api/pos/session/close', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -318,6 +326,12 @@ export default function PosPage() {
       setClosingNote('')
       setExpectedCash(null)
       await fetchSession()
+    } else {
+      // Also previously a silent no-op for any other server-side rejection
+      // (e.g. the server's own fresh check finding a discrepancy the
+      // client-side one above missed by a hair). Same fix: always tell
+      // the user something, never fail silently.
+      toast.error(j?.error?.message ?? 'Failed to close the register. Please try again.')
     }
     setSessionProcessing(false)
   }
