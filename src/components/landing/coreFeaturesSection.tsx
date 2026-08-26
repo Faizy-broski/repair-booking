@@ -10,7 +10,6 @@ import {
   Wrench,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { FadeIn, Stagger, StaggerItem } from "@/components/landing/motion";
@@ -74,12 +73,13 @@ export default function CoreFeaturesSection() {
             handles every part of your daily operation.
           </p>
 
-          <Button asChild className="mt-6 rounded-full bg-[linear-gradient(90deg,_#008080_0%,_#008080_37%,_#18E3CD_100%)] px-6 py-6 text-sm font-bold text-white hover:bg-teal-700 sm:mt-8">
-            <Link href="#pricing">
-              See pricing
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
+          <Link
+            href="#pricing"
+            className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(90deg,_#008080_0%,_#008080_37%,_#18E3CD_100%)] px-6 py-4 text-sm font-bold text-white transition-colors hover:bg-teal-700 sm:mt-8"
+          >
+            See pricing
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
 
           <div className="relative mt-12 hidden max-w-lg lg:mt-20 lg:block">
             <Image

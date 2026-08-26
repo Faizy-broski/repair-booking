@@ -53,6 +53,37 @@ export interface IndustryPage {
   related: RelatedLink[];
 }
 
+/** Service cluster pages share the industry page shape, plus a cluster grouping for nav/listing. */
+export interface ServicePage extends IndustryPage {
+  cluster: string;
+}
+
+export interface ArticleSubsection {
+  heading: string;
+  body: string[];
+}
+
+export interface ArticleSection {
+  heading: string;
+  body?: string[];
+  subsections?: ArticleSubsection[];
+}
+
+/** Long-form SEO guide pages served from the /services/[slug] route alongside ServicePage. */
+export interface ServiceArticlePage {
+  slug: string;
+  cluster: string;
+  seoTitle: string;
+  metaDescription: string;
+  keywords: string[];
+  kicker: string;
+  title: string;
+  intro: string[];
+  sections: ArticleSection[];
+  faqs?: FaqItem[];
+  related: RelatedLink[];
+}
+
 export interface ContentSection {
   heading: string;
   body: string[];

@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ChevronRight,
+  ChevronDown,
   Check,
   Menu,
   X,
@@ -15,17 +16,12 @@ import {
   Quote,
   Sparkles,
 } from "lucide-react";
-
-const NAV_LINKS = [
-  { label: "Features", href: "/features" },
-  { label: "Modules", href: "/#modules" },
-  { label: "Industries", href: "/industries" },
-  { label: "Pricing", href: "/#pricing" },
-  { label: "Reviews", href: "/#testimonials" },
-];
+import { servicePages } from "@/lib/footer-pages";
 
 export default function Nav() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [servicesOpen, setServicesOpen] = useState(false);
+  const [mobileServicesOpen, setMobileServicesOpen] = useState(false);
   return (
     <>
       <header className="fixed left-0 top-0 z-50 w-full px-3 py-3 sm:px-4 sm:py-5">
@@ -39,11 +35,68 @@ export default function Nav() {
           </Link>
 
           <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-700">
-            {NAV_LINKS.map(({ label, href }) => (
-              <Link key={label} href={href} className="hover:text-primary transition-colors">
-                {label}
-              </Link>
-            ))}
+            <Link href="/features" className="hover:text-primary transition-colors">
+              Features
+            </Link>
+            <Link href="/#modules" className="hover:text-primary transition-colors">
+              Modules
+            </Link>
+
+            <div
+              className="relative"
+              onMouseEnter={() => setServicesOpen(true)}
+              onMouseLeave={() => setServicesOpen(false)}
+            >
+              <button
+                type="button"
+                className="flex items-center gap-1 hover:text-primary transition-colors"
+                aria-expanded={servicesOpen}
+                onClick={() => setServicesOpen((v) => !v)}
+              >
+                Services
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${servicesOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {servicesOpen && (
+                <div className="absolute left-1/2 top-full z-50 w-80 -translate-x-1/2 pt-3">
+                  <div className="rounded-2xl border border-slate-100 bg-white p-2 shadow-[0_18px_50px_rgba(15,23,42,0.14)]">
+                    {servicePages.map((service) => (
+                      <Link
+                        key={service.slug}
+                        href={`/services/${service.slug}`}
+                        className="flex items-start gap-3 rounded-xl px-3 py-2.5 hover:bg-slate-50 transition-colors"
+                        onClick={() => setServicesOpen(false)}
+                      >
+                        <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-950 text-white">
+                          <service.icon className="h-4 w-4" strokeWidth={1.8} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{service.name}</p>
+                          <p className="text-xs text-slate-500">{service.cluster}</p>
+                        </div>
+                      </Link>
+                    ))}
+                    <Link
+                      href="/services"
+                      className="mt-1 flex items-center justify-center rounded-xl px-3 py-2.5 text-sm font-semibold text-primary hover:bg-slate-50 transition-colors"
+                      onClick={() => setServicesOpen(false)}
+                    >
+                      View all services
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <Link href="/industries" className="hover:text-primary transition-colors">
+              Industries
+            </Link>
+            <Link href="/#pricing" className="hover:text-primary transition-colors">
+              Pricing
+            </Link>
+            <Link href="/#testimonials" className="hover:text-primary transition-colors">
+              Reviews
+            </Link>
           </div>
 
           <div className="flex items-center gap-2 my-2 sm:gap-5">
@@ -98,17 +151,74 @@ export default function Nav() {
               </button>
             </div>
 
-            <nav className="flex flex-col gap-1 px-4 py-5">
-              {NAV_LINKS.map(({ label, href }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className="rounded-lg px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white transition-colors"
-                  onClick={() => setMobileNavOpen(false)}
-                >
-                  {label}
-                </Link>
-              ))}
+            <nav className="flex flex-col gap-1 px-4 py-5 overflow-y-auto">
+              <Link
+                href="/features"
+                className="rounded-lg px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                onClick={() => setMobileNavOpen(false)}
+              >
+                Features
+              </Link>
+              <Link
+                href="/#modules"
+                className="rounded-lg px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                onClick={() => setMobileNavOpen(false)}
+              >
+                Modules
+              </Link>
+
+              <button
+                type="button"
+                className="flex items-center justify-between rounded-lg px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                onClick={() => setMobileServicesOpen((v) => !v)}
+                aria-expanded={mobileServicesOpen}
+              >
+                Services
+                <ChevronDown className={`h-4 w-4 transition-transform ${mobileServicesOpen ? "rotate-180" : ""}`} />
+              </button>
+              {mobileServicesOpen && (
+                <div className="ml-2 flex flex-col gap-1 border-l border-white/10 pl-3">
+                  {servicePages.map((service) => (
+                    <Link
+                      key={service.slug}
+                      href={`/services/${service.slug}`}
+                      className="rounded-lg px-3 py-2.5 text-sm font-medium text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+                      onClick={() => setMobileNavOpen(false)}
+                    >
+                      {service.name}
+                    </Link>
+                  ))}
+                  <Link
+                    href="/services"
+                    className="rounded-lg px-3 py-2.5 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
+                    onClick={() => setMobileNavOpen(false)}
+                  >
+                    View all services
+                  </Link>
+                </div>
+              )}
+
+              <Link
+                href="/industries"
+                className="rounded-lg px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                onClick={() => setMobileNavOpen(false)}
+              >
+                Industries
+              </Link>
+              <Link
+                href="/#pricing"
+                className="rounded-lg px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                onClick={() => setMobileNavOpen(false)}
+              >
+                Pricing
+              </Link>
+              <Link
+                href="/#testimonials"
+                className="rounded-lg px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                onClick={() => setMobileNavOpen(false)}
+              >
+                Reviews
+              </Link>
             </nav>
 
             <div className="mt-auto border-t border-white/10 px-4 py-5 flex flex-col gap-3">

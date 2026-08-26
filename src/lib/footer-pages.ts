@@ -1,12 +1,23 @@
 import { productPages } from "./footer-pages/product";
 import { featurePages } from "./footer-pages/features";
 import { industryPages } from "./footer-pages/industries";
+import { servicePages } from "./services-pages/services";
+import { serviceArticlePages } from "./services-pages/service-articles";
 import { companyPages } from "./footer-pages/company";
 import { legalPages } from "./footer-pages/legal";
 import { resourcePages } from "./footer-pages/resources";
 
 export * from "./footer-pages/types";
-export { productPages, featurePages, industryPages, companyPages, legalPages, resourcePages };
+export {
+  productPages,
+  featurePages,
+  industryPages,
+  servicePages,
+  serviceArticlePages,
+  companyPages,
+  legalPages,
+  resourcePages,
+};
 
 export function getProductPage(slug: string) {
   return productPages.find((p) => p.slug === slug);
@@ -16,6 +27,12 @@ export function getFeaturePage(slug: string) {
 }
 export function getIndustryPage(slug: string) {
   return industryPages.find((p) => p.slug === slug);
+}
+export function getServicePage(slug: string) {
+  return servicePages.find((p) => p.slug === slug);
+}
+export function getServiceArticlePage(slug: string) {
+  return serviceArticlePages.find((p) => p.slug === slug);
 }
 export function getCompanyPage(slug: string) {
   return companyPages.find((p) => p.slug === slug);
