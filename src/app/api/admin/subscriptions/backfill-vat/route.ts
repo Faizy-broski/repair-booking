@@ -40,7 +40,7 @@ async function handler(req: Request, _ctx: RequestContext) {
 
   type SubRow = { id: string; business_id: string; stripe_sub_id: string }
 
-  const { data: subs, error } = await (supabase as any)
+  const { data: allSubs, error } = await (supabase as any)
     .from('subscriptions')
     .select('id, business_id, stripe_sub_id')
     .in('status', ['active', 'trialing'])
@@ -50,10 +50,21 @@ async function handler(req: Request, _ctx: RequestContext) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
+  // Never re-attach VAT for a business flagged vat_exempt (see migration
+  // 200_business_vat_exempt.sql) — a negotiated exemption must survive
+  // future re-runs of this bulk backfill.
+  const { data: exemptBiz } = await (supabase as any)
+    .from('businesses')
+    .select('id')
+    .eq('vat_exempt', true)
+  const exemptIds = new Set((exemptBiz ?? []).map((b: { id: string }) => b.id))
+  const subs: SubRow[] = (allSubs ?? []).filter((s: SubRow) => !exemptIds.has(s.business_id))
+  const skippedExempt = (allSubs?.length ?? 0) - subs.length
+
   let updated = 0, alreadySet = 0, errors = 0
   const log: { businessId: string; stripeSubId: string; result: string }[] = []
 
-  for (const batch of chunk<SubRow>(subs ?? [], BATCH_SIZE)) {
+  for (const batch of chunk<SubRow>(subs, BATCH_SIZE)) {
     await Promise.all(
       batch.map(async (sub: SubRow) => {
         try {
@@ -88,7 +99,7 @@ async function handler(req: Request, _ctx: RequestContext) {
     )
   }
 
-  return NextResponse.json({ ok: true, dryRun, total: subs?.length ?? 0, updated, alreadySet, errors, log })
+  return NextResponse.json({ ok: true, dryRun, total: subs.length, skippedExempt, updated, alreadySet, errors, log })
 }
 
 export const POST = withMiddleware(handler, { requiredRole: 'super_admin', skipTenant: true })

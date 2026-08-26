@@ -6,7 +6,7 @@ export const BusinessService = {
     const { page = 1, limit = 20, search } = params
     let q = adminSupabase
       .from('businesses')
-      .select('id, name, subdomain, email, is_active, is_suspended, created_at', { count: 'exact' })
+      .select('id, name, subdomain, email, is_active, is_suspended, vat_exempt, created_at', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1)
 

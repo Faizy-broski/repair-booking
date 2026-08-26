@@ -65,8 +65,12 @@ function limitSuffix(
   const limitKey = MODULE_LIMIT_KEY[moduleKey];
   if (!limitKey || !(limitKey in limits)) return null;
   const v = limits[limitKey];
-  if (v === null) return "unlimited";
-  if (typeof v === "number") return `up to ${v.toLocaleString()}`;
+  const isMonthly = limitKey.endsWith("_per_month");
+  if (v === null) return isMonthly ? "unlimited / mo" : "unlimited";
+  if (typeof v === "number")
+    return isMonthly
+      ? `up to ${v.toLocaleString()} / mo`
+      : `up to ${v.toLocaleString()}`;
   return null;
 }
 

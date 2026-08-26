@@ -118,11 +118,11 @@ export async function POST(request: NextRequest) {
     // Get existing Stripe customer ID if available (cast — stripe_customer_id from migration)
     const { data: bizRow } = await (supabase as any)
       .from('businesses')
-      .select('stripe_customer_id, subdomain')
+      .select('stripe_customer_id, subdomain, vat_exempt')
       .eq('id', businessId)
       .single()
 
-    const business = bizRow as { stripe_customer_id?: string | null; subdomain?: string } | null
+    const business = bizRow as { stripe_customer_id?: string | null; subdomain?: string; vat_exempt?: boolean | null } | null
 
     // Validate the stored customer ID against the current Stripe mode (test vs live).
     // A test-mode customer ID silently breaks when live keys are used, so we verify
@@ -153,8 +153,10 @@ export async function POST(request: NextRequest) {
       ? `${appUrlObj.protocol}//${subdomain}.${appUrlObj.host}/dashboard?upgraded=1&session_id={CHECKOUT_SESSION_ID}`
       : `${APP_URL}/dashboard?upgraded=1&session_id={CHECKOUT_SESSION_ID}`
 
-    // Create Stripe Checkout session for upgrade
-    const vatTaxRateId = process.env.STRIPE_VAT_TAX_RATE_ID
+    // Create Stripe Checkout session for upgrade — never attach VAT for a
+    // business flagged vat_exempt (see migration 200_business_vat_exempt.sql),
+    // otherwise a plan change would silently re-add VAT for them.
+    const vatTaxRateId = business?.vat_exempt ? null : process.env.STRIPE_VAT_TAX_RATE_ID
     const session = await stripe.checkout.sessions.create({
       ...customerParam,
       mode: 'subscription',

@@ -117,7 +117,13 @@ export default async function SuperAdminDashboard() {
                       <div className="text-xs text-on-surface-variant font-mono">{biz.subdomain}</div>
                     </td>
                     <td className="hidden sm:table-cell px-4 py-3 text-sm text-on-surface-variant">
-                      {biz.subscriptions?.[0]?.plans?.name ?? '—'}
+                      {/* businesses -> subscriptions is a to-one relationship
+                          (subscriptions.business_id is UNIQUE, migration 053),
+                          so Supabase returns this embed as a single object,
+                          not an array -- indexing it with [0] always missed,
+                          showing "—" for every business regardless of
+                          whether it actually had a plan. */}
+                      {biz.subscriptions?.plans?.name ?? '—'}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${

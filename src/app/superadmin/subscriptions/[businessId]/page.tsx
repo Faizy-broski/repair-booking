@@ -5,10 +5,13 @@ import Link from 'next/link'
 import {
   ArrowLeft, Receipt, Download, ExternalLink,
   RefreshCw, Building2, CreditCard, CheckCircle2,
-  AlertCircle, Calendar, Filter, X,
+  AlertCircle, Calendar, Filter, X, Landmark, Plus, Trash2,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import type { SubscriptionRow } from '@/app/api/admin/subscriptions/route'
+import type { ManualPaymentRow } from '@/app/api/admin/subscriptions/[businessId]/manual-payments/route'
+import { RecordManualPaymentModal } from '@/components/superadmin/record-manual-payment-modal'
+import type { PlanOption } from '@/components/superadmin/edit-subscription-modal'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -59,6 +62,26 @@ function fmtMoney(amount: number, currency: string) {
     currency: currency.toUpperCase(),
     minimumFractionDigits: 2,
   }).format(amount / 100)
+}
+
+// Manual payment amounts are stored in pounds (NUMERIC), unlike Stripe's pence
+function fmtGBP(amount: number) {
+  return new Intl.NumberFormat('en-GB', {
+    style: 'currency', currency: 'GBP', minimumFractionDigits: 2,
+  }).format(amount)
+}
+
+function fmtDateStr(iso: string | null) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+// Color-codes the payment method instead of a flat gray badge for every type
+function methodBadgeVariant(method: string): 'default' | 'success' | 'purple' | 'secondary' {
+  if (method === 'bank_transfer') return 'default'
+  if (method === 'cash')          return 'success'
+  if (method === 'cheque')        return 'purple'
+  return 'secondary'
 }
 
 function getMonthYear(ts: number) {
@@ -130,11 +153,15 @@ export default function BusinessInvoicesPage({
   const [filterMonth, setFilterMonth] = useState<string>('all')
   const [filterDate, setFilterDate]   = useState<string>('')
 
-  const { data: subData } = useQuery({
-    queryKey: ['superadmin-subscriptions', 1, 500, '', ''],
+  // Fetched directly by id rather than found in the Stripe-livemode-filtered
+  // /api/admin/subscriptions list — a business with no live Stripe subscription
+  // (e.g. one that only ever pays manually) would never appear in that list,
+  // which used to leave this page unable to resolve even the business's name.
+  const { data: businessData } = useQuery({
+    queryKey: ['superadmin-business-detail', businessId],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/subscriptions?page=1&limit=500`)
-      if (!res.ok) throw new Error('Failed to load subscription info')
+      const res = await fetch(`/api/businesses/${businessId}`)
+      if (!res.ok) throw new Error('Failed to load business info')
       return res.json()
     },
     staleTime: 2 * 60 * 1000,
@@ -165,8 +192,85 @@ export default function BusinessInvoicesPage({
   const activeStripeSubs = stripeSubs.filter((s) => s.status === 'active' || s.status === 'trialing')
   const stripeSubError = stripeSubIsError ? (stripeSubErrorObj as Error)?.message ?? 'Failed to load Stripe subscriptions' : null
 
-  const business: SubscriptionRow | null =
-    (subData?.data ?? []).find((r: SubscriptionRow) => r.business_id === businessId) ?? null
+  const { data: manualData, isFetching: manualFetching } = useQuery({
+    queryKey: ['superadmin-manual-payments', businessId],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/subscriptions/${businessId}/manual-payments`)
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to load manual payments')
+      return json
+    },
+    staleTime: 60 * 1000,
+  })
+  const manualPayments: ManualPaymentRow[] = manualData?.data ?? []
+  const [recordPaymentOpen, setRecordPaymentOpen] = useState(false)
+  const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null)
+
+  const { data: plansData } = useQuery({
+    queryKey: ['superadmin-plans'],
+    queryFn: async () => {
+      const res = await fetch('/api/plans?all=true')
+      if (!res.ok) throw new Error('Failed to load plans')
+      return res.json()
+    },
+    staleTime: 10 * 60 * 1000,
+  })
+  const plans: PlanOption[] = plansData?.data ?? []
+
+  async function deleteManualPayment(id: string) {
+    if (!confirm('Delete this manual payment record?')) return
+    setDeletingPaymentId(id)
+    try {
+      await fetch(`/api/admin/subscriptions/${businessId}/manual-payments/${id}`, { method: 'DELETE' })
+      queryClient.invalidateQueries({ queryKey: ['superadmin-manual-payments', businessId] })
+    } finally {
+      setDeletingPaymentId(null)
+    }
+  }
+
+  const business: SubscriptionRow | null = useMemo(() => {
+    const biz = businessData?.data
+    if (!biz) return null
+    const sub = (biz.subscriptions ?? [])[0] ?? null
+    const plan = sub?.plans ?? null
+    return {
+      business_id:         biz.id,
+      business_name:       biz.name,
+      subdomain:           biz.subdomain,
+      stripe_customer_id:  biz.stripe_customer_id ?? sub?.stripe_customer_id ?? null,
+      subscription_id:     sub?.id ?? null,
+      status:              sub?.status ?? null,
+      billing_cycle:       sub?.billing_cycle ?? null,
+      plan_id:             sub?.plan_id ?? plan?.id ?? null,
+      plan_name:           plan?.name ?? null,
+      plan_price_monthly:  plan?.price_monthly ?? null,
+      plan_price_yearly:   plan?.price_yearly ?? null,
+      is_custom:           sub?.is_custom ?? false,
+      custom_max_branches: sub?.custom_max_branches ?? null,
+      custom_max_users:    sub?.custom_max_users ?? null,
+      custom_max_products: sub?.custom_max_products ?? null,
+      custom_max_services: sub?.custom_max_services ?? null,
+      custom_price_monthly: sub?.custom_price_monthly ?? null,
+      current_period_end: sub?.current_period_end ?? null,
+      trial_ends_at:       sub?.trial_ends_at ?? null,
+      canceled_at:         sub?.canceled_at ?? null,
+      is_active:           biz.is_active ?? false,
+    }
+  }, [businessData])
+
+  const manualPaymentBusiness = business ? {
+    id: business.business_id,
+    name: business.business_name,
+    subscriptions: [{
+      status:                business.status ?? 'active',
+      billing_cycle:         business.billing_cycle,
+      current_period_end:    business.current_period_end,
+      trial_ends_at:         business.trial_ends_at,
+      plan_id:               business.plan_id,
+      is_custom:             business.is_custom,
+      custom_price_monthly:  business.custom_price_monthly,
+    }],
+  } : null
   const invoices: Invoice[]  = invData?.data ?? []
   const loading    = isLoading
   const refreshing = isFetching && !isLoading
@@ -302,9 +406,9 @@ export default function BusinessInvoicesPage({
         <button
           onClick={() => refetch()}
           disabled={refreshing}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 bg-white px-3 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50 transition-colors disabled:opacity-50"
         >
-          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`h-4 w-4 text-teal-600 ${refreshing ? 'animate-spin' : ''}`} />
           Refresh
         </button>
       </div>
@@ -312,15 +416,15 @@ export default function BusinessInvoicesPage({
       {/* Business + plan info strip */}
       {business && (
         <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 flex flex-wrap items-center gap-x-8 gap-y-2 text-sm">
-          <span className="flex items-center gap-2 text-gray-700">
-            <Building2 className="h-4 w-4 text-gray-400" />
+          <span className="flex items-center gap-2 text-gray-800 font-medium">
+            <Building2 className="h-4 w-4 text-teal-600" />
             {business.business_name}
           </span>
-          <span className="flex items-center gap-2 text-gray-700">
-            <CreditCard className="h-4 w-4 text-gray-400" />
+          <span className="flex items-center gap-2 text-gray-800 font-medium">
+            <CreditCard className="h-4 w-4 text-blue-600" />
             {business.plan_name ?? '—'}
             {business.billing_cycle && (
-              <span className="text-gray-400 text-xs">({business.billing_cycle})</span>
+              <span className="text-gray-500 text-xs">({business.billing_cycle})</span>
             )}
           </span>
           {business.status && (
@@ -346,7 +450,9 @@ export default function BusinessInvoicesPage({
       {/* Stripe subscriptions — read-only diagnostic, flags duplicates */}
       <div className={`rounded-xl border p-5 ${activeStripeSubs.length > 1 ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'}`}>
         <div className="flex items-center gap-2 mb-3">
-          <CreditCard className={`h-4 w-4 ${activeStripeSubs.length > 1 ? 'text-red-600' : 'text-gray-400'}`} />
+          <div className={`rounded-lg p-1.5 ${activeStripeSubs.length > 1 ? 'bg-red-100' : 'bg-blue-50'}`}>
+            <CreditCard className={`h-4 w-4 ${activeStripeSubs.length > 1 ? 'text-red-600' : 'text-blue-600'}`} />
+          </div>
           <h3 className={`font-semibold ${activeStripeSubs.length > 1 ? 'text-red-800' : 'text-gray-900'}`}>
             Stripe Subscriptions {stripeSubs.length > 0 && `(${stripeSubs.length})`}
           </h3>
@@ -400,6 +506,124 @@ export default function BusinessInvoicesPage({
         )}
       </div>
 
+      {/* Manual payments — bank transfer / cash / cheque, recorded off-Stripe */}
+      <div className="rounded-xl border border-gray-200 bg-white p-5">
+        <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg bg-teal-50 p-1.5">
+              <Landmark className="h-4 w-4 text-teal-600" />
+            </div>
+            <h3 className="font-semibold text-gray-900">
+              Manual Payments {manualPayments.length > 0 && `(${manualPayments.length})`}
+            </h3>
+            {manualFetching && <RefreshCw className="h-3.5 w-3.5 animate-spin text-teal-600" />}
+          </div>
+          <button
+            onClick={() => setRecordPaymentOpen(true)}
+            disabled={!manualPaymentBusiness}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-teal-700 active:bg-teal-800 transition-colors shadow-sm disabled:opacity-50"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Record Payment
+          </button>
+        </div>
+
+        {manualPayments.length === 0 ? (
+          <p className="text-sm text-gray-400 py-4 text-center">
+            No manual payments recorded — use "Record Payment" for bank transfer, cash, or cheque payments.
+          </p>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-outline-variant/50">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-primary">
+                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-white">Date</th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-white">Plan</th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-white">Method</th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-white">Reference</th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-white">Period Covered</th>
+                  <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-white">Amount</th>
+                  <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-white">Recorded By</th>
+                  <th className="px-4 py-2.5" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {manualPayments.map((p, i) => (
+                  <tr key={p.id} className={`hover:bg-teal-50 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-800 font-medium">{fmtDateStr(p.paid_at)}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {p.plan_name ? (
+                        <div>
+                          <p className="text-sm text-gray-800 font-medium">{p.plan_name}</p>
+                          {p.billing_cycle && (
+                            <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                              p.billing_cycle === 'yearly' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'
+                            }`}>
+                              {p.billing_cycle === 'yearly' ? 'Yearly' : 'Monthly'}
+                            </span>
+                          )}
+                        </div>
+                      ) : <span className="text-gray-400 text-sm">—</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant={methodBadgeVariant(p.method)} className="capitalize text-[11px]">
+                        {p.method.replace('_', ' ')}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 text-gray-700 max-w-40 truncate" title={p.reference ?? undefined}>
+                      {p.reference ?? '—'}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-600 text-xs">
+                      {p.period_start || p.period_end
+                        ? <>{fmtDateStr(p.period_start)}<span className="mx-1 text-gray-400">→</span>{fmtDateStr(p.period_end)}</>
+                        : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-emerald-700 tabular-nums whitespace-nowrap">
+                      {fmtGBP(p.amount)}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700 text-xs whitespace-nowrap">{p.created_by_name ?? '—'}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => deleteManualPayment(p.id)}
+                        disabled={deletingPaymentId === p.id}
+                        title="Delete this record"
+                        className="rounded-md p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {manualPayments.some((p) => p.notes) && (
+          <div className="mt-3 space-y-1 border-t border-gray-50 pt-3">
+            {manualPayments.filter((p) => p.notes).map((p) => (
+              <p key={p.id} className="text-xs text-gray-600">
+                <span className="text-teal-700 font-medium">{fmtDateStr(p.paid_at)}:</span> {p.notes}
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {recordPaymentOpen && manualPaymentBusiness && (
+        <RecordManualPaymentModal
+          business={manualPaymentBusiness}
+          plans={plans}
+          onClose={() => setRecordPaymentOpen(false)}
+          onSaved={() => {
+            setRecordPaymentOpen(false)
+            queryClient.invalidateQueries({ queryKey: ['superadmin-manual-payments', businessId] })
+            queryClient.invalidateQueries({ queryKey: ['superadmin-business-detail', businessId] })
+            queryClient.invalidateQueries({ queryKey: ['superadmin-subscriptions'] })
+            queryClient.invalidateQueries({ queryKey: ['superadmin-businesses'] })
+          }}
+        />
+      )}
+
       {/* KPI cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <KpiCard
@@ -430,8 +654,8 @@ export default function BusinessInvoicesPage({
 
       {/* Filters */}
       <div className="rounded-xl border border-gray-200 bg-white px-5 py-3 flex flex-wrap items-center gap-3">
-        <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wide shrink-0">
-          <Filter className="h-3.5 w-3.5" />
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-teal-700 uppercase tracking-wide shrink-0">
+          <Filter className="h-3.5 w-3.5 text-teal-600" />
           Filter by
         </span>
 
@@ -498,8 +722,8 @@ export default function BusinessInvoicesPage({
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="rounded-full bg-gray-100 p-4 mb-4">
-              <Receipt className="h-6 w-6 text-gray-400" />
+            <div className="rounded-full bg-teal-50 p-4 mb-4">
+              <Receipt className="h-6 w-6 text-teal-500" />
             </div>
             <p className="text-sm font-medium text-gray-700">No invoices found</p>
             <p className="text-xs text-gray-400 mt-1">
@@ -511,31 +735,31 @@ export default function BusinessInvoicesPage({
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
-                <th className="px-5 py-3.5">#</th>
-                <th className="px-5 py-3.5">Date</th>
-                <th className="px-5 py-3.5">Description</th>
-                <th className="px-5 py-3.5">Billing Period</th>
-                <th className="px-5 py-3.5 text-right">Amount</th>
-                <th className="px-5 py-3.5">Status</th>
-                <th className="px-5 py-3.5 text-right">Invoice</th>
+              <tr className="bg-primary">
+                <th className="px-5 py-3.5 text-left text-[11px] font-bold uppercase tracking-wider text-white">#</th>
+                <th className="px-5 py-3.5 text-left text-[11px] font-bold uppercase tracking-wider text-white">Date</th>
+                <th className="px-5 py-3.5 text-left text-[11px] font-bold uppercase tracking-wider text-white">Description</th>
+                <th className="px-5 py-3.5 text-left text-[11px] font-bold uppercase tracking-wider text-white">Billing Period</th>
+                <th className="px-5 py-3.5 text-right text-[11px] font-bold uppercase tracking-wider text-white">Amount</th>
+                <th className="px-5 py-3.5 text-left text-[11px] font-bold uppercase tracking-wider text-white">Status</th>
+                <th className="px-5 py-3.5 text-right text-[11px] font-bold uppercase tracking-wider text-white">Invoice</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map((inv, idx) => (
-                <tr key={inv.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={inv.id} className={`hover:bg-teal-50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                   {/* # */}
-                  <td className="px-5 py-4 text-gray-400 text-xs tabular-nums">
+                  <td className="px-5 py-4 text-gray-500 text-xs tabular-nums">
                     {filtered.length - idx}
                   </td>
 
                   {/* Date */}
-                  <td className="px-5 py-4 whitespace-nowrap text-gray-700 font-medium">
+                  <td className="px-5 py-4 whitespace-nowrap text-gray-800 font-medium">
                     {fmtUnix(inv.date)}
                   </td>
 
                   {/* Description */}
-                  <td className="px-5 py-4 text-gray-600 max-w-[220px]">
+                  <td className="px-5 py-4 text-gray-700 max-w-[220px]">
                     <p className="truncate" title={inv.description ?? undefined}>
                       {inv.description ?? 'Subscription payment'}
                     </p>
@@ -543,14 +767,14 @@ export default function BusinessInvoicesPage({
                   </td>
 
                   {/* Billing period */}
-                  <td className="px-5 py-4 whitespace-nowrap text-gray-500 text-xs">
+                  <td className="px-5 py-4 whitespace-nowrap text-gray-600 text-xs">
                     {fmtUnix(inv.period_start)}
-                    <span className="mx-1 text-gray-300">→</span>
+                    <span className="mx-1 text-gray-400">→</span>
                     {fmtUnix(inv.period_end)}
                   </td>
 
                   {/* Amount */}
-                  <td className="px-5 py-4 text-right font-semibold text-gray-900 tabular-nums whitespace-nowrap">
+                  <td className="px-5 py-4 text-right font-semibold text-emerald-700 tabular-nums whitespace-nowrap">
                     {fmtMoney(inv.amount, inv.currency)}
                   </td>
 

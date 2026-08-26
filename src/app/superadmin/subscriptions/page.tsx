@@ -4,12 +4,13 @@ import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import {
   Search, X, Receipt, TrendingUp, CheckCircle2, Clock,
-  AlertCircle, XCircle, RefreshCw,
+  AlertCircle, XCircle, RefreshCw, Landmark, CalendarDays, Building2,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/data-table'
 import type { ColumnDef } from '@tanstack/react-table'
 import type { SubscriptionRow } from '@/app/api/admin/subscriptions/route'
+import type { ManualPaymentListRow } from '@/app/api/admin/manual-payments/route'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,19 @@ interface SubscriptionsResponse {
   data: SubscriptionRow[]
   meta: { page: number; limit: number; total: number }
   stats: Stats
+}
+
+interface ManualPaymentStats {
+  totalAmount: number
+  thisMonthAmount: number
+  paymentsCount: number
+  businessesCount: number
+}
+
+interface ManualPaymentsResponse {
+  data: ManualPaymentListRow[]
+  meta: { page: number; limit: number; total: number }
+  stats: ManualPaymentStats
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -49,6 +63,13 @@ function fmtAmount(row: SubscriptionRow) {
   return `£${price.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/mo`
 }
 
+// Manual payment amounts are stored in pounds (NUMERIC), unlike Stripe's pence-based plan prices
+function fmtGBP(amount: number) {
+  return new Intl.NumberFormat('en-GB', {
+    style: 'currency', currency: 'GBP', minimumFractionDigits: 0, maximumFractionDigits: 0,
+  }).format(amount)
+}
+
 async function fetchSubscriptions(params: {
   page: number; pageSize: number; search: string; status: string
 }): Promise<SubscriptionsResponse> {
@@ -60,7 +81,25 @@ async function fetchSubscriptions(params: {
   return res.json()
 }
 
+async function fetchManualPayments(params: {
+  page: number; pageSize: number; search: string
+}): Promise<ManualPaymentsResponse> {
+  const p = new URLSearchParams({ page: String(params.page + 1), limit: String(params.pageSize) })
+  if (params.search) p.set('search', params.search)
+  const res = await fetch(`/api/admin/manual-payments?${p}`)
+  if (!res.ok) throw new Error('Failed to load manual payments')
+  return res.json()
+}
+
 // ── Status badge ───────────────────────────────────────────────────────────────
+
+// Color-codes the payment method instead of a flat gray badge for every type
+function methodBadgeVariant(method: string): 'default' | 'success' | 'purple' | 'secondary' {
+  if (method === 'bank_transfer') return 'default'
+  if (method === 'cash')          return 'success'
+  if (method === 'cheque')        return 'purple'
+  return 'secondary'
+}
 
 function SubBadge({ status }: { status: string | null }) {
   if (!status) return <span className="text-gray-400 text-sm">—</span>
@@ -115,9 +154,9 @@ const STATUS_PILLS = [
   { value: 'suspended', label: 'Suspended' },
 ]
 
-// ── Main page ──────────────────────────────────────────────────────────────────
+// ── Stripe tab ─────────────────────────────────────────────────────────────────
 
-export default function SubscriptionsPage() {
+function StripeTransactionsTab() {
   const [page, setPage]         = useState(0)
   const [pageSize, setPageSize] = useState(20)
   const [search, setSearch]     = useState('')
@@ -191,7 +230,7 @@ export default function SubscriptionsPage() {
             <p className="text-sm text-gray-700">{name}</p>
             {cycle && (
               <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-                cycle === 'yearly' ? 'bg-violet-50 text-violet-700' : 'bg-gray-100 text-gray-500'
+                cycle === 'yearly' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'
               }`}>
                 {cycle === 'yearly' ? 'Yearly' : 'Monthly'}
               </span>
@@ -204,7 +243,7 @@ export default function SubscriptionsPage() {
       id: 'amount',
       header: 'Amount',
       cell: ({ row }) => (
-        <span className="text-sm font-semibold tabular-nums text-gray-900">
+        <span className="text-sm font-semibold tabular-nums text-emerald-700">
           {fmtAmount(row.original)}
         </span>
       ),
@@ -245,12 +284,8 @@ export default function SubscriptionsPage() {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
-          <p className="text-sm text-gray-500">Active subscriptions — live Stripe billing only</p>
-        </div>
+        <p className="text-sm text-gray-500">Active subscriptions — live Stripe billing only</p>
         <div className="flex flex-col items-end gap-1.5">
           <button
             onClick={syncLiveMode}
@@ -333,7 +368,238 @@ export default function SubscriptionsPage() {
         onPageSizeChange={(s) => { setPageSize(s); setPage(0) }}
         emptyMessage="No transactions found."
       />
+    </div>
+  )
+}
 
+// ── Manual payments tab ────────────────────────────────────────────────────────
+
+function ManualPaymentsTab() {
+  const [page, setPage]         = useState(0)
+  const [pageSize, setPageSize] = useState(20)
+  const [search, setSearch]     = useState('')
+
+  const queryKey = ['superadmin-manual-payments-list', page, pageSize, search]
+
+  const { data, isLoading, isFetching, refetch } = useQuery({
+    queryKey,
+    queryFn: () => fetchManualPayments({ page, pageSize, search }),
+    placeholderData: (prev) => prev,
+    staleTime: 60 * 1000,
+  })
+
+  const rows  = data?.data  ?? []
+  const total = data?.meta?.total ?? 0
+  const stats = data?.stats ?? null
+
+  const columns: ColumnDef<ManualPaymentListRow>[] = [
+    {
+      id: 'date',
+      header: 'Date',
+      cell: ({ row }) => (
+        <span className="text-sm font-medium text-gray-700 whitespace-nowrap">{fmtDate(row.original.paid_at)}</span>
+      ),
+    },
+    {
+      accessorKey: 'business_name',
+      header: 'Business',
+      cell: ({ getValue, row }) => (
+        <div>
+          <Link
+            href={`/superadmin/businesses/${row.original.business_id}`}
+            className="font-medium text-teal-700 hover:text-teal-900 hover:underline"
+          >
+            {getValue() as string}
+          </Link>
+          <p className="text-xs text-gray-400 font-mono">{row.original.subdomain}.repairbooking.co.uk</p>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'plan_name',
+      header: 'Plan',
+      cell: ({ getValue, row }) => {
+        const name  = getValue() as string | null
+        const cycle = row.original.billing_cycle
+        return name ? (
+          <div>
+            <p className="text-sm text-gray-700">{name}</p>
+            {cycle && (
+              <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                cycle === 'yearly' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'
+              }`}>
+                {cycle === 'yearly' ? 'Yearly' : 'Monthly'}
+              </span>
+            )}
+          </div>
+        ) : <span className="text-gray-400 text-sm">—</span>
+      },
+    },
+    {
+      accessorKey: 'method',
+      header: 'Method',
+      cell: ({ getValue }) => {
+        const method = getValue() as string
+        return (
+          <Badge variant={methodBadgeVariant(method)} className="capitalize text-[10px]">
+            {method.replace('_', ' ')}
+          </Badge>
+        )
+      },
+    },
+    {
+      accessorKey: 'reference',
+      header: 'Reference',
+      cell: ({ getValue }) => {
+        const ref = getValue() as string | null
+        return ref
+          ? <span className="text-sm text-gray-600 max-w-[160px] truncate block" title={ref}>{ref}</span>
+          : <span className="text-gray-400 text-sm">—</span>
+      },
+    },
+    {
+      id: 'amount',
+      header: 'Amount',
+      cell: ({ row }) => (
+        <span className="text-sm font-semibold tabular-nums text-emerald-700">
+          {fmtGBP(row.original.amount)}
+        </span>
+      ),
+    },
+    {
+      id: 'period',
+      header: 'Period Covered',
+      cell: ({ row }) => {
+        const { period_start, period_end } = row.original
+        if (!period_start && !period_end) return <span className="text-gray-400 text-sm">—</span>
+        return (
+          <span className="text-xs whitespace-nowrap text-gray-500">
+            {fmtDate(period_start)} <span className="text-gray-300">→</span> {fmtDate(period_end)}
+          </span>
+        )
+      },
+    },
+    {
+      accessorKey: 'created_by_name',
+      header: 'Recorded By',
+      cell: ({ getValue }) => (
+        <span className="text-xs text-gray-500 whitespace-nowrap">{(getValue() as string | null) ?? '—'}</span>
+      ),
+    },
+    {
+      id: 'view',
+      header: '',
+      cell: ({ row }) => (
+        <Link
+          href={`/superadmin/subscriptions/${row.original.business_id}`}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-teal-50 border border-teal-200 px-2.5 py-1 text-xs font-medium text-teal-700 hover:bg-teal-600 hover:text-white hover:border-teal-600 transition-colors whitespace-nowrap"
+        >
+          <Receipt className="h-3.5 w-3.5" />
+          View
+        </Link>
+      ),
+    },
+  ]
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <p className="text-sm text-gray-500">Bank transfer, cash & cheque payments recorded by super admin — not billed through Stripe</p>
+        <button
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+          {isFetching ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </div>
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {!stats ? (
+          Array.from({ length: 4 }).map((_, i) => <StatSkeleton key={i} />)
+        ) : (
+          <>
+            <StatCard label="Total Recorded" value={fmtGBP(stats.totalAmount)} sub="all time" icon={Landmark} color="text-brand-teal" bg="bg-brand-teal-light" />
+            <StatCard label="This Month" value={fmtGBP(stats.thisMonthAmount)} sub="recorded so far" icon={CalendarDays} color="text-emerald-600" bg="bg-emerald-50" />
+            <StatCard label="Businesses Paying Manually" value={stats.businessesCount} sub="distinct businesses" icon={Building2} color="text-blue-600" bg="bg-blue-50" />
+            <StatCard label="Payments Recorded" value={stats.paymentsCount} sub="total entries" icon={Receipt} color="text-violet-600" bg="bg-violet-50" />
+          </>
+        )}
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative max-w-xs w-full sm:w-auto">
+          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search businesses..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(0) }}
+            className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-8 pr-8 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500/30 transition-colors"
+          />
+          {search && (
+            <button onClick={() => { setSearch(''); setPage(0) }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Table */}
+      <DataTable
+        data={rows}
+        columns={columns}
+        isLoading={isLoading}
+        totalCount={total}
+        pageIndex={page}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={(s) => { setPageSize(s); setPage(0) }}
+        emptyMessage="No manual payments recorded yet — use Record Payment on a business to add one."
+      />
+    </div>
+  )
+}
+
+// ── Main page ──────────────────────────────────────────────────────────────────
+
+export default function SubscriptionsPage() {
+  const [tab, setTab] = useState<'stripe' | 'manual'>('stripe')
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
+        <p className="text-sm text-gray-500">Platform billing — Stripe and manually recorded payments</p>
+      </div>
+
+      {/* Tab switcher */}
+      <div className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white p-1">
+        <button
+          onClick={() => setTab('stripe')}
+          className={`inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
+            tab === 'stripe' ? 'bg-teal-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          <Receipt className="h-3.5 w-3.5" />
+          Stripe Transactions
+        </button>
+        <button
+          onClick={() => setTab('manual')}
+          className={`inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
+            tab === 'manual' ? 'bg-teal-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          <Landmark className="h-3.5 w-3.5" />
+          Manual Payments
+        </button>
+      </div>
+
+      {tab === 'stripe' ? <StripeTransactionsTab /> : <ManualPaymentsTab />}
     </div>
   )
 }

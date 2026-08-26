@@ -63,11 +63,11 @@ export async function POST(request: NextRequest) {
 
     const { data: bizRow } = await (supabase as any)
       .from('businesses')
-      .select('stripe_customer_id, subdomain')
+      .select('stripe_customer_id, subdomain, vat_exempt')
       .eq('id', businessId)
       .single()
 
-    const business = bizRow as { stripe_customer_id?: string | null; subdomain?: string } | null
+    const business = bizRow as { stripe_customer_id?: string | null; subdomain?: string; vat_exempt?: boolean | null } | null
 
     // Validate the stored customer ID against the current Stripe mode (test vs live) —
     // same pattern as /api/stripe/upgrade/route.ts.
@@ -94,7 +94,10 @@ export async function POST(request: NextRequest) {
       ? `${appUrlObj.protocol}//${subdomain}.${appUrlObj.host}/dashboard?upgraded=1&session_id={CHECKOUT_SESSION_ID}`
       : `${APP_URL}/dashboard?upgraded=1&session_id={CHECKOUT_SESSION_ID}`
 
-    const vatTaxRateId = process.env.STRIPE_VAT_TAX_RATE_ID
+    // Never attach VAT for a business flagged vat_exempt (see migration
+    // 200_business_vat_exempt.sql), otherwise a Custom Plan change would
+    // silently re-add VAT for them.
+    const vatTaxRateId = business?.vat_exempt ? null : process.env.STRIPE_VAT_TAX_RATE_ID
 
     // Dimension values are passed through as metadata (strings) so the
     // checkout.session.completed webhook / verify-upgrade can write

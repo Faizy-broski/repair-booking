@@ -2,9 +2,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye, Trash2, MoreVertical, Users, Wrench, Package, X, Download, ChevronDown, CreditCard, Plus, Loader2 } from 'lucide-react'
+import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye, Trash2, MoreVertical, Users, Wrench, Package, X, Download, ChevronDown, CreditCard, Plus, Loader2, Landmark, Percent } from 'lucide-react'
 import { EditSubscriptionModal } from '@/components/superadmin/edit-subscription-modal'
 import type { PlanOption } from '@/components/superadmin/edit-subscription-modal'
+import { RecordManualPaymentModal } from '@/components/superadmin/record-manual-payment-modal'
 import type { SubscriptionRow } from '@/app/api/admin/subscriptions/route'
 import { Badge, SUBSCRIPTION_STATUS_VARIANTS } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/data-table'
@@ -47,6 +48,7 @@ interface BusinessRow {
   email: string | null
   owner_name: string | null
   is_active: boolean
+  vat_exempt?: boolean | null
   created_at: string
   subscriptions?: Array<{
     id: string | null
@@ -93,14 +95,18 @@ function ActionMenu({
   onViewDetails,
   onModules,
   onEditSubscription,
+  onRecordPayment,
   onToggleSuspend,
+  onToggleVatExempt,
   onDelete,
 }: {
   biz: BusinessRow
   onViewDetails: () => void
   onModules: () => void
   onEditSubscription: () => void
+  onRecordPayment: () => void
   onToggleSuspend: () => void
+  onToggleVatExempt: () => void
   onDelete: () => void
 }) {
   const [open, setOpen] = useState(false)
@@ -155,6 +161,12 @@ function ActionMenu({
           {item('View Details', <Eye className="h-3.5 w-3.5" />, onViewDetails)}
           {item('Modules', <Settings2 className="h-3.5 w-3.5" />, onModules)}
           {item('Edit Subscription', <CreditCard className="h-3.5 w-3.5" />, onEditSubscription)}
+          {item('Record Payment', <Landmark className="h-3.5 w-3.5" />, onRecordPayment)}
+          {item(
+            biz.vat_exempt ? 'Remove VAT Exemption' : 'Mark VAT Exempt',
+            <Percent className="h-3.5 w-3.5" />,
+            onToggleVatExempt,
+          )}
           {item(
             biz.is_active ? 'Suspend' : 'Activate',
             biz.is_active
@@ -477,6 +489,7 @@ export default function BusinessesPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [editSubRow, setEditSubRow] = useState<SubscriptionRow | null>(null)
+  const [recordPaymentBusiness, setRecordPaymentBusiness] = useState<BusinessRow | null>(null)
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -582,6 +595,44 @@ export default function BusinessesPage() {
     })
   }
 
+  async function toggleVatExempt(biz: BusinessRow) {
+    const nextExempt = !biz.vat_exempt
+    // Optimistic update first — the Stripe sync below can take a moment
+    queryClient.setQueryData(queryKey, (old: any) => {
+      if (!old) return old
+      return {
+        ...old,
+        data: old.data.map((x: BusinessRow) =>
+          x.id === biz.id ? { ...x, vat_exempt: nextExempt } : x
+        ),
+      }
+    })
+    try {
+      const res = await fetch(`/api/admin/subscriptions/${biz.id}/vat-exempt`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vatExempt: nextExempt }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to update VAT exemption')
+      if (json.stripeSyncError) {
+        alert(`Saved, but Stripe wasn't updated: ${json.stripeSyncError}`)
+      }
+    } catch (err: any) {
+      // Roll back the optimistic update on failure
+      queryClient.setQueryData(queryKey, (old: any) => {
+        if (!old) return old
+        return {
+          ...old,
+          data: old.data.map((x: BusinessRow) =>
+            x.id === biz.id ? { ...x, vat_exempt: !nextExempt } : x
+          ),
+        }
+      })
+      alert(err.message ?? 'Failed to update VAT exemption')
+    }
+  }
+
   const columns: ColumnDef<BusinessRow>[] = [
     {
       accessorKey: 'name',
@@ -619,7 +670,7 @@ export default function BusinessesPage() {
     {
       accessorKey: 'subscriptions',
       header: 'Plan',
-      cell: ({ getValue }) => {
+      cell: ({ getValue, row }) => {
         const subs = getValue() as BusinessRow['subscriptions']
         const sub = subs?.[0]
         if (!sub) return <span className="text-gray-400 text-sm">—</span>
@@ -633,9 +684,19 @@ export default function BusinessesPage() {
         return (
           <div>
             <p className="text-sm text-gray-700">{sub.plans?.name ?? '—'}</p>
-            <Badge variant={SUBSCRIPTION_STATUS_VARIANTS[effectiveStatus] ?? 'destructive'} className="text-[10px]">
-              {effectiveStatus}
-            </Badge>
+            <div className="flex flex-wrap items-center gap-1 mt-0.5">
+              <Badge variant={SUBSCRIPTION_STATUS_VARIANTS[effectiveStatus] ?? 'destructive'} className="text-[10px] whitespace-nowrap">
+                {effectiveStatus}
+              </Badge>
+              {row.original.vat_exempt && (
+                <span
+                  title="This business is not charged VAT"
+                  className="inline-flex items-center whitespace-nowrap rounded-full bg-purple-100 px-1.5 py-0.5 text-[10px] font-medium text-purple-700"
+                >
+                  No VAT
+                </span>
+              )}
+            </div>
           </div>
         )
       },
@@ -736,7 +797,9 @@ export default function BusinessesPage() {
             onViewDetails={() => router.push(`/superadmin/businesses/${biz.id}`)}
             onModules={() => setModulesBusiness(biz)}
             onEditSubscription={() => openEditSubscription(biz)}
+            onRecordPayment={() => setRecordPaymentBusiness(biz)}
             onToggleSuspend={() => toggleSuspend(biz)}
+            onToggleVatExempt={() => toggleVatExempt(biz)}
             onDelete={() => setConfirmDeleteId(biz.id)}
           />
         )
@@ -808,6 +871,19 @@ export default function BusinessesPage() {
           onSaved={() => {
             setEditSubRow(null)
             queryClient.invalidateQueries({ queryKey: ['superadmin-businesses'] })
+          }}
+        />
+      )}
+
+      {recordPaymentBusiness && (
+        <RecordManualPaymentModal
+          business={recordPaymentBusiness}
+          plans={plans}
+          onClose={() => setRecordPaymentBusiness(null)}
+          onSaved={() => {
+            setRecordPaymentBusiness(null)
+            queryClient.invalidateQueries({ queryKey: ['superadmin-businesses'] })
+            queryClient.invalidateQueries({ queryKey: ['superadmin-manual-payments', recordPaymentBusiness.id] })
           }}
         />
       )}

@@ -1,0 +1,12 @@
+-- Migration 200: Per-business VAT exemption.
+--
+-- VAT is charged as a shared Stripe Tax Rate (STRIPE_VAT_TAX_RATE_ID) attached
+-- to `tax_rates` on the Checkout line item and `default_tax_rates` on the
+-- subscription (see src/app/api/stripe/{checkout,upgrade,upgrade-custom}/route.ts)
+-- — never baked into plan prices. Some businesses (negotiated exemption, e.g.
+-- RiseTeck) should never be charged it. This flag is business-level (not
+-- per-subscription) since exemption is a customer attribute that should
+-- survive future plan changes, and is read by the upgrade/upgrade-custom
+-- routes (to avoid re-attaching the tax rate on a future plan change) and by
+-- backfill-vat (to exclude exempt businesses from bulk VAT attachment).
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS vat_exempt BOOLEAN NOT NULL DEFAULT false;
