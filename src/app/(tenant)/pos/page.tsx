@@ -91,6 +91,11 @@ export default function PosPage() {
     cash_in: number; cash_out: number; buyback_out: number
     credit_repayments_cash: number; credit_repayments_total: number
     expected_cash: number; opening_float: number; expenses?: number
+    // Card portion of total_refunds/repair_refunds (migration 201) — used to
+    // derive a cash-only drawer figure below, since Expected Cash itself is
+    // deliberately a combined cash+card number (migration 190) and can't be
+    // reconciled against a physical cash count on its own.
+    card_refunds?: number; repair_cash_refunds?: number
   } | null>(null)
 
   const fetchSessionStats = useCallback(async (sessionId: string) => {
@@ -522,6 +527,16 @@ export default function PosPage() {
         // tiles instead of being blended into this figure.
         const netSales = (sessionStats.total_sales - sessionStats.total_refunds)
           + (sessionStats.repair_sales - sessionStats.repair_refunds)
+        // Cash-drawer-only expected figure — unlike Expected Cash above
+        // (deliberately combined cash+card, migration 190), this is the
+        // number to compare against a physical till count: same formula,
+        // card entirely excluded, and refunds cut down to just their cash
+        // leg (total_refunds/repair_refunds minus their card portion).
+        const cashDrawerExpected = sessionStats.opening_float
+          + sessionStats.cash_sales + sessionStats.repair_cash_deposits + sessionStats.credit_repayments_cash
+          + sessionStats.cash_in - sessionStats.cash_out
+          - (sessionStats.total_refunds - (sessionStats.card_refunds ?? 0))
+          - (sessionStats.repair_cash_refunds ?? 0)
         return (
           <div className="relative shrink-0 border-b border-gray-200 bg-gray-50 px-3 py-2 sm:px-5">
             <div
@@ -558,6 +573,11 @@ export default function PosPage() {
                 // simply absent (undefined) for everyone else.
                 ...(sessionStats.expenses !== undefined ? [['Expense', sessionStats.expenses, 'text-rose-700', 'bg-rose-500']] : []),
                 ['Expected Cash',  sessionStats.expected_cash,              'text-amber-700',  'bg-amber-500'],
+                // Cash-drawer-only figure — the one to compare against a
+                // physical till count (Expected Cash above is deliberately
+                // combined cash+card, see comment where cashDrawerExpected
+                // is computed).
+                ['Cash Drawer Only', cashDrawerExpected,                    'text-lime-700',   'bg-lime-500'],
               ] as [string, number, string, string][]).map(([label, value, textCls, dotCls]) => (
                 <div key={label} className="flex shrink-0 flex-col gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm">
                   <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-bold uppercase tracking-wide text-gray-500">

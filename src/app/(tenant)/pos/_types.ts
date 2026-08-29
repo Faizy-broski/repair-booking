@@ -28,6 +28,12 @@ export interface ZReport {
   session_id?: string
   total_sales?: number
   total_refunds?: number
+  // Card portion of total_refunds (migration 201) — the remainder,
+  // total_refunds - card_refunds, is the cash portion. Split out so refund
+  // reconciliation shows which tender the money actually left through,
+  // instead of one combined figure a cashier can't reconcile physical cash
+  // against.
+  card_refunds?: number
   cash_sales?: number
   card_sales?: number
   store_credit_sales?: number

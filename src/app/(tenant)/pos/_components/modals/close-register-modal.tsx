@@ -10,6 +10,9 @@ import { DENOMINATIONS, denomTotal, channelLabel, type ZReport } from '../../_ty
 
 interface SessionStats {
   total_sales: number; repair_sales: number; total_refunds: number; repair_refunds: number
+  // Card portion of total_refunds (migration 201) -- total_refunds minus
+  // this is the cash portion. See the ZReport type's matching comment.
+  card_refunds?: number
   store_credit_sales: number; loyalty_points_sales: number; on_account_sales: number
   repair_cash_sales: number; repair_card_sales: number
   // Repair revenue collected via the Repairs module directly, excluding any
@@ -130,11 +133,16 @@ export function CloseRegisterModal({
                 ...(customChannels.length > 0
                   ? customChannels.map((m) => [channelLabel(m), zReport.other_sales_breakdown?.[m] ?? 0] as [string, number])
                   : [['Other', zReport.other_sales ?? 0] as [string, number]]),
-                ['Refunds',        -(zReport.total_refunds ?? 0)],
+                // Split by tender (migration 201) — previously one combined
+                // "Refunds" figure, which couldn't be reconciled against a
+                // physical cash count since it silently mixed in whatever
+                // was refunded back to card. cash = whatever wasn't card.
+                ['Refunds (Cash)', -((zReport.total_refunds ?? 0) - (zReport.card_refunds ?? 0))],
+                ['Refunds (Card)', -(zReport.card_refunds ?? 0)],
               ] as [string, number][]).map(([l, v]) => (
                 <div key={l} className="rounded-xl border border-gray-200 bg-white p-3">
                   <p className="text-xs text-gray-500">{l}</p>
-                  <p className={`mt-0.5 font-semibold ${l === 'Refunds' && v < 0 ? 'text-red-600' : 'text-gray-900'}`}>{formatCurrency(v)}</p>
+                  <p className={`mt-0.5 font-semibold ${l.startsWith('Refunds') && v < 0 ? 'text-red-600' : 'text-gray-900'}`}>{formatCurrency(v)}</p>
                 </div>
               ))}
               {(zReport.cash_in ?? 0) > 0 && (
@@ -391,11 +399,14 @@ export function CloseRegisterModal({
                           ...(customChannels.length > 0
                             ? customChannels.map((m) => [channelLabel(m), sessionStats.other_sales_breakdown?.[m] ?? 0] as [string, number])
                             : [['Other', sessionStats.other_sales ?? 0] as [string, number]]),
-                          ['Refunds',        -(sessionStats.total_refunds ?? 0)],
+                          // Split by tender (migration 201) — see comment in
+                          // the post-close view above.
+                          ['Refunds (Cash)', -((sessionStats.total_refunds ?? 0) - (sessionStats.card_refunds ?? 0))],
+                          ['Refunds (Card)', -(sessionStats.card_refunds ?? 0)],
                         ] as [string, number][]).map(([l, v]) => (
                           <div key={l} className="rounded-xl border border-gray-200 bg-white p-3">
                             <p className="text-xs text-gray-500">{l}</p>
-                            <p className={`mt-0.5 font-semibold ${l === 'Refunds' && v < 0 ? 'text-red-600' : 'text-gray-900'}`}>{formatCurrency(v)}</p>
+                            <p className={`mt-0.5 font-semibold ${l.startsWith('Refunds') && v < 0 ? 'text-red-600' : 'text-gray-900'}`}>{formatCurrency(v)}</p>
                           </div>
                         ))}
                         {(sessionStats.cash_in ?? 0) > 0 && (
