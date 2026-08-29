@@ -293,6 +293,17 @@ export default function PosPage() {
     // we can tell them later if it moved while they were counting.
     expectedCashAtOpenRef.current = sessionStats?.expected_cash ?? null
     setExpectedCashChangedSinceOpen(false)
+    // Pre-fill Card Total with the expected NET figure (card sales minus any
+    // card refunds this shift) rather than leaving it blank — staff were
+    // typing in the raw gross "Card Sales" tile instead, which produces a
+    // false discrepancy equal to exactly the card refund amount. Still
+    // editable — this is a starting point to check against the card
+    // machine's own report, not a substitute for actually looking at it.
+    if (sessionStats) {
+      const expectedNetCard = (sessionStats.card_sales ?? 0) + (sessionStats.repair_card_deposits ?? 0)
+        - (sessionStats.card_refunds ?? 0)
+      setClosingCardTotal(expectedNetCard.toFixed(2))
+    }
     setCloseRegisterModal(true)
   }
 

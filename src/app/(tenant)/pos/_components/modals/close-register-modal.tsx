@@ -28,6 +28,11 @@ interface SessionStats {
   other_sales_breakdown?: Record<string, number>
   cash_in: number; cash_out: number; buyback_out: number
   credit_repayments_cash: number; credit_repayments_total: number
+  // Card-side counterpart of credit_repayments_cash/repair_card_refunds --
+  // needed alongside card_refunds to compute the expected NET card total
+  // (see expectedNetCardTotal below), same way cash_refunds/repair_cash_
+  // refunds already do for the cash-only figure.
+  credit_repayments_card?: number; repair_card_refunds?: number
   expected_cash: number; opening_float: number; expenses?: number
 }
 
@@ -64,12 +69,23 @@ export function CloseRegisterModal({
   // every other business, which keeps seeing the plain "Other" tile
   // exactly as before. See Part 12 of the plan.
   const customChannels: string[] = useModuleConfigStore().getConfig('pos')?.custom_payment_channels ?? []
+  // What the card machine's own settlement SHOULD show once any card
+  // refunds this shift have gone through it -- i.e. card sales minus card
+  // refunds, not the raw "Card Sales" tile. Told to the user directly here
+  // so nobody has to work out (or guess wrong) that a card refund needs to
+  // be subtracted before typing this figure in -- entering the gross Card
+  // Sales number instead produces a false discrepancy equal to exactly the
+  // card refund amount.
+  const expectedNetCardTotal = sessionStats
+    ? (sessionStats.card_sales ?? 0) + (sessionStats.repair_card_deposits ?? 0) + (sessionStats.credit_repayments_card ?? 0)
+      - (sessionStats.card_refunds ?? 0) - (sessionStats.repair_card_refunds ?? 0)
+    : null
   const verifiedTotal = denomTotal(closingDenoms) + (parseFloat(closingCardTotal) || 0)
   const difference = expectedCash !== null ? verifiedTotal - expectedCash : null
   const hasDiscrepancy = difference !== null && Math.abs(difference) > 0.01
   const [showBreakdown, setShowBreakdown] = useState(false)
   return (
-    <Modal open={open} onClose={onClose} title="End Shift" size={zReport ? 'xl' : showBreakdown ? 'xl' : 'sm'}>
+    <Modal open={open} onClose={onClose} title="End Shift" size={zReport ? 'xl' : showBreakdown ? 'xl' : 'lg'}>
       {zReport ? (
         <div className="space-y-5">
           <p className="-mt-2 text-sm text-gray-500">Register closed successfully. Here&apos;s the summary for this shift.</p>
@@ -326,6 +342,13 @@ export function CloseRegisterModal({
               className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none"
             />
             <p className="mt-1 text-xs text-gray-400">Enter today&apos;s total card payments from your card machine&apos;s report — Expected Cash now includes card takings, so this is needed to verify against it.</p>
+            {expectedNetCardTotal !== null && (
+              <p className="mt-1 text-xs font-medium text-amber-600">
+                {(sessionStats?.card_refunds ?? 0) > 0
+                  ? <>Expect around {formatCurrency(expectedNetCardTotal)} — this shift had {formatCurrency(sessionStats?.card_refunds ?? 0)} in card refunds, so the card machine&apos;s report should already be lower than gross Card Sales by that much. Don&apos;t enter the raw Card Sales figure.</>
+                  : <>Expect around {formatCurrency(expectedNetCardTotal)} (no card refunds this shift, so this matches Card Sales).</>}
+              </p>
+            )}
           </div>
 
           {sessionStats && (() => {
