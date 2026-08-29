@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Wrench, ShoppingBag } from 'lucide-react'
+import { Wrench, ShoppingBag, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 import { usePosStore } from '@/store/pos.store'
 import { formatCurrency } from '@/lib/utils'
@@ -134,6 +134,37 @@ export default function PosPage() {
   useRealtime({ table: 'sales', filterColumn: 'branch_id', filterValue: activeBranch?.id, onInsert: refreshSessionStats, onUpdate: refreshSessionStats })
   useRealtime({ table: 'repairs', filterColumn: 'branch_id', filterValue: activeBranch?.id, onInsert: refreshSessionStats, onUpdate: refreshSessionStats })
   useRealtime({ table: 'cash_movements', filterColumn: 'branch_id', filterValue: activeBranch?.id, onInsert: refreshSessionStats })
+
+  // ── Live stats bar horizontal scroll affordance ───────────────────────────────
+  // The stats row (Net Sales…Expected Cash) overflows on most screens with no
+  // visible scrollbar (hidden by design for a cleaner look) — without this,
+  // there's no indication cards like Refunds/Cash In/Expected Cash exist off
+  // to the right, so staff never discover they can scroll to see them.
+  const statsScrollRef = useRef<HTMLDivElement>(null)
+  const [statsCanScrollLeft, setStatsCanScrollLeft] = useState(false)
+  const [statsCanScrollRight, setStatsCanScrollRight] = useState(false)
+
+  const updateStatsScrollState = useCallback(() => {
+    const el = statsScrollRef.current
+    if (!el) return
+    setStatsCanScrollLeft(el.scrollLeft > 4)
+    setStatsCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4)
+  }, [])
+
+  function scrollStatsBy(delta: number) {
+    statsScrollRef.current?.scrollBy({ left: delta, behavior: 'smooth' })
+  }
+
+  useEffect(() => {
+    if (!statsScrollRef.current) return
+    updateStatsScrollState()
+    window.addEventListener('resize', updateStatsScrollState)
+    return () => window.removeEventListener('resize', updateStatsScrollState)
+    // Re-run whenever the tile set changes (session opens/closes, custom
+    // channels/expense tile appear) — scrollWidth depends on how many tiles
+    // are actually rendered, so mount-only would miss changes to that count.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionStats, updateStatsScrollState])
 
   // ── Cash In/Out modal ─────────────────────────────────────────────────────────
   const [cashMovementOpen, setCashMovementOpen] = useState(false)
@@ -492,8 +523,12 @@ export default function PosPage() {
         const netSales = (sessionStats.total_sales - sessionStats.total_refunds)
           + (sessionStats.repair_sales - sessionStats.repair_refunds)
         return (
-          <div className="shrink-0 border-b border-gray-200 bg-gray-50 px-3 py-2 sm:px-5">
-            <div className="flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="relative shrink-0 border-b border-gray-200 bg-gray-50 px-3 py-2 sm:px-5">
+            <div
+              ref={statsScrollRef}
+              onScroll={updateStatsScrollState}
+              className="flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
               {([
                 ['Net Sales',      netSales,                                'text-brand-teal-dark', 'bg-brand-teal'],
                 ['Product Sales',  productSales,                            'text-blue-700',   'bg-blue-500'],
@@ -533,6 +568,38 @@ export default function PosPage() {
                 </div>
               ))}
             </div>
+
+            {/* Scroll affordance — the row above hides its scrollbar for a
+                cleaner look, which otherwise leaves no hint that Refunds/
+                Cash In/Cash Out/Expected Cash exist further right. A fade
+                edge + clickable arrow appear only on the side there's
+                actually more to scroll to. */}
+            {statsCanScrollLeft && (
+              <>
+                <div className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-gray-50 to-transparent sm:left-2" />
+                <button
+                  type="button"
+                  aria-label="Scroll stats left"
+                  onClick={() => scrollStatsBy(-220)}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-brand-teal text-white shadow-sm hover:bg-brand-teal-dark sm:left-1"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+              </>
+            )}
+            {statsCanScrollRight && (
+              <>
+                <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-gray-50 to-transparent sm:right-2" />
+                <button
+                  type="button"
+                  aria-label="Scroll stats right"
+                  onClick={() => scrollStatsBy(220)}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-brand-teal text-white shadow-sm hover:bg-brand-teal-dark sm:right-1"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </>
+            )}
           </div>
         )
       })()}
