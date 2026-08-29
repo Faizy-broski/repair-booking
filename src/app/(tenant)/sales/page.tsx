@@ -65,7 +65,7 @@ interface SaleItem {
 
 interface SaleDetail extends SaleRow {
   sale_items: SaleItem[]
-  refund_records?: { id: string; is_refund: boolean; total: number; sale_items: { name: string; quantity: number; total: number; is_amount_refund: boolean }[] }[]
+  refund_records?: { id: string; is_refund: boolean; total: number; created_at: string; sale_items: { name: string; quantity: number; total: number; is_amount_refund: boolean }[] }[]
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -148,6 +148,11 @@ export default function SalesPage() {
   const [refundPaymentMethod, setRefundPaymentMethod] = useState<'cash' | 'card' | 'store_credit'>('cash')
   const [refundMode, setRefundMode] = useState<'items' | 'amount'>('items')
   const [refundItemAmounts, setRefundItemAmounts] = useState<Record<string, number>>({})
+  // Split refund tender — only used when the original sale was itself split
+  // (cash+card, etc). Previously the whole refund was forced onto one
+  // payment_method, silently dropping whichever leg wasn't picked from every
+  // cash figure — see migration 201.
+  const [refundSplits, setRefundSplits] = useState<Record<string, string>>({})
 
   // Exchange
   const [exchangeOpen, setExchangeOpen] = useState(false)
@@ -330,6 +335,19 @@ export default function SalesPage() {
         subtotal = amountTotal
       }
 
+      const isSplitOriginal = detail.payment_method === 'split'
+      const paymentSplits = isSplitOriginal
+        ? Object.entries(refundSplits)
+            .filter(([, v]) => parseFloat(v) > 0)
+            .map(([method, amount]) => ({ method, amount: parseFloat(amount) }))
+        : []
+      if (isSplitOriginal) {
+        const splitSum = paymentSplits.reduce((s, l) => s + l.amount, 0)
+        if (Math.abs(splitSum - subtotal) > 0.01) {
+          throw new Error('Cash + Card must add up to the refund total')
+        }
+      }
+
       const res = await fetch('/api/pos/refund', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -341,7 +359,8 @@ export default function SalesPage() {
           subtotal,
           tax: 0,
           total: subtotal,
-          payment_method: refundPaymentMethod,
+          payment_method: isSplitOriginal ? 'split' : refundPaymentMethod,
+          payment_splits: paymentSplits.length > 0 ? paymentSplits : undefined,
           refund_reason: refundReason || null,
           items,
         }),
@@ -357,6 +376,7 @@ export default function SalesPage() {
       setRefundPaymentMethod('cash')
       setRefundMode('items')
       setRefundItemAmounts({})
+      setRefundSplits({})
       queryClient.invalidateQueries({ queryKey: ['sales'] })
       queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
       queryClient.invalidateQueries({ queryKey: ['sale-detail', detail?.id] })
@@ -534,6 +554,17 @@ export default function SalesPage() {
     setRefundPaymentMethod('cash')
     setRefundMode('items')
     setRefundItemAmounts(initialAmounts)
+    // Prefill the split refund tender from the original sale's own split —
+    // every item starts at its full remaining quantity (full refund), so
+    // this matches by default; the cashier can still adjust it before
+    // confirming if only refunding part of the sale.
+    if (detail.payment_method === 'split' && detail.payment_splits?.length) {
+      const splits: Record<string, string> = {}
+      detail.payment_splits.forEach((leg) => { splits[leg.method] = Number(leg.amount).toFixed(2) })
+      setRefundSplits(splits)
+    } else {
+      setRefundSplits({})
+    }
     setRefundOpen(true)
   }
 
@@ -1130,6 +1161,20 @@ export default function SalesPage() {
               </div>
             )}
 
+            {/* Refunded-on date(s) — a refund can be processed days after the
+                sale date shown above, so surface exactly when it happened. */}
+            {!detail.is_refund && (detail.refund_records?.length ?? 0) > 0 && (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {detail.refund_records!.length === 1
+                  ? <>Refunded on {formatDateTime(detail.refund_records![0].created_at)}</>
+                  : (
+                    <>
+                      Refunded on: {detail.refund_records!.map(r => formatDateTime(r.created_at)).join(' · ')}
+                    </>
+                  )}
+              </div>
+            )}
+
             {/* Split payment details */}
             {detail.payment_method === 'split' && detail.payment_splits?.length ? (
               <div className="rounded-md bg-gray-50 p-3">
@@ -1283,6 +1328,16 @@ export default function SalesPage() {
           const isItemsDisabled = refundMode === 'items' && Object.values(refundQtys).every(v => v === 0)
           const amountModeTotal = Object.values(refundItemAmounts).reduce((s, v) => s + (v || 0), 0)
           const isAmountDisabled = refundMode === 'amount' && (amountModeTotal <= 0 || amountModeTotal > maxRefundableAmount)
+          // Split refund tender — only relevant when the original sale
+          // itself was split-tender (see migration 201).
+          const isSplitOriginal = detail.payment_method === 'split'
+          const splitChannels = isSplitOriginal
+            ? (detail.payment_splits?.length ? detail.payment_splits.map(l => l.method) : ['cash', 'card'])
+            : []
+          const currentRefundTotal = refundMode === 'items' ? itemsRefundTotal : amountModeTotal
+          const splitTotal = Object.values(refundSplits).reduce((s, v) => s + (parseFloat(v) || 0), 0)
+          const splitRemaining = currentRefundTotal - splitTotal
+          const isSplitInvalid = isSplitOriginal && (Math.abs(splitRemaining) > 0.01 || splitTotal <= 0)
           return (
             <div className="space-y-4">
               {/* Mode toggle */}
@@ -1438,18 +1493,46 @@ export default function SalesPage() {
               </div>
 
               {/* Return payment method */}
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Return Via</label>
-                <select
-                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={refundPaymentMethod}
-                  onChange={e => setRefundPaymentMethod(e.target.value as 'cash' | 'card' | 'store_credit')}
-                >
-                  <option value="cash">Cash</option>
-                  <option value="card">Card</option>
-                  <option value="store_credit">Store Credit</option>
-                </select>
-              </div>
+              {isSplitOriginal ? (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">
+                    Return Via — this sale was split-tender, split the refund the same way
+                  </label>
+                  <div className="space-y-2">
+                    {splitChannels.map(m => (
+                      <div key={m} className="flex items-center gap-3">
+                        <span className="w-20 shrink-0 text-sm font-medium text-gray-600">
+                          {PAYMENT_LABELS[m] ?? m}
+                        </span>
+                        <input
+                          type="number" min={0} step={0.01} placeholder="0.00"
+                          value={refundSplits[m] ?? ''}
+                          onChange={e => setRefundSplits(r => ({ ...r, [m]: e.target.value }))}
+                          className="h-9 flex-1 rounded-md border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    ))}
+                    <div className={`flex justify-between rounded-md px-3 py-2 text-sm font-medium ${
+                      Math.abs(splitRemaining) > 0.005 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'
+                    }`}>
+                      <span>Remaining</span><span>{formatCurrency(splitRemaining)}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-600">Return Via</label>
+                  <select
+                    className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={refundPaymentMethod}
+                    onChange={e => setRefundPaymentMethod(e.target.value as 'cash' | 'card' | 'store_credit')}
+                  >
+                    <option value="cash">Cash</option>
+                    <option value="card">Card</option>
+                    <option value="store_credit">Store Credit</option>
+                  </select>
+                </div>
+              )}
 
               <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={() => setRefundOpen(false)} disabled={refundMutation.isPending}>
@@ -1458,7 +1541,7 @@ export default function SalesPage() {
                 <Button
                   className="bg-orange-500 hover:bg-orange-600 text-white"
                   onClick={() => refundMutation.mutate()}
-                  disabled={refundMutation.isPending || isItemsDisabled || isAmountDisabled}
+                  disabled={refundMutation.isPending || isItemsDisabled || isAmountDisabled || isSplitInvalid}
                 >
                   {refundMutation.isPending
                     ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />

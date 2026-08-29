@@ -346,9 +346,10 @@ export const PosService = {
     // Fetch refund records separately to avoid unreliable self-join
     const { data: refundRecords } = await adminSupabase
       .from('sales')
-      .select('id, is_refund, total, sale_items(name, quantity, total, is_amount_refund)')
+      .select('id, is_refund, total, created_at, sale_items(name, quantity, total, is_amount_refund)')
       .eq('original_sale_id', id)
       .eq('is_refund', true)
+      .order('created_at', { ascending: true })
 
     return { ...data, refund_records: refundRecords ?? [] }
   },
@@ -481,6 +482,7 @@ export const PosService = {
     tax: number
     total: number
     payment_method: string
+    payment_splits?: PaymentSplit[]
     refund_reason?: string | null
     items: {
       product_id?: string | null

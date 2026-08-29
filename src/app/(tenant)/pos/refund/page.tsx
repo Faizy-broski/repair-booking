@@ -19,6 +19,11 @@ interface SaleItem {
   is_service?: boolean
 }
 
+interface PaymentSplitLeg {
+  method: string
+  amount: number
+}
+
 interface Sale {
   id: string
   total: number
@@ -31,6 +36,7 @@ interface Sale {
   is_refund: boolean
   sale_items: SaleItem[]
   customers: { first_name: string; last_name: string | null } | null
+  payment_splits?: PaymentSplitLeg[] | null
 }
 
 function RefundPageInner() {
@@ -55,6 +61,12 @@ function RefundPageInner() {
 
   // Refund method + reason
   const [refundMethod, setRefundMethod] = useState<'cash' | 'card' | 'gift_card'>('cash')
+  // Split refund tender — only used when the original sale was itself a
+  // split-tender ('split') sale, so the cashier can mirror the original
+  // cash/card breakdown instead of forcing the whole refund onto one method
+  // (previously the only option, which silently dropped whichever leg wasn't
+  // picked from every cash figure — see migration 201).
+  const [refundSplits, setRefundSplits] = useState<Record<string, string>>({})
   const [refundReason, setRefundReason] = useState('')
 
   const [processing, setProcessing] = useState(false)
@@ -77,6 +89,7 @@ function RefundPageInner() {
     setRefundPrices({})
     setRestockEnabled(false)
     setRestockAmount('')
+    setRefundSplits({})
 
     const res = await fetch(`/api/pos/sales/${q}`)
     if (res.ok) {
@@ -95,6 +108,14 @@ function RefundPageInner() {
         setSelectedIds(ids)
         setRefundQtys(qtys)
         setRefundPrices(prices)
+        // Prefill the split refund tender from the original sale's own
+        // split, since every item starts selected (full refund) — the
+        // cashier can still adjust before confirming.
+        if (s.payment_method === 'split' && s.payment_splits?.length) {
+          const splits: Record<string, string> = {}
+          s.payment_splits.forEach((leg) => { splits[leg.method] = leg.amount.toFixed(2) })
+          setRefundSplits(splits)
+        }
       }
     } else {
       setSearchError('Sale not found. Check the sale ID or invoice number.')
@@ -143,11 +164,29 @@ function RefundPageInner() {
 
   const refundTotal = -(refundSubtotal - refundDiscount + refundTax - restockFee)
 
+  // Split refund tender — only relevant when the original sale itself was
+  // split-tender. Channels come from whatever methods the original sale's
+  // payment_splits used (falls back to cash/card if that's somehow empty).
+  const isSplitOriginal = sale?.payment_method === 'split'
+  const splitChannels = isSplitOriginal
+    ? (sale?.payment_splits?.length ? sale.payment_splits.map((l) => l.method) : ['cash', 'card'])
+    : []
+  const splitTotal = Object.values(refundSplits).reduce((s, v) => s + (parseFloat(v) || 0), 0)
+  const splitRemaining = Math.abs(refundTotal) - splitTotal
+  const splitValid = !isSplitOriginal || (Math.abs(splitRemaining) < 0.01 && splitTotal > 0)
+
   // ── Process Refund ────────────────────────────────────────────────────────────
 
   async function processRefund() {
     if (!activeBranch || !profile || !sale || selectedItems.length === 0) return
+    if (isSplitOriginal && !splitValid) return
     setProcessing(true)
+
+    const paymentSplits = isSplitOriginal
+      ? Object.entries(refundSplits)
+          .filter(([, v]) => parseFloat(v) > 0)
+          .map(([method, amount]) => ({ method, amount: parseFloat(amount) }))
+      : []
 
     const payload = {
       original_sale_id: sale.id,
@@ -158,7 +197,8 @@ function RefundPageInner() {
       discount: refundDiscount,
       tax: -refundTax,
       total: refundTotal,
-      payment_method: refundMethod,
+      payment_method: isSplitOriginal ? 'split' : refundMethod,
+      payment_splits: paymentSplits.length > 0 ? paymentSplits : undefined,
       refund_reason: refundReason || null,
       restocking_fee: restockFee > 0 ? restockFee : null,
       items: selectedItems.map((item) => ({
@@ -186,7 +226,7 @@ function RefundPageInner() {
     })
 
     if (res.ok) {
-      setSuccess({ total: Math.abs(refundTotal), method: refundMethod })
+      setSuccess({ total: Math.abs(refundTotal), method: isSplitOriginal ? 'split' : refundMethod })
     } else {
       const err = await res.json()
       setSearchError(err.message ?? 'Refund failed. Please try again.')
@@ -413,22 +453,50 @@ function RefundPageInner() {
 
             {/* Left: Refund method + reason */}
             <div className="space-y-3">
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Refund Method</p>
-                <div className="flex gap-2">
-                  {(['cash', 'card', 'gift_card'] as const).map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => setRefundMethod(m)}
-                      className={`flex-1 rounded-lg border py-2 text-xs font-medium transition-colors ${
-                        refundMethod === m ? 'border-brand-teal bg-brand-teal-light text-brand-teal' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      {m === 'gift_card' ? 'Gift Card' : m.charAt(0).toUpperCase() + m.slice(1)}
-                    </button>
-                  ))}
+              {isSplitOriginal ? (
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    Refund Method — this sale was split-tender, split the refund the same way
+                  </p>
+                  <div className="space-y-2">
+                    {splitChannels.map((m) => (
+                      <div key={m} className="flex items-center gap-3">
+                        <span className="w-20 shrink-0 text-sm font-medium text-gray-600">
+                          {m.charAt(0).toUpperCase() + m.slice(1)}
+                        </span>
+                        <input
+                          type="number" min={0} step={0.01} placeholder="0.00"
+                          value={refundSplits[m] ?? ''}
+                          onChange={(e) => setRefundSplits((r) => ({ ...r, [m]: e.target.value }))}
+                          className="h-9 flex-1 rounded-lg border border-gray-200 px-3 text-sm focus:border-brand-teal focus:outline-none"
+                        />
+                      </div>
+                    ))}
+                    <div className={`flex justify-between rounded-lg px-3 py-2 text-sm font-medium ${
+                      Math.abs(splitRemaining) > 0.005 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'
+                    }`}>
+                      <span>Remaining</span><span>{formatCurrency(splitRemaining)}</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Refund Method</p>
+                  <div className="flex gap-2">
+                    {(['cash', 'card', 'gift_card'] as const).map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => setRefundMethod(m)}
+                        className={`flex-1 rounded-lg border py-2 text-xs font-medium transition-colors ${
+                          refundMethod === m ? 'border-brand-teal bg-brand-teal-light text-brand-teal' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {m === 'gift_card' ? 'Gift Card' : m.charAt(0).toUpperCase() + m.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <Input
                 label="Reason for refund (optional)"
                 placeholder="e.g. Item defective, customer not satisfied"
@@ -469,7 +537,7 @@ function RefundPageInner() {
                 className="mt-2 w-full bg-green-600 hover:bg-green-700"
                 size="lg"
                 loading={processing}
-                disabled={selectedItems.length === 0}
+                disabled={selectedItems.length === 0 || !splitValid}
                 onClick={processRefund}
               >
                 Proceed

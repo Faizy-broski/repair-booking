@@ -44,6 +44,16 @@
 -- other non-cash) leg is correctly broken out into card_sales/other_sales
 -- instead of being lumped entirely into other_sales.
 --
+-- Group I (migration 201) covers a live, user-reported Riseteck bug: a
+-- split-tender sale (cash+card) refunded in full only reduced whichever
+-- single payment_method the refund row carried -- the other leg vanished
+-- from Expected Cash entirely, not just from a display tile (unlike Group
+-- G's sales-side version of this bug, migration 194, where Expected Cash was
+-- already correct and only the Cash Sales tile was wrong). Calls
+-- process_refund() directly, like Group F, since the fix spans both the
+-- RPC's INSERT (storing payment_splits on a refund row at all) and the
+-- register formula's leg-recovery query.
+--
 -- Group H (migration 190) is an EXPLICIT BUSINESS DECISION, not a bug fix:
 -- card payments (sales, refunds, split-tender card legs, repair card
 -- deposits/refunds) are now merged into Expected Cash itself, and closing
@@ -768,6 +778,73 @@ BEGIN
   EXCEPTION WHEN OTHERS THEN
     INSERT INTO _test_results (label, status, expected, actual)
     VALUES ('GROUP H UNEXPECTED ERROR: ' || SQLERRM, 'FAIL', NULL, NULL);
+  END;
+
+  -- ==========================================================================
+  -- GROUP I: Split-tender REFUND cash/card breakdown (migration 201) --
+  -- reproduces the live Riseteck bug: a split-tender sale (250 = 220 cash +
+  -- 30 card) refunded in full used to only reduce whichever single
+  -- payment_method the refund row carried -- the other leg vanished from
+  -- every cash figure. Calls process_refund() directly (like Group F) with
+  -- payment_method:'split' + payment_splits, since the fix lives in both the
+  -- RPC's INSERT (storing payment_splits at all) and the register formula's
+  -- leg-recovery query.
+  -- ==========================================================================
+  BEGIN
+  v_clock := v_clock + interval '1 second';
+  INSERT INTO register_sessions (business_id, branch_id, cashier_id, opening_float, status, opened_at)
+  VALUES (v_business_id, v_branch_id, v_cashier_id, 0, 'open', v_clock)
+  RETURNING id INTO v_session_id;
+  v_exp := 0;
+
+  -- Original split-tender sale: 250 total, 220 cash / 30 card (the PS5 sale).
+  v_clock := v_clock + interval '1 second';
+  INSERT INTO sales (branch_id, customer_id, cashier_id, subtotal, total, payment_method, payment_status, is_refund, amount_paid, payment_splits, created_at)
+  VALUES (v_branch_id, v_customer_id, v_cashier_id, 250, 250, 'split', 'paid', false, 250, '[{"method":"cash","amount":220},{"method":"card","amount":30}]'::jsonb, v_clock)
+  RETURNING id INTO v_sale_id;
+  v_exp := v_exp + 220 + 30;
+  v_preview := register_session_expected(v_session_id);
+  PERFORM pg_temp.assert_eq('I0 Split sale baseline: expected_cash', (v_preview->>'expected_cash')::numeric, v_exp);
+
+  -- Full refund via process_refund(), mirroring the same split.
+  v_clock := v_clock + interval '1 second';
+  v_refund_id := process_refund(jsonb_build_object(
+    'original_sale_id', v_sale_id,
+    'branch_id',    v_branch_id,
+    'cashier_id',   v_cashier_id,
+    'customer_id',  NULL,
+    'subtotal',     250,
+    'tax',          0,
+    'total',        250,
+    'payment_method', 'split',
+    'payment_splits', jsonb_build_array(
+      jsonb_build_object('method', 'cash', 'amount', 220),
+      jsonb_build_object('method', 'card', 'amount', 30)
+    ),
+    'refund_reason', NULL,
+    'items', jsonb_build_array(jsonb_build_object(
+      'product_id', NULL, 'variant_id', NULL, 'name', 'TEST-PS5-SPLIT-REFUND',
+      'quantity', 1, 'unit_price', 250, 'total', 250, 'is_service', true
+    ))
+  ));
+
+  SELECT payment_method, payment_splits INTO v_refund_row FROM sales WHERE id = v_refund_id;
+  PERFORM pg_temp.assert_eq('I1 process_refund stores payment_method = split (migration 201 fix)',
+    CASE WHEN v_refund_row.payment_method = 'split' THEN 1 ELSE 0 END, 1);
+  PERFORM pg_temp.assert_eq('I2 process_refund stores non-empty payment_splits (migration 201 fix)',
+    CASE WHEN v_refund_row.payment_splits IS NOT NULL AND v_refund_row.payment_splits <> '[]'::jsonb THEN 1 ELSE 0 END, 1);
+
+  v_exp := v_exp - 220 - 30;
+  v_preview := register_session_expected(v_session_id);
+  PERFORM pg_temp.assert_eq('I3 Split refund: cash leg reduces expected_cash (migration 201 fix -- previously missing)', (v_preview->>'expected_cash')::numeric, v_exp);
+  PERFORM pg_temp.assert_eq('I4 Split refund: card_refunds still gets its own leg', (v_preview->>'card_refunds')::numeric, 30);
+
+  v_close := close_register_session(v_session_id, v_exp, NULL);
+  PERFORM pg_temp.assert_eq('I5 Close parity: expected_cash matches live preview', (v_close->>'expected_cash')::numeric, v_exp);
+  PERFORM pg_temp.assert_eq('I5 Close parity: variance is zero', (v_close->>'variance')::numeric, 0);
+  EXCEPTION WHEN OTHERS THEN
+    INSERT INTO _test_results (label, status, expected, actual)
+    VALUES ('GROUP I UNEXPECTED ERROR: ' || SQLERRM, 'FAIL', NULL, NULL);
   END;
 
 EXCEPTION WHEN OTHERS THEN

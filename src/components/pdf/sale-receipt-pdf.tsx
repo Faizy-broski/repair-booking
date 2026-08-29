@@ -40,6 +40,7 @@ function calcSaleReceiptPageHeight(opts: {
   isRushJob: boolean
   isRefund: boolean
   hasRefundReason: boolean
+  hasRefundedDates: boolean
   items: { name: string }[]
   hasDiscount: boolean
   showTax: boolean
@@ -69,6 +70,7 @@ function calcSaleReceiptPageHeight(opts: {
   h += 48 // body padding
   if (opts.isRushJob) h += 28 // rush banner
   if (opts.isRefund && opts.hasRefundReason) h += 28 // refund reason box
+  if (opts.hasRefundedDates) h += 28 // "Refunded on" box (original sale receipt)
 
   // Meta grid: customer + cashier + payment (status only on full-page)
   h += 3 * 22 // 3 meta cells
@@ -172,6 +174,10 @@ export interface SaleReceiptPdfProps {
   depositLabelAmount?: number
   isRefund?: boolean
   refundReason?: string | null
+  // Dates (already formatted, e.g. "12 Aug 2026, 14:30") this ORIGINAL sale
+  // was refunded on — one entry per partial/full refund against it. Not
+  // used when this receipt IS itself a refund record (isRefund true).
+  refundedDates?: string[]
   paymentSplits?: { method: string; amount: number }[] | null
   notes?: string | null
   // Branch info
@@ -215,7 +221,7 @@ const STATUS_COLORS: Record<string, string> = {
 export function SaleReceiptPdf({
   saleId, invoiceNumber, date, customerName, cashierName, paymentMethod, paymentStatus,
   items, subtotal, discount, tax, total, amountPaid, depositLabelAmount,
-  isRefund, refundReason, paymentSplits, notes,
+  isRefund, refundReason, refundedDates, paymentSplits, notes,
   businessName, branchName, branchAddress, branchPhone, branchEmail, logoUrl,
   currency = 'GBP', taxRate, isRushJob, isExchange,
   exchangeReturnedItems = [], exchangeReturnedTotal = 0,
@@ -273,6 +279,7 @@ export function SaleReceiptPdf({
         isRushJob: !!isRushJob,
         isRefund: !!isRefund,
         hasRefundReason: !!(isRefund && refundReason),
+        hasRefundedDates: !!(!isRefund && refundedDates?.length),
         items: items,
         hasDiscount: discount > 0,
         showTax: !!(settings.show_tax_breakdown && tax > 0),
@@ -478,6 +485,17 @@ export function SaleReceiptPdf({
           {isRefund && refundReason && (
             <View style={{ backgroundColor: '#fef2f2', borderRadius: 6, borderWidth: 1, borderColor: '#fecaca', padding: 8, marginBottom: 12 }}>
               <Text style={{ fontSize: 9, color: '#991b1b' }}>Refund reason: {refundReason}</Text>
+            </View>
+          )}
+
+          {/* Refunded-on date(s) — shown on the ORIGINAL sale's own receipt so
+              it's clear this sale was later refunded, and when, since the
+              refund itself can happen days after the sale date printed above. */}
+          {!isRefund && refundedDates && refundedDates.length > 0 && (
+            <View style={{ backgroundColor: '#fef2f2', borderRadius: 6, borderWidth: 1, borderColor: '#fecaca', padding: 8, marginBottom: 12 }}>
+              <Text style={{ fontSize: 9, color: '#991b1b' }}>
+                {refundedDates.length === 1 ? `Refunded on: ${refundedDates[0]}` : `Refunded on: ${refundedDates.join(' · ')}`}
+              </Text>
             </View>
           )}
 

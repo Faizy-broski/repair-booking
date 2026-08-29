@@ -119,6 +119,13 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
     exchangeReturnedItems,
     exchangeReturnedTotal,
     refundReason: s.refund_reason ?? null,
+    // Only meaningful on the ORIGINAL sale's own receipt (this record isn't
+    // itself a refund) -- lets the customer/cashier see this sale was later
+    // refunded, and when, since a refund can be processed days after the
+    // sale date already printed above the receipt.
+    refundedDates: !s.is_refund && Array.isArray(s.refund_records) && s.refund_records.length > 0
+      ? s.refund_records.map((r: any) => new Date(r.created_at).toLocaleString('en-GB'))
+      : undefined,
     paymentSplits: s.payment_splits ?? null,
     notes: s.notes
       ? s.notes.replace(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi,
@@ -417,7 +424,11 @@ export const PosController = {
       subtotal: z.number().min(0),
       tax: z.number().min(0).default(0),
       total: z.number().min(0),
-      payment_method: z.enum(['cash', 'card', 'gift_card', 'store_credit']),
+      payment_method: z.enum(['cash', 'card', 'gift_card', 'store_credit', 'split']),
+      // Only populated when payment_method === 'split' -- lets a refund mirror
+      // a split-tender original sale's cash+card breakdown instead of forcing
+      // the whole refund onto one method (see paymentSplitSchema above).
+      payment_splits: z.array(paymentSplitSchema).optional(),
       refund_reason: z.string().optional().nullable(),
       items: z.array(refundItemSchema).min(1),
     })
