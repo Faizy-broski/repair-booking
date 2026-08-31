@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Banknote, CreditCard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
@@ -24,6 +24,8 @@ interface Props {
   setCashMovementAmount: (v: string) => void
   cashMovementNotes: string
   setCashMovementNotes: (v: string) => void
+  cashMovementPaymentType: 'cash' | 'card'
+  setCashMovementPaymentType: (v: 'cash' | 'card') => void
   cashMovementSaving: boolean
   handleCashMovement: (categoryId: string | null, addToLedger: boolean, buyback?: BuybackPayload | null) => void
   businessId: string | null | undefined
@@ -33,6 +35,7 @@ export function CashMovementModal({
   open, onClose, cashMovementType, setCashMovementType,
   cashMovementAmount, setCashMovementAmount,
   cashMovementNotes, setCashMovementNotes,
+  cashMovementPaymentType, setCashMovementPaymentType,
   cashMovementSaving, handleCashMovement,
   businessId,
 }: Props) {
@@ -143,6 +146,44 @@ export function CashMovementModal({
           value={cashMovementAmount}
           onChange={e => setCashMovementAmount(e.target.value)}
         />
+
+        {/* Cash vs Card — how the money actually moved. Matters for Cash Out
+            (e.g. paying an expense or a buyback via card/bank instead of
+            taking physical cash from the till) and for Cash In (e.g.
+            reimbursing the float via bank transfer) — either way, a Card
+            movement must not affect the physical cash count on the Z-report. */}
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            {isCashOut ? 'Paid via' : 'Received via'}
+          </label>
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+            {([
+              ['cash', 'Cash', Banknote],
+              ['card', 'Card', CreditCard],
+            ] as const).map(([value, label, Icon]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setCashMovementPaymentType(value)}
+                className={`flex flex-1 items-center justify-center gap-1.5 py-2 text-sm font-medium transition-colors ${
+                  cashMovementPaymentType === value
+                    ? 'bg-brand-teal text-white'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+          {cashMovementPaymentType === 'card' && (
+            <p className="mt-1 text-xs text-gray-400">
+              {isCashOut
+                ? "Won't be counted against your physical cash drawer."
+                : "Won't be added to your physical cash drawer."}
+            </p>
+          )}
+        </div>
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">

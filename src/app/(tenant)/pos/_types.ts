@@ -46,6 +46,11 @@ export interface ZReport {
   transaction_count?: number
   cash_in?: number
   cash_out?: number
+  // Card-tendered portion of cash_in/cash_out (migration 202) — a cash-out
+  // paid via card/bank never touched the physical till, so it's excluded
+  // from expected_cash but still shown here for accountability.
+  cash_in_card?: number
+  cash_out_card?: number
   buyback_out?: number
   credit_repayments_cash?: number
   credit_repayments_total?: number

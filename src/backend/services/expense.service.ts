@@ -37,7 +37,7 @@ export const ExpenseService = {
     return data
   },
 
-  async update(id: string, businessId: string, payload: { title?: string; amount?: number; expense_date?: string; category_id?: string | null; notes?: string | null }) {
+  async update(id: string, businessId: string, payload: { title?: string; amount?: number; expense_date?: string; category_id?: string | null; payment_method?: 'cash' | 'card'; notes?: string | null }) {
     // Verify the expense belongs to this business before updating
     const { data: existing, error: fetchErr } = await adminSupabase
       .from('expenses')

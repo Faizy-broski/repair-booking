@@ -1287,6 +1287,7 @@ export type Database = {
           expense_date: string
           id: string
           notes: string | null
+          payment_method: string
           receipt_url: string | null
           title: string
         }
@@ -1299,6 +1300,7 @@ export type Database = {
           expense_date?: string
           id?: string
           notes?: string | null
+          payment_method?: string
           receipt_url?: string | null
           title: string
         }
@@ -1311,6 +1313,7 @@ export type Database = {
           expense_date?: string
           id?: string
           notes?: string | null
+          payment_method?: string
           receipt_url?: string | null
           title?: string
         }
@@ -2975,6 +2978,8 @@ export type Database = {
           branch_id: string
           business_id: string
           card_sales: number | null
+          cash_in_card_total: number
+          cash_out_card_total: number
           cash_sales: number | null
           cashier_id: string
           closed_at: string | null
@@ -2994,6 +2999,8 @@ export type Database = {
           branch_id: string
           business_id: string
           card_sales?: number | null
+          cash_in_card_total?: number
+          cash_out_card_total?: number
           cash_sales?: number | null
           cashier_id: string
           closed_at?: string | null
@@ -3013,6 +3020,8 @@ export type Database = {
           branch_id?: string
           business_id?: string
           card_sales?: number | null
+          cash_in_card_total?: number
+          cash_out_card_total?: number
           cash_sales?: number | null
           cashier_id?: string
           closed_at?: string | null

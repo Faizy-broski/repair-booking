@@ -24,6 +24,7 @@ interface ExpenseRow {
   expense_date: string
   notes?: string | null
   category_id?: string | null
+  payment_method?: 'cash' | 'card'
   expense_categories?: { name: string } | null
 }
 interface SalaryRow {
@@ -37,6 +38,7 @@ const expenseSchema = z.object({
   amount: z.coerce.number().positive('Must be positive'),
   expense_date: z.string(),
   category_id: z.string().uuid().optional().or(z.literal('')),
+  payment_method: z.enum(['cash', 'card']).default('cash'),
   notes: z.string().optional(),
 })
 type ExpenseFormData = z.infer<typeof expenseSchema>
@@ -68,7 +70,7 @@ export default function ExpensesPage() {
 
   const addForm = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
-    defaultValues: { expense_date: new Date().toISOString().split('T')[0] },
+    defaultValues: { expense_date: new Date().toISOString().split('T')[0], payment_method: 'cash' },
   })
   const editForm = useForm<ExpenseFormData>({ resolver: zodResolver(expenseSchema) })
 
@@ -123,7 +125,7 @@ export default function ExpensesPage() {
     })
     if (!res.ok) { toast.error('Failed to add expense'); return }
     toast.success('Expense added')
-    addForm.reset({ expense_date: new Date().toISOString().split('T')[0] })
+    addForm.reset({ expense_date: new Date().toISOString().split('T')[0], payment_method: 'cash' })
     setSheetOpen(false)
     setCreatingCategory(false)
     setNewCategoryName('')
@@ -157,6 +159,7 @@ export default function ExpensesPage() {
       amount: row.amount,
       expense_date: row.expense_date,
       category_id: row.category_id ?? '',
+      payment_method: row.payment_method ?? 'cash',
       notes: row.notes ?? '',
     })
   }
@@ -223,6 +226,18 @@ export default function ExpensesPage() {
         return cat
           ? <span className="rounded-full bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700">{cat}</span>
           : <span className="text-gray-400">—</span>
+      },
+    },
+    {
+      accessorKey: 'payment_method',
+      header: 'Payment',
+      cell: ({ getValue }) => {
+        const method = (getValue() as ExpenseRow['payment_method']) ?? 'cash'
+        return (
+          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${method === 'card' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
+            {method === 'card' ? 'Card' : 'Cash'}
+          </span>
+        )
       },
     },
     {
@@ -294,6 +309,22 @@ export default function ExpensesPage() {
 
   const totalExpAmount    = expenses.reduce((s, e) => s + e.amount, 0)
   const totalSalaryAmount = salaries.reduce((s, e) => s + e.amount, 0)
+
+  // ── Payment method select helper ─────────────────────────────────────────────
+  function PaymentMethodSelect({ form }: { form: ReturnType<typeof useForm<ExpenseFormData>> }) {
+    return (
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">Payment Method</label>
+        <select
+          {...form.register('payment_method')}
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
+        >
+          <option value="cash">Cash</option>
+          <option value="card">Card</option>
+        </select>
+      </div>
+    )
+  }
 
   // ── Category select helper ───────────────────────────────────────────────────
   function CategorySelect({ formName, form, onCreateClick }: { formName: string; form: ReturnType<typeof useForm<ExpenseFormData>>; onCreateClick: () => void }) {
@@ -393,6 +424,7 @@ export default function ExpensesPage() {
           </div>
           <Input label="Amount" type="number" step="0.01" required error={addForm.formState.errors.amount?.message} {...addForm.register('amount')} />
           <Input label="Date" type="date" required {...addForm.register('expense_date')} />
+          <PaymentMethodSelect form={addForm} />
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Notes <span className="text-xs font-normal text-gray-400">(optional)</span></label>
             <textarea rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none" {...addForm.register('notes')} />
@@ -426,6 +458,7 @@ export default function ExpensesPage() {
             </div>
             <Input label="Amount" type="number" step="0.01" required error={editForm.formState.errors.amount?.message} {...editForm.register('amount')} />
             <Input label="Date" type="date" required {...editForm.register('expense_date')} />
+            <PaymentMethodSelect form={editForm} />
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">Notes <span className="text-xs font-normal text-gray-400">(optional)</span></label>
               <textarea rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none" {...editForm.register('notes')} />

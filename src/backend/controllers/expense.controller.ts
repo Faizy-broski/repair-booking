@@ -12,6 +12,7 @@ const createExpenseSchema = z.object({
   title: z.string().min(1),
   amount: z.number().positive(),
   expense_date: z.string(),
+  payment_method: z.enum(['cash', 'card']).default('cash'),
   receipt_url: z.string().url().optional().nullable(),
   notes: z.string().optional().nullable(),
 })
@@ -60,6 +61,7 @@ export const ExpenseController = {
       amount: z.number().positive().optional(),
       expense_date: z.string().optional(),
       category_id: z.string().uuid().optional().nullable(),
+      payment_method: z.enum(['cash', 'card']).optional(),
       notes: z.string().optional().nullable(),
     })
     const { data, error } = await validateBody(request, updateSchema)

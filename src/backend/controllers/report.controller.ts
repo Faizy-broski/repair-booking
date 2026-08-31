@@ -30,7 +30,7 @@ const cashMovementSchema = z.object({
   branch_id: z.string().uuid().optional(),
   type: z.enum(['cash_in', 'cash_out']),
   amount: z.number().positive(),
-  payment_type: z.string().optional(),
+  payment_type: z.enum(['cash', 'card']).optional(),
   notes: z.string().optional(),
   purpose: z.enum(['plain', 'expense', 'buyback']).optional(),
   expense_category_id: z.string().uuid().nullable().optional(),

@@ -366,6 +366,7 @@ function ZReportPageInner() {
                         </span>
                         {m.purpose && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium capitalize text-gray-500">{m.purpose}</span>}
                         {m.purpose === 'plain' && <span className="text-[10px] italic text-amber-600">(not in reports)</span>}
+                        {m.payment_type === 'card' && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Card</span>}
                       </div>
                       {m.notes && <span className="text-xs text-gray-400 truncate">{m.notes}</span>}
                       <p className="text-[10px] text-gray-400">
@@ -381,6 +382,7 @@ function ZReportPageInner() {
                   <span>Net Cash Movement</span>
                   <span>{formatCurrency(zReportMovements.reduce((s: number, m: any) => s + (m.type === 'cash_in' ? m.amount : -m.amount), 0))}</span>
                 </div>
+                <p className="text-[10px] text-gray-400 italic">Card-tagged movements are excluded from Expected Cash above, since they never touched the physical till.</p>
               </div>
             </div>
           )}
@@ -578,6 +580,7 @@ function ZReportPageInner() {
                           </span>
                           {m.purpose && <span className="rounded-full bg-surface-container px-2 py-0.5 text-[10px] font-medium capitalize text-on-surface-variant">{m.purpose}</span>}
                           {m.purpose === 'plain' && <span className="text-[10px] italic text-amber-600">(not in reports)</span>}
+                          {m.payment_type === 'card' && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Card</span>}
                         </div>
                         {m.notes && <p className="text-xs text-on-surface-variant truncate">{m.notes}</p>}
                         <p className="text-[10px] text-on-surface-variant">
@@ -595,6 +598,7 @@ function ZReportPageInner() {
                       {formatCurrency(cashMovements.reduce((sum: number, m: any) => sum + (m.type === 'cash_in' ? m.amount : -m.amount), 0))}
                     </span>
                   </div>
+                  <p className="text-[10px] text-on-surface-variant italic">Card-tagged movements are excluded from Expected Cash above, since they never touched the physical till.</p>
                 </div>
               )}
             </div>

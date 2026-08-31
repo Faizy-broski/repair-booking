@@ -177,6 +177,10 @@ export default function PosPage() {
   const [cashMovementAmount, setCashMovementAmount] = useState('')
   const [cashMovementNotes, setCashMovementNotes] = useState('')
   const [cashMovementSaving, setCashMovementSaving] = useState(false)
+  // Cash vs Card — how the money actually moved (e.g. a cash-out paid via
+  // card/bank instead of physically taken from the till). Defaults to cash
+  // so existing behavior is unchanged unless the cashier explicitly picks Card.
+  const [cashMovementPaymentType, setCashMovementPaymentType] = useState<'cash' | 'card'>('cash')
 
 
 
@@ -405,6 +409,7 @@ export default function PosPage() {
         branch_id: activeBranch?.id,
         type: cashMovementType,
         amount,
+        payment_type: cashMovementPaymentType,
         notes: cashMovementNotes || undefined,
         purpose,
         expense_category_id: purpose === 'expense' ? (categoryId || null) : undefined,
@@ -423,6 +428,7 @@ export default function PosPage() {
       setCashMovementOpen(false)
       setCashMovementAmount('')
       setCashMovementNotes('')
+      setCashMovementPaymentType('cash')
     } else {
       const errJson = await res.json().catch(() => ({}))
       toast.error(errJson?.error?.message ?? 'Failed to record cash movement')
@@ -721,6 +727,8 @@ export default function PosPage() {
         setCashMovementAmount={setCashMovementAmount}
         cashMovementNotes={cashMovementNotes}
         setCashMovementNotes={setCashMovementNotes}
+        cashMovementPaymentType={cashMovementPaymentType}
+        setCashMovementPaymentType={setCashMovementPaymentType}
         cashMovementSaving={cashMovementSaving}
         handleCashMovement={handleCashMovement}
         businessId={activeBranch?.business_id}

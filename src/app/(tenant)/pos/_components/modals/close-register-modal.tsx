@@ -27,6 +27,9 @@ interface SessionStats {
   // of the plan / migration 198.
   other_sales_breakdown?: Record<string, number>
   cash_in: number; cash_out: number; buyback_out: number
+  // Card-tendered portion of cash_in/cash_out (migration 202) -- see the
+  // ZReport type's matching comment.
+  cash_in_card?: number; cash_out_card?: number
   credit_repayments_cash: number; credit_repayments_total: number
   // Card-side counterpart of credit_repayments_cash/repair_card_refunds --
   // needed alongside card_refunds to compute the expected NET card total
@@ -165,12 +168,18 @@ export function CloseRegisterModal({
                 <div className="rounded-xl border border-green-200 bg-green-50 p-3">
                   <p className="text-xs text-green-700">Cash In</p>
                   <p className="mt-0.5 font-semibold text-green-700">+{formatCurrency(zReport.cash_in ?? 0)}</p>
+                  <p className="mt-0.5 text-[11px] text-green-600">
+                    Cash: {formatCurrency((zReport.cash_in ?? 0) - (zReport.cash_in_card ?? 0))} · Card: {formatCurrency(zReport.cash_in_card ?? 0)}
+                  </p>
                 </div>
               )}
               {(zReport.cash_out ?? 0) > 0 && (
                 <div className="rounded-xl border border-orange-200 bg-orange-50 p-3">
                   <p className="text-xs text-orange-700">Cash Out</p>
                   <p className="mt-0.5 font-semibold text-orange-700">-{formatCurrency(zReport.cash_out ?? 0)}</p>
+                  <p className="mt-0.5 text-[11px] text-orange-600">
+                    Cash: {formatCurrency((zReport.cash_out ?? 0) - (zReport.cash_out_card ?? 0))} · Card: {formatCurrency(zReport.cash_out_card ?? 0)}
+                  </p>
                 </div>
               )}
               {(zReport.buyback_out ?? 0) > 0 && (
@@ -196,7 +205,7 @@ export function CloseRegisterModal({
               <p className="mt-2 text-xs text-gray-400 italic">Expense reflects business expenses logged for this branch since the shift opened — shown for information only and excluded from the cash reconciliation below (cash-drawer expenses are already captured in Cash Out).</p>
             )}
             {((zReport.cash_in ?? 0) > 0 || (zReport.cash_out ?? 0) > 0) && (
-              <p className="mt-2 text-xs text-gray-400 italic">Cash In/Out are manual drawer adjustments for the whole shift — not tied to product or repair sales specifically. Buyback is a subset of Cash Out, shown separately for clarity.</p>
+              <p className="mt-2 text-xs text-gray-400 italic">Cash In/Out are manual drawer adjustments for the whole shift — not tied to product or repair sales specifically. Buyback is a subset of Cash Out, shown separately for clarity. The card-tendered portion (shown above) is excluded from Expected Cash below, since it never touched the physical till.</p>
             )}
             {(zReport.credit_repayments_cash ?? 0) > 0 && (
               <p className="mt-1 text-xs text-gray-400 italic">Credit Repaid (Cash) is cash collected today against a balance sold in a prior shift — it affects Expected Cash but is not new revenue this shift.</p>
@@ -436,12 +445,18 @@ export function CloseRegisterModal({
                           <div className="rounded-xl border border-green-200 bg-green-50 p-3">
                             <p className="text-xs text-green-700">Cash In</p>
                             <p className="mt-0.5 font-semibold text-green-700">+{formatCurrency(sessionStats.cash_in ?? 0)}</p>
+                            <p className="mt-0.5 text-[11px] text-green-600">
+                              Cash: {formatCurrency((sessionStats.cash_in ?? 0) - (sessionStats.cash_in_card ?? 0))} · Card: {formatCurrency(sessionStats.cash_in_card ?? 0)}
+                            </p>
                           </div>
                         )}
                         {(sessionStats.cash_out ?? 0) > 0 && (
                           <div className="rounded-xl border border-orange-200 bg-orange-50 p-3">
                             <p className="text-xs text-orange-700">Cash Out</p>
                             <p className="mt-0.5 font-semibold text-orange-700">-{formatCurrency(sessionStats.cash_out ?? 0)}</p>
+                            <p className="mt-0.5 text-[11px] text-orange-600">
+                              Cash: {formatCurrency((sessionStats.cash_out ?? 0) - (sessionStats.cash_out_card ?? 0))} · Card: {formatCurrency(sessionStats.cash_out_card ?? 0)}
+                            </p>
                           </div>
                         )}
                         {(sessionStats.buyback_out ?? 0) > 0 && (
@@ -467,7 +482,7 @@ export function CloseRegisterModal({
                         <p className="mt-2 text-xs text-gray-400 italic">Expense reflects business expenses logged for this branch since the shift opened — shown for information only and excluded from the cash reconciliation below (cash-drawer expenses are already captured in Cash Out).</p>
                       )}
                       {((sessionStats.cash_in ?? 0) > 0 || (sessionStats.cash_out ?? 0) > 0) && (
-                        <p className="mt-2 text-xs text-gray-400 italic">Cash In/Out are manual drawer adjustments for the whole shift — not tied to product or repair sales specifically. Buyback is a subset of Cash Out, shown separately for clarity.</p>
+                        <p className="mt-2 text-xs text-gray-400 italic">Cash In/Out are manual drawer adjustments for the whole shift — not tied to product or repair sales specifically. Buyback is a subset of Cash Out, shown separately for clarity. The card-tendered portion (shown above) is excluded from Expected Cash below, since it never touched the physical till.</p>
                       )}
                       {(sessionStats.credit_repayments_cash ?? 0) > 0 && (
                         <p className="mt-1 text-xs text-gray-400 italic">Credit Repaid (Cash) is cash collected today against a balance sold in a prior shift — it affects Expected Cash but is not new revenue this shift.</p>
