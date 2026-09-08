@@ -83,6 +83,7 @@ export default function NewInventoryPage() {
   const [sku, setSku] = useState('')
   const [barcode, setBarcode] = useState('')
   const [imageUrl, setImageUrl] = useState('')
+  const [imei, setImei] = useState('')
   const [partType, setPartType] = useState('')
   const [costPrice, setCostPrice] = useState('')
   const [sellingPrice, setSellingPrice] = useState('')
@@ -317,7 +318,7 @@ export default function NewInventoryPage() {
   }
 
   function resetForm() {
-    setName(''); setCategoryId(''); setBrandId(''); setModelId(''); setSku(''); setBarcode('')
+    setName(''); setCategoryId(''); setBrandId(''); setModelId(''); setSku(''); setBarcode(''); setImei('')
     setImageUrl(''); setPartType(''); setCostPrice(''); setSellingPrice('')
     setInitialStock('0'); setLowStockAlert('5'); setSupplierId(''); setPhysicalLocation('')
     setCommissionEnabled(false); setCommissionType('percentage'); setCommissionRate(''); setLoyaltyEnabled(true)
@@ -343,6 +344,7 @@ export default function NewInventoryPage() {
         name: name.trim(), item_type: itemType,
         category_id: categoryId || null, brand_id: brandId || null, model_id: modelId || null,
         sku: sku || null, barcode: barcode || null, image_url: imageUrl || null,
+        imei: imei || null,
         is_service: false, part_type: itemType === 'part' ? (partType || null) : null,
         has_variants: hasVariants,
         cost_price: parseFloat(costPrice) || 0,
@@ -547,6 +549,16 @@ export default function NewInventoryPage() {
                   {barcodeConflict && <p className="mt-1 text-xs text-red-500">This Barcode is already in use</p>}
                 </div>
               </div>
+
+              {hasRepairs && itemType === 'product' && (
+                <Input
+                  label="IMEI / Serial Number"
+                  placeholder="Optional — e.g. 352999001234567"
+                  value={imei}
+                  onChange={e => setImei(e.target.value)}
+                  hint="15-digit IMEI for phones, or any serial number"
+                />
+              )}
               </SectionCard>
 
             </div>

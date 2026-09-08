@@ -13,7 +13,7 @@ import { COUNTRIES } from '@/lib/countries'
 import {
   CheckCircle, Building2, User, CreditCard, Check, Zap, Mail,
   ChevronRight, ArrowLeft, Sparkles, Store, Wrench, ShoppingBag,
-  Scissors, Coffee, Monitor, Package, ShieldCheck, RotateCcw, Gift, Globe, MapPin, Link2,
+  Scissors, Coffee, Monitor, Package, ShieldCheck, RotateCcw, Gift, Globe, MapPin, Link2, Truck,
 } from 'lucide-react'
 
 import validations from '@/components/layout/number-validations.json'
@@ -109,6 +109,7 @@ const MODULE_LABELS: Record<string, string> = {
 const ICON_MAP: Record<string, React.ElementType> = {
   store: Store, wrench: Wrench, 'shopping-bag': ShoppingBag,
   scissors: Scissors, coffee: Coffee, monitor: Monitor, package: Package,
+  truck: Truck,
 }
 
 const ICON_COLORS: Record<string, { bg: string; text: string }> = {
@@ -119,6 +120,7 @@ const ICON_COLORS: Record<string, { bg: string; text: string }> = {
   coffee: { bg: 'bg-amber-100', text: 'text-amber-600' },
   monitor: { bg: 'bg-cyan-100', text: 'text-cyan-600' },
   package: { bg: 'bg-green-100', text: 'text-green-600' },
+  truck: { bg: 'bg-orange-100', text: 'text-orange-600' },
 }
 
 const FEATURE_LABELS: Record<string, string> = {
@@ -151,8 +153,8 @@ const STEPS = [
 export default function RegisterPage() {
   const router = useRouter()
 
-  // 1=Business 2=VerifyEmail 3=Account 4=Plan
-  const [step, setStep] = useState(1)
+  // 0=BusinessType 1=Business 2=VerifyEmail 3=Account 4=Plan
+  const [step, setStep] = useState(0)
 
   // Template picker state
   const [templates, setTemplates] = useState<VerticalTemplate[]>([])
@@ -194,7 +196,6 @@ export default function RegisterPage() {
   const mapsEmbedSrc = useMemo(() => parseGoogleMapsLink(mapsUrlValue ?? ''), [mapsUrlValue]).embedSrc
 
   // ── Fetch templates (public, cached at edge) ──────────────────────────────
-  /*
   useEffect(() => {
     fetch('/api/vertical-templates/public')
       .then(r => r.json())
@@ -202,7 +203,6 @@ export default function RegisterPage() {
       .catch(() => {})
       .finally(() => setTemplatesLoading(false))
   }, [])
-  */
 
   // ── Fetch plans when reaching step 3 ──────────────────────────────────────
   useEffect(() => {
@@ -503,7 +503,7 @@ export default function RegisterPage() {
       </div>
 
       {/* ── Step 0: Business Type ─────────────────────────────────────────── */}
-      {false && step === 0 && (
+      {step === 0 && (
         <div className="max-w-3xl mx-auto space-y-6">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-on-surface">What type of business are you?</h2>
@@ -579,7 +579,7 @@ export default function RegisterPage() {
             </div>
           )}
 
-          <div className="flex items-center justify-between gap-3 max-w-sm mx-auto">
+          <div className="flex flex-col-reverse sm:flex-row items-center justify-center gap-4 sm:gap-8 pt-2">
             <button
               type="button"
               onClick={() => { setSelectedTemplate(null); setStep(1) }}
@@ -590,7 +590,7 @@ export default function RegisterPage() {
             <Button
               onClick={() => setStep(1)}
               disabled={!selectedTemplate && templates.length > 0 && !templatesLoading}
-              className="min-w-[140px]"
+              className="min-w-[200px] whitespace-nowrap gap-2"
             >
               {selectedTemplate ? `Continue with ${selectedTemplate.name}` : 'Continue'}
               <ChevronRight className="h-4 w-4" />
@@ -607,7 +607,7 @@ export default function RegisterPage() {
       {/* ── Step 1: Business Info ─────────────────────────────────────────── */}
       {step === 1 && (
         <div className="mx-auto w-full max-w-md sm:max-w-2xl">
-          {/* selectedTemplate && (
+          {selectedTemplate && (
             <div className="mb-4 flex items-center gap-2 rounded-xl border border-primary/20 bg-primary-container/10 px-4 py-2.5">
               {(() => { const IC = ICON_MAP[selectedTemplate.icon] ?? Store; return <IC className="h-4 w-4 text-primary shrink-0" /> })()}
               <span className="text-sm text-on-surface">
@@ -622,13 +622,15 @@ export default function RegisterPage() {
                 Change
               </button>
             </div>
-          ) */}
+          )}
           <Card>
             <CardContent className="pt-6">
               <form onSubmit={form1.handleSubmit(onStep1Submit)} className="space-y-4">
                 <div>
                   <h2 className="text-lg font-bold text-on-surface">Tell us about your business</h2>
-                  <p className="text-sm text-on-surface-variant mt-0.5">Set up your repair shop on RepairBooking</p>
+                  <p className="text-sm text-on-surface-variant mt-0.5">
+                    Set up your {selectedTemplate ? selectedTemplate.name.toLowerCase() : 'business'} on RepairBooking
+                  </p>
                 </div>
 
                 {/* Row 1: Business name + Subdomain */}

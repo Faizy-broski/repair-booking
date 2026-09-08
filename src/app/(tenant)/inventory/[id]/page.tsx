@@ -27,7 +27,7 @@ interface BranchAvailability {
 }
 
 interface Product {
-  id: string; name: string; sku: string | null; barcode: string | null
+  id: string; name: string; sku: string | null; barcode: string | null; imei: string | null
   selling_price: number; cost_price: number | null; is_service: boolean
   valuation_method?: string | null
   image_url: string | null; item_type?: string; part_type?: string | null
@@ -161,6 +161,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   const [modelId, setModelId] = useState('')
   const [sku, setSku] = useState('')
   const [barcode, setBarcode] = useState('')
+  const [imei, setImei] = useState('')
   const [imageUrl, setImageUrl] = useState('')
   const [partType, setPartType] = useState('')
   const [costPrice, setCostPrice] = useState('')
@@ -237,6 +238,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
     setModelId(p.model_id ?? p.service_devices?.id ?? '')
     setSku(p.sku ?? '')
     setBarcode(p.barcode ?? '')
+    setImei(p.imei ?? '')
     setImageUrl(p.image_url ?? '')
     setPartType(p.part_type ?? '')
     setCostPrice(p.cost_price != null ? String(p.cost_price) : '')
@@ -496,6 +498,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       name: name.trim(), item_type: itemType,
       category_id: categoryId || null, brand_id: brandId || null, model_id: modelId || null,
       sku: sku || null, barcode: barcode || null, image_url: imageUrl || null,
+      imei: imei || null,
       is_service: false, part_type: itemType === 'part' ? (partType || null) : null,
       supplier_id: itemType === 'part' ? (supplierId || null) : null,
       is_trade_in: isTradeIn,
@@ -767,6 +770,15 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   </Button>
                 </div>
               </div>
+              {hasRepairs && itemType === 'product' && (
+                <Input
+                  label="IMEI / Serial Number"
+                  placeholder="Optional — e.g. 352999001234567"
+                  value={imei}
+                  onChange={e => setImei(e.target.value)}
+                  hint="15-digit IMEI for phones, or any serial number"
+                />
+              )}
               </SectionCard>
 
             </div>
