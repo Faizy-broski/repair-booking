@@ -47,14 +47,14 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (c: string)
         ))}
       </div>
       <div className="flex items-center gap-2">
-        <div className="h-8 w-8 rounded-lg border border-gray-300 shrink-0" style={{ backgroundColor: value }} />
+        <div className="h-8 w-8 rounded-lg border border-outline shrink-0" style={{ backgroundColor: value }} />
         <input
           type="color"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="h-8 w-16 cursor-pointer rounded border border-gray-300 p-0.5"
+          className="h-8 w-16 cursor-pointer rounded border border-outline p-0.5"
         />
-        <span className="text-xs text-gray-500 font-mono">{value}</span>
+        <span className="text-xs text-on-surface-variant font-mono">{value}</span>
       </div>
     </div>
   )
@@ -241,17 +241,17 @@ export default function RepairSettingsPage() {
       <div className="flex items-center gap-2 pb-1">
         <button
           onClick={() => router.push('/repairs')}
-          className="flex items-center gap-1.5 text-lg font-bold text-gray-900 hover:text-blue-600 transition-colors"
+          className="flex items-center gap-1.5 text-lg font-bold text-on-surface hover:text-blue-600 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           Repairs
         </button>
-        <span className="text-gray-400">/</span>
-        <span className="text-lg font-bold text-gray-500">Settings</span>
+        <span className="text-outline">/</span>
+        <span className="text-lg font-bold text-on-surface-variant">Settings</span>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-200 mt-2">
+      <div className="flex border-b border-outline-variant mt-2">
         {[
           { id: 'status' as Tab, label: 'Status' },
           { id: 'faults' as Tab, label: 'Faults' },
@@ -262,7 +262,7 @@ export default function RepairSettingsPage() {
             className={`flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               tab === t.id
                 ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                : 'border-transparent text-on-surface-variant hover:text-on-surface-variant'
             }`}
           >
             {tab === t.id && <span className="h-2 w-2 rounded-full bg-blue-600 inline-block" />}
@@ -275,9 +275,9 @@ export default function RepairSettingsPage() {
       {tab === 'status' && (
         <div className="mt-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-on-surface flex items-center gap-2">
               Manage Statuses
-              {statusLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
+              {statusLoading && <Loader2 className="h-4 w-4 animate-spin text-outline" />}
             </h2>
             <div className="flex gap-2">
               {statuses.length === 0 && !statusLoading && (
@@ -303,15 +303,15 @@ export default function RepairSettingsPage() {
                 autoFocus
               />
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">Color</label>
+                <label className="mb-1.5 block text-sm font-medium text-on-surface-variant">Color</label>
                 <ColorPicker value={newStatusColor} onChange={setNewStatusColor} />
               </div>
-              <label className="flex items-center gap-2 text-sm text-gray-700">
+              <label className="flex items-center gap-2 text-sm text-on-surface-variant">
                 <input
                   type="checkbox"
                   checked={newStatusIsTerminal}
                   onChange={(e) => setNewStatusIsTerminal(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300"
+                  className="h-4 w-4 rounded border-outline"
                 />
                 Job Finished? (counts as completed revenue in Profit &amp; Loss)
               </label>
@@ -327,38 +327,38 @@ export default function RepairSettingsPage() {
           )}
 
           {/* Table */}
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="overflow-x-auto rounded-xl border border-outline-variant bg-surface shadow-sm">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 w-16">Sr#</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Status Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Color</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 w-32">Job Finished?</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 w-40">Action</th>
+                <tr className="border-b border-outline-variant bg-surface-container-low">
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant w-16">Sr#</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Status Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Color</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant w-32">Job Finished?</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant w-40">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {statusLoading ? (
                   Array.from({ length: 4 }).map((_, i) => (
-                    <tr key={i} className="border-t border-gray-100">
+                    <tr key={i} className="border-t border-outline-variant">
                       {[1, 2, 3, 4, 5].map((j) => (
                         <td key={j} className="px-4 py-3">
-                          <div className="h-4 w-full animate-pulse rounded bg-gray-100" />
+                          <div className="h-4 w-full animate-pulse rounded bg-surface-container" />
                         </td>
                       ))}
                     </tr>
                   ))
                 ) : statuses.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-10 text-center text-gray-400">
+                    <td colSpan={5} className="px-4 py-10 text-center text-outline">
                       No statuses yet. Click "Add Status" to create one.
                     </td>
                   </tr>
                 ) : (
                   statuses.map((s, i) => (
-                    <tr key={s.id} className={`border-t border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}`}>
-                      <td className="px-4 py-3 text-gray-500">{i + 1}</td>
+                    <tr key={s.id} className={`border-t border-outline-variant ${i % 2 === 0 ? 'bg-surface' : 'bg-surface-container-low/60'}`}>
+                      <td className="px-4 py-3 text-on-surface-variant">{i + 1}</td>
                       <td className="px-4 py-3">
                         {editingStatus?.id === s.id ? (
                           <input
@@ -368,7 +368,7 @@ export default function RepairSettingsPage() {
                             className="h-8 w-full rounded-lg border border-blue-300 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                           />
                         ) : (
-                          <span className="font-medium text-gray-800">{s.name}</span>
+                          <span className="font-medium text-on-surface">{s.name}</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -389,14 +389,14 @@ export default function RepairSettingsPage() {
                             type="checkbox"
                             checked={editStatusIsTerminal}
                             onChange={(e) => setEditStatusIsTerminal(e.target.checked)}
-                            className="h-4 w-4 rounded border-gray-300"
+                            className="h-4 w-4 rounded border-outline"
                           />
                         ) : s.is_terminal ? (
                           <span className="inline-flex items-center rounded-full bg-green-50 border border-green-200 px-2.5 py-1 text-xs font-medium text-green-600">
                             Yes
                           </span>
                         ) : (
-                          <span className="inline-flex items-center rounded-full bg-gray-50 border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-500">
+                          <span className="inline-flex items-center rounded-full bg-surface-container-low border border-outline-variant px-2.5 py-1 text-xs font-medium text-on-surface-variant">
                             No
                           </span>
                         )}
@@ -413,7 +413,7 @@ export default function RepairSettingsPage() {
                             </button>
                             <button
                               onClick={() => setEditingStatus(null)}
-                              className="flex items-center gap-1 rounded-md bg-gray-50 border border-gray-200 px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 transition-colors"
+                              className="flex items-center gap-1 rounded-md bg-surface-container-low border border-outline-variant px-2 py-1 text-xs font-medium text-on-surface-variant hover:bg-surface-container transition-colors"
                             >
                               <X className="h-3 w-3" /> Cancel
                             </button>
@@ -443,7 +443,7 @@ export default function RepairSettingsPage() {
           </div>
 
           {statuses.length > 0 && (
-            <p className="text-xs text-gray-400">Showing 1 to {statuses.length} of {statuses.length} entries</p>
+            <p className="text-xs text-outline">Showing 1 to {statuses.length} of {statuses.length} entries</p>
           )}
         </div>
       )}
@@ -451,9 +451,9 @@ export default function RepairSettingsPage() {
       {tab === 'faults' && (
         <div className="mt-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-on-surface flex items-center gap-2">
               Manage Faults
-              {faultLoading && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
+              {faultLoading && <Loader2 className="h-4 w-4 animate-spin text-outline" />}
             </h2>
             <div className="flex gap-2">
               {faults.length === 0 && !faultLoading && (
@@ -490,36 +490,36 @@ export default function RepairSettingsPage() {
           )}
 
           {/* Table */}
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="overflow-x-auto rounded-xl border border-outline-variant bg-surface shadow-sm">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 w-16">Sr#</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Fault Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 w-40">Action</th>
+                <tr className="border-b border-outline-variant bg-surface-container-low">
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant w-16">Sr#</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Fault Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant w-40">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {faultLoading ? (
                   Array.from({ length: 3 }).map((_, i) => (
-                    <tr key={i} className="border-t border-gray-100">
+                    <tr key={i} className="border-t border-outline-variant">
                       {[1, 2, 3].map((j) => (
                         <td key={j} className="px-4 py-3">
-                          <div className="h-4 w-full animate-pulse rounded bg-gray-100" />
+                          <div className="h-4 w-full animate-pulse rounded bg-surface-container" />
                         </td>
                       ))}
                     </tr>
                   ))
                 ) : faults.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="px-4 py-10 text-center text-gray-400">
+                    <td colSpan={3} className="px-4 py-10 text-center text-outline">
                       No faults yet. Click "Add Fault" to create one.
                     </td>
                   </tr>
                 ) : (
                   faults.map((f, i) => (
-                    <tr key={f.id} className={`border-t border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/60'}`}>
-                      <td className="px-4 py-3 text-gray-500">{i + 1}</td>
+                    <tr key={f.id} className={`border-t border-outline-variant ${i % 2 === 0 ? 'bg-surface' : 'bg-surface-container-low/60'}`}>
+                      <td className="px-4 py-3 text-on-surface-variant">{i + 1}</td>
                       <td className="px-4 py-3">
                         {editingFault?.id === f.id ? (
                           <input
@@ -529,7 +529,7 @@ export default function RepairSettingsPage() {
                             className="h-8 w-full max-w-sm rounded-lg border border-blue-300 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                           />
                         ) : (
-                          <span className="font-medium text-gray-800">{f.name}</span>
+                          <span className="font-medium text-on-surface">{f.name}</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -544,7 +544,7 @@ export default function RepairSettingsPage() {
                             </button>
                             <button
                               onClick={() => setEditingFault(null)}
-                              className="flex items-center gap-1 rounded-md bg-gray-50 border border-gray-200 px-2 py-1 text-xs font-medium text-gray-500 hover:bg-gray-100 transition-colors"
+                              className="flex items-center gap-1 rounded-md bg-surface-container-low border border-outline-variant px-2 py-1 text-xs font-medium text-on-surface-variant hover:bg-surface-container transition-colors"
                             >
                               <X className="h-3 w-3" /> Cancel
                             </button>
@@ -574,7 +574,7 @@ export default function RepairSettingsPage() {
           </div>
 
           {faults.length > 0 && (
-            <p className="text-xs text-gray-400">Showing 1 to {faults.length} of {faults.length} entries</p>
+            <p className="text-xs text-outline">Showing 1 to {faults.length} of {faults.length} entries</p>
           )}
         </div>
       )}

@@ -263,8 +263,8 @@ export default function PhonePage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Branch Phone</h1>
-        <p className="text-sm text-gray-500">Internal WebRTC calling between branches</p>
+        <h1 className="text-xl font-bold text-on-surface">Branch Phone</h1>
+        <p className="text-sm text-on-surface-variant">Internal WebRTC calling between branches</p>
       </div>
 
       <audio ref={remoteAudioRef} className="hidden" />
@@ -332,22 +332,22 @@ export default function PhonePage() {
 
       {/* Branch directory */}
       {callStatus === 'idle' && (
-        <div className="rounded-xl border border-gray-200 bg-white">
-          <div className="border-b border-gray-200 px-4 py-3">
-            <h3 className="font-medium text-gray-900">Branch Directory</h3>
+        <div className="rounded-xl border border-outline-variant bg-surface">
+          <div className="border-b border-outline-variant px-4 py-3">
+            <h3 className="font-medium text-on-surface">Branch Directory</h3>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-outline-variant">
             {onlineBranches.length === 0 ? (
-              <div className="flex h-24 items-center justify-center text-sm text-gray-400">
+              <div className="flex h-24 items-center justify-center text-sm text-outline">
                 No other branches available
               </div>
             ) : (
               onlineBranches.map((branch) => (
                 <div key={branch.id} className="flex items-center justify-between px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <div className={`h-2.5 w-2.5 rounded-full ${branch.isOnline ? 'bg-green-500' : 'bg-gray-300'}`} />
+                    <div className={`h-2.5 w-2.5 rounded-full ${branch.isOnline ? 'bg-green-500' : 'bg-surface-container-highest'}`} />
                     <div>
-                      <p className="font-medium text-gray-900">{branch.name}</p>
+                      <p className="font-medium text-on-surface">{branch.name}</p>
                       <Badge variant={branch.isOnline ? 'success' : 'default'} className="text-[10px]">
                         {branch.isOnline ? 'Online' : 'Offline'}
                       </Badge>

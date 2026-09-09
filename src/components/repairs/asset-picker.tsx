@@ -67,7 +67,7 @@ export function AssetPicker({ customerId, selected, onSelect }: AssetPickerProps
   }
 
   if (loading) {
-    return <div className="h-9 animate-pulse rounded-lg bg-gray-100" />
+    return <div className="h-9 animate-pulse rounded-lg bg-surface-container" />
   }
 
   // Device selected — show chip
@@ -76,17 +76,17 @@ export function AssetPicker({ customerId, selected, onSelect }: AssetPickerProps
       <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
         <Cpu className="h-4 w-4 shrink-0 text-indigo-500" />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900 truncate">
+          <p className="text-sm font-medium text-on-surface truncate">
             {[selected.brand, selected.model].filter(Boolean).join(' ') || selected.name}
           </p>
           {selected.serial_number && (
-            <p className="text-xs text-gray-500">S/N: {selected.serial_number}</p>
+            <p className="text-xs text-on-surface-variant">S/N: {selected.serial_number}</p>
           )}
         </div>
         <button
           type="button"
           onClick={() => onSelect(null)}
-          className="shrink-0 rounded p-0.5 text-gray-400 hover:text-gray-600"
+          className="shrink-0 rounded p-0.5 text-outline hover:text-on-surface-variant"
         >
           <X className="h-4 w-4" />
         </button>
@@ -100,18 +100,18 @@ export function AssetPicker({ customerId, selected, onSelect }: AssetPickerProps
       <button
         type="button"
         onClick={() => { setShowDropdown((v) => !v); setShowAddForm(false) }}
-        className="flex w-full items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-left hover:border-gray-400 focus:outline-none focus:border-blue-500"
+        className="flex w-full items-center gap-2 rounded-lg border border-outline bg-surface px-3 py-2 text-sm text-left hover:border-outline focus:outline-none focus:border-blue-500"
       >
-        <Cpu className="h-4 w-4 text-gray-400 shrink-0" />
-        <span className="flex-1 text-gray-400">
+        <Cpu className="h-4 w-4 text-outline shrink-0" />
+        <span className="flex-1 text-outline">
           {assets.length > 0 ? `${assets.length} saved device${assets.length > 1 ? 's' : ''} — select or skip` : 'No saved devices — skip or add one'}
         </span>
-        <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" />
+        <ChevronDown className="h-4 w-4 text-outline shrink-0" />
       </button>
 
       {/* Dropdown */}
       {showDropdown && (
-        <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div className="absolute z-50 mt-1 w-full rounded-lg border border-outline-variant bg-surface shadow-lg">
           {assets.length > 0 && (
             <ul className="max-h-48 overflow-y-auto py-1">
               {assets.map((a) => (
@@ -119,16 +119,16 @@ export function AssetPicker({ customerId, selected, onSelect }: AssetPickerProps
                   <button
                     type="button"
                     onClick={() => { onSelect(a); setShowDropdown(false) }}
-                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-gray-50"
+                    className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-surface-container-low"
                   >
                     <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-indigo-100 text-indigo-600">
                       <Cpu className="h-3.5 w-3.5" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
+                      <p className="text-sm font-medium text-on-surface truncate">
                         {[a.brand, a.model].filter(Boolean).join(' ') || a.name}
                       </p>
-                      <p className="text-xs text-gray-500 truncate">
+                      <p className="text-xs text-on-surface-variant truncate">
                         {[a.serial_number && `S/N: ${a.serial_number}`, a.imei && `IMEI: ${a.imei}`, a.color].filter(Boolean).join(' · ') || 'No serial/IMEI'}
                       </p>
                     </div>
@@ -139,7 +139,7 @@ export function AssetPicker({ customerId, selected, onSelect }: AssetPickerProps
           )}
 
           {/* Add new device */}
-          <div className="border-t border-gray-100 p-2">
+          <div className="border-t border-outline-variant p-2">
             <button
               type="button"
               onClick={() => { setShowAddForm(true); setShowDropdown(false) }}
@@ -151,11 +151,11 @@ export function AssetPicker({ customerId, selected, onSelect }: AssetPickerProps
           </div>
 
           {/* Skip option */}
-          <div className="border-t border-gray-100 p-2">
+          <div className="border-t border-outline-variant p-2">
             <button
               type="button"
               onClick={() => setShowDropdown(false)}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-gray-500 hover:bg-gray-50"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-on-surface-variant hover:bg-surface-container-low"
             >
               Skip — type device details manually below
             </button>
@@ -165,8 +165,8 @@ export function AssetPicker({ customerId, selected, onSelect }: AssetPickerProps
 
       {/* Inline add-device form */}
       {showAddForm && (
-        <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
-          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Save Device to Customer</p>
+        <div className="mt-2 rounded-lg border border-outline-variant bg-surface-container-low p-3 space-y-2">
+          <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">Save Device to Customer</p>
           <Input
             label="Device Name *"
             placeholder="e.g. My iPhone 15"

@@ -13,12 +13,13 @@ import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from 'recharts'
+import { CHART_COLORS, chartAxisTick, chartGridStroke, chartTooltipStyle } from '@/lib/chart-theme'
 import type { ColumnDef } from '@tanstack/react-table'
 import { channelLabel } from '../../pos/_types'
 
 interface PaymentRow { payment_method: string; total: number; count: number }
 
-const COLORS = ['#0d9488', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6']
+const COLORS = CHART_COLORS
 
 function firstOfMonth() { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] }
 function today() { return new Date().toISOString().split('T')[0] }
@@ -90,7 +91,7 @@ export default function PaymentsReportPage() {
                   label={({ payment_method, percent }) => `${channelLabel(payment_method)} ${((percent ?? 0) * 100).toFixed(0)}%`}>
                   {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
-                <Tooltip formatter={(v: unknown) => formatCurrency(v as number)} />
+                <Tooltip formatter={(v: unknown) => formatCurrency(v as number)} {...chartTooltipStyle} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -98,11 +99,11 @@ export default function PaymentsReportPage() {
             <h3 className="mb-3 text-base font-semibold text-on-surface">Transaction Count</h3>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={data} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" tick={{ fontSize: 11 }} />
-                <YAxis dataKey="payment_method" type="category" tick={{ fontSize: 11 }} width={80} tickFormatter={(v) => channelLabel(v)} />
-                <Tooltip />
-                <Bar dataKey="count" fill="#8b5cf6" radius={[0, 4, 4, 0]} name="Transactions" />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
+                <XAxis type="number" tick={chartAxisTick} />
+                <YAxis dataKey="payment_method" type="category" tick={chartAxisTick} width={80} tickFormatter={(v) => channelLabel(v)} />
+                <Tooltip {...chartTooltipStyle} />
+                <Bar dataKey="count" fill="var(--tertiary)" radius={[0, 4, 4, 0]} name="Transactions" />
               </BarChart>
             </ResponsiveContainer>
           </div>

@@ -12,6 +12,7 @@ import { useModuleConfigStore } from '@/store/module-config.store'
 import { useBroadcastsStore } from '@/store/broadcasts.store'
 import { useRealtime } from '@/hooks/use-realtime'
 import { Toaster } from 'sonner'
+import { useTheme } from 'next-themes'
 import { getBrandStyle } from '@/lib/brand-theme'
 import type { Profile, Branch } from '@/types/database'
 import type { SubscriptionStatus } from '@/store/auth.store'
@@ -47,12 +48,15 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
   } = useAuthStore()
 
   // Mirror brand CSS vars to <html> so Dialog.Portal modals (rendered to document.body)
-  // also inherit the tenant brand color.
+  // also inherit the tenant brand color. Re-runs on theme change so the brand color
+  // stays legible against both light and dark surfaces.
+  const { resolvedTheme } = useTheme()
+  const brandMode = resolvedTheme === 'dark' ? 'dark' : 'light'
   useEffect(() => {
-    const style = getBrandStyle(brandColor)
+    const style = getBrandStyle(brandColor, brandMode)
     const root = document.documentElement
     Object.entries(style).forEach(([k, v]) => root.style.setProperty(k, v as string))
-  }, [brandColor])
+  }, [brandColor, brandMode])
   const { fetchConfigs, invalidate: invalidateConfigs } = useModuleConfigStore()
   const { setLoaded: setBroadcastsLoaded, addBroadcast, syncBroadcast, reset: resetBroadcasts } = useBroadcastsStore()
   const broadcastsBusinessId = useAuthStore((s) => s.profile?.business_id ?? '')
@@ -277,7 +281,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
 
   return (
     <Providers>
-      <div className="flex h-screen overflow-hidden bg-surface-container-low print:hidden" style={getBrandStyle(brandColor)}>
+      <div className="flex h-screen overflow-hidden bg-surface-container-low print:hidden" style={getBrandStyle(brandColor, brandMode)}>
         <div className="hidden lg:flex">
           <Suspense fallback={null}>
             <Sidebar collapsed={collapsed} />

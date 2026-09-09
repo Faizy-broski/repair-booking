@@ -41,7 +41,7 @@ function RepairCard({ repair, isDragOverlay = false }: { repair: RepairRow; isDr
       style={style}
       {...listeners}
       {...attributes}
-      className={`rounded-lg border bg-white p-3 shadow-sm cursor-grab active:cursor-grabbing select-none ${
+      className={`rounded-lg border bg-surface p-3 shadow-sm cursor-grab active:cursor-grabbing select-none ${
         isDragging && !isDragOverlay ? 'opacity-40' : ''
       }`}
     >
@@ -53,21 +53,21 @@ function RepairCard({ repair, isDragOverlay = false }: { repair: RepairRow; isDr
           )}
         </div>
         {repair.estimated_cost && (
-          <span className="text-xs text-gray-500">{formatCurrency(Math.max(0, repair.estimated_cost - ((repair as any).discount_amount || 0)))}</span>
+          <span className="text-xs text-on-surface-variant">{formatCurrency(Math.max(0, repair.estimated_cost - ((repair as any).discount_amount || 0)))}</span>
         )}
       </div>
       {repair.customers && (
-        <p className="text-xs font-medium text-gray-800 truncate">
+        <p className="text-xs font-medium text-on-surface truncate">
           {repair.customers.first_name} {repair.customers.last_name ?? ''}
         </p>
       )}
       {(repair.device_type || repair.device_brand || repair.device_model) && (
-        <p className="text-xs text-gray-500 truncate">
+        <p className="text-xs text-on-surface-variant truncate">
           {[repair.device_type, repair.device_brand, repair.device_model].filter(Boolean).join(' ')}
         </p>
       )}
       {repair.issue && (
-        <p className="mt-1 text-xs text-gray-400 line-clamp-2">{repair.issue}</p>
+        <p className="mt-1 text-xs text-outline line-clamp-2">{repair.issue}</p>
       )}
       {(repair.custom_fields as any)?.due_date && (
         <div className="mt-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-orange-600/80">
@@ -99,8 +99,8 @@ function KanbanColumn({
         style={headerStyle}
         className="mb-2 flex items-center justify-between rounded-t-lg border px-3 py-2"
       >
-        <span className="text-xs font-semibold text-gray-700">{status.label}</span>
-        <span className="rounded-full bg-white/80 px-2 py-0.5 text-xs font-medium text-gray-600">
+        <span className="text-xs font-semibold text-on-surface-variant">{status.label}</span>
+        <span className="rounded-full bg-surface/80 px-2 py-0.5 text-xs font-medium text-on-surface-variant">
           {repairs.length}
         </span>
       </div>

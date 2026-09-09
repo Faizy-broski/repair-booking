@@ -36,9 +36,9 @@ export function Select({
   return (
     <div className="w-full">
       {label && (
-        <label htmlFor={id} className="mb-1 block text-sm font-medium text-gray-700">
+        <label htmlFor={id} className="mb-1 block text-sm font-medium text-on-surface-variant">
           {label}
-          {required && <span className="ml-1 text-red-500">*</span>}
+          {required && <span className="ml-1 text-error">*</span>}
         </label>
       )}
       <RadixSelect.Root
@@ -52,11 +52,11 @@ export function Select({
         <RadixSelect.Trigger
           id={id}
           className={cn(
-            'flex h-9 w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900',
-            'data-[placeholder]:text-gray-400',
+            'flex h-9 w-full items-center justify-between rounded-lg border border-outline bg-surface px-3 py-2 text-sm text-on-surface',
+            'data-[placeholder]:text-outline',
             'focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20',
-            'disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500',
-            error && 'border-red-500 focus:border-red-500 focus:ring-red-500/20',
+            'disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-on-surface-variant',
+            error && 'border-error focus:border-error focus:ring-error/20',
             className
           )}
         >
@@ -64,7 +64,7 @@ export function Select({
             <RadixSelect.Value placeholder={placeholder} />
           </span>
           <RadixSelect.Icon asChild>
-            <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-gray-400" />
+            <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-outline" />
           </RadixSelect.Icon>
         </RadixSelect.Trigger>
 
@@ -72,7 +72,7 @@ export function Select({
           <RadixSelect.Content
             position="popper"
             sideOffset={4}
-            className="z-50 max-h-60 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
+            className="z-50 max-h-60 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-outline-variant bg-surface shadow-lg"
           >
             <RadixSelect.Viewport className="p-1">
               {mappedOptions.map((option) => (
@@ -80,7 +80,7 @@ export function Select({
                   key={option.value || option.itemValue}
                   value={option.itemValue}
                   disabled={option.disabled}
-                  className="relative flex cursor-pointer select-none items-center rounded-md py-2 pl-8 pr-3 text-sm text-gray-700 outline-none hover:bg-gray-50 focus:bg-gray-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                  className="relative flex cursor-pointer select-none items-center rounded-md py-2 pl-8 pr-3 text-sm text-on-surface outline-none hover:bg-surface-container-low focus:bg-surface-container data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
                 >
                   <RadixSelect.ItemIndicator className="absolute left-2">
                     <Check className="h-3.5 w-3.5 text-brand-teal" />
@@ -92,7 +92,7 @@ export function Select({
           </RadixSelect.Content>
         </RadixSelect.Portal>
       </RadixSelect.Root>
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-xs text-error">{error}</p>}
     </div>
   )
 }

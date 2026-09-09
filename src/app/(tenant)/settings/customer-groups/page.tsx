@@ -68,19 +68,19 @@ export default function CustomerGroupsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Customer Groups</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Segment customers for pricing and billing</p>
+          <h1 className="text-xl font-bold text-on-surface">Customer Groups</h1>
+          <p className="text-sm text-on-surface-variant mt-0.5">Segment customers for pricing and billing</p>
         </div>
         <Button onClick={() => openModal()}>
           <Plus className="h-4 w-4" /> New Group
         </Button>
       </div>
 
-      <div className="divide-y rounded-xl border border-gray-200 bg-white">
+      <div className="divide-y rounded-xl border border-outline-variant bg-surface">
         {groups.length === 0 && (
           <div className="py-16 text-center">
-            <Users className="mx-auto h-8 w-8 text-gray-300" />
-            <p className="mt-2 text-sm text-gray-400">No customer groups yet.</p>
+            <Users className="mx-auto h-8 w-8 text-outline-variant" />
+            <p className="mt-2 text-sm text-outline">No customer groups yet.</p>
           </div>
         )}
         {groups.map((g) => (
@@ -90,7 +90,7 @@ export default function CustomerGroupsPage() {
                 <Users className="h-4 w-4 text-indigo-600" />
               </div>
               <div>
-                <p className="font-medium text-gray-800">{g.name}</p>
+                <p className="font-medium text-on-surface">{g.name}</p>
                 <div className="flex items-center gap-2 mt-0.5">
                   {g.discount_percent > 0 && (
                     <span className="text-xs text-green-600">{g.discount_percent}% discount</span>
@@ -99,7 +99,7 @@ export default function CustomerGroupsPage() {
                     <Badge variant="warning">3rd-party billing</Badge>
                   )}
                   {g.net_payment_days > 0 && (
-                    <span className="text-xs text-gray-400">Net {g.net_payment_days}</span>
+                    <span className="text-xs text-outline">Net {g.net_payment_days}</span>
                   )}
                 </div>
               </div>

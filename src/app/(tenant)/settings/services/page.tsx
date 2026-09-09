@@ -227,14 +227,14 @@ export default function ServicesSettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Service Catalogue</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
+        <h1 className="text-xl font-bold text-on-surface">Service Catalogue</h1>
+        <p className="text-sm text-on-surface-variant mt-0.5">
           Define your repair categories, device models, and service problems.
         </p>
       </div>
 
       {/* Tab bar */}
-      <div className="flex gap-1 border-b border-gray-200">
+      <div className="flex gap-1 border-b border-outline-variant">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -242,11 +242,11 @@ export default function ServicesSettingsPage() {
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               tab === t.key
                 ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                : 'border-transparent text-on-surface-variant hover:text-on-surface-variant'
             }`}
           >
             {t.label}
-            <span className="ml-1.5 rounded-full bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
+            <span className="ml-1.5 rounded-full bg-surface-container px-1.5 py-0.5 text-xs text-on-surface-variant">
               {t.count}
             </span>
           </button>
@@ -261,13 +261,13 @@ export default function ServicesSettingsPage() {
               <Plus className="h-4 w-4" /> Add Manufacturer
             </Button>
           </div>
-          <div className="divide-y rounded-xl border border-gray-200 bg-white">
+          <div className="divide-y rounded-xl border border-outline-variant bg-surface">
             {manufacturers.length === 0 && (
-              <p className="py-10 text-center text-sm text-gray-400">No manufacturers yet.</p>
+              <p className="py-10 text-center text-sm text-outline">No manufacturers yet.</p>
             )}
             {manufacturers.map((m) => (
               <div key={m.id} className="flex items-center justify-between px-4 py-3">
-                <span className="font-medium text-gray-800">{m.name}</span>
+                <span className="font-medium text-on-surface">{m.name}</span>
                 <div className="flex gap-1">
                   <Button size="sm" variant="ghost" onClick={() => openMfrModal(m)}>
                     <Pencil className="h-3.5 w-3.5" />
@@ -289,7 +289,7 @@ export default function ServicesSettingsPage() {
             <select
               value={devMfrFilter}
               onChange={(e) => setDevMfrFilter(e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+              className="rounded-lg border border-outline px-3 py-1.5 text-sm"
             >
               <option value="">All manufacturers</option>
               {manufacturers.map((m) => (
@@ -300,15 +300,15 @@ export default function ServicesSettingsPage() {
               <Plus className="h-4 w-4" /> Add Device
             </Button>
           </div>
-          <div className="divide-y rounded-xl border border-gray-200 bg-white">
+          <div className="divide-y rounded-xl border border-outline-variant bg-surface">
             {filteredDevices.length === 0 && (
-              <p className="py-10 text-center text-sm text-gray-400">No devices yet.</p>
+              <p className="py-10 text-center text-sm text-outline">No devices yet.</p>
             )}
             {filteredDevices.map((d) => (
               <div key={d.id} className="flex items-center justify-between px-4 py-3">
                 <div>
-                  <p className="font-medium text-gray-800">{d.name}</p>
-                  <p className="text-xs text-gray-400">{d.service_manufacturers?.name}</p>
+                  <p className="font-medium text-on-surface">{d.name}</p>
+                  <p className="text-xs text-outline">{d.service_manufacturers?.name}</p>
                 </div>
                 <div className="flex gap-1">
                   <Button size="sm" variant="ghost" onClick={() => openDevModal(d)}>
@@ -332,15 +332,15 @@ export default function ServicesSettingsPage() {
               <Plus className="h-4 w-4" /> Add Category
             </Button>
           </div>
-          <div className="divide-y rounded-xl border border-gray-200 bg-white">
+          <div className="divide-y rounded-xl border border-outline-variant bg-surface">
             {categories.length === 0 && (
-              <p className="py-10 text-center text-sm text-gray-400">No categories yet.</p>
+              <p className="py-10 text-center text-sm text-outline">No categories yet.</p>
             )}
             {categories.map((c) => (
               <div key={c.id} className="flex items-center justify-between px-4 py-3">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-800">{c.name}</span>
-                  <span className="text-xs text-gray-400 font-mono">{c.slug}</span>
+                  <span className="font-medium text-on-surface">{c.name}</span>
+                  <span className="text-xs text-outline font-mono">{c.slug}</span>
                   {!c.show_on_pos && <Badge variant="default">Hidden on POS</Badge>}
                 </div>
                 <div className="flex gap-1">
@@ -364,7 +364,7 @@ export default function ServicesSettingsPage() {
             <select
               value={probDevFilter}
               onChange={(e) => setProbDevFilter(e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+              className="rounded-lg border border-outline px-3 py-1.5 text-sm"
             >
               <option value="">All devices</option>
               {devices.map((d) => (
@@ -377,24 +377,24 @@ export default function ServicesSettingsPage() {
               <Plus className="h-4 w-4" /> Add Service
             </Button>
           </div>
-          <div className="divide-y rounded-xl border border-gray-200 bg-white">
+          <div className="divide-y rounded-xl border border-outline-variant bg-surface">
             {filteredProblems.length === 0 && (
-              <p className="py-10 text-center text-sm text-gray-400">No services yet.</p>
+              <p className="py-10 text-center text-sm text-outline">No services yet.</p>
             )}
             {filteredProblems.map((p) => (
               <div key={p.id} className="flex items-center justify-between px-4 py-3">
                 <div>
-                  <p className="font-medium text-gray-800">{p.name}</p>
-                  <p className="text-xs text-gray-400">
+                  <p className="font-medium text-on-surface">{p.name}</p>
+                  <p className="text-xs text-outline">
                     {p.service_devices?.service_manufacturers?.name} {p.service_devices?.name}
                     {p.service_categories?.name && ` · ${p.service_categories.name}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-gray-900">{formatCurrency(p.price)}</p>
+                    <p className="text-sm font-semibold text-on-surface">{formatCurrency(p.price)}</p>
                     {p.warranty_days > 0 && (
-                      <p className="text-xs text-gray-400">{p.warranty_days}d warranty</p>
+                      <p className="text-xs text-outline">{p.warranty_days}d warranty</p>
                     )}
                   </div>
                   <div className="flex gap-1">
@@ -455,10 +455,10 @@ export default function ServicesSettingsPage() {
       >
         <form onSubmit={devForm.handleSubmit(saveDev)} className="space-y-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Manufacturer</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Manufacturer</label>
             <select
               {...devForm.register('manufacturer_id')}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-outline px-3 py-2 text-sm"
             >
               <option value="">Select manufacturer…</option>
               {manufacturers.map((m) => (
@@ -485,10 +485,10 @@ export default function ServicesSettingsPage() {
           <Input label="Service Name" {...probForm.register('name')} error={probForm.formState.errors.name?.message} />
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Device (optional)</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Device (optional)</label>
               <select
                 {...probForm.register('device_id')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-outline px-3 py-2 text-sm"
               >
                 <option value="">Any / all devices</option>
                 {devices.map((d) => (
@@ -499,10 +499,10 @@ export default function ServicesSettingsPage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Category (optional)</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Category (optional)</label>
               <select
                 {...probForm.register('category_id')}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-outline px-3 py-2 text-sm"
               >
                 <option value="">None</option>
                 {categories.map((c) => (
@@ -521,8 +521,8 @@ export default function ServicesSettingsPage() {
             Show on POS
           </label>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
-            <textarea rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" {...probForm.register('notes')} />
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes</label>
+            <textarea rows={2} className="w-full rounded-lg border border-outline px-3 py-2 text-sm" {...probForm.register('notes')} />
           </div>
           <Button type="submit" className="w-full" loading={probForm.formState.isSubmitting}>Save Service</Button>
         </form>

@@ -162,11 +162,11 @@ export default function GiftCardsPage() {
       header: 'Customer',
       cell: ({ row }) => {
         const ids: string[] = row.original.customer_ids ?? []
-        if (ids.length === 0) return <span className="text-xs text-gray-400">All Customers</span>
+        if (ids.length === 0) return <span className="text-xs text-outline">All Customers</span>
         // Legacy single customer fallback
         const c = row.original.customers
         if (c && ids.length === 1) return `${c.first_name} ${c.last_name ?? ''}`
-        return <span className="text-xs text-gray-600">{ids.length} customer{ids.length > 1 ? 's' : ''}</span>
+        return <span className="text-xs text-on-surface-variant">{ids.length} customer{ids.length > 1 ? 's' : ''}</span>
       },
     },
     {
@@ -182,10 +182,10 @@ export default function GiftCardsPage() {
         const pct = (balance / row.original.initial_value) * 100
         return (
           <div>
-            <span className={`font-semibold ${balance === 0 ? 'text-gray-400' : 'text-green-600'}`}>
+            <span className={`font-semibold ${balance === 0 ? 'text-outline' : 'text-green-600'}`}>
               {formatCurrency(balance)}
             </span>
-            <div className="mt-0.5 h-1 w-16 rounded-full bg-gray-100">
+            <div className="mt-0.5 h-1 w-16 rounded-full bg-surface-container">
               <div className="h-1 rounded-full bg-green-500" style={{ width: `${pct}%` }} />
             </div>
           </div>
@@ -214,7 +214,7 @@ export default function GiftCardsPage() {
       header: '',
       cell: ({ row }) => (
         <div className="flex items-center gap-1">
-          <Button size="sm" variant="ghost" onClick={() => printGiftCard(row.original)} className="text-gray-500 hover:text-gray-700">
+          <Button size="sm" variant="ghost" onClick={() => printGiftCard(row.original)} className="text-on-surface-variant hover:text-on-surface-variant">
             <Printer className="h-3.5 w-3.5" />
           </Button>
           {row.original.is_active && (
@@ -234,8 +234,8 @@ export default function GiftCardsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Gift Cards</h1>
-          <p className="text-sm text-gray-500">{activeCount} active · {formatCurrency(totalBalance)} outstanding</p>
+          <h1 className="text-xl font-bold text-on-surface">Gift Cards</h1>
+          <p className="text-sm text-on-surface-variant">{activeCount} active · {formatCurrency(totalBalance)} outstanding</p>
         </div>
         <Button onClick={() => setSheetOpen(true)}>
           <Plus className="h-4 w-4" /> Create Gift Card
@@ -257,13 +257,13 @@ export default function GiftCardsPage() {
       {/* QR Modal */}
       {qrCard && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setQrCard(null)}>
-          <div className="rounded-xl bg-white p-8 text-center shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="rounded-xl bg-surface p-8 text-center shadow-xl" onClick={(e) => e.stopPropagation()}>
             <Gift className="mx-auto mb-3 h-8 w-8 text-purple-500" />
-            <p className="text-lg font-bold text-gray-900">{qrCard.code}</p>
-            <p className="text-sm text-gray-500">Balance: {formatCurrency(qrCard.balance)}</p>
-            <div className="mt-4 rounded-lg bg-gray-50 p-4">
-              <p className="text-xs text-gray-400">QR code generation requires the qrcode package</p>
-              <p className="mt-1 font-mono text-xs text-gray-600">{qrCard.code}</p>
+            <p className="text-lg font-bold text-on-surface">{qrCard.code}</p>
+            <p className="text-sm text-on-surface-variant">Balance: {formatCurrency(qrCard.balance)}</p>
+            <div className="mt-4 rounded-lg bg-surface-container-low p-4">
+              <p className="text-xs text-outline">QR code generation requires the qrcode package</p>
+              <p className="mt-1 font-mono text-xs text-on-surface-variant">{qrCard.code}</p>
             </div>
             <Button className="mt-4" onClick={() => setQrCard(null)}>Close</Button>
           </div>
@@ -284,7 +284,7 @@ export default function GiftCardsPage() {
           {/* Payment method — cash sales record a cash movement against the
               open register session so Expected Cash reflects the money taken. */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Payment Method</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Payment Method</label>
             <div className="flex gap-2">
               {(['cash', 'card', 'other'] as const).map((method) => (
                 <button
@@ -294,7 +294,7 @@ export default function GiftCardsPage() {
                   className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
                     formPaymentMethod === method
                       ? 'border-brand-teal bg-brand-teal/10 text-brand-teal'
-                      : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                      : 'border-outline-variant text-on-surface-variant hover:bg-surface-container-low'
                   }`}
                 >
                   {method}
@@ -302,13 +302,13 @@ export default function GiftCardsPage() {
               ))}
             </div>
             {formPaymentMethod === 'cash' && (
-              <p className="mt-1 text-xs text-gray-400">Requires an open register — the amount will be added to Expected Cash.</p>
+              <p className="mt-1 text-xs text-outline">Requires an open register — the amount will be added to Expected Cash.</p>
             )}
           </div>
 
           {/* Customer multi-select */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Customers</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Customers</label>
             <div className="flex gap-2 mb-2">
               <button
                 type="button"
@@ -316,7 +316,7 @@ export default function GiftCardsPage() {
                 className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                   formAllCustomers
                     ? 'border-brand-teal bg-brand-teal/10 text-brand-teal'
-                    : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                    : 'border-outline-variant text-on-surface-variant hover:bg-surface-container-low'
                 }`}
               >
                 All Customers
@@ -327,7 +327,7 @@ export default function GiftCardsPage() {
                 className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                   !formAllCustomers
                     ? 'border-brand-teal bg-brand-teal/10 text-brand-teal'
-                    : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                    : 'border-outline-variant text-on-surface-variant hover:bg-surface-container-low'
                 }`}
               >
                 Specific Customers
@@ -361,12 +361,12 @@ export default function GiftCardsPage() {
                   value={custSearch}
                   onChange={e => { setCustSearch(e.target.value); setCustDropdownOpen(true) }}
                   onFocus={() => setCustDropdownOpen(true)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
+                  className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
                 />
                 {custDropdownOpen && (
-                  <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                  <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-outline-variant bg-surface shadow-lg">
                     {filteredCustomers.length === 0 ? (
-                      <p className="px-3 py-2 text-xs text-gray-400">No customers found</p>
+                      <p className="px-3 py-2 text-xs text-outline">No customers found</p>
                     ) : filteredCustomers.map(c => {
                       const selected = formCustomerIds.includes(c.id)
                       return (
@@ -374,9 +374,9 @@ export default function GiftCardsPage() {
                           key={c.id}
                           type="button"
                           onClick={() => { toggleCustomer(c.id); setCustSearch('') }}
-                          className={`flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 ${selected ? 'bg-brand-teal/5' : ''}`}
+                          className={`flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-surface-container-low ${selected ? 'bg-brand-teal/5' : ''}`}
                         >
-                          <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${selected ? 'border-brand-teal bg-brand-teal text-white' : 'border-gray-300'}`}>
+                          <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${selected ? 'border-brand-teal bg-brand-teal text-white' : 'border-outline'}`}>
                             {selected && <Check className="h-3 w-3" />}
                           </span>
                           <span className="truncate">{c.first_name} {c.last_name ?? ''}</span>
@@ -386,7 +386,7 @@ export default function GiftCardsPage() {
                     <button
                       type="button"
                       onClick={() => setCustDropdownOpen(false)}
-                      className="w-full border-t border-gray-100 px-3 py-1.5 text-xs font-medium text-gray-400 hover:bg-gray-50"
+                      className="w-full border-t border-outline-variant px-3 py-1.5 text-xs font-medium text-outline hover:bg-surface-container-low"
                     >
                       Close
                     </button>
@@ -397,7 +397,7 @@ export default function GiftCardsPage() {
           </div>
 
           <Input label="Expiry Date (optional)" type="date" value={formExpiry} onChange={e => setFormExpiry(e.target.value)} />
-          <p className="text-xs text-gray-400">A unique code will be auto-generated</p>
+          <p className="text-xs text-outline">A unique code will be auto-generated</p>
           {formError && <p className="text-sm text-red-600">{formError}</p>}
           <Button type="submit" className="w-full" loading={formSubmitting} disabled={!formValue}>Create Gift Card</Button>
         </form>

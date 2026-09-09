@@ -34,26 +34,26 @@ export function RegisterGate({
   // ── Case A: a shift is already open — prompt to join ──────────────────────
   if (existingSession) {
     return (
-      <div className="-m-6 flex h-[calc(100vh-3.5rem)] items-center justify-center bg-gray-50">
-        <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm w-full max-w-md text-center">
+      <div className="-m-6 flex h-[calc(100vh-3.5rem)] items-center justify-center bg-surface-container-low">
+        <div className="rounded-2xl border border-outline-variant bg-surface p-8 shadow-sm w-full max-w-md text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50">
             <Unlock className="h-7 w-7 text-blue-600" />
           </div>
-          <h2 className="mb-1 text-lg font-bold text-gray-900">Shift Already Active</h2>
-          <p className="mb-6 text-sm text-gray-500">
+          <h2 className="mb-1 text-lg font-bold text-on-surface">Shift Already Active</h2>
+          <p className="mb-6 text-sm text-on-surface-variant">
             {activeBranchName} · A shift is already open for this register
           </p>
-          <div className="mb-6 rounded-lg bg-gray-50 px-4 py-3 text-left space-y-2 text-sm">
+          <div className="mb-6 rounded-lg bg-surface-container-low px-4 py-3 text-left space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-500">Opened by</span>
+              <span className="text-on-surface-variant">Opened by</span>
               <span className="font-medium">{(existingSession as any).profiles?.full_name ?? '—'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Opening float</span>
+              <span className="text-on-surface-variant">Opening float</span>
               <span className="font-medium">{formatCurrency(existingSession.opening_float)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Opened at</span>
+              <span className="text-on-surface-variant">Opened at</span>
               <span className="font-medium">{new Date(existingSession.opened_at).toLocaleTimeString()}</span>
             </div>
           </div>
@@ -69,7 +69,7 @@ export function RegisterGate({
 
         <Modal open={joinShiftOpen} onClose={() => setJoinShiftOpen(false)} title="Join Active Shift" size="sm">
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">Join the currently open shift to start processing sales.</p>
+            <p className="text-sm text-on-surface-variant">Join the currently open shift to start processing sales.</p>
             <div className="flex gap-2 justify-end">
               <Button variant="outline" onClick={() => setJoinShiftOpen(false)}>Cancel</Button>
               <Button loading={sessionProcessing} onClick={handleJoinShift}>Join Shift</Button>
@@ -85,23 +85,23 @@ export function RegisterGate({
   const hasDiscrepancy = prevClosingBalance !== null && Math.abs(openingTotal - prevClosingBalance) > 0.01
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center bg-gray-50">
-      <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm w-full max-w-xl">
+    <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center bg-surface-container-low">
+      <div className="rounded-2xl border border-outline-variant bg-surface p-8 shadow-sm w-full max-w-xl">
         <div className="mb-6 flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-teal-light shrink-0">
             <Lock className="h-6 w-6 text-brand-teal" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Start Shift</h2>
-            <p className="text-sm text-gray-500">{activeBranchName} · Count your cash drawer to begin</p>
+            <h2 className="text-lg font-bold text-on-surface">Start Shift</h2>
+            <p className="text-sm text-on-surface-variant">{activeBranchName} · Count your cash drawer to begin</p>
           </div>
         </div>
 
         {prevClosingBalance !== null && (
-          <div className="mb-4 flex items-center justify-between rounded-lg bg-gray-50 px-4 py-2.5 text-sm">
-            <span className="text-gray-500">Previous shift closing balance</span>
+          <div className="mb-4 flex items-center justify-between rounded-lg bg-surface-container-low px-4 py-2.5 text-sm">
+            <span className="text-on-surface-variant">Previous shift closing balance</span>
             <div className="flex items-center gap-3">
-              <span className="font-semibold text-gray-900">{formatCurrency(prevClosingBalance)}</span>
+              <span className="font-semibold text-on-surface">{formatCurrency(prevClosingBalance)}</span>
               <Link href="/reports/z-report" className="flex items-center gap-1 text-xs font-medium text-brand-teal hover:underline">
                 <ExternalLink className="h-3 w-3" /> Z-Report
               </Link>
@@ -110,11 +110,11 @@ export function RegisterGate({
         )}
 
         <div className="mb-3">
-          <p className="mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Count Denominations</p>
+          <p className="mb-2 text-xs font-semibold text-on-surface-variant uppercase tracking-wide">Count Denominations</p>
           <div className="grid grid-cols-4 gap-2">
             {DENOMINATIONS.map(d => (
-              <div key={d.value} className="flex flex-col gap-1 rounded-lg border border-gray-200 bg-white p-1.5 shadow-sm">
-                <span className="text-[10px] font-bold text-gray-400 uppercase text-center">{d.label}</span>
+              <div key={d.value} className="flex flex-col gap-1 rounded-lg border border-outline-variant bg-surface p-1.5 shadow-sm">
+                <span className="text-[10px] font-bold text-outline uppercase text-center">{d.label}</span>
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
@@ -122,7 +122,7 @@ export function RegisterGate({
                       const v = (openingDenoms[String(d.value)] ?? 0)
                       if (v > 0) setOpeningDenoms(prev => ({ ...prev, [String(d.value)]: v - 1 }))
                     }}
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
                   >
                     <Minus className="h-3 w-3" />
                   </button>
@@ -133,7 +133,7 @@ export function RegisterGate({
                       const v = parseInt(e.target.value) || 0
                       setOpeningDenoms(prev => ({ ...prev, [String(d.value)]: v }))
                     }}
-                    className="h-6 w-full min-w-0 bg-transparent text-center text-sm font-bold text-gray-900 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="h-6 w-full min-w-0 bg-transparent text-center text-sm font-bold text-on-surface focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                   <button
                     type="button"

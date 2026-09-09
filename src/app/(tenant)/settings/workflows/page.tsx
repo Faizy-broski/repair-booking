@@ -27,7 +27,7 @@ const REPAIR_STATUSES = [
 ]
 
 const TYPE_COLOURS: Record<string, string> = {
-  note:  'bg-gray-100 text-gray-700',
+  note:  'bg-surface-container text-on-surface-variant',
   sms:   'bg-green-100 text-green-700',
   email: 'bg-blue-100 text-blue-700',
 }
@@ -157,17 +157,17 @@ export default function WorkflowsSettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Workflows & Responses</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Configure repair workflows, status messages, and canned responses.</p>
+        <h1 className="text-xl font-bold text-on-surface">Workflows & Responses</h1>
+        <p className="text-sm text-on-surface-variant mt-0.5">Configure repair workflows, status messages, and canned responses.</p>
       </div>
 
-      <div className="flex gap-1 border-b border-gray-200">
+      <div className="flex gap-1 border-b border-outline-variant">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-              tab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+              tab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-on-surface-variant hover:text-on-surface-variant'
             }`}
           >
             {t.label}
@@ -186,27 +186,27 @@ export default function WorkflowsSettingsPage() {
 
           <div className="space-y-2">
             {workflows.length === 0 && (
-              <p className="py-10 text-center text-sm text-gray-400">No workflows yet.</p>
+              <p className="py-10 text-center text-sm text-outline">No workflows yet.</p>
             )}
             {workflows.map((wf) => (
-              <div key={wf.id} className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+              <div key={wf.id} className="rounded-xl border border-outline-variant bg-surface overflow-hidden">
                 {/* Header row */}
                 <div
-                  className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50"
+                  className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-surface-container-low"
                   onClick={() => setExpandedWorkflow(expandedWorkflow === wf.id ? null : wf.id)}
                 >
                   <div className="flex items-center gap-2">
                     {expandedWorkflow === wf.id
-                      ? <ChevronDown className="h-4 w-4 text-gray-400" />
-                      : <ChevronRight className="h-4 w-4 text-gray-400" />
+                      ? <ChevronDown className="h-4 w-4 text-outline" />
+                      : <ChevronRight className="h-4 w-4 text-outline" />
                     }
-                    <span className="font-medium text-gray-800">{wf.name}</span>
+                    <span className="font-medium text-on-surface">{wf.name}</span>
                     {wf.is_default && (
                       <span className="flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700">
                         <Star className="h-2.5 w-2.5" /> Default
                       </span>
                     )}
-                    <span className="text-xs text-gray-400">{wf.ticket_workflow_steps.length} steps</span>
+                    <span className="text-xs text-outline">{wf.ticket_workflow_steps.length} steps</span>
                   </div>
                   <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                     <Button
@@ -228,13 +228,13 @@ export default function WorkflowsSettingsPage() {
 
                 {/* Steps */}
                 {expandedWorkflow === wf.id && (
-                  <div className="border-t border-gray-100 px-4 py-3 space-y-2">
+                  <div className="border-t border-outline-variant px-4 py-3 space-y-2">
                     {editingSteps?.workflowId === wf.id ? (
                       <div className="space-y-2">
                         {editingSteps.steps.map((step, idx) => (
                           <div key={idx} className="flex gap-2 items-center">
-                            <GripVertical className="h-4 w-4 text-gray-300 shrink-0" />
-                            <span className="text-xs w-5 text-gray-400 shrink-0">{idx + 1}.</span>
+                            <GripVertical className="h-4 w-4 text-outline-variant shrink-0" />
+                            <span className="text-xs w-5 text-outline shrink-0">{idx + 1}.</span>
                             <input
                               value={step.name}
                               onChange={(e) => {
@@ -243,7 +243,7 @@ export default function WorkflowsSettingsPage() {
                                 setEditingSteps({ ...editingSteps, steps: updated })
                               }}
                               placeholder="Step name"
-                              className="h-8 flex-1 rounded-md border border-gray-300 px-2 text-sm"
+                              className="h-8 flex-1 rounded-md border border-outline px-2 text-sm"
                             />
                             <input
                               value={step.description}
@@ -253,14 +253,14 @@ export default function WorkflowsSettingsPage() {
                                 setEditingSteps({ ...editingSteps, steps: updated })
                               }}
                               placeholder="Description (optional)"
-                              className="h-8 flex-1 rounded-md border border-gray-300 px-2 text-sm"
+                              className="h-8 flex-1 rounded-md border border-outline px-2 text-sm"
                             />
                             <button
                               onClick={() => {
                                 const updated = editingSteps.steps.filter((_, i) => i !== idx)
                                 setEditingSteps({ ...editingSteps, steps: updated })
                               }}
-                              className="text-gray-400 hover:text-red-500 text-sm"
+                              className="text-outline hover:text-red-500 text-sm"
                             >
                               ×
                             </button>
@@ -283,15 +283,15 @@ export default function WorkflowsSettingsPage() {
                     ) : (
                       <div className="space-y-1">
                         {wf.ticket_workflow_steps.length === 0 && (
-                          <p className="text-xs text-gray-400 italic">No steps defined.</p>
+                          <p className="text-xs text-outline italic">No steps defined.</p>
                         )}
                         {wf.ticket_workflow_steps.map((step, idx) => (
-                          <div key={step.id} className="flex items-center gap-2 text-sm text-gray-600">
-                            <span className="h-5 w-5 rounded-full bg-gray-100 text-center text-xs font-medium leading-5 text-gray-500 shrink-0">
+                          <div key={step.id} className="flex items-center gap-2 text-sm text-on-surface-variant">
+                            <span className="h-5 w-5 rounded-full bg-surface-container text-center text-xs font-medium leading-5 text-on-surface-variant shrink-0">
                               {idx + 1}
                             </span>
                             <span>{step.name}</span>
-                            {step.description && <span className="text-xs text-gray-400">— {step.description}</span>}
+                            {step.description && <span className="text-xs text-outline">— {step.description}</span>}
                           </div>
                         ))}
                         <button
@@ -322,7 +322,7 @@ export default function WorkflowsSettingsPage() {
       {/* ── Status Flags ─────────────────────────────────────────────────────── */}
       {tab === 'status_flags' && (
         <section className="space-y-3">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-on-surface-variant">
             Show a warning message when a technician changes a ticket to a specific status.
           </p>
           <div className="flex justify-end">
@@ -330,15 +330,15 @@ export default function WorkflowsSettingsPage() {
               <Plus className="h-4 w-4" /> Add Flag
             </Button>
           </div>
-          <div className="divide-y rounded-xl border border-gray-200 bg-white">
+          <div className="divide-y rounded-xl border border-outline-variant bg-surface">
             {flags.length === 0 && (
-              <p className="py-10 text-center text-sm text-gray-400">No status flags configured.</p>
+              <p className="py-10 text-center text-sm text-outline">No status flags configured.</p>
             )}
             {flags.map((f) => (
               <div key={f.id} className="flex items-start justify-between px-4 py-3">
                 <div>
                   <Badge variant="warning">{f.status.replace('_', ' ')}</Badge>
-                  <p className="mt-1 text-sm text-gray-600">{f.message}</p>
+                  <p className="mt-1 text-sm text-on-surface-variant">{f.message}</p>
                 </div>
                 <div className="flex gap-1 shrink-0 ml-4">
                   <Button size="sm" variant="ghost" onClick={() => setFlagModal({ open: true, status: f.status, message: f.message, editId: f.id })}>
@@ -357,7 +357,7 @@ export default function WorkflowsSettingsPage() {
       {/* ── Canned Responses ─────────────────────────────────────────────────── */}
       {tab === 'canned' && (
         <section className="space-y-3">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-on-surface-variant">
             Pre-written templates for ticket notes, SMS, and email messages.
           </p>
           <div className="flex justify-end">
@@ -371,9 +371,9 @@ export default function WorkflowsSettingsPage() {
               <Plus className="h-4 w-4" /> New Template
             </Button>
           </div>
-          <div className="divide-y rounded-xl border border-gray-200 bg-white">
+          <div className="divide-y rounded-xl border border-outline-variant bg-surface">
             {canned.length === 0 && (
-              <p className="py-10 text-center text-sm text-gray-400">No canned responses yet.</p>
+              <p className="py-10 text-center text-sm text-outline">No canned responses yet.</p>
             )}
             {canned.map((c) => (
               <div key={c.id} className="flex items-start justify-between px-4 py-3">
@@ -382,9 +382,9 @@ export default function WorkflowsSettingsPage() {
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_COLOURS[c.type]}`}>
                       {c.type}
                     </span>
-                    <span className="font-medium text-gray-800 truncate">{c.title}</span>
+                    <span className="font-medium text-on-surface truncate">{c.title}</span>
                   </div>
-                  <p className="mt-0.5 text-xs text-gray-400 truncate">{c.body}</p>
+                  <p className="mt-0.5 text-xs text-outline truncate">{c.body}</p>
                 </div>
                 <div className="flex gap-1 shrink-0 ml-4">
                   <Button
@@ -418,11 +418,11 @@ export default function WorkflowsSettingsPage() {
       >
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Workflow Name</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Workflow Name</label>
             <input
               value={wfName}
               onChange={(e) => setWfName(e.target.value)}
-              className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm"
+              className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
               placeholder="e.g. Standard Repair"
             />
           </div>
@@ -443,11 +443,11 @@ export default function WorkflowsSettingsPage() {
       >
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Status</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Status</label>
             <select
               value={flagModal.status}
               onChange={(e) => setFlagModal((f) => ({ ...f, status: e.target.value }))}
-              className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm"
+              className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
             >
               <option value="">Select status…</option>
               {REPAIR_STATUSES.map((s) => (
@@ -456,12 +456,12 @@ export default function WorkflowsSettingsPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Warning Message</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Warning Message</label>
             <textarea
               rows={3}
               value={flagModal.message}
               onChange={(e) => setFlagModal((f) => ({ ...f, message: e.target.value }))}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-outline px-3 py-2 text-sm"
               placeholder="e.g. Have you confirmed the customer is aware of the repair cost?"
             />
           </div>
@@ -478,20 +478,20 @@ export default function WorkflowsSettingsPage() {
       >
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Title</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Title</label>
             <input
               value={cannedForm.title}
               onChange={(e) => setCannedForm((f) => ({ ...f, title: e.target.value }))}
-              className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm"
+              className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
               placeholder="Short descriptive title"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Type</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Type</label>
             <select
               value={cannedForm.type}
               onChange={(e) => setCannedForm((f) => ({ ...f, type: e.target.value as 'note' | 'sms' | 'email' }))}
-              className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm"
+              className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
             >
               <option value="note">Note</option>
               <option value="sms">SMS</option>
@@ -499,12 +499,12 @@ export default function WorkflowsSettingsPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Body</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Body</label>
             <textarea
               rows={4}
               value={cannedForm.body}
               onChange={(e) => setCannedForm((f) => ({ ...f, body: e.target.value }))}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-outline px-3 py-2 text-sm"
               placeholder="Template text…"
             />
           </div>

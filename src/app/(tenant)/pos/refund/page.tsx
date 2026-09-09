@@ -243,7 +243,7 @@ function RefundPageInner() {
           <CheckCircle2 className="h-9 w-9 text-green-600" />
         </div>
         <p className="text-xl font-bold text-green-700">Refund Processed</p>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-on-surface-variant">
           {formatCurrency(success.total)} refunded via {success.method.replace('_', ' ')}
         </p>
         <div className="flex gap-3">
@@ -265,26 +265,26 @@ function RefundPageInner() {
 
       {/* Header */}
       <div className="flex items-center gap-3">
-        <button onClick={() => router.back()} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+        <button onClick={() => router.back()} className="rounded p-1.5 text-outline hover:bg-surface-container hover:text-on-surface-variant">
           <ChevronLeft className="h-5 w-5" />
         </button>
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Process Refund</h1>
-          <p className="text-xs text-gray-500">Search by Sale ID or Invoice number to begin</p>
+          <h1 className="text-xl font-bold text-on-surface">Process Refund</h1>
+          <p className="text-xs text-on-surface-variant">Search by Sale ID or Invoice number to begin</p>
         </div>
       </div>
 
       {/* Sale lookup */}
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
           <input
             type="text"
             placeholder="Enter sale ID or invoice number..."
             value={invoiceSearch}
             onChange={(e) => setInvoiceSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && doSearch()}
-            className="h-10 w-full rounded-lg border border-gray-200 pl-9 pr-3 text-sm focus:border-brand-teal focus:outline-none"
+            className="h-10 w-full rounded-lg border border-outline-variant pl-9 pr-3 text-sm focus:border-brand-teal focus:outline-none"
           />
         </div>
         <Button className="bg-brand-teal hover:bg-brand-teal-dark" onClick={() => doSearch()} loading={searching}>
@@ -300,27 +300,27 @@ function RefundPageInner() {
 
       {/* Refund form */}
       {sale && (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
 
           {/* Invoice header */}
-          <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-6 py-4">
+          <div className="flex items-center justify-between border-b border-outline-variant bg-surface-container-low px-6 py-4">
             <div>
-              <p className="font-bold text-gray-900">
+              <p className="font-bold text-on-surface">
                 Invoice #{sale.id.slice(0, 8).toUpperCase()}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-on-surface-variant">
                 {sale.customers
                   ? `${sale.customers.first_name} ${sale.customers.last_name ?? ''}`.trim()
                   : 'Walk-in Customer'}
                 {' · '}{new Date(sale.created_at).toLocaleDateString()} · {sale.payment_method}
               </p>
             </div>
-            <p className="text-base font-bold text-gray-900">{formatCurrency(sale.total)}</p>
+            <p className="text-base font-bold text-on-surface">{formatCurrency(sale.total)}</p>
           </div>
 
           {/* Restocking fee toggle */}
-          <div className="flex items-center gap-6 border-b border-gray-100 px-6 py-3">
-            <p className="text-sm font-medium text-gray-700">Would you like to charge a restocking fee?</p>
+          <div className="flex items-center gap-6 border-b border-outline-variant px-6 py-3">
+            <p className="text-sm font-medium text-on-surface-variant">Would you like to charge a restocking fee?</p>
             <div className="flex items-center gap-4">
               <label className="flex cursor-pointer items-center gap-1.5 text-sm">
                 <input type="radio" checked={restockEnabled} onChange={() => setRestockEnabled(true)} className="accent-[var(--brand-teal)]" />
@@ -336,14 +336,14 @@ function RefundPageInner() {
           {/* Items table */}
           <div>
             <table className="w-full text-sm">
-              <thead className="border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <thead className="border-b border-outline-variant text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
                 <tr>
                   <th className="px-4 py-3 text-left w-8">
                     <input
                       type="checkbox"
                       checked={selectedIds.size === sale.sale_items.length}
                       onChange={toggleAll}
-                      className="h-4 w-4 rounded border-gray-300 accent-[var(--brand-teal)]"
+                      className="h-4 w-4 rounded border-outline accent-[var(--brand-teal)]"
                     />
                   </th>
                   <th className="px-2 py-3 text-left w-16">QTY</th>
@@ -354,7 +354,7 @@ function RefundPageInner() {
                   <th className="px-2 py-3 text-right w-32">Refund Amount</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-outline-variant">
                 {sale.sale_items.map((item) => {
                   const isSelected = selectedIds.has(item.id)
                   const qty = refundQtys[item.id] ?? item.quantity
@@ -365,14 +365,14 @@ function RefundPageInner() {
                   return (
                     <tr
                       key={item.id}
-                      className={`transition-colors ${isSelected ? 'bg-red-50' : 'bg-white opacity-60'}`}
+                      className={`transition-colors ${isSelected ? 'bg-red-50' : 'bg-surface opacity-60'}`}
                     >
                       <td className="px-4 py-3">
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleItem(item.id)}
-                          className="h-4 w-4 rounded border-gray-300 accent-[var(--brand-teal)]"
+                          className="h-4 w-4 rounded border-outline accent-[var(--brand-teal)]"
                         />
                       </td>
                       <td className="px-2 py-3">
@@ -387,12 +387,12 @@ function RefundPageInner() {
                             if (v === 0) setSelectedIds((s) => { const n = new Set(s); n.delete(item.id); return n })
                             else if (v > 0) setSelectedIds((s) => new Set([...s, item.id]))
                           }}
-                          className="h-8 w-14 rounded border border-gray-200 text-center text-sm focus:border-brand-teal focus:outline-none"
+                          className="h-8 w-14 rounded border border-outline-variant text-center text-sm focus:border-brand-teal focus:outline-none"
                         />
                       </td>
                       <td className="px-2 py-3">
-                        <p className="font-medium text-gray-900">{item.name}</p>
-                        <p className="text-xs text-gray-400">Disc = {formatCurrency(item.discount * qty)}</p>
+                        <p className="font-medium text-on-surface">{item.name}</p>
+                        <p className="text-xs text-outline">Disc = {formatCurrency(item.discount * qty)}</p>
                       </td>
                       <td className="px-2 py-3 text-right">
                         <input
@@ -405,11 +405,11 @@ function RefundPageInner() {
                             const v = Math.max(0, Math.min(parseFloat(e.target.value) || 0, item.unit_price))
                             setRefundPrices((r) => ({ ...r, [item.id]: v }))
                           }}
-                          className="h-8 w-24 rounded border border-gray-200 px-2 text-right text-sm focus:border-brand-teal focus:outline-none"
+                          className="h-8 w-24 rounded border border-outline-variant px-2 text-right text-sm focus:border-brand-teal focus:outline-none"
                         />
                       </td>
-                      <td className="px-2 py-3 text-right text-gray-500">{formatCurrency(itemTax)}</td>
-                      <td className="px-2 py-3 text-right font-medium text-gray-900">{formatCurrency(price * qty)}</td>
+                      <td className="px-2 py-3 text-right text-on-surface-variant">{formatCurrency(itemTax)}</td>
+                      <td className="px-2 py-3 text-right font-medium text-on-surface">{formatCurrency(price * qty)}</td>
                       <td className="px-2 py-3 text-right font-semibold text-red-600">{formatCurrency(refundAmt)}</td>
                     </tr>
                   )
@@ -419,56 +419,56 @@ function RefundPageInner() {
 
             {/* Restocking fee row */}
             {restockEnabled && (
-              <div className="flex items-center gap-3 border-t border-gray-100 px-6 py-3">
+              <div className="flex items-center gap-3 border-t border-outline-variant px-6 py-3">
                 <input
                   type="checkbox" checked readOnly
-                  className="h-4 w-4 rounded border-gray-300 accent-[var(--brand-teal)]"
+                  className="h-4 w-4 rounded border-outline accent-[var(--brand-teal)]"
                 />
-                <span className="text-sm font-medium text-gray-700">Charge Restocking Fee</span>
+                <span className="text-sm font-medium text-on-surface-variant">Charge Restocking Fee</span>
                 <input
                   type="number" min={0} step={0.01} placeholder="0.00"
                   value={restockAmount}
                   onChange={(e) => setRestockAmount(e.target.value)}
-                  className="h-8 w-24 rounded border border-gray-200 px-2 text-right text-sm focus:border-brand-teal focus:outline-none"
+                  className="h-8 w-24 rounded border border-outline-variant px-2 text-right text-sm focus:border-brand-teal focus:outline-none"
                 />
-                <div className="flex overflow-hidden rounded border border-gray-200">
+                <div className="flex overflow-hidden rounded border border-outline-variant">
                   <button
                     onClick={() => setRestockType('$')}
-                    className={`px-2.5 py-1 text-xs font-medium ${restockType === '$' ? 'bg-brand-teal text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                    className={`px-2.5 py-1 text-xs font-medium ${restockType === '$' ? 'bg-brand-teal text-white' : 'bg-surface text-on-surface-variant hover:bg-surface-container-low'}`}
                   >$</button>
                   <button
                     onClick={() => setRestockType('%')}
-                    className={`px-2.5 py-1 text-xs font-medium border-l border-gray-200 ${restockType === '%' ? 'bg-brand-teal text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                    className={`px-2.5 py-1 text-xs font-medium border-l border-outline-variant ${restockType === '%' ? 'bg-brand-teal text-white' : 'bg-surface text-on-surface-variant hover:bg-surface-container-low'}`}
                   >%</button>
                 </div>
                 {restockFee > 0 && (
-                  <span className="text-xs text-gray-500">= {formatCurrency(restockFee)}</span>
+                  <span className="text-xs text-on-surface-variant">= {formatCurrency(restockFee)}</span>
                 )}
               </div>
             )}
           </div>
 
           {/* Summary + options */}
-          <div className="grid grid-cols-2 gap-6 border-t border-gray-100 px-6 py-5">
+          <div className="grid grid-cols-2 gap-6 border-t border-outline-variant px-6 py-5">
 
             {/* Left: Refund method + reason */}
             <div className="space-y-3">
               {isSplitOriginal ? (
                 <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
                     Refund Method — this sale was split-tender, split the refund the same way
                   </p>
                   <div className="space-y-2">
                     {splitChannels.map((m) => (
                       <div key={m} className="flex items-center gap-3">
-                        <span className="w-20 shrink-0 text-sm font-medium text-gray-600">
+                        <span className="w-20 shrink-0 text-sm font-medium text-on-surface-variant">
                           {m.charAt(0).toUpperCase() + m.slice(1)}
                         </span>
                         <input
                           type="number" min={0} step={0.01} placeholder="0.00"
                           value={refundSplits[m] ?? ''}
                           onChange={(e) => setRefundSplits((r) => ({ ...r, [m]: e.target.value }))}
-                          className="h-9 flex-1 rounded-lg border border-gray-200 px-3 text-sm focus:border-brand-teal focus:outline-none"
+                          className="h-9 flex-1 rounded-lg border border-outline-variant px-3 text-sm focus:border-brand-teal focus:outline-none"
                         />
                       </div>
                     ))}
@@ -481,14 +481,14 @@ function RefundPageInner() {
                 </div>
               ) : (
                 <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Refund Method</p>
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Refund Method</p>
                   <div className="flex gap-2">
                     {(['cash', 'card', 'gift_card'] as const).map((m) => (
                       <button
                         key={m}
                         onClick={() => setRefundMethod(m)}
                         className={`flex-1 rounded-lg border py-2 text-xs font-medium transition-colors ${
-                          refundMethod === m ? 'border-brand-teal bg-brand-teal-light text-brand-teal' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                          refundMethod === m ? 'border-brand-teal bg-brand-teal-light text-brand-teal' : 'border-outline-variant text-on-surface-variant hover:bg-surface-container-low'
                         }`}
                       >
                         {m === 'gift_card' ? 'Gift Card' : m.charAt(0).toUpperCase() + m.slice(1)}
@@ -512,17 +512,17 @@ function RefundPageInner() {
             </div>
 
             {/* Right: Summary */}
-            <div className="rounded-xl bg-gray-50 p-4 space-y-2 text-sm">
-              <div className="flex justify-between text-gray-500">
+            <div className="rounded-xl bg-surface-container-low p-4 space-y-2 text-sm">
+              <div className="flex justify-between text-on-surface-variant">
                 <span>Total Items</span><span>{selectedItems.reduce((s, i) => s + (refundQtys[i.id] ?? i.quantity), 0)}</span>
               </div>
-              <div className="flex justify-between text-gray-500">
+              <div className="flex justify-between text-on-surface-variant">
                 <span>Sub Total</span><span>{formatCurrency(-refundSubtotal)}</span>
               </div>
-              <div className="flex justify-between text-gray-500">
+              <div className="flex justify-between text-on-surface-variant">
                 <span>Discount</span><span>{formatCurrency(refundDiscount)}</span>
               </div>
-              <div className="flex justify-between text-gray-500">
+              <div className="flex justify-between text-on-surface-variant">
                 <span>Tax</span><span>{formatCurrency(-refundTax)}</span>
               </div>
               {restockFee > 0 && (
@@ -530,7 +530,7 @@ function RefundPageInner() {
                   <span>Restocking Fee</span><span>+{formatCurrency(restockFee)}</span>
                 </div>
               )}
-              <div className="flex justify-between border-t border-gray-200 pt-2 text-base font-bold text-gray-900">
+              <div className="flex justify-between border-t border-outline-variant pt-2 text-base font-bold text-on-surface">
                 <span>Total</span><span className="text-red-600">{formatCurrency(refundTotal)}</span>
               </div>
               <Button
@@ -553,7 +553,7 @@ function RefundPageInner() {
 
 export default function RefundPage() {
   return (
-    <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-gray-400">Loading...</div>}>
+    <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-outline">Loading...</div>}>
       <RefundPageInner />
     </Suspense>
   )

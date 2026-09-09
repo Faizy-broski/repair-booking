@@ -13,7 +13,7 @@ interface SignOutButtonProps {
 
 export function SignOutButton({
   redirectTo = '/login',
-  className = 'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-100',
+  className = 'flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-on-surface-variant hover:bg-surface-container',
   iconClassName = 'h-4 w-4',
   label = 'Sign Out',
 }: SignOutButtonProps) {

@@ -103,7 +103,7 @@ export function EstimatesPanel({ repairId, customerId, branchId }: EstimatesPane
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-gray-700">Estimates</h3>
+        <h3 className="text-sm font-medium text-on-surface-variant">Estimates</h3>
         <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
           <Plus className="h-3.5 w-3.5 mr-1" />
           New Estimate
@@ -111,35 +111,35 @@ export function EstimatesPanel({ repairId, customerId, branchId }: EstimatesPane
       </div>
 
       {loading ? (
-        <div className="h-16 animate-pulse rounded-lg bg-gray-100" />
+        <div className="h-16 animate-pulse rounded-lg bg-surface-container" />
       ) : estimates.length === 0 ? (
-        <p className="text-sm text-gray-400">No estimates yet</p>
+        <p className="text-sm text-outline">No estimates yet</p>
       ) : (
         <div className="space-y-2">
           {estimates.map((est) => (
-            <div key={est.id} className="rounded-lg border border-gray-200 p-3">
+            <div key={est.id} className="rounded-lg border border-outline-variant p-3">
               <div className="flex items-start justify-between mb-2">
                 <div>
                   <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[est.status]}`}>
                     {est.status.replace('_', ' ')}
                   </span>
-                  <p className="mt-1 text-xs text-gray-400">{formatDateTime(est.created_at)}</p>
+                  <p className="mt-1 text-xs text-outline">{formatDateTime(est.created_at)}</p>
                 </div>
-                <span className="text-base font-bold text-gray-900">{formatCurrency(est.total)}</span>
+                <span className="text-base font-bold text-on-surface">{formatCurrency(est.total)}</span>
               </div>
               <table className="w-full text-xs">
                 <tbody>
                   {(est.items as EstimateItem[]).map((item, i) => (
-                    <tr key={i} className="border-t border-gray-50">
-                      <td className="py-1 text-gray-700">{item.name}</td>
-                      <td className="py-1 text-right text-gray-500">{item.quantity} × {formatCurrency(item.unit_price)}</td>
+                    <tr key={i} className="border-t border-outline-variant">
+                      <td className="py-1 text-on-surface-variant">{item.name}</td>
+                      <td className="py-1 text-right text-on-surface-variant">{item.quantity} × {formatCurrency(item.unit_price)}</td>
                       <td className="py-1 text-right font-medium">{formatCurrency(item.total)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               {est.customer_note && (
-                <p className="mt-2 text-xs text-gray-500 italic">"{est.customer_note}"</p>
+                <p className="mt-2 text-xs text-on-surface-variant italic">"{est.customer_note}"</p>
               )}
             </div>
           ))}
@@ -151,7 +151,7 @@ export function EstimatesPanel({ repairId, customerId, branchId }: EstimatesPane
         <div className="space-y-3">
           {/* Line items */}
           <div className="space-y-2">
-            <div className="grid grid-cols-12 gap-1 text-xs font-medium text-gray-500">
+            <div className="grid grid-cols-12 gap-1 text-xs font-medium text-on-surface-variant">
               <div className="col-span-5">Item</div>
               <div className="col-span-2 text-center">Qty</div>
               <div className="col-span-3 text-right">Unit Price</div>
@@ -164,14 +164,14 @@ export function EstimatesPanel({ repairId, customerId, branchId }: EstimatesPane
                   value={item.name}
                   onChange={(e) => updateLine(idx, { name: e.target.value })}
                   placeholder="Description"
-                  className="col-span-5 h-8 rounded border border-gray-200 px-2 text-sm focus:border-blue-400 focus:outline-none"
+                  className="col-span-5 h-8 rounded border border-outline-variant px-2 text-sm focus:border-blue-400 focus:outline-none"
                 />
                 <input
                   type="number"
                   min="1"
                   value={item.quantity}
                   onChange={(e) => updateLine(idx, { quantity: parseInt(e.target.value) || 1 })}
-                  className="col-span-2 h-8 rounded border border-gray-200 px-2 text-center text-sm focus:border-blue-400 focus:outline-none"
+                  className="col-span-2 h-8 rounded border border-outline-variant px-2 text-center text-sm focus:border-blue-400 focus:outline-none"
                 />
                 <input
                   type="number"
@@ -180,12 +180,12 @@ export function EstimatesPanel({ repairId, customerId, branchId }: EstimatesPane
                   value={item.unit_price || ''}
                   onChange={(e) => updateLine(idx, { unit_price: parseFloat(e.target.value) || 0 })}
                   placeholder="0.00"
-                  className="col-span-3 h-8 rounded border border-gray-200 px-2 text-right text-sm focus:border-blue-400 focus:outline-none"
+                  className="col-span-3 h-8 rounded border border-outline-variant px-2 text-right text-sm focus:border-blue-400 focus:outline-none"
                 />
-                <span className="col-span-1 text-right text-xs text-gray-600">
+                <span className="col-span-1 text-right text-xs text-on-surface-variant">
                   {item.total > 0 ? formatCurrency(item.total) : '—'}
                 </span>
-                <button onClick={() => removeLine(idx)} className="col-span-1 flex justify-center text-gray-300 hover:text-red-400">
+                <button onClick={() => removeLine(idx)} className="col-span-1 flex justify-center text-outline-variant hover:text-red-400">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -200,9 +200,9 @@ export function EstimatesPanel({ repairId, customerId, branchId }: EstimatesPane
             Add line
           </button>
 
-          <div className="flex items-center justify-between border-t border-gray-100 pt-3">
-            <span className="text-sm font-medium text-gray-700">Total</span>
-            <span className="text-lg font-bold text-gray-900">{formatCurrency(estimateTotal)}</span>
+          <div className="flex items-center justify-between border-t border-outline-variant pt-3">
+            <span className="text-sm font-medium text-on-surface-variant">Total</span>
+            <span className="text-lg font-bold text-on-surface">{formatCurrency(estimateTotal)}</span>
           </div>
 
           <div className="flex gap-2">

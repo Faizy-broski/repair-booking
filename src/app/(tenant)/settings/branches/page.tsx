@@ -128,15 +128,15 @@ export default function BranchesSettingsPage() {
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+    <div className="rounded-2xl border border-outline-variant bg-surface shadow-sm">
+      <div className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-teal/10">
             <Building2 className="h-4 w-4 text-brand-teal" />
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900">Branches</h3>
-            <p className="text-xs text-gray-400">{branchList.length} location{branchList.length !== 1 ? 's' : ''}</p>
+            <h3 className="font-semibold text-on-surface">Branches</h3>
+            <p className="text-xs text-outline">{branchList.length} location{branchList.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
         <UIButton size="sm" onClick={() => { setShowNewBranchForm(true); setBranchCreateError(null); newBranchForm.reset() }}>
@@ -145,8 +145,8 @@ export default function BranchesSettingsPage() {
       </div>
       
       {showNewBranchForm && (
-        <div className="border-b border-gray-100 bg-blue-50/40 px-4 py-5">
-          <p className="mb-3 text-sm font-semibold text-gray-700">New Branch</p>
+        <div className="border-b border-outline-variant bg-blue-50/40 px-4 py-5">
+          <p className="mb-3 text-sm font-semibold text-on-surface-variant">New Branch</p>
           {branchCreateError && (
             <div className="mb-3 max-w-2xl rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {branchCreateError}
@@ -161,8 +161,8 @@ export default function BranchesSettingsPage() {
               <UIInput label="Email" type="email" {...newBranchForm.register('email')} />
             </div>
 
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
-              <p className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-gray-700">
+            <div className="rounded-xl border border-outline-variant bg-surface p-4">
+              <p className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-on-surface-variant">
                 <UserRound className="h-4 w-4 text-blue-600" /> Branch User
               </p>
               <div className="grid grid-cols-2 gap-4">
@@ -189,11 +189,11 @@ export default function BranchesSettingsPage() {
                   error={newBranchForm.formState.errors.manager_password?.message}
                 />
                 <div className="col-span-2">
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Role *</label>
+                  <label className="mb-1 block text-sm font-medium text-on-surface-variant">Role *</label>
                   <select
                     {...newBranchForm.register('manager_role')}
                     defaultValue=""
-                    className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
+                    className="h-9 w-full rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
                   >
                     <option value="" disabled>Select role</option>
                     <option value="cashier">Cashier</option>
@@ -219,7 +219,7 @@ export default function BranchesSettingsPage() {
         {branchList.map((branch) => (
           <div
             key={branch.id}
-            className="group relative rounded-xl border border-gray-100 bg-gray-50/60 p-5 transition-all duration-200 hover:border-brand-teal/30 hover:bg-white hover:shadow-md"
+            className="group relative rounded-xl border border-outline-variant bg-surface-container-low/60 p-5 transition-all duration-200 hover:border-brand-teal/30 hover:bg-surface hover:shadow-md"
           >
             {editBranchId === branch.id ? (
               <form onSubmit={branchForm.handleSubmit(onSaveBranch)} className="space-y-3">
@@ -233,15 +233,15 @@ export default function BranchesSettingsPage() {
 
                 {/* Associated users — editable */}
                 {branch.profiles && branch.profiles.length > 0 && (
-                  <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                    <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <div className="rounded-xl border border-outline-variant bg-surface-container-low p-4">
+                    <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
                       <UserRound className="h-3.5 w-3.5" /> Associated Users
                     </p>
                     <div className="space-y-3">
                       {branch.profiles.map((user) => {
                         const edit = userEdits[user.id] ?? { full_name: user.full_name ?? '', role: user.role, saving: false }
                         return (
-                          <div key={user.id} className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
+                          <div key={user.id} className="rounded-xl border border-outline-variant bg-surface p-3 shadow-sm">
                             <div className="mb-3 flex items-center gap-3">
                               <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-teal/10">
                                 {user.avatar_url ? (
@@ -252,7 +252,7 @@ export default function BranchesSettingsPage() {
                                   </span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                              <div className="flex items-center gap-1.5 text-xs text-outline">
                                 <Mail className="h-3 w-3 shrink-0" />
                                 <span className="truncate">{user.email ?? '—'}</span>
                               </div>
@@ -264,11 +264,11 @@ export default function BranchesSettingsPage() {
                                 onChange={(e) => setUserEdits((prev) => ({ ...prev, [user.id]: { ...prev[user.id], full_name: e.target.value } }))}
                               />
                               <div>
-                                <label className="mb-1 block text-sm font-medium text-gray-700">Role</label>
+                                <label className="mb-1 block text-sm font-medium text-on-surface-variant">Role</label>
                                 <select
                                   value={edit.role}
                                   onChange={(e) => setUserEdits((prev) => ({ ...prev, [user.id]: { ...prev[user.id], role: e.target.value } }))}
-                                  className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
+                                  className="h-9 w-full rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
                                 >
                                   <option value="cashier">Cashier</option>
                                   <option value="staff">Staff</option>
@@ -318,19 +318,19 @@ export default function BranchesSettingsPage() {
                 </div>
 
                 {/* Branch name */}
-                <p className="mb-3 font-semibold text-gray-900">{branch.name}</p>
+                <p className="mb-3 font-semibold text-on-surface">{branch.name}</p>
 
                 {/* Contact info */}
                 <div className="space-y-1.5">
                   {branch.address && (
-                    <div className="flex items-start gap-2 text-xs text-gray-500">
-                      <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" />
+                    <div className="flex items-start gap-2 text-xs text-on-surface-variant">
+                      <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-outline" />
                       <span className="leading-snug">{branch.address}</span>
                     </div>
                   )}
                   {branch.phone && (
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <Phone className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                    <div className="flex items-center gap-2 text-xs text-on-surface-variant">
+                      <Phone className="h-3.5 w-3.5 shrink-0 text-outline" />
                       <span>{branch.phone}</span>
                     </div>
                   )}

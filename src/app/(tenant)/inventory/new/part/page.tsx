@@ -389,13 +389,13 @@ export default function NewPartPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <div className="sticky top-0 z-30 flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-4 sm:px-6 py-3 gap-3 sm:gap-0">
+      <div className="sticky top-0 z-30 flex flex-col sm:flex-row sm:items-center justify-between border-b border-outline-variant bg-surface px-4 sm:px-6 py-3 gap-3 sm:gap-0">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <Link href="/inventory" className="flex shrink-0 items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800">
+          <Link href="/inventory" className="flex shrink-0 items-center gap-1.5 text-sm text-on-surface-variant hover:text-on-surface">
             <ChevronLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back to Inventory</span><span className="sm:hidden">Back</span>
           </Link>
-          <span className="text-gray-300 shrink-0">/</span>
-          <span className="text-sm font-medium text-gray-900 truncate">Add New Part</span>
+          <span className="text-outline-variant shrink-0">/</span>
+          <span className="text-sm font-medium text-on-surface truncate">Add New Part</span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Button variant="outline" onClick={() => handleSave(true)} loading={saving && saveAndNew} disabled={hasConflict} className="px-3 sm:px-4">
@@ -416,14 +416,14 @@ export default function NewPartPage() {
 
           {/* Bought from Customer — compact */}
           <div className="max-w-xl">
-            <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-lg border-2 px-4 py-3 transition-colors ${isTradeIn ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}`}>
+            <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-lg border-2 px-4 py-3 transition-colors ${isTradeIn ? 'border-purple-500 bg-purple-50' : 'border-outline-variant hover:border-outline'}`}>
               <div className="flex items-center gap-3 min-w-0">
-                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isTradeIn ? 'bg-purple-100' : 'bg-gray-100'}`}>
-                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isTradeIn ? 'text-purple-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isTradeIn ? 'bg-purple-100' : 'bg-surface-container'}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isTradeIn ? 'text-purple-600' : 'text-outline'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
                 </div>
                 <div>
-                  <p className={`text-sm font-semibold ${isTradeIn ? 'text-purple-800' : 'text-gray-900'}`}>Bought from Customer</p>
-                  <p className={`text-xs ${isTradeIn ? 'text-purple-600' : 'text-gray-500'}`}>Mark if this item was purchased directly from a customer</p>
+                  <p className={`text-sm font-semibold ${isTradeIn ? 'text-purple-800' : 'text-on-surface'}`}>Bought from Customer</p>
+                  <p className={`text-xs ${isTradeIn ? 'text-purple-600' : 'text-on-surface-variant'}`}>Mark if this item was purchased directly from a customer</p>
                 </div>
               </div>
               <div className="shrink-0 flex items-center gap-2">
@@ -443,15 +443,15 @@ export default function NewPartPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Device Type <span className="text-red-500">*</span> <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
+                  <label className="block text-sm font-medium text-on-surface-variant mb-1">Device Type <span className="text-red-500">*</span> <span className="text-xs font-normal text-outline">(select or create)</span></label>
                   <CreatableCombobox options={categories.map(c => ({ value: c.id, label: c.name }))} value={categoryId} onChange={(id) => { setCategoryId(id); setBrandId(''); setModelId(''); setPartType('') }} onCreate={createCategory} onEdit={editCategory} onDelete={deleteCategory} placeholder="Select or type to create..." createLabel="Add device type" />
                 </div>
                 <div>
-                  <label className={`block text-sm font-medium mb-1 ${!categoryId ? 'text-gray-400' : 'text-gray-700'}`}>Brand <span className="text-red-500">*</span> <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
+                  <label className={`block text-sm font-medium mb-1 ${!categoryId ? 'text-outline' : 'text-on-surface-variant'}`}>Brand <span className="text-red-500">*</span> <span className="text-xs font-normal text-outline">(select or create)</span></label>
                   {categoryId ? (
                     <CreatableCombobox options={brands.map(b => ({ value: b.id, label: b.name }))} value={brandId} onChange={(id) => { setBrandId(id); setModelId(''); setPartType('') }} onCreate={createBrand} onEdit={editBrand} onDelete={deleteBrand} placeholder="Select or type to create..." createLabel="Add brand" />
                   ) : (
-                    <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                    <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-sm text-outline-variant select-none">
                       <Lock className="h-3.5 w-3.5 shrink-0" /> Select device type first
                     </div>
                   )}
@@ -460,21 +460,21 @@ export default function NewPartPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className={`block text-sm font-medium mb-1 ${!brandId ? 'text-gray-400' : 'text-gray-700'}`}>Model <span className="text-red-500">*</span> <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
+                  <label className={`block text-sm font-medium mb-1 ${!brandId ? 'text-outline' : 'text-on-surface-variant'}`}>Model <span className="text-red-500">*</span> <span className="text-xs font-normal text-outline">(select or create)</span></label>
                   {brandId ? (
                     <CreatableCombobox options={devices.map(d => ({ value: d.id, label: d.name }))} value={modelId} onChange={(id) => { setModelId(id); setPartType('') }} onCreate={createModel} onEdit={editModel} onDelete={deleteModel} placeholder="Select or type to create..." createLabel="Add model" />
                   ) : (
-                    <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                    <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-sm text-outline-variant select-none">
                       <Lock className="h-3.5 w-3.5 shrink-0" /> Select brand first
                     </div>
                   )}
                 </div>
                 <div>
-                  <label className={`block text-sm font-medium mb-1 ${!modelId ? 'text-gray-400' : 'text-gray-700'}`}>Part Type <span className="text-red-500">*</span> <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
+                  <label className={`block text-sm font-medium mb-1 ${!modelId ? 'text-outline' : 'text-on-surface-variant'}`}>Part Type <span className="text-red-500">*</span> <span className="text-xs font-normal text-outline">(select or create)</span></label>
                   {modelId ? (
                     <CreatableCombobox options={partTypesForModel.map(p => ({ value: p.name, label: p.name }))} value={partType} onChange={(v) => setPartType(v)} onCreate={createPartType} onEdit={editPartType} onDelete={deletePartType} placeholder="Select or type to create..." createLabel="Add part type" />
                   ) : (
-                    <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                    <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-sm text-outline-variant select-none">
                       <Lock className="h-3.5 w-3.5 shrink-0" /> Select model first
                     </div>
                   )}
@@ -504,8 +504,8 @@ export default function NewPartPage() {
             {hasVariants && (
               <div className="space-y-4">
                 {/* Attribute definitions */}
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
-                  <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Define Attributes</p>
+                <div className="rounded-lg border border-outline-variant bg-surface-container-low p-4 space-y-3">
+                  <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">Define Attributes</p>
                   {attrDefs.map((attr, idx) => (
                     <div key={attr.id} className="flex items-center gap-2">
                       <div className="w-36 shrink-0">
@@ -514,7 +514,7 @@ export default function NewPartPage() {
                           placeholder={`Attribute ${idx + 1}`}
                           value={attr.name}
                           onChange={e => updateAttr(attr.id, 'name', e.target.value)}
-                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full rounded-lg border border-outline-variant bg-surface px-3 py-1.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                       <div className="flex-1">
@@ -523,14 +523,14 @@ export default function NewPartPage() {
                           placeholder="Values, comma-separated (e.g. OEM, Compatible, Aftermarket)"
                           value={attr.valuesRaw}
                           onChange={e => updateAttr(attr.id, 'valuesRaw', e.target.value)}
-                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full rounded-lg border border-outline-variant bg-surface px-3 py-1.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                       <button
                         type="button"
                         onClick={() => removeAttr(attr.id)}
                         disabled={attrDefs.length === 1}
-                        className="p-1.5 text-gray-400 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="p-1.5 text-outline hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -550,47 +550,47 @@ export default function NewPartPage() {
                 {variantRows.length > 0 && (
                   <div>
                     <div className="mb-2 flex items-center justify-between">
-                      <p className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
-                        <Layers className="h-4 w-4 text-gray-400" /> {variantRows.length} variant{variantRows.length !== 1 ? 's' : ''}
+                      <p className="text-sm font-medium text-on-surface-variant flex items-center gap-1.5">
+                        <Layers className="h-4 w-4 text-outline" /> {variantRows.length} variant{variantRows.length !== 1 ? 's' : ''}
                       </p>
                       <button type="button" onClick={generateVariants} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
                         <RefreshCw className="h-3 w-3" /> Regenerate
                       </button>
                     </div>
-                    <div className="overflow-x-auto rounded-lg border border-gray-200">
-                      <table className="min-w-full divide-y divide-gray-100 text-sm">
-                        <thead className="bg-gray-50">
+                    <div className="overflow-x-auto rounded-lg border border-outline-variant">
+                      <table className="min-w-full divide-y divide-outline-variant text-sm">
+                        <thead className="bg-surface-container-low">
                           <tr>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Variant</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">SKU</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Barcode</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Cost ({currSymbol})</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Price ({currSymbol}) *</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Stock</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-on-surface-variant">Variant</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-on-surface-variant">SKU</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-on-surface-variant">Barcode</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-on-surface-variant">Cost ({currSymbol})</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-on-surface-variant">Price ({currSymbol}) *</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-on-surface-variant">Stock</th>
                             <th className="px-3 py-2" />
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 bg-white">
+                        <tbody className="divide-y divide-outline-variant bg-surface">
                           {variantRows.map(row => (
-                            <tr key={row.key} className="hover:bg-gray-50">
-                              <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">{row.name}</td>
+                            <tr key={row.key} className="hover:bg-surface-container-low">
+                              <td className="px-3 py-2 font-medium text-on-surface whitespace-nowrap">{row.name}</td>
                               <td className="px-3 py-2">
-                                <input type="text" value={row.sku} onChange={e => updateVariantRow(row.key, 'sku', e.target.value)} placeholder="Optional" className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                                <input type="text" value={row.sku} onChange={e => updateVariantRow(row.key, 'sku', e.target.value)} placeholder="Optional" className="w-24 rounded border border-outline-variant px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
                               </td>
                               <td className="px-3 py-2">
-                                <input type="text" value={row.barcode} onChange={e => updateVariantRow(row.key, 'barcode', e.target.value)} placeholder="Optional" className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                                <input type="text" value={row.barcode} onChange={e => updateVariantRow(row.key, 'barcode', e.target.value)} placeholder="Optional" className="w-24 rounded border border-outline-variant px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
                               </td>
                               <td className="px-3 py-2">
-                                <input type="number" min="0" step="0.01" value={row.costPrice} onChange={e => updateVariantRow(row.key, 'costPrice', e.target.value)} placeholder="0.00" className="w-20 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                                <input type="number" min="0" step="0.01" value={row.costPrice} onChange={e => updateVariantRow(row.key, 'costPrice', e.target.value)} placeholder="0.00" className="w-20 rounded border border-outline-variant px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
                               </td>
                               <td className="px-3 py-2">
-                                <input type="number" min="0" step="0.01" value={row.sellingPrice} onChange={e => updateVariantRow(row.key, 'sellingPrice', e.target.value)} placeholder="0.00" className={`w-20 rounded border px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 ${!row.sellingPrice ? 'border-red-300 bg-red-50' : 'border-gray-200'}`} />
+                                <input type="number" min="0" step="0.01" value={row.sellingPrice} onChange={e => updateVariantRow(row.key, 'sellingPrice', e.target.value)} placeholder="0.00" className={`w-20 rounded border px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 ${!row.sellingPrice ? 'border-red-300 bg-red-50' : 'border-outline-variant'}`} />
                               </td>
                               <td className="px-3 py-2">
-                                <input type="number" min="0" value={row.stock} onChange={e => updateVariantRow(row.key, 'stock', e.target.value)} className="w-16 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                                <input type="number" min="0" value={row.stock} onChange={e => updateVariantRow(row.key, 'stock', e.target.value)} className="w-16 rounded border border-outline-variant px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
                               </td>
                               <td className="px-3 py-2">
-                                <button type="button" onClick={() => removeVariantRow(row.key)} className="text-gray-400 hover:text-red-500">
+                                <button type="button" onClick={() => removeVariantRow(row.key)} className="text-outline hover:text-red-500">
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                               </td>
@@ -618,9 +618,9 @@ export default function NewPartPage() {
                 </div>
                 {hasMargin && (
                   <div className="rounded-lg bg-green-50 border border-green-100 px-4 py-2.5 flex items-center gap-4 text-sm">
-                    <span className="text-gray-600">Margin:</span>
+                    <span className="text-on-surface-variant">Margin:</span>
                     <span className="font-semibold text-green-700">{Math.round(((sell - cost) / sell) * 100)}%</span>
-                    <span className="text-gray-500">({formatCurrency(sell - cost)} profit)</span>
+                    <span className="text-on-surface-variant">({formatCurrency(sell - cost)} profit)</span>
                   </div>
                 )}
               </SectionCard>
@@ -638,44 +638,44 @@ export default function NewPartPage() {
                   <Input label="Low Stock Alert" type="number" min="0" value={lowStockAlert} onChange={e => setLowStockAlert(e.target.value)} />
                 </div>
                 {hasVariants && (
-                  <p className="text-xs text-gray-500 rounded-lg border border-dashed border-gray-200 px-3 py-2">
+                  <p className="text-xs text-on-surface-variant rounded-lg border border-dashed border-outline-variant px-3 py-2">
                     Opening stock is set per-variant in the table above.
                   </p>
                 )}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Stock Location</label>
+                  <label className="block text-sm font-medium text-on-surface-variant mb-1">Stock Location</label>
                   <Select options={[{ value: '', label: 'Select location...' }, { value: 'warehouse', label: 'Warehouse (Main Stock)' }, ...branches.map(b => ({ value: b.name, label: b.name + (b.is_main ? ' (Main Branch)' : '') }))]} value={physicalLocation} onValueChange={setPhysicalLocation} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier <span className="text-xs font-normal text-gray-400">(select or create)</span></label>
+                  <label className="block text-sm font-medium text-on-surface-variant mb-1">Supplier <span className="text-xs font-normal text-outline">(select or create)</span></label>
                   <CreatableCombobox options={suppliers.map(s => ({ value: s.id, label: s.name }))} value={supplierId} onChange={(v) => setSupplierId(v)} onCreate={createSupplier} onEdit={editSupplier} onDelete={deleteSupplier} placeholder="Select or type to create..." createLabel="Add supplier" />
                 </div>
               </SectionCard>
 
               {/* Pricing Options */}
               <SectionCard title="Pricing Options">
-                <div className="rounded-lg border border-gray-200">
+                <div className="rounded-lg border border-outline-variant">
                   <div className="flex items-center justify-between px-4 py-3">
                     <div>
-                      <p className="text-sm font-medium text-gray-900">Commission</p>
-                      <p className="text-xs text-gray-500">Enable employee commission for this part</p>
+                      <p className="text-sm font-medium text-on-surface">Commission</p>
+                      <p className="text-xs text-on-surface-variant">Enable employee commission for this part</p>
                     </div>
                     <Toggle checked={commissionEnabled} onChange={setCommissionEnabled} color="blue" />
                   </div>
                   {commissionEnabled && (
-                    <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-1 gap-4">
+                    <div className="border-t border-outline-variant px-4 py-3 grid grid-cols-1 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
+                        <label className="block text-sm font-medium text-on-surface-variant mb-1">Commission Type</label>
                         <Select options={[{ value: 'percentage', label: 'Percentage (%)' }, { value: 'fixed', label: `Fixed Amount (${currSymbol})` }]} value={commissionType} onValueChange={setCommissionType} />
                       </div>
                       <Input label={commissionType === 'percentage' ? 'Rate (%)' : `Amount (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0" value={commissionRate} onChange={e => setCommissionRate(e.target.value)} />
                     </div>
                   )}
                 </div>
-                <div className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
+                <div className="flex items-center justify-between rounded-lg border border-outline-variant px-4 py-3">
                   <div>
-                    <p className="text-sm font-medium text-gray-900">Loyalty Points</p>
-                    <p className="text-xs text-gray-500">Earn / redeem loyalty points on this part</p>
+                    <p className="text-sm font-medium text-on-surface">Loyalty Points</p>
+                    <p className="text-xs text-on-surface-variant">Earn / redeem loyalty points on this part</p>
                   </div>
                   <Toggle checked={loyaltyEnabled} onChange={setLoyaltyEnabled} color="blue" />
                 </div>
@@ -684,7 +684,7 @@ export default function NewPartPage() {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-end gap-3 py-6 border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row items-center justify-end gap-3 py-6 border-t border-outline-variant">
             <Link href="/inventory" className="w-full sm:w-auto"><Button variant="outline" className="w-full">Cancel</Button></Link>
             <Button variant="outline" className="w-full sm:w-auto" onClick={() => handleSave(true)} loading={saving && saveAndNew} disabled={hasConflict}>
               <Plus className="h-4 w-4" /> Save &amp; New

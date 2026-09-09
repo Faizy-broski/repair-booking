@@ -136,7 +136,7 @@ export default function DamageReturnDetailPage({ params }: { params: Promise<{ i
   if (loading || !ret) {
     return (
       <div className="space-y-4">
-        {[1, 2, 3].map((i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-gray-100" />)}
+        {[1, 2, 3].map((i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-surface-container" />)}
       </div>
     )
   }
@@ -145,15 +145,15 @@ export default function DamageReturnDetailPage({ params }: { params: Promise<{ i
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.push('/inventory/damage-returns')} className="h-8 w-8 text-gray-500 hover:text-gray-900">
+        <Button variant="ghost" size="icon" onClick={() => router.push('/inventory/damage-returns')} className="h-8 w-8 text-on-surface-variant hover:text-on-surface">
           <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-gray-900 font-mono">{ret.return_number}</h1>
+            <h1 className="text-xl font-bold text-on-surface font-mono">{ret.return_number}</h1>
             <Badge variant={STATUS_VARIANT[ret.status] ?? 'default'}>{ret.status}</Badge>
           </div>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-on-surface-variant">
             {ret.suppliers?.name ?? 'Unknown supplier'} · Created {formatDate(ret.created_at)}
             {ret.purchase_orders?.po_number && (
               <>
@@ -205,20 +205,20 @@ export default function DamageReturnDetailPage({ params }: { params: Promise<{ i
             value: ret.shipped_at ? formatDate(ret.shipped_at) : '—',
           },
         ].map((card) => (
-          <div key={card.label} className="rounded-lg border border-gray-200 bg-white p-3">
-            <p className="text-xs text-gray-400">{card.label}</p>
-            <p className="font-semibold text-gray-900">{card.value}</p>
+          <div key={card.label} className="rounded-lg border border-outline-variant bg-surface p-3">
+            <p className="text-xs text-outline">{card.label}</p>
+            <p className="font-semibold text-on-surface">{card.value}</p>
           </div>
         ))}
       </div>
 
       {/* Line items */}
-      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-        <div className="border-b border-gray-200 px-4 py-3">
-          <h3 className="font-semibold text-gray-900 text-sm">Items</h3>
+      <div className="rounded-xl border border-outline-variant bg-surface overflow-hidden">
+        <div className="border-b border-outline-variant px-4 py-3">
+          <h3 className="font-semibold text-on-surface text-sm">Items</h3>
         </div>
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-xs text-gray-500">
+          <thead className="bg-surface-container-low text-xs text-on-surface-variant">
             <tr>
               <th className="px-4 py-2 text-left">Item</th>
               <th className="px-4 py-2 text-right">Qty</th>
@@ -227,26 +227,26 @@ export default function DamageReturnDetailPage({ params }: { params: Promise<{ i
               <th className="px-4 py-2 text-left">Reason</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-outline-variant">
             {ret.supplier_return_items.map((item) => (
-              <tr key={item.id} className="hover:bg-gray-50">
+              <tr key={item.id} className="hover:bg-surface-container-low">
                 <td className="px-4 py-3">
-                  <p className="font-medium text-gray-800">{item.name}</p>
-                  {item.sku && <p className="text-xs text-gray-400">SKU: {item.sku}</p>}
+                  <p className="font-medium text-on-surface">{item.name}</p>
+                  {item.sku && <p className="text-xs text-outline">SKU: {item.sku}</p>}
                 </td>
-                <td className="px-4 py-3 text-right text-gray-700">{item.quantity}</td>
-                <td className="px-4 py-3 text-right text-gray-700">{formatCurrency(item.unit_cost)}</td>
-                <td className="px-4 py-3 text-right font-semibold text-gray-900">
+                <td className="px-4 py-3 text-right text-on-surface-variant">{item.quantity}</td>
+                <td className="px-4 py-3 text-right text-on-surface-variant">{formatCurrency(item.unit_cost)}</td>
+                <td className="px-4 py-3 text-right font-semibold text-on-surface">
                   {formatCurrency(item.quantity * item.unit_cost)}
                 </td>
-                <td className="px-4 py-3 text-gray-600">{item.reason ?? '—'}</td>
+                <td className="px-4 py-3 text-on-surface-variant">{item.reason ?? '—'}</td>
               </tr>
             ))}
           </tbody>
-          <tfoot className="bg-gray-50">
+          <tfoot className="bg-surface-container-low">
             <tr>
-              <td colSpan={3} className="px-4 py-3 text-right text-sm font-medium text-gray-700">Total</td>
-              <td className="px-4 py-3 text-right font-bold text-gray-900">{formatCurrency(ret.total_value)}</td>
+              <td colSpan={3} className="px-4 py-3 text-right text-sm font-medium text-on-surface-variant">Total</td>
+              <td className="px-4 py-3 text-right font-bold text-on-surface">{formatCurrency(ret.total_value)}</td>
               <td />
             </tr>
           </tfoot>
@@ -254,29 +254,29 @@ export default function DamageReturnDetailPage({ params }: { params: Promise<{ i
       </div>
 
       {ret.notes && (
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <p className="text-sm font-medium text-gray-700 mb-1">Notes</p>
-          <p className="text-sm text-gray-600">{ret.notes}</p>
+        <div className="rounded-lg border border-outline-variant bg-surface p-4">
+          <p className="text-sm font-medium text-on-surface-variant mb-1">Notes</p>
+          <p className="text-sm text-on-surface-variant">{ret.notes}</p>
         </div>
       )}
 
       {(ret.status === 'resolved' || ret.status === 'cancelled') && ret.resolution_note && (
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <p className="text-sm font-medium text-gray-700 mb-1">Resolution Note</p>
-          <p className="text-sm text-gray-600">{ret.resolution_note}</p>
+        <div className="rounded-lg border border-outline-variant bg-surface p-4">
+          <p className="text-sm font-medium text-on-surface-variant mb-1">Resolution Note</p>
+          <p className="text-sm text-on-surface-variant">{ret.resolution_note}</p>
         </div>
       )}
 
       {/* Resolve Modal */}
       <Modal open={resolveOpen} onClose={() => setResolveOpen(false)} title="Resolve Return" size="sm">
         <div className="space-y-4">
-          <p className="text-sm text-gray-500">How did the supplier make this right?</p>
+          <p className="text-sm text-on-surface-variant">How did the supplier make this right?</p>
           <div className="space-y-2">
             {(['replacement', 'credit', 'refund'] as const).map((type) => (
               <label
                 key={type}
                 className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer transition-colors ${
-                  resolutionType === type ? 'border-brand-teal bg-brand-teal-light/10' : 'border-gray-200'
+                  resolutionType === type ? 'border-brand-teal bg-brand-teal-light/10' : 'border-outline-variant'
                 }`}
               >
                 <input
@@ -285,25 +285,25 @@ export default function DamageReturnDetailPage({ params }: { params: Promise<{ i
                   checked={resolutionType === type}
                   onChange={() => setResolutionType(type)}
                 />
-                <span className="capitalize font-medium text-gray-800">{type}</span>
+                <span className="capitalize font-medium text-on-surface">{type}</span>
               </label>
             ))}
           </div>
 
           {resolutionType !== 'replacement' && (
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">
                 {resolutionType === 'credit' ? 'Credit Amount' : 'Refund Amount'}
               </label>
               <input
                 type="number" min={0} step="0.01"
                 value={resolutionAmount}
                 onChange={(e) => setResolutionAmount(e.target.value)}
-                className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
                 placeholder="0.00"
               />
               {ret.po_id && (
-                <p className="mt-1 text-xs text-gray-400">
+                <p className="mt-1 text-xs text-outline">
                   This amount will automatically be posted against {ret.purchase_orders?.po_number}'s balance.
                 </p>
               )}
@@ -311,12 +311,12 @@ export default function DamageReturnDetailPage({ params }: { params: Promise<{ i
           )}
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Note</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Note</label>
             <textarea
               rows={2}
               value={resolutionNote}
               onChange={(e) => setResolutionNote(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-outline px-3 py-2 text-sm"
             />
           </div>
 

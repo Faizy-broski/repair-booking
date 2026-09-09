@@ -157,7 +157,7 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
   }
 
   if (!supplier) {
-    return <div className="py-16 text-center text-sm text-gray-400">Supplier not found</div>
+    return <div className="py-16 text-center text-sm text-outline">Supplier not found</div>
   }
 
   const TABS: { id: Tab; label: string }[] = [
@@ -168,7 +168,7 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="space-y-5">
-      <button onClick={() => router.push('/inventory/suppliers')} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700">
+      <button onClick={() => router.push('/inventory/suppliers')} className="flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-on-surface-variant">
         <ArrowLeft className="h-4 w-4" /> Back to Suppliers
       </button>
 
@@ -178,8 +178,8 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
             <Truck className="h-6 w-6 text-blue-600" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">{supplier.name}</h1>
-            <p className="text-sm text-gray-500">
+            <h1 className="text-xl font-bold text-on-surface">{supplier.name}</h1>
+            <p className="text-sm text-on-surface-variant">
               {[supplier.contact_person, supplier.city, supplier.country].filter(Boolean).join(' · ') || 'No contact details'}
             </p>
           </div>
@@ -189,13 +189,13 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
         </Button>
       </div>
 
-      <div className="flex gap-1 border-b border-gray-200">
+      <div className="flex gap-1 border-b border-outline-variant">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-              tab === t.id ? 'border-brand-teal text-brand-teal' : 'border-transparent text-gray-500 hover:text-gray-700'
+              tab === t.id ? 'border-brand-teal text-brand-teal' : 'border-transparent text-on-surface-variant hover:text-on-surface-variant'
             }`}
           >
             {t.label}
@@ -207,17 +207,17 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
         <div className="grid gap-4 sm:grid-cols-2">
           <Card>
             <CardContent className="space-y-2 pt-4 text-sm">
-              <h3 className="mb-2 text-sm font-semibold text-gray-700">Contact</h3>
-              <div className="flex items-center gap-2 text-gray-600"><Phone className="h-3.5 w-3.5 text-gray-400" /> {supplier.phone ?? '—'}</div>
-              <div className="flex items-center gap-2 text-gray-600"><Mail className="h-3.5 w-3.5 text-gray-400" /> {supplier.email ?? '—'}</div>
-              <div className="flex items-center gap-2 text-gray-600"><MapPin className="h-3.5 w-3.5 text-gray-400" /> {[supplier.address, supplier.city, supplier.country].filter(Boolean).join(', ') || '—'}</div>
-              <div className="mt-2 text-xs text-gray-400">Payment terms: Net {supplier.payment_terms_days} days · {supplier.currency}</div>
+              <h3 className="mb-2 text-sm font-semibold text-on-surface-variant">Contact</h3>
+              <div className="flex items-center gap-2 text-on-surface-variant"><Phone className="h-3.5 w-3.5 text-outline" /> {supplier.phone ?? '—'}</div>
+              <div className="flex items-center gap-2 text-on-surface-variant"><Mail className="h-3.5 w-3.5 text-outline" /> {supplier.email ?? '—'}</div>
+              <div className="flex items-center gap-2 text-on-surface-variant"><MapPin className="h-3.5 w-3.5 text-outline" /> {[supplier.address, supplier.city, supplier.country].filter(Boolean).join(', ') || '—'}</div>
+              <div className="mt-2 text-xs text-outline">Payment terms: Net {supplier.payment_terms_days} days · {supplier.currency}</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4 space-y-2">
-              <h3 className="mb-2 text-sm font-semibold text-gray-700">Outstanding Balance</h3>
-              <p className={`text-2xl font-bold ${outstanding > 0 ? 'text-red-600' : 'text-gray-900'}`}>{formatCurrency(outstanding)}</p>
+              <h3 className="mb-2 text-sm font-semibold text-on-surface-variant">Outstanding Balance</h3>
+              <p className={`text-2xl font-bold ${outstanding > 0 ? 'text-red-600' : 'text-on-surface'}`}>{formatCurrency(outstanding)}</p>
               <Link href="/inventory/suppliers?view=credit" className="inline-block text-xs font-medium text-purple-600 hover:underline">
                 Manage in Supplier Credit →
               </Link>
@@ -227,9 +227,9 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
       )}
 
       {tab === 'purchase_orders' && (
-        <div className="rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+        <div className="rounded-xl border border-outline-variant bg-surface shadow-sm overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+            <thead className="bg-surface-container-low text-xs uppercase text-on-surface-variant">
               <tr>
                 <th className="px-4 py-2 text-left">PO #</th>
                 <th className="px-4 py-2 text-left">Date</th>
@@ -238,13 +238,13 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
                 <th className="px-4 py-2 text-right">Outstanding</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-outline-variant">
               {purchaseOrders.map((po) => (
                 <tr key={po.id}>
-                  <td className="px-4 py-2 font-mono text-xs text-gray-500">{po.po_number}</td>
-                  <td className="px-4 py-2 text-gray-600">{formatDate(po.created_at)}</td>
+                  <td className="px-4 py-2 font-mono text-xs text-on-surface-variant">{po.po_number}</td>
+                  <td className="px-4 py-2 text-on-surface-variant">{formatDate(po.created_at)}</td>
                   <td className="px-4 py-2">
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[po.payment_status] ?? 'bg-gray-100 text-gray-700'}`}>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[po.payment_status] ?? 'bg-surface-container text-on-surface-variant'}`}>
                       {po.status === 'received' ? po.payment_status : po.status}
                     </span>
                   </td>
@@ -255,7 +255,7 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
                 </tr>
               ))}
               {purchaseOrders.length === 0 && (
-                <tr><td colSpan={5} className="py-8 text-center text-xs text-gray-400 italic">No purchase orders for this supplier</td></tr>
+                <tr><td colSpan={5} className="py-8 text-center text-xs text-outline italic">No purchase orders for this supplier</td></tr>
               )}
             </tbody>
           </table>
@@ -263,7 +263,7 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
       )}
 
       {tab === 'payments' && (
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface shadow-sm">
           {/* Section header */}
           <div className="flex items-center justify-between bg-gradient-to-r from-purple-600 to-violet-700 px-5 py-4">
             <div className="flex items-center gap-3">
@@ -284,7 +284,7 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
           </div>
 
           {/* Filter toolbar */}
-          <div className="border-b border-gray-200 bg-slate-800 px-5 py-3 space-y-2">
+          <div className="border-b border-outline-variant bg-slate-800 px-5 py-3 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative flex items-center">
                 <Search className="absolute left-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
@@ -306,7 +306,7 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
                   className="w-[118px] border-0 bg-transparent text-xs text-white focus:outline-none [color-scheme:dark]"
                 />
               </div>
-              <span className="text-slate-500 text-xs font-bold">→</span>
+              <span className="text-slate-400 text-xs font-bold">→</span>
               <div className="flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-700 px-2.5 h-8">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">To</span>
                 <input
@@ -353,7 +353,7 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
 
           {/* Table */}
           {filteredPayablePOs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-14 text-gray-400">
+            <div className="flex flex-col items-center justify-center py-14 text-outline">
               <Receipt className="h-10 w-10 mb-3 opacity-30" />
               {payablePOs.length === 0
                 ? <><p className="text-sm font-medium">No received purchase orders</p><p className="text-xs mt-1">POs marked as received will appear here</p></>
@@ -372,17 +372,17 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
                     <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider" style={{ color: '#cbd5e1' }}>Payments</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-300">
+                <tbody className="divide-y divide-outline">
                   {filteredPayablePOs.map((po) => {
                     const owed = Number(po.total) - Number(po.amount_paid)
                     const isPaid = owed <= 0.01
                     return (
-                      <tr key={po.id} className="border-b border-gray-300 group hover:bg-purple-50/40 transition-colors">
+                      <tr key={po.id} className="border-b border-outline group hover:bg-purple-50/40 transition-colors">
                         <td className="px-5 py-3 align-top">
-                          <span className="font-mono text-xs font-semibold text-gray-700">{po.po_number}</span>
+                          <span className="font-mono text-xs font-semibold text-on-surface-variant">{po.po_number}</span>
                         </td>
-                        <td className="px-4 py-3 align-top text-xs text-gray-500">{formatDate(po.created_at)}</td>
-                        <td className="px-4 py-3 align-top text-right text-xs font-semibold text-gray-700">
+                        <td className="px-4 py-3 align-top text-xs text-on-surface-variant">{formatDate(po.created_at)}</td>
+                        <td className="px-4 py-3 align-top text-right text-xs font-semibold text-on-surface-variant">
                           {formatCurrency(Number(po.total))}
                         </td>
                         <td className="px-4 py-3 align-top text-right text-xs font-semibold text-emerald-600">
@@ -397,13 +397,13 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
                         </td>
                         <td className="px-5 py-3 align-top">
                           {po.payments.length === 0 ? (
-                            <span className="text-xs text-gray-300 italic">No payments yet</span>
+                            <span className="text-xs text-outline-variant italic">No payments yet</span>
                           ) : (
                             <div className="space-y-1.5">
                               {po.payments.map((p) => (
                                 <div key={p.id} className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-[11px] text-gray-500">{formatDate(p.created_at)}</span>
-                                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium capitalize text-gray-600">
+                                  <span className="text-[11px] text-on-surface-variant">{formatDate(p.created_at)}</span>
+                                  <span className="rounded-full bg-surface-container px-2 py-0.5 text-[10px] font-medium capitalize text-on-surface-variant">
                                     {p.method.replace('_', ' ')}
                                   </span>
                                   <span className="font-semibold text-[11px] text-emerald-600">

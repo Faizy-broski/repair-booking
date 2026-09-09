@@ -94,11 +94,11 @@ function StatusBadge({ status }: { status: string }) {
     active:    { label: 'Active',    className: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
     trialing:  { label: 'Trial',     className: 'bg-amber-500/15  text-amber-400  border-amber-500/30'  },
     past_due:  { label: 'Past due',  className: 'bg-red-500/15    text-red-400    border-red-500/30'    },
-    canceled:  { label: 'Canceled',  className: 'bg-zinc-500/15   text-zinc-400   border-zinc-500/30'   },
+    canceled:  { label: 'Canceled',  className: 'bg-zinc-500/15   text-outline   border-zinc-500/30'   },
     suspended: { label: 'Suspended', className: 'bg-red-500/15    text-red-400    border-red-500/30'    },
     paid:      { label: 'Completed', className: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
   }
-  const cfg = map[status] ?? { label: status, className: 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30' }
+  const cfg = map[status] ?? { label: status, className: 'bg-zinc-500/15 text-outline border-zinc-500/30' }
   return (
     <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold', cfg.className)}>
       {cfg.label}

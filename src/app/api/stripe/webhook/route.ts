@@ -567,6 +567,22 @@ export async function POST(request: NextRequest) {
 
       await SubscriptionSyncService.deactivate(businessId)
       await invalidateBusinessCache(businessId)
+
+      // Notify the business owner directly that their subscription has expired
+      // and access has been paused — sent from connect@repairbooking.co.uk.
+      const { data: business } = await supabase
+        .from('businesses')
+        .select('email, name, subdomain')
+        .eq('id', businessId)
+        .maybeSingle()
+
+      if (business?.email) {
+        EmailService.sendSubscriptionExpired({
+          to:           business.email,
+          businessName: business.name,
+          subdomain:    business.subdomain,
+        }).catch((e: unknown) => console.error('[webhook] sendSubscriptionExpired error:', e))
+      }
     }
 
     return NextResponse.json({ received: true })

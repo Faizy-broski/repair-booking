@@ -49,7 +49,7 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
             size === 'full'
               ? 'fixed left-0 top-0 z-50 w-screen h-screen -translate-x-0 -translate-y-0 rounded-none'
               : 'fixed left-1/2 top-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 rounded-xl',
-            'bg-white shadow-xl',
+            'bg-surface shadow-xl',
             size === 'full' ? 'overflow-auto' : 'max-h-[85vh] overflow-y-auto',
             '[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
@@ -62,14 +62,14 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
         >
           <div className={cn('mb-4 flex items-start justify-between', printable && 'print:hidden')}>
             <div>
-              <Dialog.Title className="text-lg font-semibold text-gray-900">{title}</Dialog.Title>
+              <Dialog.Title className="text-lg font-semibold text-on-surface">{title}</Dialog.Title>
               {description && (
-                <Dialog.Description className="mt-1 text-sm text-gray-500">{description}</Dialog.Description>
+                <Dialog.Description className="mt-1 text-sm text-on-surface-variant">{description}</Dialog.Description>
               )}
             </div>
             <button
               onClick={onClose}
-              className="ml-4 rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              className="ml-4 rounded-md p-1 text-outline hover:bg-surface-container-low hover:text-on-surface"
             >
               <X className="h-4 w-4" />
             </button>

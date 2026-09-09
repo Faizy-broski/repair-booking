@@ -192,7 +192,7 @@ export default function OtherIncomePage() {
       header: 'Title',
       cell: ({ row }) => (
         <div>
-          <span className="font-medium text-gray-900">{row.original.title}</span>
+          <span className="font-medium text-on-surface">{row.original.title}</span>
         </div>
       ),
     },
@@ -203,13 +203,13 @@ export default function OtherIncomePage() {
         const cat = (getValue() as IncomeRow['other_income_categories'])?.name
         return cat
           ? <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">{cat}</span>
-          : <span className="text-gray-400">—</span>
+          : <span className="text-outline">—</span>
       },
     },
     {
       accessorKey: 'amount',
       header: 'Amount',
-      cell: ({ getValue }) => <span className="font-semibold text-gray-900">{formatCurrency(getValue() as number)}</span>,
+      cell: ({ getValue }) => <span className="font-semibold text-on-surface">{formatCurrency(getValue() as number)}</span>,
     },
     {
       accessorKey: 'income_date',
@@ -222,8 +222,8 @@ export default function OtherIncomePage() {
       cell: ({ getValue }) => {
         const notes = getValue() as string | null
         return notes
-          ? <span className="max-w-[200px] truncate text-sm text-gray-500" title={notes}>{notes}</span>
-          : <span className="text-gray-300">—</span>
+          ? <span className="max-w-[200px] truncate text-sm text-on-surface-variant" title={notes}>{notes}</span>
+          : <span className="text-outline-variant">—</span>
       },
     },
     {
@@ -232,7 +232,7 @@ export default function OtherIncomePage() {
       cell: ({ row }) => (
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
-            <button className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-800 shadow-sm hover:bg-gray-50 transition-colors">
+            <button className="flex h-7 w-7 items-center justify-center rounded-md border border-outline bg-surface text-on-surface shadow-sm hover:bg-surface-container-low transition-colors">
               <MoreVertical className="h-4 w-4 stroke-[2.5]" />
             </button>
           </DropdownMenu.Trigger>
@@ -240,11 +240,11 @@ export default function OtherIncomePage() {
             <DropdownMenu.Content
               align="end"
               sideOffset={4}
-              className="z-50 min-w-[140px] rounded-lg border border-gray-200 bg-white p-1 shadow-lg"
+              className="z-50 min-w-[140px] rounded-lg border border-outline-variant bg-surface p-1 shadow-lg"
             >
               <DropdownMenu.Item
                 onClick={() => openEdit(row.original)}
-                className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 text-sm text-gray-700 outline-none hover:bg-gray-50"
+                className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 text-sm text-on-surface-variant outline-none hover:bg-surface-container-low"
               >
                 <Pencil className="h-3.5 w-3.5 text-blue-500" />
                 Edit
@@ -271,7 +271,7 @@ export default function OtherIncomePage() {
       <>
         <select
           {...form.register('category_id')}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
+          className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
         >
           <option value="">No category</option>
           {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -287,8 +287,8 @@ export default function OtherIncomePage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Income</h1>
-          <p className="text-sm text-gray-500">Track miscellaneous income recorded outside normal sales</p>
+          <h1 className="text-xl font-bold text-on-surface">Income</h1>
+          <p className="text-sm text-on-surface-variant">Track miscellaneous income recorded outside normal sales</p>
         </div>
         <Button onClick={() => setSheetOpen(true)}>
           <Plus className="h-4 w-4" /> Add Income
@@ -297,8 +297,8 @@ export default function OtherIncomePage() {
 
       {/* Summary */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <p className="text-sm text-gray-500">Total Income</p>
+        <div className="rounded-xl border border-outline-variant bg-surface p-4">
+          <p className="text-sm text-on-surface-variant">Total Income</p>
           <p className="text-2xl font-bold text-green-600">{formatCurrency(totalIncomeAmount)}</p>
         </div>
       </div>
@@ -319,7 +319,7 @@ export default function OtherIncomePage() {
         <form onSubmit={addForm.handleSubmit(onAddIncome)} className="space-y-4">
           <Input label="Title" placeholder="Misc cash payment" required error={addForm.formState.errors.title?.message} {...addForm.register('title')} />
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Category</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Category</label>
             {!creatingCategory ? (
               <CategorySelect form={addForm} onCreateClick={() => setCreatingCategory(true)} />
             ) : (
@@ -329,7 +329,7 @@ export default function OtherIncomePage() {
                   placeholder="e.g. Repair Cash Payment, Refund…"
                   value={newCategoryName}
                   onChange={e => setNewCategoryName(e.target.value)}
-                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none"
+                  className="flex-1 rounded-lg border border-outline px-3 py-2 text-sm focus:outline-none"
                 />
                 <Button type="button" size="sm" disabled={!newCategoryName.trim()} loading={savingCategory} onClick={handleAddCategory}>Add</Button>
                 <Button type="button" size="sm" variant="outline" onClick={() => { setCreatingCategory(false); setNewCategoryName('') }}>Cancel</Button>
@@ -339,8 +339,8 @@ export default function OtherIncomePage() {
           <Input label="Amount" type="number" step="0.01" required error={addForm.formState.errors.amount?.message} {...addForm.register('amount')} />
           <Input label="Date" type="date" required {...addForm.register('income_date')} />
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Notes <span className="text-xs font-normal text-gray-400">(optional)</span></label>
-            <textarea rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none" {...addForm.register('notes')} />
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes <span className="text-xs font-normal text-outline">(optional)</span></label>
+            <textarea rows={2} className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none" {...addForm.register('notes')} />
           </div>
           <Button type="submit" className="w-full" loading={addForm.formState.isSubmitting}>Add Income</Button>
         </form>
@@ -352,7 +352,7 @@ export default function OtherIncomePage() {
           <form onSubmit={editForm.handleSubmit(onEditIncome)} className="space-y-4">
             <Input label="Title" required error={editForm.formState.errors.title?.message} {...editForm.register('title')} />
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Category</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Category</label>
               {!editCreatingCat ? (
                 <CategorySelect form={editForm} onCreateClick={() => setEditCreatingCat(true)} />
               ) : (
@@ -362,7 +362,7 @@ export default function OtherIncomePage() {
                     placeholder="e.g. Repair Cash Payment, Refund…"
                     value={editNewCatName}
                     onChange={e => setEditNewCatName(e.target.value)}
-                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none"
+                    className="flex-1 rounded-lg border border-outline px-3 py-2 text-sm focus:outline-none"
                   />
                   <Button type="button" size="sm" disabled={!editNewCatName.trim()} loading={editSavingCat} onClick={handleEditCategory}>Add</Button>
                   <Button type="button" size="sm" variant="outline" onClick={() => { setEditCreatingCat(false); setEditNewCatName('') }}>Cancel</Button>
@@ -372,8 +372,8 @@ export default function OtherIncomePage() {
             <Input label="Amount" type="number" step="0.01" required error={editForm.formState.errors.amount?.message} {...editForm.register('amount')} />
             <Input label="Date" type="date" required {...editForm.register('income_date')} />
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Notes <span className="text-xs font-normal text-gray-400">(optional)</span></label>
-              <textarea rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none" {...editForm.register('notes')} />
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes <span className="text-xs font-normal text-outline">(optional)</span></label>
+              <textarea rows={2} className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none" {...editForm.register('notes')} />
             </div>
             <div className="flex gap-2 pt-1">
               <Button type="button" variant="outline" className="flex-1" onClick={() => setEditRow(null)}>Cancel</Button>
@@ -387,7 +387,7 @@ export default function OtherIncomePage() {
       <Modal open={!!deleteRow} onClose={() => setDeleteRow(null)} title="Delete Income" size="sm">
         {deleteRow && (
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-on-surface-variant">
               Are you sure you want to delete &quot;{deleteRow.title}&quot; ({formatCurrency(deleteRow.amount)})?
             </p>
             <p className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">

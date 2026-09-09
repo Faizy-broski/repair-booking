@@ -79,14 +79,14 @@ export default function SmsGatewayPage() {
           <MessageSquare className="h-5 w-5 text-green-600" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">SMS Gateway</h1>
-          <p className="text-sm text-gray-500">Connect an SMS provider to send text notifications to customers</p>
+          <h1 className="text-2xl font-bold text-on-surface">SMS Gateway</h1>
+          <p className="text-sm text-on-surface-variant">Connect an SMS provider to send text notifications to customers</p>
         </div>
       </div>
 
       <div className="max-w-lg space-y-6">
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <h3 className="mb-4 text-lg font-semibold text-gray-900">SMS Gateway Configuration</h3>
+        <div className="rounded-lg border border-outline-variant bg-surface p-6 shadow-sm">
+          <h3 className="mb-4 text-lg font-semibold text-on-surface">SMS Gateway Configuration</h3>
           {smsConfig?.is_configured && (
             <div className="mb-4 flex items-center gap-2 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
               <CheckCircle2 className="h-4 w-4" /> SMS gateway is configured ({smsConfig.sms_gateway})
@@ -128,8 +128,8 @@ export default function SmsGatewayPage() {
         </div>
 
         {/* Test SMS */}
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <h3 className="mb-4 text-lg font-semibold text-gray-900">Send Test SMS</h3>
+        <div className="rounded-lg border border-outline-variant bg-surface p-6 shadow-sm">
+          <h3 className="mb-4 text-lg font-semibold text-on-surface">Send Test SMS</h3>
           <div className="flex gap-3">
             <Input
               placeholder="+447911123456"

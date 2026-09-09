@@ -437,6 +437,65 @@ export const EmailService = {
     })
   },
 
+  /**
+   * Sent when a business's subscription has fully expired/been cancelled and
+   * access has been revoked (customer.subscription.deleted, or a reconcile
+   * pass that detects the same drift). Sent from connect@repairbooking.co.uk
+   * (SMTP_FROM) straight to the business owner's email on file.
+   */
+  async sendSubscriptionExpired(payload: {
+    to: string
+    businessName: string
+    subdomain: string
+    planName?: string | null
+  }) {
+    const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'repairbooking.co.uk'
+    const renewUrl = `https://${payload.subdomain}.${ROOT_DOMAIN}/account/plans`
+    const supportEmail = process.env.SMTP_FROM ?? 'connect@repairbooking.co.uk'
+
+    const transport = await getGlobalTransporter()
+    await transport.sendMail({
+      from: globalFromAddress('RepairBooking'),
+      to: payload.to,
+      subject: `Your RepairBooking subscription has expired`,
+      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8f9fa;font-family:Arial,sans-serif;">
+        <div style="max-width:600px;margin:40px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+          <div style="background:#ef4444;padding:32px 40px;text-align:center;">
+            <h1 style="color:#fff;margin:0;font-size:24px;font-weight:800;">RepairBooking</h1>
+            <p style="color:rgba(255,255,255,0.9);margin:8px 0 0;font-size:14px;">Subscription expired</p>
+          </div>
+          <div style="padding:40px;">
+            <p style="color:#374151;font-size:16px;margin:0 0 8px;">Hi there,</p>
+            <p style="color:#6B7280;font-size:14px;line-height:1.6;margin:0 0 24px;">
+              Your${payload.planName ? ` <strong>${payload.planName}</strong>` : ''} subscription for
+              <strong>${payload.businessName}</strong> has expired and access to your RepairBooking
+              dashboard has now been paused. Your data is safe and will be waiting for you as soon as
+              you renew.
+            </p>
+            <div style="text-align:center;margin-bottom:32px;">
+              <a href="${renewUrl}" style="display:inline-block;background:#008080;color:#fff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">Renew Your Subscription →</a>
+            </div>
+            <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px 20px;">
+              <p style="margin:0;font-size:13px;color:#991b1b;font-weight:600;">What this means</p>
+              <ul style="margin:8px 0 0;padding-left:20px;color:#b91c1c;font-size:13px;line-height:1.8;">
+                <li>Staff can no longer log in to the dashboard</li>
+                <li>Online booking and customer-facing tools are paused</li>
+                <li>All your data is retained and will be restored the moment you renew</li>
+              </ul>
+            </div>
+            <p style="color:#9CA3AF;font-size:13px;margin:24px 0 0;text-align:center;">
+              Questions? Reply to this email or contact us at
+              <a href="mailto:${supportEmail}" style="color:#008080;text-decoration:none;">${supportEmail}</a>
+            </p>
+          </div>
+          <div style="background:#F9FAFB;border-top:1px solid #F3F4F6;padding:20px 40px;text-align:center;">
+            <p style="color:#9CA3AF;font-size:12px;margin:0;">© ${new Date().getFullYear()} The Social Nexus Ltd · <a href="https://${ROOT_DOMAIN}" style="color:#9CA3AF;">repairbooking.co.uk</a></p>
+          </div>
+        </div>
+      </body></html>`,
+    })
+  },
+
   async sendOtp(payload: { to: string; otp: string; expiresInMinutes: number }) {
     const APP_NAME = 'RepairBooking'
     const transport = await getGlobalTransporter()

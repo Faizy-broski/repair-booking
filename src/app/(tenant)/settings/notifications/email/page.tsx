@@ -144,8 +144,8 @@ export default function EmailSmtpPage() {
 
       {/* ── Page header ── */}
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Email Settings</h1>
-        <p className="mt-0.5 text-sm text-gray-500">Choose how customers receive email notifications from your shop</p>
+        <h1 className="text-xl font-bold text-on-surface">Email Settings</h1>
+        <p className="mt-0.5 text-sm text-on-surface-variant">Choose how customers receive email notifications from your shop</p>
       </div>
 
       {/* ── Tab selector ── */}
@@ -155,7 +155,7 @@ export default function EmailSmtpPage() {
           className={`relative flex flex-col items-start gap-2 rounded-xl border-2 p-4 text-left cursor-pointer transition-all ${
             tab === 'simple'
               ? 'border-teal-500 bg-teal-50 shadow-sm'
-              : 'border-gray-200 bg-white hover:border-gray-300'
+              : 'border-outline-variant bg-surface hover:border-outline'
           }`}
         >
           {tab === 'simple' && (
@@ -163,20 +163,20 @@ export default function EmailSmtpPage() {
               <CheckCircle2 className="h-3.5 w-3.5 text-white" />
             </span>
           )}
-          <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${tab === 'simple' ? 'bg-teal-100' : 'bg-gray-100'}`}>
-            <Mail className={`h-5 w-5 ${tab === 'simple' ? 'text-teal-600' : 'text-gray-500'}`} />
+          <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${tab === 'simple' ? 'bg-teal-100' : 'bg-surface-container'}`}>
+            <Mail className={`h-5 w-5 ${tab === 'simple' ? 'text-teal-600' : 'text-on-surface-variant'}`} />
           </div>
           <div>
-            <p className={`text-sm font-semibold ${tab === 'simple' ? 'text-teal-900' : 'text-gray-800'}`}>
+            <p className={`text-sm font-semibold ${tab === 'simple' ? 'text-teal-900' : 'text-on-surface'}`}>
               Gmail / Personal Email
             </p>
-            <p className="mt-0.5 text-xs text-gray-500 leading-relaxed">
+            <p className="mt-0.5 text-xs text-on-surface-variant leading-relaxed">
               We send emails for you. Replies go to your inbox.
             </p>
           </div>
           {isSmtpActive
-            ? <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">Inactive — SMTP active</span>
-            : <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${tab === 'simple' ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'}`}>Recommended</span>
+            ? <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-surface-container text-outline">Inactive — SMTP active</span>
+            : <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${tab === 'simple' ? 'bg-teal-100 text-teal-700' : 'bg-surface-container text-on-surface-variant'}`}>Recommended</span>
           }
         </button>
 
@@ -185,7 +185,7 @@ export default function EmailSmtpPage() {
           className={`relative flex flex-col items-start gap-2 rounded-xl border-2 p-4 text-left cursor-pointer transition-all ${
             tab === 'business'
               ? 'border-indigo-500 bg-indigo-50 shadow-sm'
-              : 'border-gray-200 bg-white hover:border-gray-300'
+              : 'border-outline-variant bg-surface hover:border-outline'
           }`}
         >
           {tab === 'business' && (
@@ -198,20 +198,20 @@ export default function EmailSmtpPage() {
               <CheckCircle2 className="h-3.5 w-3.5 text-white" />
             </span>
           )}
-          <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${tab === 'business' ? 'bg-indigo-100' : 'bg-gray-100'}`}>
-            <Globe className={`h-5 w-5 ${tab === 'business' ? 'text-indigo-600' : 'text-gray-500'}`} />
+          <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${tab === 'business' ? 'bg-indigo-100' : 'bg-surface-container'}`}>
+            <Globe className={`h-5 w-5 ${tab === 'business' ? 'text-indigo-600' : 'text-on-surface-variant'}`} />
           </div>
           <div>
-            <p className={`text-sm font-semibold ${tab === 'business' ? 'text-indigo-900' : 'text-gray-800'}`}>
+            <p className={`text-sm font-semibold ${tab === 'business' ? 'text-indigo-900' : 'text-on-surface'}`}>
               Business Domain
             </p>
-            <p className="mt-0.5 text-xs text-gray-500 leading-relaxed">
+            <p className="mt-0.5 text-xs text-on-surface-variant leading-relaxed">
               Send from your own domain via SMTP.
             </p>
           </div>
           {isSmtpActive
             ? <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-green-100 text-green-700">Active</span>
-            : <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${tab === 'business' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}>Advanced</span>
+            : <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full ${tab === 'business' ? 'bg-indigo-100 text-indigo-700' : 'bg-surface-container text-on-surface-variant'}`}>Advanced</span>
           }
         </button>
       </div>
@@ -236,22 +236,22 @@ export default function EmailSmtpPage() {
           )}
 
           {/* How it works */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+          <div className="rounded-xl border border-outline-variant bg-surface p-5 space-y-4">
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-teal-500" />
-              <h3 className="text-sm font-semibold text-gray-900">How it works</h3>
+              <h3 className="text-sm font-semibold text-on-surface">How it works</h3>
             </div>
             <div className="space-y-2">
               {[
                 { from: 'connect@repairbooking.co.uk', label: 'Sent from', sub: 'Platform handles delivery — no setup needed' },
                 { from: replyToEmail || 'your email below', label: 'Replies go to', sub: 'Customer hits Reply → lands in your inbox' },
               ].map((item, i) => (
-                <div key={i} className="flex items-center gap-3 rounded-lg bg-gray-50 px-4 py-2.5">
-                  <span className="text-xs font-medium text-gray-400 w-16 shrink-0">{item.label}</span>
-                  <ArrowRight className="h-3 w-3 text-gray-300 shrink-0" />
+                <div key={i} className="flex items-center gap-3 rounded-lg bg-surface-container-low px-4 py-2.5">
+                  <span className="text-xs font-medium text-outline w-16 shrink-0">{item.label}</span>
+                  <ArrowRight className="h-3 w-3 text-outline-variant shrink-0" />
                   <div>
-                    <p className="text-xs font-semibold text-gray-800 font-mono">{item.from}</p>
-                    <p className="text-[10px] text-gray-400">{item.sub}</p>
+                    <p className="text-xs font-semibold text-on-surface font-mono">{item.from}</p>
+                    <p className="text-[10px] text-outline">{item.sub}</p>
                   </div>
                 </div>
               ))}
@@ -259,10 +259,10 @@ export default function EmailSmtpPage() {
           </div>
 
           {/* Reply-to field */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+          <div className="rounded-xl border border-outline-variant bg-surface p-5 space-y-4">
             <div>
-              <h3 className="text-sm font-semibold text-gray-900">Your Reply Address</h3>
-              <p className="text-xs text-gray-500 mt-0.5">Customers who reply to notification emails will reach this address.</p>
+              <h3 className="text-sm font-semibold text-on-surface">Your Reply Address</h3>
+              <p className="text-xs text-on-surface-variant mt-0.5">Customers who reply to notification emails will reach this address.</p>
             </div>
             <Input
               label="Email Address"
@@ -306,20 +306,20 @@ export default function EmailSmtpPage() {
           )}
 
           {/* SMTP form */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+          <div className="rounded-xl border border-outline-variant bg-surface p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-gray-900">SMTP Configuration</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Emails send directly from your domain</p>
+                <h3 className="text-sm font-semibold text-on-surface">SMTP Configuration</h3>
+                <p className="text-xs text-outline mt-0.5">Emails send directly from your domain</p>
               </div>
               <button
                 type="button"
                 onClick={() => setSmtpForm((f) => ({ ...f, smtp_enabled: !f.smtp_enabled }))}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  smtpForm.smtp_enabled ? 'bg-indigo-600' : 'bg-gray-200'
+                  smtpForm.smtp_enabled ? 'bg-indigo-600' : 'bg-surface-container-high'
                 }`}
               >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-surface shadow transition-transform ${
                   smtpForm.smtp_enabled ? 'translate-x-6' : 'translate-x-1'
                 }`} />
               </button>
@@ -349,19 +349,19 @@ export default function EmailSmtpPage() {
             />
 
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700">Password / App Password</label>
+              <label className="block text-sm font-medium text-on-surface-variant">Password / App Password</label>
               <div className="relative">
                 <input
                   type={smtpShowPass ? 'text' : 'password'}
                   value={smtpForm.smtp_pass}
                   onChange={(e) => setSmtpForm((f) => ({ ...f, smtp_pass: e.target.value }))}
                   placeholder={smtpConfig?.is_configured ? '••••••••  (leave blank to keep)' : 'Enter password'}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-10 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  className="w-full rounded-lg border border-outline px-3 py-2 pr-10 text-sm text-on-surface placeholder:text-outline focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
                 <button
                   type="button"
                   onClick={() => setSmtpShowPass((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface-variant"
                   tabIndex={-1}
                 >
                   {smtpShowPass ? <EyeOff className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
@@ -380,11 +380,11 @@ export default function EmailSmtpPage() {
             <label className="flex items-center gap-3 cursor-pointer">
               <div
                 onClick={() => setSmtpForm((f) => ({ ...f, smtp_secure: !f.smtp_secure, smtp_port: !f.smtp_secure ? 465 : 587 }))}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${smtpForm.smtp_secure ? 'bg-indigo-600' : 'bg-gray-200'}`}
+                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${smtpForm.smtp_secure ? 'bg-indigo-600' : 'bg-surface-container-high'}`}
               >
-                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${smtpForm.smtp_secure ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface shadow transition-transform ${smtpForm.smtp_secure ? 'translate-x-4' : 'translate-x-0.5'}`} />
               </div>
-              <span className="text-sm text-gray-700">Use SSL (port 465) — off means TLS/STARTTLS (port 587)</span>
+              <span className="text-sm text-on-surface-variant">Use SSL (port 465) — off means TLS/STARTTLS (port 587)</span>
             </label>
 
             {smtpMsg && (
@@ -406,9 +406,9 @@ export default function EmailSmtpPage() {
           </div>
 
           {/* Test connection */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-3">
-            <h3 className="text-sm font-semibold text-gray-900">Send Test Email</h3>
-            <p className="text-xs text-gray-500">Verify your settings work before going live. Uses the credentials entered above.</p>
+          <div className="rounded-xl border border-outline-variant bg-surface p-5 space-y-3">
+            <h3 className="text-sm font-semibold text-on-surface">Send Test Email</h3>
+            <p className="text-xs text-on-surface-variant">Verify your settings work before going live. Uses the credentials entered above.</p>
             <div className="flex gap-2">
               <Input
                 placeholder="test@example.com"

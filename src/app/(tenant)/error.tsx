@@ -16,8 +16,8 @@ export default function TenantError({
         </svg>
       </div>
       <div>
-        <h2 className="text-lg font-semibold text-gray-900">Something went wrong</h2>
-        <p className="mt-1 text-sm text-gray-500">{error.message}</p>
+        <h2 className="text-lg font-semibold text-on-surface">Something went wrong</h2>
+        <p className="mt-1 text-sm text-on-surface-variant">{error.message}</p>
       </div>
       <button
         onClick={reset}

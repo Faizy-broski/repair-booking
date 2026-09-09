@@ -11,8 +11,8 @@ const ICONS = {
 
 const STYLES = {
   info:    'bg-primary text-on-primary border-primary/20',
-  success: 'bg-[#1b8c4e] text-white border-green-700/20',
-  warning: 'bg-[#b36a00] text-white border-yellow-700/20',
+  success: 'bg-success text-on-success border-success/20',
+  warning: 'bg-warning text-on-warning border-warning/20',
   error:   'bg-error text-on-error border-error/20',
 }
 

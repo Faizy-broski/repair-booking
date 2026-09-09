@@ -148,11 +148,11 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
             <span className="text-2xl">✓</span>
           </div>
           <p className="font-semibold text-green-700">Payment Successful!</p>
-          {successSaleId && <p className="text-xs text-gray-400 mt-1">Sale #{successSaleId.slice(-8)}</p>}
+          {successSaleId && <p className="text-xs text-outline mt-1">Sale #{successSaleId.slice(-8)}</p>}
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="rounded-lg bg-gray-50 p-4">
+          <div className="rounded-lg bg-surface-container-low p-4">
             <div className="flex justify-between text-lg font-bold">
               <span>Total Due</span>
               <span className="text-blue-600">{formatCurrency(pos.total())}</span>
@@ -173,8 +173,8 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
                     pos.paymentMethod === key
                       ? 'border-blue-500 bg-blue-50 text-blue-700'
                       : disabled
-                        ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
-                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                        ? 'border-outline-variant bg-surface-container-low text-outline-variant cursor-not-allowed'
+                        : 'border-outline-variant text-on-surface-variant hover:bg-surface-container-low'
                   }`}
                 >
                   {icon}
@@ -208,8 +208,8 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
           {pos.paymentMethod === 'store_credit' && (
             <div className="space-y-2">
               {creditBalance !== null && (
-                <p className="text-xs text-gray-500">
-                  Available balance: <span className="font-semibold text-gray-800">{formatCurrency(creditBalance)}</span>
+                <p className="text-xs text-on-surface-variant">
+                  Available balance: <span className="font-semibold text-on-surface">{formatCurrency(creditBalance)}</span>
                 </p>
               )}
               <div className="flex gap-2">
@@ -236,8 +236,8 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
           {pos.paymentMethod === 'loyalty_points' && (
             <div className="space-y-2">
               {loyaltyBalance !== null && (
-                <p className="text-xs text-gray-500">
-                  Points balance: <span className="font-semibold text-gray-800">{loyaltyBalance} pts</span>
+                <p className="text-xs text-on-surface-variant">
+                  Points balance: <span className="font-semibold text-on-surface">{loyaltyBalance} pts</span>
                   {' '}(≈ {formatCurrency(loyaltyBalance * loyaltyRate)})
                 </p>
               )}

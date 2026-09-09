@@ -197,15 +197,15 @@ export default function UsersSettingsPage() {
     }
   }
 
-  if (!isOwner()) return <div className="p-8 text-center text-gray-500">Only business owners can manage users.</div>
+  if (!isOwner()) return <div className="p-8 text-center text-on-surface-variant">Only business owners can manage users.</div>
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-gray-200 bg-white">
-        <div className="border-b border-gray-200 px-4 py-3">
-          <h3 className="font-semibold text-gray-900">Team Members</h3>
+      <div className="rounded-xl border border-outline-variant bg-surface">
+        <div className="border-b border-outline-variant px-4 py-3">
+          <h3 className="font-semibold text-on-surface">Team Members</h3>
         </div>
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-outline-variant">
           {users.map((user) => {
             const isSelf = user.id === profile?.id
             return (
@@ -215,7 +215,7 @@ export default function UsersSettingsPage() {
               >
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-gray-900">{user.full_name ?? user.email}</p>
+                    <p className="font-medium text-on-surface">{user.full_name ?? user.email}</p>
                     {isSelf && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
                         <Crown className="h-3 w-3" />
@@ -223,7 +223,7 @@ export default function UsersSettingsPage() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-gray-400">{user.email} · {ROLE_LABELS[user.role] ?? user.role}</p>
+                  <p className="text-xs text-outline">{user.email} · {ROLE_LABELS[user.role] ?? user.role}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {(user.role !== 'business_owner' || isSelf) && (
@@ -252,7 +252,7 @@ export default function UsersSettingsPage() {
                       <KeyRound className="h-4 w-4" />
                     </Button>
                   )}
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${user.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${user.is_active ? 'bg-green-100 text-green-700' : 'bg-surface-container text-on-surface-variant'}`}>
                     {user.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </div>
@@ -262,8 +262,8 @@ export default function UsersSettingsPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-6">
-        <h3 className="mb-4 font-semibold text-gray-900">Create Team Member Account</h3>
+      <div className="rounded-xl border border-outline-variant bg-surface p-6">
+        <h3 className="mb-4 font-semibold text-on-surface">Create Team Member Account</h3>
         {userCreateError && (
           <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{userCreateError}</div>
         )}
@@ -273,16 +273,16 @@ export default function UsersSettingsPage() {
           <Input label="Password" type="password" required {...userForm.register('password')} />
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Role</label>
-              <select {...userForm.register('role')} className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm">
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Role</label>
+              <select {...userForm.register('role')} className="h-9 w-full rounded-lg border border-outline px-3 text-sm">
                 <option value="cashier">Cashier</option>
                 <option value="staff">Staff</option>
                 <option value="branch_manager">Branch Manager</option>
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Branch</label>
-              <select {...userForm.register('branch_id')} className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm">
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Branch</label>
+              <select {...userForm.register('branch_id')} className="h-9 w-full rounded-lg border border-outline px-3 text-sm">
                 <option value="">Select branch</option>
                 {branches.map((b) => (
                   <option key={b.id} value={b.id}>{b.name}</option>
@@ -296,15 +296,15 @@ export default function UsersSettingsPage() {
 
       {resetTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+          <div className="w-full max-w-sm rounded-xl bg-surface shadow-xl">
+            <div className="flex items-center justify-between border-b border-outline-variant px-5 py-4">
               <div>
-                <h2 className="font-semibold text-gray-900">Set password</h2>
-                <p className="mt-0.5 text-xs text-gray-500">{resetTarget.full_name ?? resetTarget.email}</p>
+                <h2 className="font-semibold text-on-surface">Set password</h2>
+                <p className="mt-0.5 text-xs text-on-surface-variant">{resetTarget.full_name ?? resetTarget.email}</p>
               </div>
               <button
                 onClick={() => { setResetTarget(null); setResetError(null); setResetSuccess(false) }}
-                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100"
+                className="rounded-lg p-1 text-outline hover:bg-surface-container"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -351,18 +351,18 @@ export default function UsersSettingsPage() {
 
       {editTarget && editTarget.role === 'business_owner' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+          <div className="w-full max-w-sm rounded-xl bg-surface shadow-xl">
+            <div className="flex items-center justify-between border-b border-outline-variant px-5 py-4">
               <div className="flex items-center gap-2">
                 <Crown className="h-4 w-4 text-amber-500" />
                 <div>
-                  <h2 className="font-semibold text-gray-900">Edit my details</h2>
-                  <p className="mt-0.5 text-xs text-gray-500">{editTarget.full_name ?? editTarget.email}</p>
+                  <h2 className="font-semibold text-on-surface">Edit my details</h2>
+                  <p className="mt-0.5 text-xs text-on-surface-variant">{editTarget.full_name ?? editTarget.email}</p>
                 </div>
               </div>
               <button
                 onClick={() => { setEditTarget(null); setEditError(null) }}
-                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100"
+                className="rounded-lg p-1 text-outline hover:bg-surface-container"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -393,15 +393,15 @@ export default function UsersSettingsPage() {
 
       {editTarget && editTarget.role !== 'business_owner' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+          <div className="w-full max-w-sm rounded-xl bg-surface shadow-xl">
+            <div className="flex items-center justify-between border-b border-outline-variant px-5 py-4">
               <div>
-                <h2 className="font-semibold text-gray-900">Edit team member</h2>
-                <p className="mt-0.5 text-xs text-gray-500">{editTarget.full_name ?? editTarget.email}</p>
+                <h2 className="font-semibold text-on-surface">Edit team member</h2>
+                <p className="mt-0.5 text-xs text-on-surface-variant">{editTarget.full_name ?? editTarget.email}</p>
               </div>
               <button
                 onClick={() => { setEditTarget(null); setEditError(null) }}
-                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100"
+                className="rounded-lg p-1 text-outline hover:bg-surface-container"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -423,16 +423,16 @@ export default function UsersSettingsPage() {
                 />
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Role</label>
-                    <select {...editForm.register('role')} className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                    <label className="mb-1 block text-sm font-medium text-on-surface-variant">Role</label>
+                    <select {...editForm.register('role')} className="h-9 w-full rounded-lg border border-outline px-3 text-sm">
                       <option value="cashier">Cashier</option>
                       <option value="staff">Staff</option>
                       <option value="branch_manager">Branch Manager</option>
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">Branch</label>
-                    <select {...editForm.register('branch_id')} className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm">
+                    <label className="mb-1 block text-sm font-medium text-on-surface-variant">Branch</label>
+                    <select {...editForm.register('branch_id')} className="h-9 w-full rounded-lg border border-outline px-3 text-sm">
                       <option value="">Select branch</option>
                       {branches.map((b) => (
                         <option key={b.id} value={b.id}>{b.name}</option>
@@ -440,8 +440,8 @@ export default function UsersSettingsPage() {
                     </select>
                   </div>
                 </div>
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input type="checkbox" className="h-4 w-4 rounded border-gray-300" {...editForm.register('is_active')} />
+                <label className="flex items-center gap-2 text-sm text-on-surface-variant">
+                  <input type="checkbox" className="h-4 w-4 rounded border-outline" {...editForm.register('is_active')} />
                   Active
                 </label>
                 <Button type="submit" className="w-full" loading={editForm.formState.isSubmitting}>
@@ -455,18 +455,18 @@ export default function UsersSettingsPage() {
 
       {changePwTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+          <div className="w-full max-w-sm rounded-xl bg-surface shadow-xl">
+            <div className="flex items-center justify-between border-b border-outline-variant px-5 py-4">
               <div className="flex items-center gap-2">
                 <Crown className="h-4 w-4 text-amber-500" />
                 <div>
-                  <h2 className="font-semibold text-gray-900">Change my password</h2>
-                  <p className="mt-0.5 text-xs text-gray-500">{changePwTarget.full_name ?? changePwTarget.email}</p>
+                  <h2 className="font-semibold text-on-surface">Change my password</h2>
+                  <p className="mt-0.5 text-xs text-on-surface-variant">{changePwTarget.full_name ?? changePwTarget.email}</p>
                 </div>
               </div>
               <button
                 onClick={() => { setChangePwTarget(null); setChangePwError(null); setChangePwSuccess(false) }}
-                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100"
+                className="rounded-lg p-1 text-outline hover:bg-surface-container"
               >
                 <X className="h-4 w-4" />
               </button>

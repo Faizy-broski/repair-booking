@@ -142,7 +142,7 @@ export default function NewDamageReturnPage() {
   return (
     <div className="space-y-4 max-w-3xl">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-gray-500 hover:text-gray-900">
+        <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-on-surface-variant hover:text-on-surface">
           <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
         </Button>
         <div className="flex items-center gap-3">
@@ -150,20 +150,20 @@ export default function NewDamageReturnPage() {
             <Undo2 className="h-5 w-5 text-orange-600" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">New Damage Return</h1>
-            <p className="text-sm text-gray-500">Creates a draft — stock isn't deducted until you ship it</p>
+            <h1 className="text-xl font-bold text-on-surface">New Damage Return</h1>
+            <p className="text-sm text-on-surface-variant">Creates a draft — stock isn't deducted until you ship it</p>
           </div>
         </div>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-4">
+      <div className="rounded-xl border border-outline-variant bg-surface p-4 space-y-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Supplier</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Supplier</label>
             <select
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
-              className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm"
+              className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
             >
               <option value="">Select supplier…</option>
               {suppliers.map((s) => (
@@ -172,12 +172,12 @@ export default function NewDamageReturnPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Link to Purchase Order (optional)</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Link to Purchase Order (optional)</label>
             <select
               value={poId}
               onChange={(e) => selectPo(e.target.value)}
               disabled={!supplierId || loadingPo}
-              className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm disabled:bg-gray-50"
+              className="h-9 w-full rounded-lg border border-outline px-3 text-sm disabled:bg-surface-container-low"
             >
               <option value="">No linked PO</option>
               {pos.map((p) => (
@@ -185,14 +185,14 @@ export default function NewDamageReturnPage() {
               ))}
             </select>
             {supplierId && pos.length === 0 && (
-              <p className="mt-1 text-xs text-gray-400">No received purchase orders for this supplier</p>
+              <p className="mt-1 text-xs text-outline">No received purchase orders for this supplier</p>
             )}
           </div>
         </div>
 
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <label className="text-sm font-medium text-gray-700">Line Items</label>
+            <label className="text-sm font-medium text-on-surface-variant">Line Items</label>
             {!poDetail && (
               <button type="button" onClick={() => setPickerOpen(true)} className="text-xs font-medium text-brand-teal hover:underline">
                 + Add product
@@ -201,7 +201,7 @@ export default function NewDamageReturnPage() {
           </div>
 
           {poDetail && (
-            <p className="mb-2 text-xs text-gray-500">
+            <p className="mb-2 text-xs text-on-surface-variant">
               Items from {poDetail.po_number} — quantity capped at what was actually received.
             </p>
           )}
@@ -209,7 +209,7 @@ export default function NewDamageReturnPage() {
           <div className="space-y-2">
             {items.map((item, idx) => (
               <div key={idx} className="grid grid-cols-[1fr,4.5rem,4.5rem,1fr,1.5rem] gap-1.5 items-center">
-                <div className="flex h-8 items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 px-2 text-sm truncate">
+                <div className="flex h-8 items-center gap-1.5 rounded-md border border-outline-variant bg-surface-container-low px-2 text-sm truncate">
                   <span className="truncate">{item.name}</span>
                 </div>
                 <input
@@ -220,27 +220,27 @@ export default function NewDamageReturnPage() {
                     const capped = item.maxQuantity != null ? Math.min(val, item.maxQuantity) : val
                     updateItem(idx, { quantity: isNaN(capped) ? 0 : capped })
                   }}
-                  className="h-8 rounded-md border border-gray-300 px-2 text-sm"
+                  className="h-8 rounded-md border border-outline px-2 text-sm"
                 />
                 <input
                   type="number" min={0} step="0.01" placeholder="Cost"
                   value={item.unit_cost}
                   onChange={(e) => updateItem(idx, { unit_cost: Number(e.target.value) })}
-                  className="h-8 rounded-md border border-gray-300 px-2 text-sm"
+                  className="h-8 rounded-md border border-outline px-2 text-sm"
                 />
                 <input
                   type="text" placeholder="Reason (e.g. screen cracked)"
                   value={item.reason}
                   onChange={(e) => updateItem(idx, { reason: e.target.value })}
-                  className="h-8 rounded-md border border-gray-300 px-2 text-sm"
+                  className="h-8 rounded-md border border-outline px-2 text-sm"
                 />
                 {!poDetail && (
-                  <button onClick={() => removeItem(idx)} className="text-gray-400 hover:text-red-500 text-sm">×</button>
+                  <button onClick={() => removeItem(idx)} className="text-outline hover:text-red-500 text-sm">×</button>
                 )}
               </div>
             ))}
             {items.length === 0 && (
-              <p className="py-3 text-center text-xs text-gray-400">
+              <p className="py-3 text-center text-xs text-outline">
                 {poDetail ? 'No received items on this PO.' : 'Add a product to get started'}
               </p>
             )}
@@ -264,14 +264,14 @@ export default function NewDamageReturnPage() {
           />
         </div>
 
-        <div className="rounded-lg bg-gray-50 p-3 flex justify-between text-sm">
-          <span className="text-gray-500">Total Value</span>
-          <span className="font-semibold text-gray-900">{formatCurrency(total)}</span>
+        <div className="rounded-lg bg-surface-container-low p-3 flex justify-between text-sm">
+          <span className="text-on-surface-variant">Total Value</span>
+          <span className="font-semibold text-on-surface">{formatCurrency(total)}</span>
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
-          <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes</label>
+          <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full rounded-lg border border-outline px-3 py-2 text-sm" />
         </div>
 
         <Button className="w-full" onClick={handleSubmit} loading={saving} disabled={!supplierId || activeItems.length === 0}>

@@ -96,11 +96,11 @@ export function ServiceSelector({ onSelect }: Props) {
       <p className="text-xs font-semibold uppercase tracking-wider text-brand-teal">Service Catalogue Quick-fill</p>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">Device Type</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Device Type</label>
           <select
             value={catId}
             onChange={(e) => { setCatId(e.target.value); onSelect(null); setProbId('') }}
-            className="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-brand-teal focus:ring-1 focus:ring-brand-teal outline-none transition-all"
+            className="h-9 w-full rounded-lg border border-outline bg-surface px-3 text-sm focus:border-brand-teal focus:ring-1 focus:ring-brand-teal outline-none transition-all"
           >
             <option value="">Select Device Type…</option>
             {categories.map((c) => (
@@ -109,11 +109,11 @@ export function ServiceSelector({ onSelect }: Props) {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">Brand</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Brand</label>
           <select
             value={mfrId}
             onChange={(e) => setMfrId(e.target.value)}
-            className="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-brand-teal focus:ring-1 focus:ring-brand-teal outline-none transition-all"
+            className="h-9 w-full rounded-lg border border-outline bg-surface px-3 text-sm focus:border-brand-teal focus:ring-1 focus:ring-brand-teal outline-none transition-all"
           >
             <option value="">Select Brand…</option>
             {manufacturers.map((m) => (
@@ -122,12 +122,12 @@ export function ServiceSelector({ onSelect }: Props) {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">Model</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Model</label>
           <select
             value={devId}
             onChange={(e) => setDevId(e.target.value)}
             disabled={!mfrId}
-            className="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-brand-teal focus:ring-1 focus:ring-brand-teal outline-none transition-all disabled:opacity-50 disabled:bg-gray-50"
+            className="h-9 w-full rounded-lg border border-outline bg-surface px-3 text-sm focus:border-brand-teal focus:ring-1 focus:ring-brand-teal outline-none transition-all disabled:opacity-50 disabled:bg-surface-container-low"
           >
             <option value="">Select Model…</option>
             {devices.map((d) => (
@@ -136,12 +136,12 @@ export function ServiceSelector({ onSelect }: Props) {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">Service</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Service</label>
           <select
             value={probId}
             onChange={(e) => handleProblemChange(e.target.value)}
             disabled={!devId && !catId}
-            className="h-9 w-full rounded-lg border border-brand-teal bg-white px-3 text-sm font-medium text-brand-teal focus:ring-1 focus:ring-brand-teal outline-none transition-all disabled:opacity-50 disabled:border-gray-300 disabled:text-gray-500 disabled:font-normal"
+            className="h-9 w-full rounded-lg border border-brand-teal bg-surface px-3 text-sm font-medium text-brand-teal focus:ring-1 focus:ring-brand-teal outline-none transition-all disabled:opacity-50 disabled:border-outline disabled:text-on-surface-variant disabled:font-normal"
           >
             <option value="">Select Service…</option>
             {problems.map((p) => (

@@ -280,31 +280,31 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 animate-pulse rounded-lg bg-gray-100" />
+          <div className="h-8 w-8 animate-pulse rounded-lg bg-surface-container" />
           <div className="flex-1 space-y-1.5">
-            <div className="h-5 w-40 animate-pulse rounded bg-gray-200" />
-            <div className="h-3.5 w-28 animate-pulse rounded bg-gray-100" />
+            <div className="h-5 w-40 animate-pulse rounded bg-surface-container-high" />
+            <div className="h-3.5 w-28 animate-pulse rounded bg-surface-container" />
           </div>
-          <div className="h-7 w-24 animate-pulse rounded-full bg-gray-200" />
-          <div className="h-9 w-32 animate-pulse rounded-lg bg-gray-100" />
+          <div className="h-7 w-24 animate-pulse rounded-full bg-surface-container-high" />
+          <div className="h-9 w-32 animate-pulse rounded-lg bg-surface-container" />
         </div>
         <div className="flex items-center justify-center py-8">
-          <div className="flex items-center gap-3 text-gray-400">
+          <div className="flex items-center gap-3 text-outline">
             <BrandSpinner size="sm" />
             <span className="text-sm">Loading repair details…</span>
           </div>
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
-          {[1, 2].map((i) => <div key={i} className="h-48 animate-pulse rounded-xl bg-gray-100" />)}
+          {[1, 2].map((i) => <div key={i} className="h-48 animate-pulse rounded-xl bg-surface-container" />)}
         </div>
-        <div className="h-32 animate-pulse rounded-xl bg-gray-100" />
+        <div className="h-32 animate-pulse rounded-xl bg-surface-container" />
       </div>
     )
   }
 
   if (!repair) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+      <div className="flex flex-col items-center justify-center py-16 text-outline">
         <p>Repair not found</p>
         <Button variant="outline" className="mt-4" onClick={() => router.back()}>Go back</Button>
       </div>
@@ -316,12 +316,12 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 shrink-0 text-gray-500 hover:text-gray-900">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 shrink-0 text-on-surface-variant hover:text-on-surface">
             <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
           </Button>
           <div className="flex-1 min-w-0">
-            <h1 className="truncate text-lg font-bold text-gray-900 sm:text-xl">Job #{repair.job_number}</h1>
-            <p className="text-xs text-gray-500 sm:text-sm">{formatDateTime(repair.created_at)}</p>
+            <h1 className="truncate text-lg font-bold text-on-surface sm:text-xl">Job #{repair.job_number}</h1>
+            <p className="text-xs text-on-surface-variant sm:text-sm">{formatDateTime(repair.created_at)}</p>
           </div>
           {(() => {
             const sc = customStatuses.find((cs) => cs.name === repair.status)
@@ -379,7 +379,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
                 {repair.diagnosis && <InfoRow label="Diagnosis" value={repair.diagnosis} />}
                 {repair.custom_fields?.item_attributes && Object.keys(repair.custom_fields.item_attributes as Record<string, string>).length > 0 && (
                   <>
-                    <hr className="border-gray-100" />
+                    <hr className="border-outline-variant" />
                     {Object.entries(repair.custom_fields.item_attributes as Record<string, string>).map(([k, v]) => (
                       <InfoRow key={k} label={k} value={v} />
                     ))}
@@ -397,8 +397,8 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
                 {repair.lock_type === 'passcode' && <InfoRow label="Passcode" value={repair.passcode} />}
                 {repair.lock_type === 'pattern' && repair.passcode && (
                   <div className="flex gap-2">
-                    <span className="w-28 shrink-0 text-gray-400">Pattern</span>
-                    <div className="rounded-lg border border-gray-200 bg-gray-50 overflow-hidden pointer-events-none w-fit">
+                    <span className="w-28 shrink-0 text-outline">Pattern</span>
+                    <div className="rounded-lg border border-outline-variant bg-surface-container-low overflow-hidden pointer-events-none w-fit">
                       <PatternLock value={repair.passcode} size={150} readOnly />
                     </div>
                   </div>
@@ -419,7 +419,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
                 <InfoRow label="Phone" value={repair.customers.phone} />
               </>
             )}
-            <hr className="border-gray-100" />
+            <hr className="border-outline-variant" />
             <InfoRow label="Estimated" value={repair.estimated_cost ? formatCurrency(repair.estimated_cost) : null} />
             <InfoRow label="Actual cost" value={repair.actual_cost ? formatCurrency(repair.actual_cost) : null} />
             {(() => {
@@ -459,13 +459,13 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
             )}
             {repair.repair_payments && repair.repair_payments.length > 0 && (
               <div className="flex flex-wrap items-start gap-x-2 gap-y-1 py-0.5">
-                <span className="w-24 shrink-0 text-gray-400">Payments</span>
+                <span className="w-24 shrink-0 text-outline">Payments</span>
                 <div className="flex-1 space-y-0.5">
                   {repair.repair_payments.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between text-xs text-gray-600">
+                    <div key={p.id} className="flex items-center justify-between text-xs text-on-surface-variant">
                       <span className="capitalize">{p.method.replace('_', ' ')}</span>
-                      <span className="text-gray-400">{formatDate(p.created_at)}</span>
-                      <span className="font-medium text-gray-800">{formatCurrency(p.amount)}</span>
+                      <span className="text-outline">{formatDate(p.created_at)}</span>
+                      <span className="font-medium text-on-surface">{formatCurrency(p.amount)}</span>
                     </div>
                   ))}
                 </div>
@@ -480,21 +480,21 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
             <InfoRow label="Due Date" value={repair.custom_fields?.due_date ? formatDate(repair.custom_fields.due_date) : null} />
             {repair.profiles?.full_name && (
               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                <span className="w-24 shrink-0 text-gray-400">Booked by</span>
+                <span className="w-24 shrink-0 text-outline">Booked by</span>
                 <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
                   {repair.profiles.full_name}
                 </span>
               </div>
             )}
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 py-0.5">
-              <span className="w-24 shrink-0 text-gray-400">Assigned</span>
+              <span className="w-24 shrink-0 text-outline">Assigned</span>
               <div className="flex flex-1 items-center gap-2">
-                {assigningTech && <span className="text-xs text-gray-400">Saving…</span>}
+                {assigningTech && <span className="text-xs text-outline">Saving…</span>}
                 <select
                   value={repair.assigned_to ?? ''}
                   onChange={(e) => assignTechnician(e.target.value || null)}
                   disabled={assigningTech}
-                  className="h-8 min-w-0 flex-1 rounded-md border border-gray-200 bg-white px-2 text-sm text-gray-700 focus:border-blue-500 focus:outline-none disabled:opacity-50"
+                  className="h-8 min-w-0 flex-1 rounded-md border border-outline-variant bg-surface px-2 text-sm text-on-surface-variant focus:border-blue-500 focus:outline-none disabled:opacity-50"
                 >
                   <option value="">— Unassigned —</option>
                   {technicians.map((t) => (
@@ -515,14 +515,14 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
             <CardContent className="space-y-4 text-sm">
               {repair.custom_fields?.customer_note && (
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Customer Note (Public)</label>
-                  <p className="mt-1 rounded-lg border border-blue-100 bg-blue-50/50 p-2 text-gray-900">{repair.custom_fields.customer_note}</p>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-outline">Customer Note (Public)</label>
+                  <p className="mt-1 rounded-lg border border-blue-100 bg-blue-50/50 p-2 text-on-surface">{repair.custom_fields.customer_note}</p>
                 </div>
               )}
               {repair.custom_fields?.staff_note && (
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Staff Note (Internal)</label>
-                  <p className="mt-1 rounded-lg border border-amber-100 bg-amber-50/50 p-2 text-gray-900">{repair.custom_fields.staff_note}</p>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-outline">Staff Note (Internal)</label>
+                  <p className="mt-1 rounded-lg border border-amber-100 bg-amber-50/50 p-2 text-on-surface">{repair.custom_fields.staff_note}</p>
                 </div>
               )}
             </CardContent>
@@ -555,7 +555,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
           <CardContent>
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 text-xs text-gray-500">
+                <tr className="border-b border-outline-variant text-xs text-on-surface-variant">
                   <th className="py-1 text-left">Item</th>
                   <th className="py-1 text-right">Qty</th>
                   <th className="py-1 text-right">Price</th>
@@ -566,12 +566,12 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
                   const itemDiscount = item.discount_amount || 0
                   const netUnitPrice = item.unit_price - (item.quantity > 0 ? itemDiscount / item.quantity : itemDiscount)
                   return (
-                    <tr key={item.id} className="border-b border-gray-50">
+                    <tr key={item.id} className="border-b border-outline-variant">
                       <td className="py-1.5">{item.name}</td>
                       <td className="py-1.5 text-right">{item.quantity}</td>
                       <td className="py-1.5 text-right">
                         {itemDiscount > 0 && (
-                          <span className="mr-1.5 text-gray-400 line-through">{formatCurrency(item.unit_price)}</span>
+                          <span className="mr-1.5 text-outline line-through">{formatCurrency(item.unit_price)}</span>
                         )}
                         {formatCurrency(netUnitPrice)}
                       </td>
@@ -612,8 +612,8 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
                     })()}
                     {h.email_sent && <span className="text-xs text-green-600">Email sent</span>}
                   </div>
-                  {h.note && <p className="mt-0.5 text-gray-500">{h.note}</p>}
-                  <p className="text-xs text-gray-400">
+                  {h.note && <p className="mt-0.5 text-on-surface-variant">{h.note}</p>}
+                  <p className="text-xs text-outline">
                     {formatDateTime(h.created_at)}
                     {h.profiles?.full_name && ` · ${h.profiles.full_name}`}
                   </p>
@@ -646,9 +646,9 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
                   }
                   return (
                     <div key={item.id} className="flex items-center justify-between">
-                      <span className="text-gray-700">{item.name}</span>
+                      <span className="text-on-surface-variant">{item.name}</span>
                       <span className={`text-xs font-medium ${
-                        daysLeft === null ? 'text-gray-400' :
+                        daysLeft === null ? 'text-outline' :
                         daysLeft > 30 ? 'text-green-600' :
                         daysLeft > 0 ? 'text-yellow-600' : 'text-red-600'
                       }`}>
@@ -704,7 +704,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
           />
           <div>
             <div className="mb-1 flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-700">Note (optional)</label>
+              <label className="text-sm font-medium text-on-surface-variant">Note (optional)</label>
               {cannedResponses.length > 0 && (
                 <div className="relative">
                   <button
@@ -715,12 +715,12 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
                     <BookOpen className="h-3 w-3" /> Use template
                   </button>
                   {showCannedPicker && (
-                    <div className="absolute right-0 z-50 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg">
+                    <div className="absolute right-0 z-50 mt-1 w-56 rounded-lg border border-outline-variant bg-surface shadow-lg">
                       {cannedResponses.map((c) => (
                         <button
                           key={c.id}
                           type="button"
-                          className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                          className="block w-full px-3 py-2 text-left text-sm hover:bg-surface-container-low"
                           onClick={() => {
                             setStatusNote(c.body)
                             setShowCannedPicker(false)
@@ -739,7 +739,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
               value={statusNote}
               onChange={(e) => setStatusNote(e.target.value)}
               placeholder="Describe the update..."
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
             />
           </div>
           <Button className="w-full" loading={updating} onClick={updateStatus}>
@@ -774,8 +774,8 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
   if (!value) return null
   return (
     <div className="flex flex-wrap gap-x-2 gap-y-0.5">
-      <span className="w-24 shrink-0 text-gray-400">{label}</span>
-      <span className="flex-1 break-words text-gray-900">{value}</span>
+      <span className="w-24 shrink-0 text-outline">{label}</span>
+      <span className="flex-1 break-words text-on-surface">{value}</span>
     </div>
   )
 }

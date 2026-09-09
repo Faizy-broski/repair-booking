@@ -170,7 +170,7 @@ export default function RepairCustomerDetailPage() {
         const issue = row.original.issue
         return issue
           ? <span className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">{issue}</span>
-          : <span className="text-gray-400">—</span>
+          : <span className="text-outline">—</span>
       },
     },
     {
@@ -214,11 +214,11 @@ export default function RepairCustomerDetailPage() {
     <div className="space-y-4">
       {/* Header */}
       <div>
-        <button onClick={() => router.push('/repairs/customers')} className="mb-2 flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors">
+        <button onClick={() => router.push('/repairs/customers')} className="mb-2 flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-on-surface transition-colors">
           <ArrowLeft className="h-4 w-4" /> Back to Repair Customers
         </button>
-        <h1 className="text-xl font-bold text-gray-900">Repair Job Sheet</h1>
-        <p className="mt-0.5 text-sm font-semibold text-gray-700">{customerLabel}</p>
+        <h1 className="text-xl font-bold text-on-surface">Repair Job Sheet</h1>
+        <p className="mt-0.5 text-sm font-semibold text-on-surface-variant">{customerLabel}</p>
       </div>
 
       {/* Export Toolbar */}

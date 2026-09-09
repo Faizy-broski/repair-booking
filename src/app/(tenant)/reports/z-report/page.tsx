@@ -312,12 +312,12 @@ function ZReportPageInner() {
             <h3 className="text-lg font-semibold text-blue-900">Z-Report — Register Closed</h3>
             <Button size="sm" variant="outline" onClick={() => setZReportData(null)}>Dismiss</Button>
           </div>
-          <div className="mb-3 rounded-lg border border-blue-200 bg-white p-3">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Sales Breakdown</p>
+          <div className="mb-3 rounded-lg border border-blue-200 bg-surface p-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Sales Breakdown</p>
             <div className="grid grid-cols-3 gap-2 text-sm">
-              <div><p className="text-xs text-gray-500">Product Sales</p><p className="font-semibold text-gray-900">{formatCurrency(zReportData.total_sales ?? 0)}</p></div>
-              <div><p className="text-xs text-gray-500">Repair Sales</p><p className="font-semibold text-gray-900">{formatCurrency(zReportData.repair_sales ?? 0)}</p></div>
-              <div><p className="text-xs text-gray-500">Total</p><p className="font-semibold text-blue-900">{formatCurrency(zReportData.grand_total ?? (zReportData.total_sales ?? 0) + (zReportData.repair_sales ?? 0) - (zReportData.repair_refunds ?? 0) - (zReportData.total_refunds ?? 0))}</p></div>
+              <div><p className="text-xs text-on-surface-variant">Product Sales</p><p className="font-semibold text-on-surface">{formatCurrency(zReportData.total_sales ?? 0)}</p></div>
+              <div><p className="text-xs text-on-surface-variant">Repair Sales</p><p className="font-semibold text-on-surface">{formatCurrency(zReportData.repair_sales ?? 0)}</p></div>
+              <div><p className="text-xs text-on-surface-variant">Total</p><p className="font-semibold text-blue-900">{formatCurrency(zReportData.grand_total ?? (zReportData.total_sales ?? 0) + (zReportData.repair_sales ?? 0) - (zReportData.repair_refunds ?? 0) - (zReportData.total_refunds ?? 0))}</p></div>
             </div>
           </div>
 
@@ -343,19 +343,19 @@ function ZReportPageInner() {
               { label: 'Card Total',     value: zReportData.closing_card_total },
               { label: 'Variance',       value: zReportData.variance, highlight: true },
             ] as { label: string; value: number | undefined; isCurrency?: boolean; highlight?: boolean }[]).map(({ label, value, isCurrency = true, highlight }) => (
-              <div key={label} className={`rounded-lg border bg-white p-3 ${highlight && (value ?? 0) !== 0 ? 'border-red-300' : 'border-gray-200'}`}>
-                <p className="text-xs text-gray-500">{label}</p>
-                <p className={`mt-0.5 font-semibold ${highlight && (value ?? 0) !== 0 ? 'text-red-600' : 'text-gray-900'}`}>
+              <div key={label} className={`rounded-lg border bg-surface p-3 ${highlight && (value ?? 0) !== 0 ? 'border-red-300' : 'border-outline-variant'}`}>
+                <p className="text-xs text-on-surface-variant">{label}</p>
+                <p className={`mt-0.5 font-semibold ${highlight && (value ?? 0) !== 0 ? 'text-red-600' : 'text-on-surface'}`}>
                   {isCurrency ? formatCurrency(value ?? 0) : String(value ?? 0)}
                 </p>
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-gray-400 italic">Reflects cash-drawer transactions: product/service sales and repair deposits paid in cash. Repair balances collected outside POS aren't captured with a payment method today, so they're excluded here.</p>
+          <p className="mt-2 text-[11px] text-outline italic">Reflects cash-drawer transactions: product/service sales and repair deposits paid in cash. Repair balances collected outside POS aren't captured with a payment method today, so they're excluded here.</p>
 
           {zReportMovements.length > 0 && (
-            <div className="mt-4 rounded-lg border border-blue-200 bg-white p-3">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Cash Movements</p>
+            <div className="mt-4 rounded-lg border border-blue-200 bg-surface p-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Cash Movements</p>
               <div className="space-y-1.5">
                 {zReportMovements.map((m: any) => (
                   <div key={m.id} className="flex items-start justify-between text-sm">
@@ -364,12 +364,12 @@ function ZReportPageInner() {
                         <span className={`text-xs font-semibold ${m.type === 'cash_in' ? 'text-green-600' : 'text-orange-600'}`}>
                           {m.type === 'cash_in' ? '+ Cash In' : '− Cash Out'}
                         </span>
-                        {m.purpose && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium capitalize text-gray-500">{m.purpose}</span>}
+                        {m.purpose && <span className="rounded-full bg-surface-container px-2 py-0.5 text-[10px] font-medium capitalize text-on-surface-variant">{m.purpose}</span>}
                         {m.purpose === 'plain' && <span className="text-[10px] italic text-amber-600">(not in reports)</span>}
                         {m.payment_type === 'card' && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">Card</span>}
                       </div>
-                      {m.notes && <span className="text-xs text-gray-400 truncate">{m.notes}</span>}
-                      <p className="text-[10px] text-gray-400">
+                      {m.notes && <span className="text-xs text-outline truncate">{m.notes}</span>}
+                      <p className="text-[10px] text-outline">
                         {new Date(m.created_at).toLocaleString('en-GB')} · {m.profiles?.full_name ?? 'Unknown'}
                       </p>
                     </div>
@@ -378,11 +378,11 @@ function ZReportPageInner() {
                     </span>
                   </div>
                 ))}
-                <div className="border-t border-gray-200 pt-1.5 flex justify-between text-xs font-semibold text-gray-700">
+                <div className="border-t border-outline-variant pt-1.5 flex justify-between text-xs font-semibold text-on-surface-variant">
                   <span>Net Cash Movement</span>
                   <span>{formatCurrency(zReportMovements.reduce((s: number, m: any) => s + (m.type === 'cash_in' ? m.amount : -m.amount), 0))}</span>
                 </div>
-                <p className="text-[10px] text-gray-400 italic">Card-tagged movements are excluded from Expected Cash above, since they never touched the physical till.</p>
+                <p className="text-[10px] text-outline italic">Card-tagged movements are excluded from Expected Cash above, since they never touched the physical till.</p>
               </div>
             </div>
           )}
@@ -672,7 +672,7 @@ function ZReportPageInner() {
 
 export default function ZReportPage() {
   return (
-    <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-gray-400">Loading...</div>}>
+    <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-outline">Loading...</div>}>
       <ZReportPageInner />
     </Suspense>
   )

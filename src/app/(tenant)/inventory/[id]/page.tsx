@@ -636,7 +636,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   if (!product) {
     return (
       <div className="py-16 text-center">
-        <p className="text-gray-500">Product not found.</p>
+        <p className="text-on-surface-variant">Product not found.</p>
         <Link href="/inventory" className="mt-2 inline-block text-sm text-brand-teal hover:underline">Back to Inventory</Link>
       </div>
     )
@@ -649,13 +649,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="flex min-h-screen flex-col">
-      <div className="sticky top-0 z-30 flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 bg-white px-4 sm:px-6 py-3 gap-3 sm:gap-0">
+      <div className="sticky top-0 z-30 flex flex-col sm:flex-row sm:items-center justify-between border-b border-outline-variant bg-surface px-4 sm:px-6 py-3 gap-3 sm:gap-0">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <Link href="/inventory" className="flex shrink-0 items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800">
+          <Link href="/inventory" className="flex shrink-0 items-center gap-1.5 text-sm text-on-surface-variant hover:text-on-surface">
             <ChevronLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back to Inventory</span><span className="sm:hidden">Back</span>
           </Link>
-          <span className="text-gray-300 shrink-0">/</span>
-          <span className="text-sm font-medium text-gray-900 truncate">{product.name}</span>
+          <span className="text-outline-variant shrink-0">/</span>
+          <span className="text-sm font-medium text-on-surface truncate">{product.name}</span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Button variant="outline" className="text-red-600 hover:bg-red-50 px-3 sm:px-4" onClick={() => setDeleteModal(true)}>
@@ -672,28 +672,28 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
           {/* Type Toggle + Bought from Customer — compact, stacked */}
           <div className="max-w-xl space-y-4">
-            <div className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3">
-              <span className="text-sm font-medium text-gray-700 shrink-0">Item Type</span>
-              <div className="flex rounded-lg border border-gray-200 p-0.5 ml-auto">
+            <div className="flex items-center gap-3 rounded-lg border border-outline-variant bg-surface px-4 py-3">
+              <span className="text-sm font-medium text-on-surface-variant shrink-0">Item Type</span>
+              <div className="flex rounded-lg border border-outline-variant p-0.5 ml-auto">
                 <button type="button" onClick={() => setItemType('product')}
-                  className={`rounded px-4 py-1.5 text-sm font-medium transition-colors ${itemType === 'product' ? 'bg-brand-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                  className={`rounded px-4 py-1.5 text-sm font-medium transition-colors ${itemType === 'product' ? 'bg-brand-teal text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}>
                   Product
                 </button>
                 <button type="button" onClick={() => setItemType('part')}
-                  className={`rounded px-4 py-1.5 text-sm font-medium transition-colors ${itemType === 'part' ? 'bg-brand-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                  className={`rounded px-4 py-1.5 text-sm font-medium transition-colors ${itemType === 'part' ? 'bg-brand-teal text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}>
                   Part
                 </button>
               </div>
             </div>
 
-            <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-lg border-2 px-4 py-3 transition-colors ${isTradeIn ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-gray-300'}`}>
+            <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-lg border-2 px-4 py-3 transition-colors ${isTradeIn ? 'border-purple-500 bg-purple-50' : 'border-outline-variant hover:border-outline'}`}>
               <div className="flex items-center gap-3 min-w-0">
-                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isTradeIn ? 'bg-purple-100' : 'bg-gray-100'}`}>
-                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isTradeIn ? 'text-purple-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isTradeIn ? 'bg-purple-100' : 'bg-surface-container'}`}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isTradeIn ? 'text-purple-600' : 'text-outline'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
                 </div>
                 <div>
-                  <p className={`text-sm font-semibold ${isTradeIn ? 'text-purple-800' : 'text-gray-900'}`}>Bought from Customer</p>
-                  <p className={`text-xs ${isTradeIn ? 'text-purple-600' : 'text-gray-500'}`}>Mark if this item was purchased directly from a customer</p>
+                  <p className={`text-sm font-semibold ${isTradeIn ? 'text-purple-800' : 'text-on-surface'}`}>Bought from Customer</p>
+                  <p className={`text-xs ${isTradeIn ? 'text-purple-600' : 'text-on-surface-variant'}`}>Mark if this item was purchased directly from a customer</p>
                 </div>
               </div>
               <div className="shrink-0 flex items-center gap-2">
@@ -712,8 +712,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               <Input label="Name *" required value={name} onChange={e => setName(e.target.value)} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {hasRepairs ? 'Device Type' : 'Category'} <span className="text-xs font-normal text-gray-400">(select or create)</span>
+                  <label className="block text-sm font-medium text-on-surface-variant mb-1">
+                    {hasRepairs ? 'Device Type' : 'Category'} <span className="text-xs font-normal text-outline">(select or create)</span>
                   </label>
                   <CreatableCombobox
                     options={categories.map(c => ({ value: c.id, label: c.name }))}
@@ -727,8 +727,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Brand <span className="text-xs font-normal text-gray-400">(select or create)</span>
+                  <label className="block text-sm font-medium text-on-surface-variant mb-1">
+                    Brand <span className="text-xs font-normal text-outline">(select or create)</span>
                   </label>
                   <CreatableCombobox
                     options={brands.map(b => ({ value: b.id, label: b.name }))}
@@ -746,14 +746,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <label className="block text-sm font-medium text-gray-700">Model</label>
+                      <label className="block text-sm font-medium text-on-surface-variant">Model</label>
                       <button type="button" onClick={() => setAddingDevice(true)} className="text-xs text-brand-teal hover:underline">+ Add</button>
                     </div>
                     <Select options={[{ value: '', label: 'Select model...' }, ...devices.map(d => ({ value: d.id, label: d.name }))]} value={modelId} onValueChange={setModelId} />
                   </div>
                   {itemType === 'part' && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Part Type</label>
+                      <label className="block text-sm font-medium text-on-surface-variant mb-1">Part Type</label>
                       <Select options={[{ value: '', label: 'Select part type...' }, ...partTypeOptions]} value={partType} onValueChange={setPartType} />
                     </div>
                   )}
@@ -765,7 +765,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   <div className="flex-1">
                     <Input label="Barcode / UPC" value={barcode} onChange={e => setBarcode(e.target.value)} error={barcodeConflict ? 'This Barcode is already in use' : undefined} />
                   </div>
-                  <Button type="button" variant="outline" className="mb-0.5 h-10 px-3 shrink-0 border-gray-300" onClick={() => setBarcodeModalOpen(true)} title="Generate or Print Barcode" disabled={!product}>
+                  <Button type="button" variant="outline" className="mb-0.5 h-10 px-3 shrink-0 border-outline" onClick={() => setBarcodeModalOpen(true)} title="Generate or Print Barcode" disabled={!product}>
                     <Barcode className="h-4 w-4" />
                   </Button>
                 </div>
@@ -803,7 +803,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Stock Location</label>
+                <label className="block text-sm font-medium text-on-surface-variant mb-1">Stock Location</label>
                 <Select
                   options={[
                     { value: '', label: 'Select location...' },
@@ -816,7 +816,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               </div>
               {itemType === 'part' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier (optional)</label>
+                  <label className="block text-sm font-medium text-on-surface-variant mb-1">Supplier (optional)</label>
                   <Select options={[{ value: '', label: 'Select Supplier...' }, ...suppliers.map(s => ({ value: s.id, label: s.name }))]} value={supplierId} onValueChange={setSupplierId} />
                 </div>
               )}
@@ -824,28 +824,28 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
 
               {/* Pricing Options */}
               <SectionCard title="Pricing Options">
-              <div className="rounded-lg border border-gray-200">
+              <div className="rounded-lg border border-outline-variant">
                 <div className="flex items-center justify-between px-4 py-3">
                   <div>
-                    <p className="text-sm font-medium text-gray-900">Commission</p>
-                    <p className="text-xs text-gray-500">Enable employee commission for this {itemType}</p>
+                    <p className="text-sm font-medium text-on-surface">Commission</p>
+                    <p className="text-xs text-on-surface-variant">Enable employee commission for this {itemType}</p>
                   </div>
                   <Toggle checked={commissionEnabled} onChange={setCommissionEnabled} color="blue" />
                 </div>
                 {commissionEnabled && (
-                  <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-1 gap-4">
+                  <div className="border-t border-outline-variant px-4 py-3 grid grid-cols-1 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Commission Type</label>
+                      <label className="block text-sm font-medium text-on-surface-variant mb-1">Commission Type</label>
                       <Select options={[{ value: 'percentage', label: 'Percentage (%)' }, { value: 'fixed', label: `Fixed Amount (${currSymbol})` }]} value={commissionType} onValueChange={setCommissionType} />
                     </div>
                     <Input label={commissionType === 'percentage' ? 'Rate (%)' : `Amount (${currSymbol})`} type="number" step="0.01" min="0" placeholder="0" value={commissionRate} onChange={e => setCommissionRate(e.target.value)} />
                   </div>
                 )}
               </div>
-              <div className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
+              <div className="flex items-center justify-between rounded-lg border border-outline-variant px-4 py-3">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Loyalty Points</p>
-                  <p className="text-xs text-gray-500">Earn / redeem loyalty points on this {itemType}</p>
+                  <p className="text-sm font-medium text-on-surface">Loyalty Points</p>
+                  <p className="text-xs text-on-surface-variant">Earn / redeem loyalty points on this {itemType}</p>
                 </div>
                 <Toggle checked={loyaltyEnabled} onChange={setLoyaltyEnabled} color="blue" />
               </div>
@@ -877,24 +877,24 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               >
             {/* Existing variants table */}
             {allVariants.length > 0 && (
-              <div className="mb-4 overflow-x-auto rounded-lg border border-gray-200">
-                <table className="min-w-full divide-y divide-gray-100 text-sm">
-                  <thead className="bg-gray-50">
+              <div className="mb-4 overflow-x-auto rounded-lg border border-outline-variant">
+                <table className="min-w-full divide-y divide-outline-variant text-sm">
+                  <thead className="bg-surface-container-low">
                     <tr>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Image</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Variant</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">SKU</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Barcode</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Cost ({currSymbol})</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Selling Price ({currSymbol})</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Stock</th>
-                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-900">Batches</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-on-surface">Image</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-on-surface">Variant</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-on-surface">SKU</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-on-surface">Barcode</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-on-surface">Cost ({currSymbol})</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-on-surface">Selling Price ({currSymbol})</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-on-surface">Stock</th>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-on-surface">Batches</th>
                       <th className="px-3 py-2.5" />
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
+                  <tbody className="divide-y divide-outline-variant bg-surface">
                     {allVariants.map(row => (
-                      <tr key={row.id} className={`hover:bg-gray-50 transition-colors ${row.dirty ? 'bg-amber-50' : ''}`}>
+                      <tr key={row.id} className={`hover:bg-surface-container-low transition-colors ${row.dirty ? 'bg-amber-50' : ''}`}>
                         <td className="px-3 py-2.5">
                           <ImageUpload
                             compact
@@ -903,17 +903,17 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                             onChange={(url) => updateExistingVariant(row.id, 'imageUrl', url)}
                           />
                         </td>
-                        <td className="px-3 py-2.5 font-medium text-gray-800 whitespace-nowrap">
+                        <td className="px-3 py-2.5 font-medium text-on-surface whitespace-nowrap">
                           {row.name}
                           {row.dirty && <span className="ml-1.5 text-[10px] text-amber-600 font-semibold">unsaved</span>}
                         </td>
                         <td className="px-3 py-2.5">
-                          <input type="text" value={row.sku} onChange={e => updateExistingVariant(row.id, 'sku', e.target.value)} placeholder="Optional" className="w-28 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
+                          <input type="text" value={row.sku} onChange={e => updateExistingVariant(row.id, 'sku', e.target.value)} placeholder="Optional" className="w-28 rounded-md border border-outline px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
                         </td>
                         <td className="px-3 py-2.5">
                           <div className="flex gap-1.5 items-center">
-                            <input type="text" value={row.barcode} onChange={e => updateExistingVariant(row.id, 'barcode', e.target.value)} placeholder="Optional" className="w-40 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
-                            <button type="button" onClick={() => updateExistingVariant(row.id, 'barcode', Math.floor(100000000000 + Math.random() * 900000000000).toString())} className="p-1.5 text-gray-400 hover:text-brand-teal transition-colors bg-gray-50 hover:bg-brand-teal/10 rounded-md shrink-0" title="Generate Barcode">
+                            <input type="text" value={row.barcode} onChange={e => updateExistingVariant(row.id, 'barcode', e.target.value)} placeholder="Optional" className="w-40 rounded-md border border-outline px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
+                            <button type="button" onClick={() => updateExistingVariant(row.id, 'barcode', Math.floor(100000000000 + Math.random() * 900000000000).toString())} className="p-1.5 text-outline hover:text-brand-teal transition-colors bg-surface-container-low hover:bg-brand-teal/10 rounded-md shrink-0" title="Generate Barcode">
                               <RefreshCw className="h-3 w-3" />
                             </button>
                             {row.barcode && (
@@ -926,23 +926,23 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                         <td className="px-3 py-2.5">
                           {product?.valuation_method === 'fifo' ? (() => {
                             const nextCost = (costLayers ?? []).filter(l => l.variant_id === row.id)[0]?.unit_cost
-                            return <span className="text-xs text-gray-600">{nextCost != null ? formatCurrency(nextCost) : '—'}</span>
+                            return <span className="text-xs text-on-surface-variant">{nextCost != null ? formatCurrency(nextCost) : '—'}</span>
                           })() : (
-                            <input type="number" min="0" step="0.01" value={row.costPrice} onChange={e => updateExistingVariant(row.id, 'costPrice', e.target.value)} placeholder="0.00" className="w-24 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
+                            <input type="number" min="0" step="0.01" value={row.costPrice} onChange={e => updateExistingVariant(row.id, 'costPrice', e.target.value)} placeholder="0.00" className="w-24 rounded-md border border-outline px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
                           )}
                         </td>
                         <td className="px-3 py-2.5">
                           {product?.valuation_method === 'fifo' ? (
-                            <span className="text-xs text-gray-600">{formatCurrency(Number(row.sellingPrice) || 0)}</span>
+                            <span className="text-xs text-on-surface-variant">{formatCurrency(Number(row.sellingPrice) || 0)}</span>
                           ) : (
-                            <input type="number" min="0" step="0.01" value={row.sellingPrice} onChange={e => updateExistingVariant(row.id, 'sellingPrice', e.target.value)} placeholder="0.00" className="w-24 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
+                            <input type="number" min="0" step="0.01" value={row.sellingPrice} onChange={e => updateExistingVariant(row.id, 'sellingPrice', e.target.value)} placeholder="0.00" className="w-24 rounded-md border border-outline px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
                           )}
                         </td>
                         <td className="px-3 py-2.5">
                           {product?.valuation_method === 'fifo' ? (
-                            <span className="text-xs text-gray-600">{row.stock}</span>
+                            <span className="text-xs text-on-surface-variant">{row.stock}</span>
                           ) : (
-                            <input type="number" min="0" value={row.stock} onChange={e => updateExistingVariant(row.id, 'stock', e.target.value)} className="w-20 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
+                            <input type="number" min="0" value={row.stock} onChange={e => updateExistingVariant(row.id, 'stock', e.target.value)} className="w-20 rounded-md border border-outline px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
                           )}
                         </td>
                         <td className="px-3 py-2.5">
@@ -953,7 +953,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                             const label = layers.length === 0 ? 'No batches' : `${totalQty} @ ${formatCurrency(nextCost)}`
                             if (product?.valuation_method !== 'fifo') {
                               return layers.length === 0 ? (
-                                <span className="text-xs text-gray-400">No batches yet</span>
+                                <span className="text-xs text-outline">No batches yet</span>
                               ) : (
                                 <span
                                   title={layers.map(l => `${l.quantity} unit${l.quantity === 1 ? '' : 's'} @ ${formatCurrency(l.unit_cost)}, received ${formatDate(l.received_at)}`).join('\n')}
@@ -992,9 +992,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             )}
 
             {allVariants.length === 0 && !showAddVariants && (
-              <div className="rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center">
-                <Layers className="mx-auto h-7 w-7 text-gray-300 mb-2" />
-                <p className="text-sm text-gray-500">No variants yet.</p>
+              <div className="rounded-lg border border-dashed border-outline-variant px-4 py-6 text-center">
+                <Layers className="mx-auto h-7 w-7 text-outline-variant mb-2" />
+                <p className="text-sm text-on-surface-variant">No variants yet.</p>
                 <button type="button" onClick={() => setShowAddVariants(true)} className="mt-1 text-sm text-blue-600 hover:underline">Add variants</button>
               </div>
             )}
@@ -1002,8 +1002,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             {/* Add more variants panel */}
             {showAddVariants && (
               <div className="mt-3 space-y-4">
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
-                  <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Define Attributes</p>
+                <div className="rounded-lg border border-outline-variant bg-surface-container-low p-4 space-y-3">
+                  <p className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">Define Attributes</p>
                   {attrDefs.map((attr, idx) => (
                     <div key={attr.id} className="flex items-center gap-2">
                       <div className="w-36 shrink-0">
@@ -1012,7 +1012,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                           placeholder={`Attribute ${idx + 1}`}
                           value={attr.name}
                           onChange={e => updateAttr(attr.id, 'name', e.target.value)}
-                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full rounded-lg border border-outline-variant bg-surface px-3 py-1.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                       <div className="flex-1">
@@ -1021,10 +1021,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                           placeholder="Values, comma-separated (e.g. Black, White, Silver)"
                           value={attr.valuesRaw}
                           onChange={e => updateAttr(attr.id, 'valuesRaw', e.target.value)}
-                          className="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full rounded-lg border border-outline-variant bg-surface px-3 py-1.5 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
-                      <button type="button" onClick={() => removeAttr(attr.id)} disabled={attrDefs.length === 1} className="p-1.5 text-gray-400 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed">
+                      <button type="button" onClick={() => removeAttr(attr.id)} disabled={attrDefs.length === 1} className="p-1.5 text-outline hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
@@ -1042,30 +1042,30 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                 {newVariantRows.length > 0 && (
                   <div>
                     <div className="mb-2 flex items-center justify-between">
-                      <p className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
-                        <Layers className="h-4 w-4 text-gray-400" /> {newVariantRows.length} new variant{newVariantRows.length !== 1 ? 's' : ''} — will be saved with the product
+                      <p className="text-sm font-medium text-on-surface-variant flex items-center gap-1.5">
+                        <Layers className="h-4 w-4 text-outline" /> {newVariantRows.length} new variant{newVariantRows.length !== 1 ? 's' : ''} — will be saved with the product
                       </p>
                       <button type="button" onClick={generateNewVariants} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
                         <RefreshCw className="h-3 w-3" /> Regenerate
                       </button>
                     </div>
-                    <div className="overflow-x-auto rounded-lg border border-gray-200">
-                      <table className="min-w-full divide-y divide-gray-100 text-sm">
-                        <thead className="bg-gray-50">
+                    <div className="overflow-x-auto rounded-lg border border-outline-variant">
+                      <table className="min-w-full divide-y divide-outline-variant text-sm">
+                        <thead className="bg-surface-container-low">
                           <tr>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Image</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Variant</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">SKU</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Barcode</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Cost ({currSymbol})</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Selling Price ({currSymbol}) *</th>
-                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Stock</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-on-surface-variant">Image</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-on-surface-variant">Variant</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-on-surface-variant">SKU</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-on-surface-variant">Barcode</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-on-surface-variant">Cost ({currSymbol})</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-on-surface-variant">Selling Price ({currSymbol}) *</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-on-surface-variant">Stock</th>
                             <th className="px-3 py-2" />
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 bg-white">
+                        <tbody className="divide-y divide-outline-variant bg-surface">
                           {newVariantRows.map(row => (
-                            <tr key={row.key} className="hover:bg-gray-50">
+                            <tr key={row.key} className="hover:bg-surface-container-low">
                               <td className="px-3 py-2">
                                 <ImageUpload
                                   compact
@@ -1074,14 +1074,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                                   onChange={(url) => updateNewVariantRow(row.key, 'imageUrl', url)}
                                 />
                               </td>
-                              <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">{row.name}</td>
+                              <td className="px-3 py-2 font-medium text-on-surface whitespace-nowrap">{row.name}</td>
                               <td className="px-3 py-2">
-                                <input type="text" value={row.sku} onChange={e => updateNewVariantRow(row.key, 'sku', e.target.value)} placeholder="Optional" className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                                <input type="text" value={row.sku} onChange={e => updateNewVariantRow(row.key, 'sku', e.target.value)} placeholder="Optional" className="w-24 rounded border border-outline-variant px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
                               </td>
                               <td className="px-3 py-2">
                                 <div className="flex gap-1 items-center">
-                                  <input type="text" value={row.barcode} onChange={e => updateNewVariantRow(row.key, 'barcode', e.target.value)} placeholder="Optional" className="w-24 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                                  <button type="button" onClick={() => updateNewVariantRow(row.key, 'barcode', Math.floor(100000000000 + Math.random() * 900000000000).toString())} className="p-1 text-gray-400 hover:text-blue-500 transition-colors bg-gray-50 rounded shrink-0" title="Generate Barcode">
+                                  <input type="text" value={row.barcode} onChange={e => updateNewVariantRow(row.key, 'barcode', e.target.value)} placeholder="Optional" className="w-24 rounded border border-outline-variant px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                                  <button type="button" onClick={() => updateNewVariantRow(row.key, 'barcode', Math.floor(100000000000 + Math.random() * 900000000000).toString())} className="p-1 text-outline hover:text-blue-500 transition-colors bg-surface-container-low rounded shrink-0" title="Generate Barcode">
                                     <RefreshCw className="h-3 w-3" />
                                   </button>
                                   {row.barcode && (
@@ -1092,16 +1092,16 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                                 </div>
                               </td>
                               <td className="px-3 py-2">
-                                <input type="number" min="0" step="0.01" value={row.costPrice} onChange={e => updateNewVariantRow(row.key, 'costPrice', e.target.value)} placeholder="0.00" className="w-20 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                                <input type="number" min="0" step="0.01" value={row.costPrice} onChange={e => updateNewVariantRow(row.key, 'costPrice', e.target.value)} placeholder="0.00" className="w-20 rounded border border-outline-variant px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
                               </td>
                               <td className="px-3 py-2">
-                                <input type="number" min="0" step="0.01" value={row.sellingPrice} onChange={e => updateNewVariantRow(row.key, 'sellingPrice', e.target.value)} placeholder="0.00" className={`w-20 rounded border px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 ${!row.sellingPrice ? 'border-red-300 bg-red-50' : 'border-gray-200'}`} />
+                                <input type="number" min="0" step="0.01" value={row.sellingPrice} onChange={e => updateNewVariantRow(row.key, 'sellingPrice', e.target.value)} placeholder="0.00" className={`w-20 rounded border px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 ${!row.sellingPrice ? 'border-red-300 bg-red-50' : 'border-outline-variant'}`} />
                               </td>
                               <td className="px-3 py-2">
-                                <input type="number" min="0" value={row.stock} onChange={e => updateNewVariantRow(row.key, 'stock', e.target.value)} className="w-16 rounded border border-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                                <input type="number" min="0" value={row.stock} onChange={e => updateNewVariantRow(row.key, 'stock', e.target.value)} className="w-16 rounded border border-outline-variant px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
                               </td>
                               <td className="px-3 py-2">
-                                <button type="button" onClick={() => setNewVariantRows(p => p.filter(r => r.key !== row.key))} className="text-gray-400 hover:text-red-500">
+                                <button type="button" onClick={() => setNewVariantRows(p => p.filter(r => r.key !== row.key))} className="text-outline hover:text-red-500">
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                               </td>
@@ -1150,7 +1150,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   manages its own batches via the "Batches" button in the variants table. */}
               {allVariants.length === 0 && product.valuation_method === 'fifo' && (
                 <div>
-                  <p className="mb-2 text-sm font-semibold text-gray-800 flex items-center gap-2">
+                  <p className="mb-2 text-sm font-semibold text-on-surface flex items-center gap-2">
                     <Layers className="h-4 w-4 text-brand-teal" /> Stock Batches
                   </p>
                   <BatchManager productId={product.id} variantId={null} branchId={activeBranch?.id} />
@@ -1164,13 +1164,13 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                       <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-teal-light">
                         <Layers className="h-4 w-4 text-brand-teal" />
                       </span>
-                      <p className="text-sm font-semibold text-gray-800">Stock Batches</p>
+                      <p className="text-sm font-semibold text-on-surface">Stock Batches</p>
                       <span className="ml-auto rounded-full bg-brand-teal-light px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-teal">FIFO</span>
                     </div>
                     <div className="p-4">
                       {productLayers.length === 0 ? (
-                        <div className="flex items-center gap-3 rounded-lg bg-white/60 px-3 py-4 text-center">
-                          <p className="w-full text-sm text-gray-500">No open batches yet — the next sale of this product will seed one from the current cost price.</p>
+                        <div className="flex items-center gap-3 rounded-lg bg-surface/60 px-3 py-4 text-center">
+                          <p className="w-full text-sm text-on-surface-variant">No open batches yet — the next sale of this product will seed one from the current cost price.</p>
                         </div>
                       ) : (() => {
                         const totalQty = productLayers.reduce((s, l) => s + l.quantity, 0)
@@ -1196,21 +1196,21 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                             <div className="mt-3 space-y-2">
                               {productLayers.map((layer, i) => (
                                 <div key={layer.id} className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-sm ${i === 0 ? 'bg-brand-teal-light/50' : ''}`}>
-                                  <span className="flex items-center gap-2 text-gray-600">
+                                  <span className="flex items-center gap-2 text-on-surface-variant">
                                     <span className={`inline-block h-3 w-3 rounded-sm shadow-sm ${shades[Math.min(i, shades.length - 1)]}`} />
                                     <span>{layer.quantity} unit{layer.quantity === 1 ? '' : 's'} received {formatDate(layer.received_at)}</span>
                                     {i === 0 && (
                                       <span className="rounded-full bg-brand-teal px-2 py-0.5 text-[11px] font-semibold text-white">Next to sell</span>
                                     )}
                                   </span>
-                                  <span className="font-semibold text-gray-800">{formatCurrency(layer.unit_cost)} / unit</span>
+                                  <span className="font-semibold text-on-surface">{formatCurrency(layer.unit_cost)} / unit</span>
                                 </div>
                               ))}
                             </div>
                           </>
                         )
                       })()}
-                      <p className="mt-3 text-xs text-gray-400">Oldest batch is sold first — stock is consumed left to right.</p>
+                      <p className="mt-3 text-xs text-outline">Oldest batch is sold first — stock is consumed left to right.</p>
                     </div>
                   </div>
                 )
@@ -1222,9 +1222,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
               )}
               {hasMargin && (
                 <div className="rounded-lg bg-green-50 border border-green-100 px-4 py-2.5 flex items-center gap-4 text-sm">
-                  <span className="text-gray-600">Margin:</span>
+                  <span className="text-on-surface-variant">Margin:</span>
                   <span className="font-semibold text-green-700">{Math.round(((sell - cost) / sell) * 100)}%</span>
-                  <span className="text-gray-500">({formatCurrency(sell - cost)} profit)</span>
+                  <span className="text-on-surface-variant">({formatCurrency(sell - cost)} profit)</span>
                 </div>
               )}
               </SectionCard>
@@ -1240,24 +1240,24 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   description={`Control which branches can see and sell this ${itemType} in their inventory and POS.`}
                   contentClassName="p-0"
                 >
-              <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+              <div className="rounded-xl border border-outline-variant overflow-hidden divide-y divide-outline-variant">
                 {branchAvailability.map((b) => (
-                  <div key={b.branch_id} className="flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 transition-colors">
+                  <div key={b.branch_id} className="flex items-center justify-between px-4 py-3 bg-surface hover:bg-surface-container-low transition-colors">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100">
-                        <Store className="h-4 w-4 text-gray-500" />
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-container">
+                        <Store className="h-4 w-4 text-on-surface-variant" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-on-surface">
                           {b.name}
                           {b.is_main && <span className="ml-1.5 text-[10px] uppercase tracking-wide font-semibold text-brand-teal">Main</span>}
                         </p>
-                        <p className="text-xs text-gray-400">{b.is_enabled ? 'Enabled — visible in inventory & POS' : 'Disabled — hidden from this branch'}</p>
+                        <p className="text-xs text-outline">{b.is_enabled ? 'Enabled — visible in inventory & POS' : 'Disabled — hidden from this branch'}</p>
                       </div>
                     </div>
                     <label className="relative inline-flex cursor-pointer items-center">
                       <input type="checkbox" className="sr-only peer" checked={b.is_enabled} disabled={togglingBranch === b.branch_id} onChange={() => toggleBranchAvailability(b.branch_id, b.is_enabled)} />
-                      <div className="peer h-5 w-9 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-brand-teal peer-checked:after:translate-x-full peer-disabled:opacity-50" />
+                      <div className="peer h-5 w-9 rounded-full bg-surface-container-high after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-surface after:transition-all after:content-[''] peer-checked:bg-brand-teal peer-checked:after:translate-x-full peer-disabled:opacity-50" />
                     </label>
                   </div>
                 ))}
@@ -1269,7 +1269,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           {/* Bottom save */}
-          <div className="flex items-center justify-end gap-3 py-6 border-t border-gray-200">
+          <div className="flex items-center justify-end gap-3 py-6 border-t border-outline-variant">
             <Link href="/inventory"><Button variant="outline">Cancel</Button></Link>
             <Button onClick={handleSave} loading={saving} disabled={skuConflict || barcodeConflict}>
               <Save className="h-4 w-4" /> Save Changes
@@ -1281,7 +1281,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
       {/* Delete product confirm */}
       <Modal open={deleteModal} onClose={() => setDeleteModal(false)} title="Delete Product" size="sm">
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">Are you sure you want to delete <strong>{product.name}</strong>?</p>
+          <p className="text-sm text-on-surface-variant">Are you sure you want to delete <strong>{product.name}</strong>?</p>
           <div className="flex gap-2">
             <Button variant="outline" className="flex-1" onClick={() => setDeleteModal(false)}>Cancel</Button>
             <Button variant="destructive" className="flex-1" onClick={handleDelete}>Delete</Button>
@@ -1302,7 +1302,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           ) : (
             <>
               <Input label="Model Name" placeholder="e.g. iPhone 15 Pro, Galaxy S24" required value={newDeviceName} onChange={e => setNewDeviceName(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddDevice())} />
-              <p className="text-xs text-gray-500">This model will be linked to the selected brand.</p>
+              <p className="text-xs text-on-surface-variant">This model will be linked to the selected brand.</p>
             </>
           )}
           <div className="flex justify-end gap-2">

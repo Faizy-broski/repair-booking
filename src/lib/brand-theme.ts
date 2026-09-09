@@ -56,21 +56,57 @@ function relativeLuminance([r, g, b]: [number, number, number]): number {
   }, 0)
 }
 
+export type ThemeMode = 'light' | 'dark'
+
 /**
  * Given a tenant brand hex, returns a fully self-contained map of CSS custom
  * property overrides covering the entire primary-family token set. Every value
  * is explicitly computed here so the override works via inline style without
  * relying on any CSS var() chain resolution in the stylesheet.
+ *
+ * `mode` branches the math so the brand color stays legible against dark
+ * surfaces too: containers get darker (not lighter) and text-on-container
+ * gets lighter (not darker) than the light-mode formula.
  */
-export function getBrandStyle(brandColor: string | null | undefined): CSSProperties {
+export function getBrandStyle(brandColor: string | null | undefined, mode: ThemeMode = 'light'): CSSProperties {
   const hex = brandColor && HEX_RE.test(brandColor) ? brandColor : DEFAULT_BRAND
   const [h, s, l] = hexToHsl(hex)
+  const isLight = relativeLuminance(hexToRgb(hex)) > 0.45
+
+  if (mode === 'dark') {
+    // In dark mode, `primary` itself should be a lightened/dimmed tone (not
+    // the raw brand hex, which can be too saturated/dark against near-black
+    // surfaces), matching how the base M3 dark tokens use `-dim` as the tone.
+    const primary   = hslToHex(h, s, Math.min(0.85, Math.max(l, 0.55)))
+    const container = hslToHex(h, Math.max(0, s - 0.15), Math.max(0.12, l - 0.35))
+    const fixedDim  = hslToHex(h, Math.max(0, s - 0.1), Math.max(0.18, l - 0.25))
+    const onPrimary = relativeLuminance(hexToRgb(primary)) > 0.45 ? '#0d0d0d' : '#ffffff'
+    const onContainer = hslToHex(h, s, Math.min(0.92, l + 0.45))
+    const sidebarBg = hslToHex(h, Math.min(0.6, s * 0.9), 0.08)
+
+    return {
+      '--brand-primary':            hex,
+      '--primary':                  primary,
+      '--primary-dim':              hex,
+      '--primary-fixed':            container,
+      '--primary-fixed-dim':        fixedDim,
+      '--primary-container':        container,
+      '--inverse-primary':          hex,
+      '--surface-tint':             hex,
+      '--brand-teal':               primary,
+      '--brand-teal-dark':          hex,
+      '--brand-teal-light':         container,
+      '--on-primary':               onPrimary,
+      '--on-primary-container':     onContainer,
+      '--on-primary-fixed':         onContainer,
+      '--on-primary-fixed-variant': onContainer,
+      '--sidebar-bg':               sidebarBg,
+    } as CSSProperties
+  }
 
   const dim       = hslToHex(h, s, Math.max(0, l - 0.2))
   const container = hslToHex(h, Math.max(0, s - 0.1), Math.min(0.95, l + 0.55))
   const fixedDim  = hslToHex(h, Math.max(0, s - 0.05), Math.min(0.92, l + 0.45))
-
-  const isLight = relativeLuminance(hexToRgb(hex)) > 0.45
   const onPrimary = isLight ? '#1a1a1a' : '#ffffff'
   const onContainer = hslToHex(h, s, Math.max(0.05, l - 0.35))
 

@@ -18,7 +18,7 @@ import { formatCurrency } from '@/lib/utils'
 const WebcamScanner = dynamic(
   () => import('./webcam-scanner').then((m) => m.WebcamScanner),
   { ssr: false, loading: () => (
-    <div className="flex h-48 items-center justify-center rounded-xl bg-gray-50 text-sm text-gray-400">
+    <div className="flex h-48 items-center justify-center rounded-xl bg-surface-container-low text-sm text-outline">
       <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading camera…
     </div>
   ) }
@@ -146,7 +146,7 @@ export function ScannerModal({
         size="lg"
       >
         {/* ── Tab bar ──────────────────────────────────────────────────────── */}
-        <div className="mb-4 flex overflow-hidden rounded-lg border border-gray-200">
+        <div className="mb-4 flex overflow-hidden rounded-lg border border-outline-variant">
           {(['webcam', 'hid'] as const).map((t) => (
             <button
               key={t}
@@ -154,7 +154,7 @@ export function ScannerModal({
               className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors ${
                 tab === t
                   ? 'bg-brand-teal text-white'
-                  : 'text-gray-500 hover:bg-gray-50'
+                  : 'text-on-surface-variant hover:bg-surface-container-low'
               }`}
             >
               {t === 'webcam' ? <Camera className="h-4 w-4" /> : <Usb className="h-4 w-4" />}
@@ -173,13 +173,13 @@ export function ScannerModal({
 
         {/* ── HID / Physical scanner tab ───────────────────────────────────── */}
         {tab === 'hid' && scanState === 'scanning' && (
-          <div className="flex flex-col items-center gap-4 rounded-xl bg-gray-50 border border-gray-200 px-6 py-10 text-center">
+          <div className="flex flex-col items-center gap-4 rounded-xl bg-surface-container-low border border-outline-variant px-6 py-10 text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-teal-50 border-2 border-brand-teal">
               <ScanLine className="h-8 w-8 text-brand-teal" />
             </div>
             <div>
-              <p className="font-semibold text-gray-900">Physical Scanner Ready</p>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="font-semibold text-on-surface">Physical Scanner Ready</p>
+              <p className="mt-1 text-sm text-on-surface-variant">
                 Point your USB barcode or QR scanner at a label and pull the trigger.
                 <br />
                 The code will be detected automatically.
@@ -196,8 +196,8 @@ export function ScannerModal({
         {(scanState === 'looking' || isLooking) && (
           <div className="flex flex-col items-center gap-3 py-10">
             <Loader2 className="h-8 w-8 animate-spin text-brand-teal" />
-            <p className="text-sm text-gray-500">
-              Looking up <span className="font-mono font-medium text-gray-800">{lastBarcode}</span>…
+            <p className="text-sm text-on-surface-variant">
+              Looking up <span className="font-mono font-medium text-on-surface">{lastBarcode}</span>…
             </p>
           </div>
         )}
@@ -209,18 +209,18 @@ export function ScannerModal({
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium uppercase tracking-wider text-green-600">Product Found</p>
-                <p className="mt-1 text-base font-semibold text-gray-900 leading-snug">
+                <p className="mt-1 text-base font-semibold text-on-surface leading-snug">
                   {foundProduct.name}
                 </p>
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-on-surface-variant">
                   <span className="font-bold text-brand-teal">
                     {formatCurrency(foundProduct.selling_price)}
                   </span>
                   {foundProduct.sku && (
-                    <span className="font-mono text-xs text-gray-400">SKU: {foundProduct.sku}</span>
+                    <span className="font-mono text-xs text-outline">SKU: {foundProduct.sku}</span>
                   )}
                   {foundProduct.on_hand !== undefined && !foundProduct.is_service && (
-                    <span className={foundProduct.on_hand > 0 ? 'text-gray-500' : 'text-red-500'}>
+                    <span className={foundProduct.on_hand > 0 ? 'text-on-surface-variant' : 'text-red-500'}>
                       {foundProduct.on_hand > 0 ? `${foundProduct.on_hand} in stock` : 'Out of stock'}
                     </span>
                   )}
@@ -234,10 +234,10 @@ export function ScannerModal({
                   className="h-14 w-14 shrink-0 rounded-lg object-cover"
                 />
               ) : (
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-gray-100">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-surface-container">
                   {(foundProduct as any).item_type === 'part'
-                    ? <Package className="h-6 w-6 text-gray-300" />
-                    : <ShoppingBag className="h-6 w-6 text-gray-300" />}
+                    ? <Package className="h-6 w-6 text-outline-variant" />
+                    : <ShoppingBag className="h-6 w-6 text-outline-variant" />}
                 </div>
               )}
             </div>
@@ -245,7 +245,7 @@ export function ScannerModal({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <button
                 onClick={resetToScanning}
-                className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700"
+                className="flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-on-surface-variant"
               >
                 <RotateCcw className="h-4 w-4" /> Scan Again
               </button>
@@ -253,7 +253,7 @@ export function ScannerModal({
                 <Link
                   href={`/inventory/${foundProduct.id}`}
                   onClick={handleClose}
-                  className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  className="flex items-center gap-1.5 rounded-lg border border-outline bg-surface px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
                   {isInventory ? 'View Product' : 'Edit Product'}
@@ -275,11 +275,11 @@ export function ScannerModal({
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-amber-600">No Product Found</p>
-                <p className="mt-1 text-sm text-gray-700">
+                <p className="mt-1 text-sm text-on-surface-variant">
                   No product matched barcode{' '}
                   <span className="font-mono font-semibold">{lastBarcode}</span>.
                 </p>
-                <p className="mt-0.5 text-xs text-gray-500">
+                <p className="mt-0.5 text-xs text-on-surface-variant">
                   Create it now with the required fields — you can add full details later.
                 </p>
               </div>
@@ -287,7 +287,7 @@ export function ScannerModal({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <button
                 onClick={resetToScanning}
-                className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700"
+                className="flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-on-surface-variant"
               >
                 <RotateCcw className="h-4 w-4" /> Scan Again
               </button>

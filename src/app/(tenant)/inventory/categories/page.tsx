@@ -69,12 +69,12 @@ export default function CategoriesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-gray-500 hover:text-gray-900">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-on-surface-variant hover:text-on-surface">
             <ArrowLeft className="h-5 w-5" strokeWidth={3} />
           </Button>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Categories</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <h1 className="text-xl font-bold text-on-surface">Categories</h1>
+            <p className="text-sm text-on-surface-variant mt-0.5">
               Organise products into categories. Assign attributes to a category when creating them under{' '}
               <Link href="/inventory/attributes" className="text-brand-teal underline">Attributes</Link>.
             </p>
@@ -85,25 +85,25 @@ export default function CategoriesPage() {
 
       {/* Search */}
       <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-outline pointer-events-none" />
         <input
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search categories..."
-          className="w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal"
+          className="w-full rounded-lg border border-outline-variant bg-surface pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal"
         />
       </div>
 
       {/* List */}
       {loading ? (
         <div className="space-y-2">
-          {[1,2,3,4].map(i => <div key={i} className="h-14 animate-pulse rounded-xl bg-gray-100" />)}
+          {[1,2,3,4].map(i => <div key={i} className="h-14 animate-pulse rounded-xl bg-surface-container" />)}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-xl border-2 border-dashed border-gray-200 py-16 text-center">
-          <Layers className="mx-auto h-8 w-8 text-gray-300 mb-3" />
-          <p className="text-sm font-medium text-gray-500">
+        <div className="rounded-xl border-2 border-dashed border-outline-variant py-16 text-center">
+          <Layers className="mx-auto h-8 w-8 text-outline-variant mb-3" />
+          <p className="text-sm font-medium text-on-surface-variant">
             {search ? `No categories matching "${search}"` : 'No categories yet'}
           </p>
           {!search && (
@@ -113,13 +113,13 @@ export default function CategoriesPage() {
           )}
         </div>
       ) : (
-        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden divide-y divide-gray-100">
+        <div className="rounded-xl border border-outline-variant bg-surface overflow-hidden divide-y divide-outline-variant">
           {filtered.map(cat => (
-            <div key={cat.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors">
+            <div key={cat.id} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-container-low transition-colors">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-teal/10 shrink-0">
                 <Layers className="h-4 w-4 text-brand-teal" />
               </div>
-              <span className="flex-1 text-sm font-medium text-gray-900">{cat.name}</span>
+              <span className="flex-1 text-sm font-medium text-on-surface">{cat.name}</span>
               <div className="flex items-center gap-1 shrink-0">
                 <button onClick={() => openEdit(cat)}
                   className="rounded p-1.5 text-blue-500 hover:bg-blue-50 transition-colors" title="Rename">
@@ -136,7 +136,7 @@ export default function CategoriesPage() {
       )}
 
       {!loading && filtered.length > 0 && (
-        <p className="text-xs text-gray-400">{filtered.length} categor{filtered.length === 1 ? 'y' : 'ies'}</p>
+        <p className="text-xs text-outline">{filtered.length} categor{filtered.length === 1 ? 'y' : 'ies'}</p>
       )}
 
       {/* Create / Edit modal */}
@@ -162,7 +162,7 @@ export default function CategoriesPage() {
       {/* Delete confirm */}
       <Modal open={!!deleteCat} onClose={() => setDeleteCat(null)} title="Delete Category">
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-on-surface-variant">
             Are you sure you want to delete <strong>{deleteCat?.name}</strong>?
             Products assigned to this category will become uncategorised.
           </p>

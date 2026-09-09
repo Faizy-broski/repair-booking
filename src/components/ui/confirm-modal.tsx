@@ -28,17 +28,17 @@ export function ConfirmModal({
     <Modal open={open} onClose={onClose} title="" size="sm">
       <div className="flex flex-col items-center text-center">
         <div className={
-          `mb-4 flex h-12 w-12 items-center justify-center rounded-full 
-          ${variant === 'danger' ? 'bg-red-100 text-red-600' : 
-            variant === 'warning' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}
+          `mb-4 flex h-12 w-12 items-center justify-center rounded-full
+          ${variant === 'danger' ? 'bg-error-container text-on-error-container' :
+            variant === 'warning' ? 'bg-warning/15 text-warning' : 'bg-primary-container text-on-primary-container'}
           `
         }>
           <AlertTriangle className="h-6 w-6" />
         </div>
-        
-        <h3 className="mb-1 text-lg font-bold text-gray-900">{title}</h3>
+
+        <h3 className="mb-1 text-lg font-bold text-on-surface">{title}</h3>
         {description && (
-          <p className="mb-6 text-sm text-gray-500">{description}</p>
+          <p className="mb-6 text-sm text-on-surface-variant">{description}</p>
         )}
 
         <div className="flex w-full gap-3">

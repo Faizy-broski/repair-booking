@@ -91,7 +91,7 @@ export function LabelPicker({ repairId, selectedIds, onChange }: LabelPickerProp
         ))}
         <button
           onClick={() => setOpen((o) => !o)}
-          className="flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-2 py-0.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
+          className="flex items-center gap-1 rounded-full border border-dashed border-outline px-2 py-0.5 text-xs text-on-surface-variant hover:border-outline hover:text-on-surface-variant"
         >
           <Tag className="h-3 w-3" />
           {activeLabels.length === 0 ? 'Add labels' : 'Edit'}
@@ -100,10 +100,10 @@ export function LabelPicker({ repairId, selectedIds, onChange }: LabelPickerProp
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute left-0 top-full z-20 mt-1 w-52 rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div className="absolute left-0 top-full z-20 mt-1 w-52 rounded-lg border border-outline-variant bg-surface shadow-lg">
           <div className="p-2 space-y-0.5 max-h-48 overflow-y-auto">
             {labels.length === 0 && (
-              <p className="px-2 py-1 text-xs text-gray-400">No labels yet</p>
+              <p className="px-2 py-1 text-xs text-outline">No labels yet</p>
             )}
             {labels.map((label) => {
               const selected = selectedIds.includes(label.id)
@@ -112,13 +112,13 @@ export function LabelPicker({ repairId, selectedIds, onChange }: LabelPickerProp
                   key={label.id}
                   onClick={() => toggleLabel(label.id)}
                   disabled={saving}
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-gray-50"
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-surface-container-low"
                 >
                   <span
                     className="h-3 w-3 shrink-0 rounded-full"
                     style={{ backgroundColor: label.color }}
                   />
-                  <span className="flex-1 text-gray-800">{label.name}</span>
+                  <span className="flex-1 text-on-surface">{label.name}</span>
                   {selected && <Check className="h-3 w-3 text-blue-600" />}
                 </button>
               )
@@ -126,7 +126,7 @@ export function LabelPicker({ repairId, selectedIds, onChange }: LabelPickerProp
           </div>
 
           {/* Create new label */}
-          <div className="border-t border-gray-100 p-2">
+          <div className="border-t border-outline-variant p-2">
             {creating ? (
               <div className="space-y-1.5">
                 <div className="flex gap-1.5">
@@ -134,7 +134,7 @@ export function LabelPicker({ repairId, selectedIds, onChange }: LabelPickerProp
                     type="color"
                     value={newLabelColor}
                     onChange={(e) => setNewLabelColor(e.target.value)}
-                    className="h-7 w-8 rounded border border-gray-200 p-0.5"
+                    className="h-7 w-8 rounded border border-outline-variant p-0.5"
                   />
                   <input
                     autoFocus
@@ -142,7 +142,7 @@ export function LabelPicker({ repairId, selectedIds, onChange }: LabelPickerProp
                     onChange={(e) => setNewLabelName(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && createLabel()}
                     placeholder="Label name"
-                    className="h-7 flex-1 rounded border border-gray-200 px-2 text-xs focus:border-blue-400 focus:outline-none"
+                    className="h-7 flex-1 rounded border border-outline-variant px-2 text-xs focus:border-blue-400 focus:outline-none"
                   />
                 </div>
                 <div className="flex gap-1">
@@ -154,7 +154,7 @@ export function LabelPicker({ repairId, selectedIds, onChange }: LabelPickerProp
                   </button>
                   <button
                     onClick={() => setCreating(false)}
-                    className="flex-1 rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                    className="flex-1 rounded border border-outline-variant px-2 py-1 text-xs text-on-surface-variant hover:bg-surface-container-low"
                   >
                     Cancel
                   </button>

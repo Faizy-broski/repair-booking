@@ -164,7 +164,7 @@ export function CustomFieldBuilder({ module: initialModule, repairCategory: init
       {!initialModule && (
         <div className="flex gap-3 flex-wrap items-end">
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">Module</label>
+            <label className="mb-1 block text-xs font-medium text-on-surface-variant">Module</label>
             <Select
               options={MODULE_OPTIONS}
               value={module}
@@ -175,13 +175,13 @@ export function CustomFieldBuilder({ module: initialModule, repairCategory: init
           </div>
           {module === 'repairs' && (
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">Repair Category (optional)</label>
+              <label className="mb-1 block text-xs font-medium text-on-surface-variant">Repair Category (optional)</label>
               <input
                 type="text"
                 placeholder="e.g. Phone Repair, Computer Repair"
                 value={repairCategory}
                 onChange={e => setRepairCategory(e.target.value)}
-                className="h-9 w-56 rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none"
+                className="h-9 w-56 rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none"
               />
             </div>
           )}
@@ -189,22 +189,22 @@ export function CustomFieldBuilder({ module: initialModule, repairCategory: init
       )}
       {initialModule === 'repairs' && (
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">
-            Repair Category <span className="text-gray-400">(optional — leave blank to apply to all repair types)</span>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">
+            Repair Category <span className="text-outline">(optional — leave blank to apply to all repair types)</span>
           </label>
           <input
             type="text"
             placeholder="e.g. Phone Repair, Computer Repair, Watch Repair"
             value={repairCategory}
             onChange={e => setRepairCategory(e.target.value)}
-            className="h-9 w-72 rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none"
+            className="h-9 w-72 rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none"
           />
         </div>
       )}
 
       {loading ? (
         <div className="space-y-2">
-          {[1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-gray-100" />)}
+          {[1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-surface-container" />)}
         </div>
       ) : (
         <div className="space-y-2">
@@ -214,9 +214,9 @@ export function CustomFieldBuilder({ module: initialModule, repairCategory: init
               draggable
               onDragStart={() => onDragStart(index)}
               onDragOver={(e) => onDragOver(e, index)}
-              className="flex items-start gap-2 rounded-lg border border-gray-200 bg-white p-3"
+              className="flex items-start gap-2 rounded-lg border border-outline-variant bg-surface p-3"
             >
-              <GripVertical className="mt-2.5 h-4 w-4 shrink-0 cursor-grab text-gray-300" />
+              <GripVertical className="mt-2.5 h-4 w-4 shrink-0 cursor-grab text-outline-variant" />
 
               <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-3">
                 <Input
@@ -230,7 +230,7 @@ export function CustomFieldBuilder({ module: initialModule, repairCategory: init
                   onValueChange={(v) => updateField(index, { field_type: v as CustomField['field_type'] })}
                 />
                 <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-1 text-sm text-gray-600">
+                  <label className="flex items-center gap-1 text-sm text-on-surface-variant">
                     <input
                       type="checkbox"
                       checked={field.is_required}
@@ -263,7 +263,7 @@ export function CustomFieldBuilder({ module: initialModule, repairCategory: init
               <button
                 type="button"
                 onClick={() => removeField(index)}
-                className="mt-2 text-gray-300 hover:text-red-500"
+                className="mt-2 text-outline-variant hover:text-red-500"
               >
                 <Trash2 className="h-4 w-4" />
               </button>

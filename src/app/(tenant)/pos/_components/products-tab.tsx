@@ -60,9 +60,9 @@ const ProductCard = memo(function ProductCard({
       disabled={outOfStock}
       onMouseEnter={() => hasVariants && onVariantHover?.(product)}
       onClick={(e) => hasVariants ? onVariantSelect(product, e) : hasDiscount ? onDiscountSelect?.(product) : onAdd(product)}
-      className={`relative flex w-full flex-col overflow-hidden rounded-xl border bg-white p-3 text-left transition-all ${outOfStock
-          ? 'border-gray-100 opacity-50 cursor-not-allowed'
-          : 'border-gray-200 hover:border-brand-teal hover:shadow-sm cursor-pointer'
+      className={`relative flex w-full flex-col overflow-hidden rounded-xl border bg-surface p-3 text-left transition-all ${outOfStock
+          ? 'border-outline-variant opacity-50 cursor-not-allowed'
+          : 'border-outline-variant hover:border-brand-teal hover:shadow-sm cursor-pointer'
         }`}
     >
       {showSaleBadge && (
@@ -71,12 +71,12 @@ const ProductCard = memo(function ProductCard({
         </span>
       )}
       {outOfStock && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/60">
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-surface/60">
           <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-600">Out of Stock</span>
         </div>
       )}
       {product.image_url ? (
-        <div className="relative mb-3 w-full overflow-hidden rounded-xl bg-gray-50 aspect-[4/3]">
+        <div className="relative mb-3 w-full overflow-hidden rounded-xl bg-surface-container-low aspect-[4/3]">
           <Image
             src={product.image_url}
             alt={product.name}
@@ -86,28 +86,28 @@ const ProductCard = memo(function ProductCard({
           />
         </div>
       ) : (
-        <div className="mb-3 flex w-full items-center justify-center rounded-xl bg-gray-100 aspect-[4/3]">
-          {(product as any).item_type === 'part' ? <Package className="h-8 w-8 text-gray-300" /> : <ShoppingBag className="h-8 w-8 text-gray-300" />}
+        <div className="mb-3 flex w-full items-center justify-center rounded-xl bg-surface-container aspect-[4/3]">
+          {(product as any).item_type === 'part' ? <Package className="h-8 w-8 text-outline-variant" /> : <ShoppingBag className="h-8 w-8 text-outline-variant" />}
         </div>
       )}
 
       <div className="flex flex-1 flex-col justify-between gap-2">
         <div>
-          <span className="block text-sm font-semibold text-gray-900 line-clamp-2 leading-tight">{product.name}</span>
-          {product.sku && <span className="mt-1 block text-xs text-gray-400 font-mono truncate">{product.sku}</span>}
+          <span className="block text-sm font-semibold text-on-surface line-clamp-2 leading-tight">{product.name}</span>
+          {product.sku && <span className="mt-1 block text-xs text-outline font-mono truncate">{product.sku}</span>}
         </div>
 
         <div className="space-y-1">
           {hasDiscount ? (
             <span className="flex items-center gap-1.5">
               <span className="text-sm font-bold text-brand-teal">{formatCurrency(product.active_discount!.discount_price)}</span>
-              <span className="text-xs text-gray-400 line-through">{formatCurrency(product.selling_price)}</span>
+              <span className="text-xs text-outline line-through">{formatCurrency(product.selling_price)}</span>
             </span>
           ) : (
             <span className="text-sm font-bold text-brand-teal">{formatCurrency(product.selling_price)}</span>
           )}
           {product.on_hand !== undefined && !product.is_service && !hasVariants && (
-            <span className={`block text-xs font-medium ${(product.on_hand ?? 0) > 0 ? 'text-gray-400' : 'text-red-500'}`}>
+            <span className={`block text-xs font-medium ${(product.on_hand ?? 0) > 0 ? 'text-outline' : 'text-red-500'}`}>
               {(product.on_hand ?? 0) > 0 ? `${product.on_hand} in stock` : 'Out of stock'}
             </span>
           )}
@@ -152,23 +152,23 @@ const VariantPopover = memo(function VariantPopover({
 
       {/* Modal Container */}
       <div
-        className="relative z-10 w-full max-w-md flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-150 rounded-2xl border border-slate-200 bg-white shadow-[0_32px_64px_-12px_rgba(0,0,0,0.35)] ring-1 ring-black/5 overflow-hidden"
+        className="relative z-10 w-full max-w-md flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-150 rounded-2xl border border-outline-variant bg-surface shadow-[0_32px_64px_-12px_rgba(0,0,0,0.35)] ring-1 ring-black/5 overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Brand accent bar */}
         <div className="h-1.5 w-full bg-brand-teal shrink-0" />
 
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-100 bg-white px-5 pt-4 pb-4 shrink-0">
+        <div className="flex items-center justify-between border-b border-outline-variant bg-surface px-5 pt-4 pb-4 shrink-0">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-widest text-brand-teal mb-0.5">Select variant</p>
-            <p className="truncate text-lg font-bold text-slate-900">{product.name}</p>
+            <p className="truncate text-lg font-bold text-on-surface">{product.name}</p>
           </div>
           <div className="ml-3 flex items-center gap-2 shrink-0">
             {fetching && variants.length > 0 && <Loader2 className="h-4 w-4 animate-spin text-brand-teal/50" />}
             <button
               onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-outline hover:bg-surface-container hover:text-on-surface-variant transition-colors"
             >
               <X className="h-4 w-4" />
             </button>
@@ -176,19 +176,19 @@ const VariantPopover = memo(function VariantPopover({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto bg-slate-50 p-4 space-y-2">
+        <div className="flex-1 overflow-y-auto bg-surface-container-low p-4 space-y-2">
           {loading ? (
             <div className="space-y-3">
               {[1, 2, 3].map(i => (
-                <div key={i} className="h-20 w-full animate-pulse rounded-xl bg-slate-200/60" />
+                <div key={i} className="h-20 w-full animate-pulse rounded-xl bg-surface-container-high/60" />
               ))}
             </div>
           ) : variants.length === 0 ? (
             <div className="py-12 flex flex-col items-center text-center">
-              <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
-                <X className="h-5 w-5 text-slate-300" />
+              <div className="h-12 w-12 rounded-full bg-surface-container flex items-center justify-center mb-3">
+                <X className="h-5 w-5 text-outline-variant" />
               </div>
-              <p className="text-sm font-medium text-slate-400">No variants found</p>
+              <p className="text-sm font-medium text-outline">No variants found</p>
             </div>
           ) : (
             variants.map(v => {
@@ -203,7 +203,7 @@ const VariantPopover = memo(function VariantPopover({
                 <img
                   src={v.image_url}
                   alt={v.name}
-                  className="h-12 w-12 shrink-0 rounded-lg border border-slate-100 object-cover shadow-sm"
+                  className="h-12 w-12 shrink-0 rounded-lg border border-outline-variant object-cover shadow-sm"
                 />
               ) : (
                 <div className="h-12 w-12 shrink-0 rounded-lg bg-brand-teal-light/50 border border-brand-teal/10 flex items-center justify-center">
@@ -218,7 +218,7 @@ const VariantPopover = memo(function VariantPopover({
                   {Object.entries(v.attributes).map(([k, val]) => (
                     <span
                       key={k}
-                      className="rounded-md bg-slate-200/50 px-2 py-0.5 text-[10px] font-semibold text-slate-500"
+                      className="rounded-md bg-surface-container-high/50 px-2 py-0.5 text-[10px] font-semibold text-on-surface-variant"
                     >
                       {k}: {val}
                     </span>
@@ -229,12 +229,12 @@ const VariantPopover = memo(function VariantPopover({
               // ── Discounted variant ──────────────────────────────────────────
               if (hasDiscount) {
                 return (
-                  <div key={v.id} className="rounded-xl border border-brand-teal/30 bg-white shadow-sm overflow-hidden">
+                  <div key={v.id} className="rounded-xl border border-brand-teal/30 bg-surface shadow-sm overflow-hidden">
                     {/* Variant identity row */}
                     <div className="flex items-start gap-3 px-4 pt-4 pb-3">
                       {variantImage}
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-base font-bold text-slate-800">{v.name}</p>
+                        <p className="truncate text-base font-bold text-on-surface">{v.name}</p>
                         {attrPills}
                       </div>
                       <span className="shrink-0 rounded-full bg-brand-teal px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm mt-1">Sale</span>
@@ -248,16 +248,16 @@ const VariantPopover = memo(function VariantPopover({
                         <span className="text-[10px] font-bold text-brand-teal uppercase tracking-wide">Sale price</span>
                         <span className="text-lg font-extrabold text-brand-teal leading-tight mt-0.5">{formatCurrency(v.active_discount!.discount_price)}</span>
                         <div className="flex items-center gap-2 mt-1 w-full justify-between">
-                          <span className="text-[10px] text-slate-400 line-through">{formatCurrency(v.selling_price)}</span>
+                          <span className="text-[10px] text-outline line-through">{formatCurrency(v.selling_price)}</span>
                           <span className="text-[10px] font-bold text-brand-teal/70">{v.active_discount!.quantity_remaining} left</span>
                         </div>
                       </button>
                       <button
                         onClick={() => onAdd(v, false)}
-                        className="flex flex-col items-start justify-center rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-left transition-all hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98]"
+                        className="flex flex-col items-start justify-center rounded-xl border border-outline-variant bg-surface px-3.5 py-2.5 text-left transition-all hover:border-outline hover:bg-surface-container-low active:scale-[0.98]"
                       >
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Regular</span>
-                        <span className="text-lg font-bold text-slate-800 leading-tight mt-0.5">{formatCurrency(v.selling_price)}</span>
+                        <span className="text-[10px] font-bold text-outline uppercase tracking-wide">Regular</span>
+                        <span className="text-lg font-bold text-on-surface leading-tight mt-0.5">{formatCurrency(v.selling_price)}</span>
                       </button>
                     </div>
                   </div>
@@ -271,15 +271,15 @@ const VariantPopover = memo(function VariantPopover({
                   onClick={() => !oos && onAdd(v)}
                   className={`flex w-full items-center gap-4 rounded-xl border p-3.5 text-left transition-all ${
                     oos
-                      ? 'pointer-events-none border-dashed border-slate-200 bg-slate-50 opacity-50'
-                      : 'border-slate-200 bg-white hover:border-brand-teal/40 hover:bg-brand-teal-light/20 hover:shadow-sm cursor-pointer active:scale-[0.99]'
+                      ? 'pointer-events-none border-dashed border-outline-variant bg-surface-container-low opacity-50'
+                      : 'border-outline-variant bg-surface hover:border-brand-teal/40 hover:bg-brand-teal-light/20 hover:shadow-sm cursor-pointer active:scale-[0.99]'
                   }`}
                 >
                   {variantImage}
 
                   {/* Name + attributes */}
                   <div className="min-w-0 flex-1">
-                    <p className={`truncate text-base font-bold leading-snug ${oos ? 'text-slate-400' : 'text-slate-800'}`}>
+                    <p className={`truncate text-base font-bold leading-snug ${oos ? 'text-outline' : 'text-on-surface'}`}>
                       {v.name}
                     </p>
                     {attrPills}
@@ -291,9 +291,9 @@ const VariantPopover = memo(function VariantPopover({
                       <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-500">Out of stock</span>
                     ) : (
                       <>
-                        <p className="text-base font-bold text-slate-900">{formatCurrency(v.selling_price)}</p>
+                        <p className="text-base font-bold text-on-surface">{formatCurrency(v.selling_price)}</p>
                         {effectiveStock !== null && (
-                          <p className="text-xs font-semibold text-slate-400 mt-0.5">{effectiveStock} left</p>
+                          <p className="text-xs font-semibold text-outline mt-0.5">{effectiveStock} left</p>
                         )}
                       </>
                     )}
@@ -306,8 +306,8 @@ const VariantPopover = memo(function VariantPopover({
 
         {/* Footer */}
         {!loading && variants.length > 0 && (
-          <div className="border-t border-slate-100 bg-white px-5 py-3 shrink-0">
-            <p className="text-center text-xs font-medium text-slate-400">Tap a variant to add it to the cart</p>
+          <div className="border-t border-outline-variant bg-surface px-5 py-3 shrink-0">
+            <p className="text-center text-xs font-medium text-outline">Tap a variant to add it to the cart</p>
           </div>
         )}
       </div>
@@ -343,18 +343,18 @@ const DiscountPricePopover = memo(function DiscountPricePopover({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150" onClick={onClose}>
       <div className="absolute inset-0 bg-slate-900/20" />
       <div
-        className="relative z-10 w-full max-w-sm animate-in fade-in zoom-in-95 duration-150 rounded-2xl border border-slate-200 bg-white shadow-[0_32px_64px_-12px_rgba(0,0,0,0.35)] ring-1 ring-black/5"
+        className="relative z-10 w-full max-w-sm animate-in fade-in zoom-in-95 duration-150 rounded-2xl border border-outline-variant bg-surface shadow-[0_32px_64px_-12px_rgba(0,0,0,0.35)] ring-1 ring-black/5"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between rounded-t-2xl border-b border-slate-100 bg-brand-teal-light/30 px-4 pt-4 pb-3">
+        <div className="flex items-center justify-between rounded-t-2xl border-b border-outline-variant bg-brand-teal-light/30 px-4 pt-4 pb-3">
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-widest text-brand-teal mb-0.5">This item is on sale</p>
-            <p className="truncate text-base font-bold text-slate-900">{product.name}</p>
+            <p className="truncate text-base font-bold text-on-surface">{product.name}</p>
           </div>
           <button
             onClick={onClose}
-            className="ml-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-white/70 hover:text-slate-600 transition-colors"
+            className="ml-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-outline hover:bg-surface/70 hover:text-on-surface-variant transition-colors"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -372,7 +372,7 @@ const DiscountPricePopover = memo(function DiscountPricePopover({
                 <span className="rounded-full bg-brand-teal px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Sale</span>
                 <span className="text-xs font-semibold text-brand-teal">{discount.quantity_remaining} left at this price</span>
               </div>
-              <p className="text-[11px] text-slate-400 line-through">{formatCurrency(product.selling_price)}</p>
+              <p className="text-[11px] text-outline line-through">{formatCurrency(product.selling_price)}</p>
             </div>
             <p className="shrink-0 ml-3 text-2xl font-extrabold text-brand-teal">{formatCurrency(discount.discount_price)}</p>
           </button>
@@ -380,14 +380,14 @@ const DiscountPricePopover = memo(function DiscountPricePopover({
           {/* Regular price row */}
           <button
             onClick={() => onPick(false)}
-            className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-left transition-all hover:border-slate-300 hover:bg-white active:scale-[0.99]"
+            className="flex w-full items-center justify-between rounded-xl border border-outline-variant bg-surface-container-low/60 p-4 text-left transition-all hover:border-outline hover:bg-surface active:scale-[0.99]"
           >
-            <p className="text-sm font-semibold text-slate-600">Regular Price</p>
-            <p className="text-lg font-bold text-slate-900">{formatCurrency(product.selling_price)}</p>
+            <p className="text-sm font-semibold text-on-surface-variant">Regular Price</p>
+            <p className="text-lg font-bold text-on-surface">{formatCurrency(product.selling_price)}</p>
           </button>
         </div>
 
-        <p className="px-4 pb-4 pt-0 text-center text-[11px] text-slate-400">Tap a price to add it to the cart</p>
+        <p className="px-4 pb-4 pt-0 text-center text-[11px] text-outline">Tap a price to add it to the cart</p>
       </div>
     </div>
   )
@@ -841,9 +841,9 @@ export function ProductsTab() {
   return (
     <div className="flex h-full flex-col">
       {/* Toggle bar */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-gray-200 bg-white px-3 py-2">
+      <div className="flex shrink-0 items-center gap-2 border-b border-outline-variant bg-surface px-3 py-2">
         <div className="flex min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div className="flex overflow-hidden rounded-lg border border-gray-200">
+          <div className="flex overflow-hidden rounded-lg border border-outline-variant">
             {(
               useSimpleCatalog
                 ? (['all_products', 'by_category', 'custom_item'] as const)
@@ -864,7 +864,7 @@ export function ProductsTab() {
                     if (view === 'by_products' && catBreadcrumb.length === 0) loadCatLevel('device_types')
                     if (view === 'by_parts' && partBreadcrumb.length === 0) loadPartLevel('device_types')
                   }}
-                  className={`shrink-0 px-3 py-2 text-xs font-medium transition-colors sm:px-5 sm:text-sm ${i > 0 ? 'border-l border-gray-200' : ''} ${productsView === view ? 'bg-white text-brand-teal font-semibold border-b-2 border-brand-teal' : 'text-gray-500 hover:bg-gray-50'
+                  className={`shrink-0 px-3 py-2 text-xs font-medium transition-colors sm:px-5 sm:text-sm ${i > 0 ? 'border-l border-outline-variant' : ''} ${productsView === view ? 'bg-surface text-brand-teal font-semibold border-b-2 border-brand-teal' : 'text-on-surface-variant hover:bg-surface-container-low'
                     }`}
                 >
                   {label}
@@ -875,10 +875,10 @@ export function ProductsTab() {
         </div>
         <button
           onClick={openAdvSearch}
-          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 sm:px-3"
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-outline-variant bg-surface px-2 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-container-low sm:px-3"
         >
           <Search className="h-3.5 w-3.5" />
-          <span className="hidden rounded bg-gray-100 px-1 text-[10px] font-mono text-gray-500 sm:inline">Ctrl S</span>
+          <span className="hidden rounded bg-surface-container px-1 text-[10px] font-mono text-on-surface-variant sm:inline">Ctrl S</span>
           <span className="hidden sm:inline">Advance Search</span>
         </button>
         <ScanButton onClick={() => setScannerOpen(true)} className="text-xs py-1.5" />
@@ -890,7 +890,7 @@ export function ProductsTab() {
         {productsView === 'all_products' && (
           <div className="space-y-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-outline pointer-events-none" />
               <input
                 type="text" value={allProductsSearch} onChange={e => setAllProductsSearch(e.target.value)}
                 onKeyDown={async (e) => {
@@ -927,10 +927,10 @@ export function ProductsTab() {
                   }
                 }}
                 placeholder="Search by name, SKU or barcode…" autoFocus
-                className="w-full rounded-lg border border-gray-200 bg-white pl-9 pr-9 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal"
+                className="w-full rounded-lg border border-outline-variant bg-surface pl-9 pr-9 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal"
               />
               {allProductsSearch && (
-                <button onClick={() => setAllProductsSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <button onClick={() => setAllProductsSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface-variant">
                   <X className="h-4 w-4" />
                 </button>
               )}
@@ -940,13 +940,13 @@ export function ProductsTab() {
                 <button
                   key={t}
                   onClick={() => setAllProductsItemType(t)}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${allProductsItemType === t ? 'bg-brand-teal text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${allProductsItemType === t ? 'bg-brand-teal text-white shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}`}
                 >
                   {t === 'all' ? 'All' : t === 'product' ? 'Products' : 'Parts'}
                 </button>
               ))}
               {allCats.length > 0 && (
-                <select value={allProductsCategoryId} onChange={e => setAllProductsCategoryId(e.target.value)} className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal">
+                <select value={allProductsCategoryId} onChange={e => setAllProductsCategoryId(e.target.value)} className="rounded-lg border border-outline-variant bg-surface px-3 py-1.5 text-sm text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal">
                   <option value="">All Categories</option>
                   {allCats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -956,11 +956,11 @@ export function ProductsTab() {
                   <X className="h-3 w-3" /> Clear
                 </button>
               )}
-              {!allProductsLoading && <span className="ml-auto text-xs text-gray-400">{allProductsList.length} of {allProductsTotal} item{allProductsTotal !== 1 ? 's' : ''}</span>}
+              {!allProductsLoading && <span className="ml-auto text-xs text-outline">{allProductsList.length} of {allProductsTotal} item{allProductsTotal !== 1 ? 's' : ''}</span>}
             </div>
             {allProductsLoading && allProductsList.length === 0 ? (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
-                {Array.from({ length: 10 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}
+                {Array.from({ length: 10 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-surface-container-high" />)}
               </div>
             ) : allProductsList.length > 0 ? (
               <>
@@ -972,7 +972,7 @@ export function ProductsTab() {
                     <button
                       onClick={() => fetchNextPage()}
                       disabled={isFetchingNextPage}
-                      className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                      className="flex items-center gap-2 rounded-lg border border-outline-variant bg-surface px-5 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50 transition-colors"
                     >
                       {isFetchingNextPage
                         ? <><Loader2 className="h-4 w-4 animate-spin" /> Loading…</>
@@ -983,9 +983,9 @@ export function ProductsTab() {
               </>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <Package className="h-12 w-12 text-gray-200 mb-3" />
-                <p className="text-sm text-gray-500 font-medium">{allProductsSearch ? `No results for "${allProductsSearch}"` : 'No products found'}</p>
-                <p className="text-xs text-gray-400 mt-1">{allProductsSearch ? 'Try a different search term' : 'Add products in Inventory to get started'}</p>
+                <Package className="h-12 w-12 text-outline-variant mb-3" />
+                <p className="text-sm text-on-surface-variant font-medium">{allProductsSearch ? `No results for "${allProductsSearch}"` : 'No products found'}</p>
+                <p className="text-xs text-outline mt-1">{allProductsSearch ? 'Try a different search term' : 'Add products in Inventory to get started'}</p>
               </div>
             )}
           </div>
@@ -999,9 +999,9 @@ export function ProductsTab() {
                 <button onClick={resetCatBrowse} className="text-blue-500 hover:underline">Device Types</button>
                 {catBreadcrumb.map((crumb, i) => (
                   <span key={crumb.id} className="flex items-center gap-1">
-                    <ChevronRight className="h-3 w-3 text-gray-400" />
+                    <ChevronRight className="h-3 w-3 text-outline" />
                     {i === catBreadcrumb.length - 1
-                      ? <span className="font-semibold text-gray-800">{crumb.name}</span>
+                      ? <span className="font-semibold text-on-surface">{crumb.name}</span>
                       : <button onClick={() => navigateCatBreadcrumb(i)} className="text-blue-500 hover:underline">{crumb.name}</button>
                     }
                   </span>
@@ -1010,29 +1010,29 @@ export function ProductsTab() {
             )}
             {catLevel !== 'products' && (
               catItemsLoading ? (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-32 animate-pulse rounded-xl bg-gray-200" />)}</div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-32 animate-pulse rounded-xl bg-surface-container-high" />)}</div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
                   {catItems.map(item => (
-                    <button key={item.id} onClick={() => selectCatItem(item)} className="flex flex-col w-full overflow-hidden rounded-xl border border-gray-200 bg-white hover:border-brand-teal hover:shadow-sm transition-all text-center min-h-[140px]">
+                    <button key={item.id} onClick={() => selectCatItem(item)} className="flex flex-col w-full overflow-hidden rounded-xl border border-outline-variant bg-surface hover:border-brand-teal hover:shadow-sm transition-all text-center min-h-[140px]">
                       {item.image_url ? (
-                        <div className="relative w-full h-24 border-b border-gray-100 bg-white">
+                        <div className="relative w-full h-24 border-b border-outline-variant bg-surface">
                           <Image src={item.image_url} alt={item.name} fill sizes="(max-width: 640px) 50vw, 33vw" className="object-contain" />
                         </div>
                       ) : (
-                        <div className="flex w-full h-24 items-center justify-center bg-gray-50 border-b border-gray-100">
-                          {catLevel === 'device_types' && <Layers className="h-8 w-8 text-gray-400" />}
+                        <div className="flex w-full h-24 items-center justify-center bg-surface-container-low border-b border-outline-variant">
+                          {catLevel === 'device_types' && <Layers className="h-8 w-8 text-outline" />}
                           {catLevel === 'brands' && <Tag className="h-8 w-8 text-blue-400" />}
                           {catLevel === 'models' && <Phone className="h-8 w-8 text-purple-400" />}
                         </div>
                       )}
                       <div className="w-full p-3 flex-1 flex items-center justify-center">
-                        <span className="text-sm font-semibold text-gray-800 line-clamp-2 leading-tight">{item.name}</span>
+                        <span className="text-sm font-semibold text-on-surface line-clamp-2 leading-tight">{item.name}</span>
                       </div>
                     </button>
                   ))}
                   {catItems.length === 0 && !catItemsLoading && (
-                    <p className="col-span-4 py-8 text-center text-sm text-gray-400">
+                    <p className="col-span-4 py-8 text-center text-sm text-outline">
                       {catLevel === 'device_types' ? 'No device types' : catLevel === 'brands' ? 'No brands' : 'No models'} found
                     </p>
                   )}
@@ -1041,15 +1041,15 @@ export function ProductsTab() {
             )}
             {catLevel === 'products' && (
               <div className="space-y-2">
-                <h4 className="text-sm font-semibold text-gray-700">{catBreadcrumb[catBreadcrumb.length - 1]?.name}</h4>
+                <h4 className="text-sm font-semibold text-on-surface-variant">{catBreadcrumb[catBreadcrumb.length - 1]?.name}</h4>
                 {categoryProductsLoading ? (
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}</div>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-surface-container-high" />)}</div>
                 ) : categoryProducts.length > 0 ? (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
                     {categoryProducts.map(product => <ProductCard key={product.id} product={product} size="sm" onAdd={p => pos.addToCart(p as unknown as Product, null, p.is_service ? null : (p.on_hand ?? 0))} onVariantSelect={(p, e) => openVariantSelect(p, e)} onVariantHover={prefetchVariants} onDiscountSelect={p => openDiscountSelect(p)} />)}
                   </div>
                 ) : (
-                  <p className="py-4 text-center text-sm text-gray-400">No products for this model</p>
+                  <p className="py-4 text-center text-sm text-outline">No products for this model</p>
                 )}
               </div>
             )}
@@ -1064,9 +1064,9 @@ export function ProductsTab() {
                 <button onClick={resetPartBrowse} className="text-blue-500 hover:underline">Device Types</button>
                 {partBreadcrumb.map((crumb, i) => (
                   <span key={crumb.id} className="flex items-center gap-1">
-                    <ChevronRight className="h-3 w-3 text-gray-400" />
+                    <ChevronRight className="h-3 w-3 text-outline" />
                     {i === partBreadcrumb.length - 1
-                      ? <span className="font-semibold text-gray-800">{crumb.name}</span>
+                      ? <span className="font-semibold text-on-surface">{crumb.name}</span>
                       : <button onClick={() => navigatePartBreadcrumb(i)} className="text-blue-500 hover:underline">{crumb.name}</button>
                     }
                   </span>
@@ -1074,10 +1074,10 @@ export function ProductsTab() {
               </div>
             )}
             {partItemsLoading ? (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-gray-200" />)}</div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-surface-container-high" />)}</div>
             ) : partLevel === 'parts' ? (
               partProductsLoading ? (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-32 animate-pulse rounded-xl bg-gray-200" />)}</div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-32 animate-pulse rounded-xl bg-surface-container-high" />)}</div>
               ) : partProducts.length > 0 ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
                   {partProducts.map(product => {
@@ -1085,23 +1085,23 @@ export function ProductsTab() {
                     const oos = !hasVariants && typeof product.on_hand === 'number' && product.on_hand <= 0
                     return (
                       <button key={product.id} disabled={oos} onClick={(e) => handleProductClick(product, e)}
-                        className={`relative flex flex-col items-center rounded-xl border bg-white p-3 text-center transition-all w-full overflow-hidden ${oos ? 'border-gray-100 opacity-50 cursor-not-allowed' : 'border-gray-200 hover:border-brand-teal hover:shadow-sm cursor-pointer'}`}>
+                        className={`relative flex flex-col items-center rounded-xl border bg-surface p-3 text-center transition-all w-full overflow-hidden ${oos ? 'border-outline-variant opacity-50 cursor-not-allowed' : 'border-outline-variant hover:border-brand-teal hover:shadow-sm cursor-pointer'}`}>
                         {oos && (
-                          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/60">
+                          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-surface/60">
                             <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-600">Out of Stock</span>
                           </div>
                         )}
                         {product.image_url ? (
-                          <div className="relative mb-2 w-full h-28 rounded-lg bg-gray-50 overflow-hidden">
+                          <div className="relative mb-2 w-full h-28 rounded-lg bg-surface-container-low overflow-hidden">
                             <Image src={product.image_url} alt={product.name} fill sizes="(max-width: 640px) 50vw, 33vw" className="object-contain" />
                           </div>
                         ) : (
-                          <div className="mb-2 flex h-28 w-full items-center justify-center rounded-lg bg-gray-100"><Package className="h-8 w-8 text-gray-300" /></div>
+                          <div className="mb-2 flex h-28 w-full items-center justify-center rounded-lg bg-surface-container"><Package className="h-8 w-8 text-outline-variant" /></div>
                         )}
-                        <span className="text-sm font-semibold text-gray-800 line-clamp-2 leading-tight w-full">{product.name}</span>
+                        <span className="text-sm font-semibold text-on-surface line-clamp-2 leading-tight w-full">{product.name}</span>
                         <span className="text-sm font-bold text-brand-teal mt-1">{formatCurrency(Number(product.selling_price))}</span>
                         {typeof product.on_hand === 'number' && (
-                          <span className={`text-xs mt-0.5 ${product.on_hand > 0 ? 'text-gray-400' : 'text-red-500 font-medium'}`}>
+                          <span className={`text-xs mt-0.5 ${product.on_hand > 0 ? 'text-outline' : 'text-red-500 font-medium'}`}>
                             {product.on_hand > 0 ? `${product.on_hand} in stock` : 'Out of stock'}
                           </span>
                         )}
@@ -1110,31 +1110,31 @@ export function ProductsTab() {
                   })}
                 </div>
               ) : (
-                <p className="py-8 text-center text-sm text-gray-400">No parts found for this part type</p>
+                <p className="py-8 text-center text-sm text-outline">No parts found for this part type</p>
               )
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
                 {partItems.map(item => (
-                  <button key={item.id} onClick={() => selectPartItem(item)} className="flex flex-col w-full overflow-hidden rounded-xl border border-gray-200 bg-white hover:border-brand-teal hover:shadow-sm transition-all cursor-pointer text-center min-h-[140px]">
+                  <button key={item.id} onClick={() => selectPartItem(item)} className="flex flex-col w-full overflow-hidden rounded-xl border border-outline-variant bg-surface hover:border-brand-teal hover:shadow-sm transition-all cursor-pointer text-center min-h-[140px]">
                     {item.image_url ? (
-                      <div className="relative w-full h-24 border-b border-gray-100 bg-white">
+                      <div className="relative w-full h-24 border-b border-outline-variant bg-surface">
                         <Image src={item.image_url} alt={item.name} fill sizes="(max-width: 640px) 50vw, 33vw" className="object-contain" />
                       </div>
                     ) : (
-                      <div className="flex w-full h-24 items-center justify-center bg-gray-50 border-b border-gray-100">
-                        {partLevel === 'device_types' && <Layers className="h-8 w-8 text-gray-400" />}
+                      <div className="flex w-full h-24 items-center justify-center bg-surface-container-low border-b border-outline-variant">
+                        {partLevel === 'device_types' && <Layers className="h-8 w-8 text-outline" />}
                         {partLevel === 'brands' && <Tag className="h-8 w-8 text-blue-400" />}
                         {partLevel === 'models' && <Phone className="h-8 w-8 text-purple-400" />}
                         {partLevel === 'part_types' && <Package className="h-8 w-8 text-purple-500" />}
                       </div>
                     )}
                     <div className="w-full p-3 flex-1 flex items-center justify-center">
-                      <span className="text-sm font-semibold text-gray-800 line-clamp-2 leading-tight">{item.name}</span>
+                      <span className="text-sm font-semibold text-on-surface line-clamp-2 leading-tight">{item.name}</span>
                     </div>
                   </button>
                 ))}
                 {partItems.length === 0 && !partItemsLoading && (
-                  <p className="col-span-4 py-8 text-center text-sm text-gray-400">
+                  <p className="col-span-4 py-8 text-center text-sm text-outline">
                     {partLevel === 'device_types' ? 'No device types' : partLevel === 'brands' ? 'No brands' : partLevel === 'models' ? 'No models' : 'No part types'} found
                   </p>
                 )}
@@ -1149,8 +1149,8 @@ export function ProductsTab() {
             {!allProductsCategoryId ? (
               allCats.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <Package className="h-12 w-12 text-gray-200 mb-3" />
-                  <p className="text-sm text-gray-500 font-medium">No categories found</p>
+                  <Package className="h-12 w-12 text-outline-variant mb-3" />
+                  <p className="text-sm text-on-surface-variant font-medium">No categories found</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
@@ -1158,10 +1158,10 @@ export function ProductsTab() {
                     <button
                       key={cat.id}
                       onClick={() => setAllProductsCategoryId(cat.id)}
-                      className="flex flex-col w-full overflow-hidden rounded-xl border border-gray-200 bg-white hover:border-brand-teal hover:shadow-sm transition-all text-center min-h-[100px] items-center justify-center p-4"
+                      className="flex flex-col w-full overflow-hidden rounded-xl border border-outline-variant bg-surface hover:border-brand-teal hover:shadow-sm transition-all text-center min-h-[100px] items-center justify-center p-4"
                     >
-                      <Layers className="h-8 w-8 text-gray-400 mb-2" />
-                      <span className="text-sm font-semibold text-gray-800 line-clamp-2 leading-tight">{cat.name}</span>
+                      <Layers className="h-8 w-8 text-outline mb-2" />
+                      <span className="text-sm font-semibold text-on-surface line-clamp-2 leading-tight">{cat.name}</span>
                     </button>
                   ))}
                 </div>
@@ -1172,12 +1172,12 @@ export function ProductsTab() {
                   <button onClick={() => setAllProductsCategoryId('')} className="text-blue-500 hover:underline">
                     All Categories
                   </button>
-                  <ChevronRight className="h-3 w-3 text-gray-400" />
-                  <span className="font-semibold text-gray-800">{allCats.find(c => c.id === allProductsCategoryId)?.name}</span>
+                  <ChevronRight className="h-3 w-3 text-outline" />
+                  <span className="font-semibold text-on-surface">{allCats.find(c => c.id === allProductsCategoryId)?.name}</span>
                 </div>
                 {allProductsLoading && allProductsList.length === 0 ? (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
-                    {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-200" />)}
+                    {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-surface-container-high" />)}
                   </div>
                 ) : allProductsList.length > 0 ? (
                   <>
@@ -1189,7 +1189,7 @@ export function ProductsTab() {
                         <button
                           onClick={() => fetchNextPage()}
                           disabled={isFetchingNextPage}
-                          className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                          className="flex items-center gap-2 rounded-lg border border-outline-variant bg-surface px-5 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50 transition-colors"
                         >
                           {isFetchingNextPage
                             ? <><Loader2 className="h-4 w-4 animate-spin" /> Loading…</>
@@ -1200,8 +1200,8 @@ export function ProductsTab() {
                   </>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <Package className="h-12 w-12 text-gray-200 mb-3" />
-                    <p className="text-sm text-gray-500 font-medium">No products in this category</p>
+                    <Package className="h-12 w-12 text-outline-variant mb-3" />
+                    <p className="text-sm text-on-surface-variant font-medium">No products in this category</p>
                   </div>
                 )}
               </div>
@@ -1211,8 +1211,8 @@ export function ProductsTab() {
 
         {/* CUSTOM ITEM VIEW */}
         {productsView === 'custom_item' && (
-          <div className="max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-sm space-y-3">
-            <h3 className="font-semibold text-gray-900">Add Custom Item</h3>
+          <div className="max-w-md rounded-xl border border-outline-variant bg-surface p-5 shadow-sm space-y-3">
+            <h3 className="font-semibold text-on-surface">Add Custom Item</h3>
             <Input label="Item Name" placeholder="Enter item description..." value={miscName} onChange={e => setMiscName(e.target.value)} />
             <Input label="Price (£)" type="number" min="0" step="0.01" placeholder="0.00" value={miscPrice} onChange={e => setMiscPrice(e.target.value)} />
             <Button className="w-full bg-brand-teal hover:bg-brand-teal-dark" disabled={!miscName.trim() || !miscPrice} onClick={addMiscItem}>
@@ -1246,51 +1246,51 @@ export function ProductsTab() {
       {/* ── Advanced Search Modal ── */}
       {advSearchOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setAdvSearchOpen(false)}>
-          <div className="flex w-[920px] max-h-[85vh] rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+          <div className="flex w-[920px] max-h-[85vh] rounded-2xl bg-surface shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
             {/* Left: Category filter */}
-            <div className="w-60 shrink-0 border-r border-gray-100 flex flex-col">
-              <div className="border-b border-gray-100 px-4 py-3">
-                <p className="text-xs font-semibold text-gray-700">Browse by Categories</p>
+            <div className="w-60 shrink-0 border-r border-outline-variant flex flex-col">
+              <div className="border-b border-outline-variant px-4 py-3">
+                <p className="text-xs font-semibold text-on-surface-variant">Browse by Categories</p>
               </div>
               <div className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
                 {allCats.map(cat => (
-                  <label key={cat.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-gray-50">
-                    <input type="checkbox" checked={advSearchCatIds.has(cat.id)} onChange={() => toggleAdvCat(cat.id)} className="h-3.5 w-3.5 rounded border-gray-300 text-brand-teal accent-[var(--brand-teal)]" />
-                    <span className="text-xs text-gray-700">{cat.name}</span>
+                  <label key={cat.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-surface-container-low">
+                    <input type="checkbox" checked={advSearchCatIds.has(cat.id)} onChange={() => toggleAdvCat(cat.id)} className="h-3.5 w-3.5 rounded border-outline text-brand-teal accent-[var(--brand-teal)]" />
+                    <span className="text-xs text-on-surface-variant">{cat.name}</span>
                   </label>
                 ))}
-                {allCats.length === 0 && <p className="py-4 text-center text-xs text-gray-400">No categories</p>}
+                {allCats.length === 0 && <p className="py-4 text-center text-xs text-outline">No categories</p>}
               </div>
             </div>
             {/* Right: Search + results */}
             <div className="flex flex-1 flex-col overflow-hidden">
-              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
-                <h3 className="font-bold text-gray-900">Advanced Search</h3>
-                <button onClick={() => setAdvSearchOpen(false)} className="ml-2 text-gray-400 hover:text-gray-600"><X className="h-4 w-4" /></button>
+              <div className="flex items-center justify-between border-b border-outline-variant px-5 py-3">
+                <h3 className="font-bold text-on-surface">Advanced Search</h3>
+                <button onClick={() => setAdvSearchOpen(false)} className="ml-2 text-outline hover:text-on-surface-variant"><X className="h-4 w-4" /></button>
               </div>
-              <div className="flex gap-3 border-b border-gray-100 px-5 py-3">
+              <div className="flex gap-3 border-b border-outline-variant px-5 py-3">
                 <div className="flex-1">
-                  <p className="mb-1 text-xs font-medium text-gray-600">Item Name</p>
-                  <input type="text" placeholder="Enter item name" value={advSearchName} onChange={e => setAdvSearchName(e.target.value)} onKeyDown={e => e.key === 'Enter' && runAdvSearch()} className="h-8 w-full rounded border border-gray-200 px-3 text-sm focus:border-brand-teal focus:outline-none" />
+                  <p className="mb-1 text-xs font-medium text-on-surface-variant">Item Name</p>
+                  <input type="text" placeholder="Enter item name" value={advSearchName} onChange={e => setAdvSearchName(e.target.value)} onKeyDown={e => e.key === 'Enter' && runAdvSearch()} className="h-8 w-full rounded border border-outline-variant px-3 text-sm focus:border-brand-teal focus:outline-none" />
                 </div>
                 <div className="flex-1">
-                  <p className="mb-1 text-xs font-medium text-gray-600">Item Identifier</p>
-                  <input type="text" placeholder="Item ID/SKU/UPC/IMEI/Serial" value={advSearchSku} onChange={e => setAdvSearchSku(e.target.value)} onKeyDown={e => e.key === 'Enter' && runAdvSearch()} className="h-8 w-full rounded border border-gray-200 px-3 text-sm focus:border-brand-teal focus:outline-none" />
+                  <p className="mb-1 text-xs font-medium text-on-surface-variant">Item Identifier</p>
+                  <input type="text" placeholder="Item ID/SKU/UPC/IMEI/Serial" value={advSearchSku} onChange={e => setAdvSearchSku(e.target.value)} onKeyDown={e => e.key === 'Enter' && runAdvSearch()} className="h-8 w-full rounded border border-outline-variant px-3 text-sm focus:border-brand-teal focus:outline-none" />
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto px-5 py-3">
-                <p className="mb-2 text-xs text-gray-500">Results ({advSearchResults.length})</p>
+                <p className="mb-2 text-xs text-on-surface-variant">Results ({advSearchResults.length})</p>
                 {advSearchHasMore && (
                   <p className="mb-2 text-xs text-amber-600">Showing first 100 results — refine your search to narrow results.</p>
                 )}
                 {advSearching ? (
-                  <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-12 animate-pulse rounded bg-gray-100" />)}</div>
+                  <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-12 animate-pulse rounded bg-surface-container" />)}</div>
                 ) : advSearchResults.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-gray-400">No results. Try searching above.</p>
+                  <p className="py-8 text-center text-sm text-outline">No results. Try searching above.</p>
                 ) : (
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-100 text-xs font-medium text-gray-500">
+                      <tr className="border-b border-outline-variant text-xs font-medium text-on-surface-variant">
                         <th className="pb-2 text-left">Item</th>
                         <th className="pb-2 text-left w-28">SKU/UPC</th>
                         <th className="pb-2 text-center w-20">Stock</th>
@@ -1298,23 +1298,23 @@ export function ProductsTab() {
                         <th className="pb-2 w-10"></th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody className="divide-y divide-outline-variant">
                       {advSearchResults.map(p => (
-                        <tr key={p.id} className="hover:bg-gray-50">
+                        <tr key={p.id} className="hover:bg-surface-container-low">
                           <td className="py-2">
                             <div className="flex items-center gap-2">
-                              {p.image_url ? <div className="relative h-9 w-9 shrink-0 rounded border border-gray-100 overflow-hidden"><Image src={p.image_url} alt={p.name} fill sizes="36px" className="object-contain" /></div> : <div className="flex h-9 w-9 items-center justify-center rounded bg-gray-100"><ShoppingBag className="h-4 w-4 text-gray-300" /></div>}
+                              {p.image_url ? <div className="relative h-9 w-9 shrink-0 rounded border border-outline-variant overflow-hidden"><Image src={p.image_url} alt={p.name} fill sizes="36px" className="object-contain" /></div> : <div className="flex h-9 w-9 items-center justify-center rounded bg-surface-container"><ShoppingBag className="h-4 w-4 text-outline-variant" /></div>}
                               <div className="min-w-0">
-                                <p className="line-clamp-1 text-xs font-medium text-gray-900">{p.name}</p>
+                                <p className="line-clamp-1 text-xs font-medium text-on-surface">{p.name}</p>
                                 {p.is_serialized && <span className="inline-block rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">Serialized</span>}
                               </div>
                             </div>
                           </td>
-                          <td className="py-2 text-xs text-gray-500">{p.sku ?? '—'}</td>
+                          <td className="py-2 text-xs text-on-surface-variant">{p.sku ?? '—'}</td>
                           <td className="py-2 text-center">
                             {p.on_hand !== undefined
                               ? <span className={`inline-flex h-6 w-8 items-center justify-center rounded-full text-xs font-medium ${(p.on_hand ?? 0) > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>{p.on_hand ?? 0}</span>
-                              : <span className="text-xs text-gray-400">—</span>
+                              : <span className="text-xs text-outline">—</span>
                             }
                           </td>
                           <td className="py-2 text-right text-xs font-semibold text-brand-teal">{formatCurrency(p.selling_price)}</td>
@@ -1326,7 +1326,7 @@ export function ProductsTab() {
                                   disabled={advOos}
                                   title={advOos ? 'Out of stock' : undefined}
                                   onClick={() => { setAdvSearchOpen(false); handleProductClick(p) }}
-                                  className={`flex h-7 w-7 items-center justify-center rounded border text-gray-500 ${advOos ? 'border-gray-100 opacity-40 cursor-not-allowed' : 'border-gray-200 hover:border-brand-teal hover:text-brand-teal'}`}
+                                  className={`flex h-7 w-7 items-center justify-center rounded border text-on-surface-variant ${advOos ? 'border-outline-variant opacity-40 cursor-not-allowed' : 'border-outline-variant hover:border-brand-teal hover:text-brand-teal'}`}
                                 >
                                   <Plus className="h-3.5 w-3.5" />
                                 </button>
@@ -1339,8 +1339,8 @@ export function ProductsTab() {
                   </table>
                 )}
               </div>
-              <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3">
-                <button onClick={() => { setAdvSearchName(''); setAdvSearchSku(''); setAdvSearchCatIds(new Set()); setAdvSearchResults([]) }} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700">
+              <div className="flex items-center justify-between border-t border-outline-variant px-5 py-3">
+                <button onClick={() => { setAdvSearchName(''); setAdvSearchSku(''); setAdvSearchCatIds(new Set()); setAdvSearchResults([]) }} className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface-variant">
                   <X className="h-3.5 w-3.5" /> Reset
                 </button>
                 <button onClick={runAdvSearch} disabled={advSearching} className="flex items-center gap-1.5 rounded-lg bg-brand-teal px-4 py-1.5 text-xs font-medium text-white hover:bg-brand-teal-dark disabled:opacity-50">
@@ -1355,15 +1355,15 @@ export function ProductsTab() {
       {/* ── Warranty Claim Modal ── */}
       {warrantyOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setWarrantyOpen(false)}>
-          <div className="flex w-[880px] max-h-[88vh] flex-col rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+          <div className="flex w-[880px] max-h-[88vh] flex-col rounded-2xl bg-surface shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5 text-brand-teal" />
-                <h3 className="text-base font-bold text-gray-900">Warranty Claim — Check Device / Item History</h3>
+                <h3 className="text-base font-bold text-on-surface">Warranty Claim — Check Device / Item History</h3>
               </div>
-              <button onClick={() => setWarrantyOpen(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+              <button onClick={() => setWarrantyOpen(false)} className="text-outline hover:text-on-surface-variant"><X className="h-5 w-5" /></button>
             </div>
-            <div className="border-b border-gray-100 bg-gray-50 px-6 py-4">
+            <div className="border-b border-outline-variant bg-surface-container-low px-6 py-4">
               <div className="grid grid-cols-3 gap-3">
                 {[
                   { label: 'Device IMEI / Serial No.', key: 'imei', placeholder: 'Enter IMEI or serial' },
@@ -1373,13 +1373,13 @@ export function ProductsTab() {
                   { label: 'Invoice ID', key: 'invoiceId', placeholder: 'Invoice UUID' },
                 ].map(field => (
                   <div key={field.key}>
-                    <label className="mb-1 block text-xs font-medium text-gray-600">{field.label}</label>
+                    <label className="mb-1 block text-xs font-medium text-on-surface-variant">{field.label}</label>
                     <input
                       type="text" placeholder={field.placeholder}
                       value={(warrantyForm as any)[field.key]}
                       onChange={e => setWarrantyForm(f => ({ ...f, [field.key]: e.target.value }))}
                       onKeyDown={e => e.key === 'Enter' && runWarrantySearch()}
-                      className="h-8 w-full rounded border border-gray-200 px-3 text-sm focus:border-brand-teal focus:outline-none"
+                      className="h-8 w-full rounded border border-outline-variant px-3 text-sm focus:border-brand-teal focus:outline-none"
                     />
                   </div>
                 ))}
@@ -1392,9 +1392,9 @@ export function ProductsTab() {
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {warrantySearching ? (
-                <div className="space-y-3">{[1, 2].map(i => <div key={i} className="h-24 animate-pulse rounded-lg bg-gray-100" />)}</div>
+                <div className="space-y-3">{[1, 2].map(i => <div key={i} className="h-24 animate-pulse rounded-lg bg-surface-container" />)}</div>
               ) : warrantyResults.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                <div className="flex flex-col items-center justify-center py-16 text-outline">
                   <ShieldCheck className="h-12 w-12 mb-3 opacity-30" />
                   <p className="text-sm">Enter search criteria above to find repair history</p>
                 </div>
@@ -1403,27 +1403,27 @@ export function ProductsTab() {
                   {warrantyResults.map((repair: any) => {
                     const customer = repair.customers
                     const items: any[] = repair.repair_items ?? []
-                    const statusColors: Record<string, string> = { repaired: 'bg-green-100 text-green-700', in_progress: 'bg-blue-100 text-blue-700', waiting_for_parts: 'bg-yellow-100 text-yellow-700', waiting_for_inspection: 'bg-orange-100 text-orange-700', picked_up: 'bg-gray-100 text-gray-600' }
+                    const statusColors: Record<string, string> = { repaired: 'bg-green-100 text-green-700', in_progress: 'bg-blue-100 text-blue-700', waiting_for_parts: 'bg-yellow-100 text-yellow-700', waiting_for_inspection: 'bg-orange-100 text-orange-700', picked_up: 'bg-surface-container text-on-surface-variant' }
                     const statusLabel = repair.status.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
                     return (
-                      <div key={repair.id} className="rounded-xl border border-gray-200 overflow-hidden">
-                        <div className="flex items-center justify-between bg-gray-50 px-4 py-3">
+                      <div key={repair.id} className="rounded-xl border border-outline-variant overflow-hidden">
+                        <div className="flex items-center justify-between bg-surface-container-low px-4 py-3">
                           <div className="flex items-center gap-4">
-                            <div><p className="text-xs text-gray-500">Ticket</p><p className="text-sm font-bold text-gray-900">{repair.job_number}</p></div>
-                            {customer && <div><p className="text-xs text-gray-500">Customer</p><p className="text-sm font-medium text-gray-900">{customer.first_name} {customer.last_name ?? ''}</p>{customer.phone && <p className="text-xs text-gray-500">{customer.phone}</p>}</div>}
-                            <div><p className="text-xs text-gray-500">Device</p><p className="text-sm font-medium text-gray-900">{[repair.device_brand, repair.device_model].filter(Boolean).join(' ') || '—'}</p>{repair.serial_number && <p className="text-xs text-gray-500">S/N: {repair.serial_number}</p>}</div>
-                            <div><p className="text-xs text-gray-500">Issue</p><p className="text-sm text-gray-700 line-clamp-1 max-w-xs">{repair.issue}</p></div>
+                            <div><p className="text-xs text-on-surface-variant">Ticket</p><p className="text-sm font-bold text-on-surface">{repair.job_number}</p></div>
+                            {customer && <div><p className="text-xs text-on-surface-variant">Customer</p><p className="text-sm font-medium text-on-surface">{customer.first_name} {customer.last_name ?? ''}</p>{customer.phone && <p className="text-xs text-on-surface-variant">{customer.phone}</p>}</div>}
+                            <div><p className="text-xs text-on-surface-variant">Device</p><p className="text-sm font-medium text-on-surface">{[repair.device_brand, repair.device_model].filter(Boolean).join(' ') || '—'}</p>{repair.serial_number && <p className="text-xs text-on-surface-variant">S/N: {repair.serial_number}</p>}</div>
+                            <div><p className="text-xs text-on-surface-variant">Issue</p><p className="text-sm text-on-surface-variant line-clamp-1 max-w-xs">{repair.issue}</p></div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusColors[repair.status] ?? 'bg-gray-100 text-gray-600'}`}>{statusLabel}</span>
+                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusColors[repair.status] ?? 'bg-surface-container text-on-surface-variant'}`}>{statusLabel}</span>
                             <div className="relative">
-                              <button onClick={() => setWarrantyActionsOpen(warrantyActionsOpen === repair.id ? null : repair.id)} className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                              <button onClick={() => setWarrantyActionsOpen(warrantyActionsOpen === repair.id ? null : repair.id)} className="flex items-center gap-1 rounded-lg border border-outline-variant bg-surface px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-container-low">
                                 Actions <ChevronRight className="h-3 w-3 rotate-90" />
                               </button>
                               {warrantyActionsOpen === repair.id && (
-                                <div className="absolute right-0 top-full z-10 mt-1 w-48 rounded-lg border border-gray-200 bg-white shadow-lg">
-                                  <button onClick={() => { setWarrantyActionsOpen(null); router.push(`/repairs/${repair.id}`) }} className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"><ExternalLink className="h-3.5 w-3.5" /> View Ticket</button>
-                                  <button onClick={() => { setWarrantyActionsOpen(null); router.push(`/pos/refund?sale_id=${repair.id}`) }} className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"><ArrowLeft className="h-3.5 w-3.5" /> Issue Refund</button>
+                                <div className="absolute right-0 top-full z-10 mt-1 w-48 rounded-lg border border-outline-variant bg-surface shadow-lg">
+                                  <button onClick={() => { setWarrantyActionsOpen(null); router.push(`/repairs/${repair.id}`) }} className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-on-surface-variant hover:bg-surface-container-low"><ExternalLink className="h-3.5 w-3.5" /> View Ticket</button>
+                                  <button onClick={() => { setWarrantyActionsOpen(null); router.push(`/pos/refund?sale_id=${repair.id}`) }} className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-on-surface-variant hover:bg-surface-container-low"><ArrowLeft className="h-3.5 w-3.5" /> Issue Refund</button>
                                   <button onClick={() => setWarrantyActionsOpen(null)} className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"><X className="h-3.5 w-3.5" /> Out Of Warranty</button>
                                 </div>
                               )}
@@ -1432,21 +1432,21 @@ export function ProductsTab() {
                         </div>
                         {items.length > 0 && (
                           <table className="w-full text-sm">
-                            <thead><tr className="border-b border-gray-100 text-xs font-medium text-gray-500"><th className="px-4 py-2 text-left">Part / Service</th><th className="px-4 py-2 text-center w-24">Warranty</th><th className="px-4 py-2 text-center w-32">Expires</th><th className="px-4 py-2 text-center w-24">Status</th><th className="px-4 py-2 w-32"></th></tr></thead>
-                            <tbody className="divide-y divide-gray-50">
+                            <thead><tr className="border-b border-outline-variant text-xs font-medium text-on-surface-variant"><th className="px-4 py-2 text-left">Part / Service</th><th className="px-4 py-2 text-center w-24">Warranty</th><th className="px-4 py-2 text-center w-32">Expires</th><th className="px-4 py-2 text-center w-24">Status</th><th className="px-4 py-2 w-32"></th></tr></thead>
+                            <tbody className="divide-y divide-outline-variant">
                               {items.map((item: any) => (
-                                <tr key={item.id} className="hover:bg-gray-50">
-                                  <td className="px-4 py-2.5 font-medium text-gray-900">{item.name}</td>
-                                  <td className="px-4 py-2.5 text-center">{item.warranty_days ? <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">{item.warranty_days}d</span> : <span className="text-xs text-gray-400">None</span>}</td>
-                                  <td className="px-4 py-2.5 text-center text-xs text-gray-500">{item.warrantyExpiry ? new Date(item.warrantyExpiry).toLocaleDateString() : '—'}</td>
-                                  <td className="px-4 py-2.5 text-center">{item.warranty_days ? (item.inWarranty ? <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">In Warranty</span> : <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-600">Expired</span>) : <span className="text-xs text-gray-400">—</span>}</td>
+                                <tr key={item.id} className="hover:bg-surface-container-low">
+                                  <td className="px-4 py-2.5 font-medium text-on-surface">{item.name}</td>
+                                  <td className="px-4 py-2.5 text-center">{item.warranty_days ? <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">{item.warranty_days}d</span> : <span className="text-xs text-outline">None</span>}</td>
+                                  <td className="px-4 py-2.5 text-center text-xs text-on-surface-variant">{item.warrantyExpiry ? new Date(item.warrantyExpiry).toLocaleDateString() : '—'}</td>
+                                  <td className="px-4 py-2.5 text-center">{item.warranty_days ? (item.inWarranty ? <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">In Warranty</span> : <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-600">Expired</span>) : <span className="text-xs text-outline">—</span>}</td>
                                   <td className="px-4 py-2.5 text-right">{item.inWarranty && <button onClick={() => setWarrantyClaimModal({ repairId: repair.id, item })} className="rounded border border-brand-teal-light bg-brand-teal-light px-3 py-1 text-xs font-medium text-brand-teal hover:bg-brand-teal-light">Warranty Claim</button>}</td>
                                 </tr>
                               ))}
                             </tbody>
                           </table>
                         )}
-                        {items.length === 0 && <p className="px-4 py-3 text-xs text-gray-400">No parts recorded for this repair.</p>}
+                        {items.length === 0 && <p className="px-4 py-3 text-xs text-outline">No parts recorded for this repair.</p>}
                       </div>
                     )
                   })}
@@ -1463,12 +1463,12 @@ export function ProductsTab() {
           <div className="space-y-4">
             <div className="rounded-lg bg-brand-teal-light border border-brand-teal-light px-4 py-3">
               <p className="text-xs text-brand-teal font-medium">Part</p>
-              <p className="text-sm font-semibold text-gray-900">{warrantyClaimModal.item.name}</p>
-              <p className="text-xs text-gray-500 mt-0.5">Warranty expires: {warrantyClaimModal.item.warrantyExpiry ? new Date(warrantyClaimModal.item.warrantyExpiry).toLocaleDateString() : '—'}</p>
+              <p className="text-sm font-semibold text-on-surface">{warrantyClaimModal.item.name}</p>
+              <p className="text-xs text-on-surface-variant mt-0.5">Warranty expires: {warrantyClaimModal.item.warrantyExpiry ? new Date(warrantyClaimModal.item.warrantyExpiry).toLocaleDateString() : '—'}</p>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Fault Description / Reason <span className="text-red-500">*</span></label>
-              <textarea rows={3} placeholder="Describe the fault or reason for warranty claim…" value={warrantyClaimReason} onChange={e => setWarrantyClaimReason(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none" />
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Fault Description / Reason <span className="text-red-500">*</span></label>
+              <textarea rows={3} placeholder="Describe the fault or reason for warranty claim…" value={warrantyClaimReason} onChange={e => setWarrantyClaimReason(e.target.value)} className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none" />
             </div>
             <div className="flex gap-2 pt-1">
               <Button variant="outline" className="flex-1" onClick={() => { setWarrantyClaimModal(null); setWarrantyClaimReason('') }}>Cancel</Button>

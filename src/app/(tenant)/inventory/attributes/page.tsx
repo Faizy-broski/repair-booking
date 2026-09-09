@@ -142,12 +142,12 @@ export default function InventoryAttributesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-gray-500 hover:text-gray-900">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-on-surface-variant hover:text-on-surface">
             <ArrowLeft className="h-5 w-5" strokeWidth={3} />
           </Button>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Product Attributes</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Define attributes like Color or Size and assign each to a category.</p>
+            <h1 className="text-xl font-bold text-on-surface">Product Attributes</h1>
+            <p className="text-sm text-on-surface-variant mt-0.5">Define attributes like Color or Size and assign each to a category.</p>
           </div>
         </div>
         <Button onClick={openCreate}><Plus className="h-4 w-4" /> Add Attribute</Button>
@@ -156,7 +156,7 @@ export default function InventoryAttributesPage() {
       {/* Category filter pills */}
       {categories.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">Filter:</span>
+          <span className="text-xs font-medium text-outline uppercase tracking-wide">Filter:</span>
           {[
             { id: '', label: 'All' },
             ...categories.map(c => ({ id: c.id, label: c.name })),
@@ -166,7 +166,7 @@ export default function InventoryAttributesPage() {
               className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                 filterCatId === id
                   ? id === '__none__' ? 'border-gray-500 bg-gray-500 text-white' : 'border-brand-teal bg-brand-teal text-white'
-                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-400 hover:text-gray-800'
+                  : 'border-outline-variant bg-surface text-on-surface-variant hover:border-outline hover:text-on-surface'
               }`}
             >{label}</button>
           ))}
@@ -175,25 +175,25 @@ export default function InventoryAttributesPage() {
 
       {/* Table */}
       {loading ? (
-        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-          <div className="grid grid-cols-[2fr_3fr_1.5fr_auto] gap-4 border-b border-gray-100 bg-gray-50 px-5 py-3">
+        <div className="rounded-xl border border-outline-variant bg-surface overflow-hidden">
+          <div className="grid grid-cols-[2fr_3fr_1.5fr_auto] gap-4 border-b border-outline-variant bg-surface-container-low px-5 py-3">
             {['ATTRIBUTE', 'VALUES', 'CATEGORY', 'ACTIONS'].map(h => (
-              <div key={h} className="h-3 w-20 animate-pulse rounded bg-gray-200" />
+              <div key={h} className="h-3 w-20 animate-pulse rounded bg-surface-container-high" />
             ))}
           </div>
           {[1,2,3,4].map(i => (
-            <div key={i} className="grid grid-cols-[2fr_3fr_1.5fr_auto] gap-4 border-b border-gray-100 px-5 py-4">
-              <div className="h-4 w-24 animate-pulse rounded bg-gray-100" />
-              <div className="h-4 w-40 animate-pulse rounded bg-gray-100" />
-              <div className="h-5 w-20 animate-pulse rounded-full bg-gray-100" />
-              <div className="h-4 w-16 animate-pulse rounded bg-gray-100" />
+            <div key={i} className="grid grid-cols-[2fr_3fr_1.5fr_auto] gap-4 border-b border-outline-variant px-5 py-4">
+              <div className="h-4 w-24 animate-pulse rounded bg-surface-container" />
+              <div className="h-4 w-40 animate-pulse rounded bg-surface-container" />
+              <div className="h-5 w-20 animate-pulse rounded-full bg-surface-container" />
+              <div className="h-4 w-16 animate-pulse rounded bg-surface-container" />
             </div>
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-xl border-2 border-dashed border-gray-200 py-20 text-center">
-          <Tag className="mx-auto h-9 w-9 text-gray-300 mb-3" />
-          <p className="text-sm font-medium text-gray-500">
+        <div className="rounded-xl border-2 border-dashed border-outline-variant py-20 text-center">
+          <Tag className="mx-auto h-9 w-9 text-outline-variant mb-3" />
+          <p className="text-sm font-medium text-on-surface-variant">
             {attributes.length === 0 ? 'No attributes yet' : 'No attributes match this filter'}
           </p>
           {attributes.length === 0 && (
@@ -201,9 +201,9 @@ export default function InventoryAttributesPage() {
           )}
         </div>
       ) : (
-        <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+        <div className="rounded-xl border border-outline-variant bg-surface overflow-hidden">
           {/* Table head */}
-          <div className="grid grid-cols-[2fr_3fr_1.5fr_120px] gap-4 border-b border-gray-100 bg-gray-50 px-5 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+          <div className="grid grid-cols-[2fr_3fr_1.5fr_120px] gap-4 border-b border-outline-variant bg-surface-container-low px-5 py-3 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
             <div>Attribute</div>
             <div>Values</div>
             <div>Category</div>
@@ -211,13 +211,13 @@ export default function InventoryAttributesPage() {
           </div>
 
           {/* Rows */}
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-outline-variant">
             {paginated.map(attr => {
               const vals = attr.product_attribute_values
               const isAdding = addingValueFor === attr.id
 
               return (
-                <div key={attr.id} className="grid grid-cols-[2fr_3fr_1.5fr_120px] gap-4 items-start px-5 py-4 hover:bg-gray-50/60 transition-colors">
+                <div key={attr.id} className="grid grid-cols-[2fr_3fr_1.5fr_120px] gap-4 items-start px-5 py-4 hover:bg-surface-container-low/60 transition-colors">
 
                   {/* Attribute name */}
                   <div className="flex items-center gap-2.5 min-h-[32px]">
@@ -225,9 +225,9 @@ export default function InventoryAttributesPage() {
                       <Tag className="h-4 w-4 text-violet-500" />
                     </div>
                     <div className="flex flex-col">
-                      <span className="font-semibold text-sm text-gray-900 leading-tight">{attr.name}</span>
+                      <span className="font-semibold text-sm text-on-surface leading-tight">{attr.name}</span>
                       {attr.is_default && (
-                        <span className="mt-0.5 inline-block w-fit rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500">Default</span>
+                        <span className="mt-0.5 inline-block w-fit rounded-full bg-surface-container px-2 py-0.5 text-[10px] font-medium text-on-surface-variant">Default</span>
                       )}
                     </div>
                   </div>
@@ -235,16 +235,16 @@ export default function InventoryAttributesPage() {
                   {/* Values — inline pills + add input */}
                   <div className="flex flex-wrap items-center gap-1.5 min-h-[32px]">
                     {vals.length === 0 && !isAdding && (
-                      <span className="text-xs text-gray-400 italic">No values</span>
+                      <span className="text-xs text-outline italic">No values</span>
                     )}
                     {vals.map(v => (
                       <span key={v.id}
-                        className="group inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2.5 py-0.5 text-xs font-medium text-gray-700 shadow-sm"
+                        className="group inline-flex items-center gap-1 rounded-full border border-outline-variant bg-surface px-2.5 py-0.5 text-xs font-medium text-on-surface-variant shadow-sm"
                       >
                         {v.value}
                         <button
                           onClick={() => deleteValue(v.id)}
-                          className="ml-0.5 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                          className="ml-0.5 text-outline-variant hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -264,14 +264,14 @@ export default function InventoryAttributesPage() {
                           className="h-7 w-32 text-xs"
                         />
                         <Button size="sm" className="h-7 text-xs px-2" onClick={() => addValue(attr.id)} disabled={!newValueText.trim()}>Add</Button>
-                        <button onClick={() => { setAddingValueFor(null); setNewValueText('') }} className="text-gray-400 hover:text-gray-600">
+                        <button onClick={() => { setAddingValueFor(null); setNewValueText('') }} className="text-outline hover:text-on-surface-variant">
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     ) : (
                       <button
                         onClick={() => { setAddingValueFor(attr.id); setNewValueText('') }}
-                        className="inline-flex items-center gap-0.5 rounded-full border border-dashed border-gray-300 px-2 py-0.5 text-xs text-gray-400 hover:border-brand-teal hover:text-brand-teal transition-colors"
+                        className="inline-flex items-center gap-0.5 rounded-full border border-dashed border-outline px-2 py-0.5 text-xs text-outline hover:border-brand-teal hover:text-brand-teal transition-colors"
                       >
                         <Plus className="h-3 w-3" /> Add
                       </button>
@@ -285,7 +285,7 @@ export default function InventoryAttributesPage() {
                         <Layers className="h-3 w-3 text-brand-teal" />{attr.categoryName}
                       </span>
                     ) : (
-                      <span className="text-xs text-gray-400 italic">—</span>
+                      <span className="text-xs text-outline italic">—</span>
                     )}
                   </div>
 
@@ -306,8 +306,8 @@ export default function InventoryAttributesPage() {
           </div>
 
           {/* Pagination footer */}
-          <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50/60 px-5 py-3">
-            <p className="text-xs text-gray-500">
+          <div className="flex items-center justify-between border-t border-outline-variant bg-surface-container-low/60 px-5 py-3">
+            <p className="text-xs text-on-surface-variant">
               Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length} attribute{filtered.length !== 1 ? 's' : ''}
             </p>
             {totalPages > 1 && (
@@ -315,19 +315,19 @@ export default function InventoryAttributesPage() {
                 <button
                   onClick={() => setPage(p => Math.max(0, p - 1))}
                   disabled={page === 0}
-                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >Previous</button>
                 {Array.from({ length: totalPages }, (_, i) => (
                   <button key={i} onClick={() => setPage(i)}
                     className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                      page === i ? 'border-brand-teal bg-brand-teal text-white' : 'border-gray-200 text-gray-600 hover:bg-white'
+                      page === i ? 'border-brand-teal bg-brand-teal text-white' : 'border-outline-variant text-on-surface-variant hover:bg-surface'
                     }`}
                   >{i + 1}</button>
                 ))}
                 <button
                   onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                   disabled={page === totalPages - 1}
-                  className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >Next</button>
               </div>
             )}
@@ -352,7 +352,7 @@ export default function InventoryAttributesPage() {
             ]}
           />
           {categories.length === 0 && (
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-outline">
               No categories yet.{' '}
               <Link href="/inventory/categories" className="text-brand-teal underline">Create one first.</Link>
             </p>
@@ -369,7 +369,7 @@ export default function InventoryAttributesPage() {
       {/* Delete confirm */}
       <Modal open={!!deleteAttr} onClose={() => setDeleteAttr(null)} title="Delete Attribute">
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-on-surface-variant">
             Are you sure you want to delete <strong>{deleteAttr?.name}</strong>? This will remove all its values.
           </p>
           <div className="flex justify-end gap-2">

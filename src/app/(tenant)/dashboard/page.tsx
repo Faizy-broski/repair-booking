@@ -219,9 +219,14 @@ export default function DashboardPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={branchRevenue.map((b) => ({ name: b.branchName, revenue: b.total }))}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-container)" />
-                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => v >= 1000 ? `£${(v / 1000).toFixed(1)}k` : `£${v}`} />
-                    <Tooltip formatter={(v) => formatCurrency(v as number)} />
+                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: 'var(--on-surface-variant)' }} />
+                    <YAxis tick={{ fontSize: 12, fill: 'var(--on-surface-variant)' }} tickFormatter={(v) => v >= 1000 ? `£${(v / 1000).toFixed(1)}k` : `£${v}`} />
+                    <Tooltip
+                      formatter={(v) => formatCurrency(v as number)}
+                      contentStyle={{ background: 'var(--surface-container-lowest)', border: '1px solid var(--outline-variant)', borderRadius: 8 }}
+                      itemStyle={{ color: 'var(--on-surface)' }}
+                      labelStyle={{ color: 'var(--on-surface-variant)' }}
+                    />
                     <Bar dataKey="revenue" fill="var(--primary)" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -325,7 +330,7 @@ export default function DashboardPage() {
                 <p className="px-4 py-6 text-center text-sm text-on-surface-variant">No activity yet.</p>
               ) : (
                 <div className="relative h-[500px] overflow-y-auto">
-                  <div className="absolute left-[31px] top-3 bottom-3 w-px bg-gray-200" />
+                  <div className="absolute left-[31px] top-3 bottom-3 w-px bg-outline-variant" />
                   {recentActivity.map((a) => {
                     const meta = ACTIVITY_META[a.status] ?? { label: a.status, dot: 'bg-gray-400' }
                     return (
@@ -335,7 +340,7 @@ export default function DashboardPage() {
                         className="flex items-start gap-3 px-4 py-2.5 hover:bg-surface-container-low transition-colors"
                       >
                         <div className="relative z-10 mt-1 flex h-4 w-4 shrink-0 items-center justify-center">
-                          <div className={`h-2.5 w-2.5 rounded-full ${meta.dot} ring-2 ring-white`} />
+                          <div className={`h-2.5 w-2.5 rounded-full ${meta.dot} ring-2 ring-surface`} />
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-[10px] text-on-surface-variant mb-0.5 leading-none">

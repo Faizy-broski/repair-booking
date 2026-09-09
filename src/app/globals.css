@@ -149,6 +149,98 @@ body {
   --brand-teal-dark:      var(--primary-dim);
   --brand-yellow-light:   color-mix(in srgb, #F8C301 15%, white);
   --brand-yellow-dark:    color-mix(in srgb, #F8C301 85%, black);
+
+  /* ── Semantic status tokens (used by toasts/badges, not part of M3 core) ── */
+  --success:              #1b8c4e;
+  --on-success:           #ffffff;
+  --warning:              #b36a00;
+  --on-warning:           #ffffff;
+}
+
+/* ── Dark scheme ──────────────────────────────────────────────────────
+   Same token names as :root above, redefined for dark surfaces. Anything
+   built on the M3 utility classes (bg-surface, text-on-surface, etc.)
+   picks these up automatically the moment .dark is present on <html> —
+   no component changes needed beyond what already uses the tokens. */
+.dark {
+  --primary-dim:                 color-mix(in srgb, var(--brand-primary) 70%, white);
+  --primary:                     var(--primary-dim);
+  --primary-light: #5EEEDD;
+  --primary-fixed:                color-mix(in srgb, var(--brand-primary) 30%, black);
+  --primary-fixed-dim:            color-mix(in srgb, var(--brand-primary) 40%, black);
+  --primary-container:            color-mix(in srgb, var(--brand-primary) 30%, black);
+  --on-primary:                  #00201d;
+  --on-primary-container:        #a3f2e6;
+  --on-primary-fixed:            #a3f2e6;
+  --on-primary-fixed-variant:    #7fd8ca;
+  --inverse-primary:             var(--brand-primary);
+
+  /* Secondary – slate-blue, dimmed for dark backgrounds */
+  --secondary:                  #b8c1e0;
+  --secondary-dim:              #a0a9c8;
+  --secondary-fixed:            #dae2fd;
+  --secondary-fixed-dim:        #ccd4ee;
+  --secondary-container:        #3b4258;
+  --on-secondary:               #252c40;
+  --on-secondary-container:     #dae2fd;
+  --on-secondary-fixed:         #373f54;
+  --on-secondary-fixed-variant: #ccd4ee;
+
+  /* Tertiary – blue, dimmed for dark backgrounds */
+  --tertiary:                   #8ccbff;
+  --tertiary-dim:               #6bb8f9;
+  --tertiary-fixed:             #5bb8ff;
+  --tertiary-fixed-dim:         #37abf9;
+  --tertiary-container:         #00436b;
+  --on-tertiary:                #003352;
+  --on-tertiary-container:      #cce6ff;
+  --on-tertiary-fixed:          #001a2c;
+  --on-tertiary-fixed-variant:  #cce6ff;
+
+  /* Error, dimmed for dark backgrounds */
+  --error:                      #ff8a80;
+  --error-dim:                  #ff6f61;
+  --error-container:            #7a0e17;
+  --on-error:                   #3a0004;
+  --on-error-container:         #ffdad6;
+
+  /* Surface — near-black, elevation via ascending lightness */
+  --surface:                    #17191a;
+  --surface-dim:                #101213;
+  --surface-bright:             #3a3d3e;
+  --surface-tint:               var(--brand-primary);
+  --surface-variant:            #43474a;
+  --surface-container-lowest:   #0c0e0f;
+  --surface-container-low:      #1f2122;
+  --surface-container:          #232526;
+  --surface-container-high:     #2d2f30;
+  --surface-container-highest:  #38393b;
+
+  /* On-surface — light text for contrast against dark surfaces */
+  --on-surface:                 #e2e3e4;
+  --on-surface-variant:         #c3c6c8;
+  --on-background:              #e2e3e4;
+  --inverse-surface:            #e2e3e4;
+  --inverse-on-surface:         #2c2f31;
+
+  /* Outline */
+  --outline:                    #8d9092;
+  --outline-variant:            #43474a;
+
+  /* Background */
+  --background:                 #101213;
+  --foreground:                 #e2e3e4;
+
+  /* Sidebar stays a near-black brand-tinted panel in both schemes */
+  --sidebar-bg:         #00141b;
+
+  /* Legacy brand aliases pick up the redefinitions above automatically */
+
+  /* Status tokens, dimmed for dark surfaces */
+  --success:              #4ade80;
+  --on-success:           #04240f;
+  --warning:              #fbbf24;
+  --on-warning:           #2c1c00;
 }
 
 @theme inline {
@@ -232,6 +324,12 @@ body {
   --color-brand-teal:         var(--brand-teal);
   --color-brand-teal-light:   var(--brand-teal-light);
   --color-brand-teal-dark:    var(--brand-teal-dark);
+
+  /* Status */
+  --color-success:    var(--success);
+  --color-on-success: var(--on-success);
+  --color-warning:    var(--warning);
+  --color-on-warning: var(--on-warning);
 }
 
 body {
@@ -248,7 +346,8 @@ body {
   font-family: "Segoe Script Custom", cursive;
 }
 
-/* Force light-mode colours on form elements regardless of OS dark-mode preference */
+/* Form elements follow the M3 surface tokens, so they track the active theme
+   (light/dark/system) instead of the browser's native form-control styling */
 input, textarea, select {
   color: var(--on-surface);
   background-color: var(--surface-container-lowest);

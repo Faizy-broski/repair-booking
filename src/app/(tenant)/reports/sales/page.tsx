@@ -13,6 +13,7 @@ import Link from 'next/link'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
+import { chartAxisTick, chartGridStroke, chartTooltipStyle } from '@/lib/chart-theme'
 import type { ColumnDef } from '@tanstack/react-table'
 
 interface SalesRow { date: string; total_sales: number; transaction_count: number; avg_order_value: number }
@@ -110,11 +111,11 @@ export default function SalesReportPage() {
           <h3 className="mb-3 text-base font-semibold text-on-surface">Daily Revenue</h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-surface-container-high, #f0f0f0)" />
-              <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(v) => formatDate(v)} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `£${v}`} />
-              <Tooltip formatter={(v: unknown) => formatCurrency(v as number)} />
-              <Bar dataKey="total_sales" fill="#0d9488" radius={[4, 4, 0, 0]} name="Revenue" />
+              <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
+              <XAxis dataKey="date" tick={chartAxisTick} tickFormatter={(v) => formatDate(v)} />
+              <YAxis tick={chartAxisTick} tickFormatter={(v) => `£${v}`} />
+              <Tooltip formatter={(v: unknown) => formatCurrency(v as number)} {...chartTooltipStyle} />
+              <Bar dataKey="total_sales" fill="var(--primary)" radius={[4, 4, 0, 0]} name="Revenue" />
             </BarChart>
           </ResponsiveContainer>
         </div>

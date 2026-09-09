@@ -34,9 +34,9 @@ const EMPTY_DETAILS: RepairDetailsForm = {
   is_rush: false, physical_location: '', task_type: 'In-Store', device_network: '',
 }
 
-const inp = 'h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm focus:border-brand-teal focus:outline-none'
+const inp = 'h-10 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm focus:border-brand-teal focus:outline-none'
 const sel = inp
-const lbl = 'mb-1 block text-sm font-medium text-gray-700'
+const lbl = 'mb-1 block text-sm font-medium text-on-surface-variant'
 
 export function RepairsTab() {
   const { activeBranch } = useAuthStore()
@@ -484,10 +484,10 @@ export function RepairsTab() {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between gap-2 border-b border-gray-200 bg-white px-4 py-2.5">
+      <div className="flex items-center justify-between gap-2 border-b border-outline-variant bg-surface px-4 py-2.5">
         <div className="flex items-center gap-3">
-          <p className="text-sm font-semibold text-gray-800">New Repair Job</p>
-          <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${pos.customer ? 'bg-teal-50 text-brand-teal' : 'bg-gray-100 text-gray-400'}`}>
+          <p className="text-sm font-semibold text-on-surface">New Repair Job</p>
+          <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${pos.customer ? 'bg-teal-50 text-brand-teal' : 'bg-surface-container text-outline'}`}>
             <User className="h-3 w-3" />
             {pos.customer ? `${pos.customer.first_name} ${pos.customer.last_name ?? ''}`.trim() : 'No customer selected — walk-in'}
           </div>
@@ -502,7 +502,7 @@ export function RepairsTab() {
         <div className="mx-auto max-w-3xl space-y-4">
 
           {/* DEVICE */}
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <div className="rounded-xl border border-outline-variant bg-surface p-4">
             <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-brand-teal">
               <Wrench className="h-3 w-3" /> Device
             </p>
@@ -523,7 +523,7 @@ export function RepairsTab() {
               <div>
                 <label className={`${lbl} flex items-center gap-1`}>
                   Brand <span className="text-red-400">*</span>
-                  {!repairDetails.device_type && <Lock className="h-3 w-3 text-gray-300" />}
+                  {!repairDetails.device_type && <Lock className="h-3 w-3 text-outline-variant" />}
                 </label>
                 {repairDetails.device_type ? (
                   <CreatableCombobox
@@ -537,7 +537,7 @@ export function RepairsTab() {
                     createLabel="Add brand"
                   />
                 ) : (
-                  <div className="flex h-10 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                  <div className="flex h-10 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-sm text-outline-variant select-none">
                     <Lock className="h-3.5 w-3.5 shrink-0" /> Select type first
                   </div>
                 )}
@@ -545,7 +545,7 @@ export function RepairsTab() {
               <div>
                 <label className={`${lbl} flex items-center gap-1`}>
                   Model <span className="text-red-400">*</span>
-                  {!repairDetails.device_brand && <Lock className="h-3 w-3 text-gray-300" />}
+                  {!repairDetails.device_brand && <Lock className="h-3 w-3 text-outline-variant" />}
                 </label>
                 {repairDetails.device_brand ? (
                   <CreatableCombobox
@@ -559,7 +559,7 @@ export function RepairsTab() {
                     createLabel="Add model"
                   />
                 ) : (
-                  <div className="flex h-10 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                  <div className="flex h-10 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-sm text-outline-variant select-none">
                     <Lock className="h-3.5 w-3.5 shrink-0" /> Select brand first
                   </div>
                 )}
@@ -580,7 +580,7 @@ export function RepairsTab() {
           </div>
 
           {/* REPAIR PARTS */}
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <div className="rounded-xl border border-outline-variant bg-surface p-4">
             <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-brand-teal">
               <Wrench className="h-3 w-3" /> Repair Parts
             </p>
@@ -591,7 +591,7 @@ export function RepairsTab() {
             )}
             <div className="relative" ref={partDropRef}>
               <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
                 <input
                   value={partQuery}
                   onChange={(e) => { setPartQuery(e.target.value); searchParts(e.target.value) }}
@@ -601,12 +601,12 @@ export function RepairsTab() {
                   disabled={!repairDetails.device_model}
                 />
                 {partSearchLoading && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-transparent" />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin rounded-full border-2 border-outline border-t-transparent" />
                 )}
               </div>
 
               {showPartDrop && (
-                <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+                <div className="absolute z-50 mt-1 w-full rounded-lg border border-outline-variant bg-surface shadow-lg">
                   <ul className="max-h-44 overflow-y-auto py-1">
                     {partResults.map((p) => (
                       <li key={p.id}>
@@ -615,9 +615,9 @@ export function RepairsTab() {
                           className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
                           onMouseDown={(e) => { e.preventDefault(); addPartFromInventory(p) }}
                         >
-                          <span className="min-w-0 flex-1 truncate text-gray-700">{p.name}</span>
+                          <span className="min-w-0 flex-1 truncate text-on-surface-variant">{p.name}</span>
                           {!p.is_service && (
-                            <span className={`shrink-0 text-xs font-medium ${(p.on_hand ?? 0) > 0 ? 'text-gray-400' : 'text-red-500'}`}>
+                            <span className={`shrink-0 text-xs font-medium ${(p.on_hand ?? 0) > 0 ? 'text-outline' : 'text-red-500'}`}>
                               {(p.on_hand ?? 0) > 0 ? `${p.on_hand} in stock` : 'Out of stock'}
                             </span>
                           )}
@@ -626,29 +626,29 @@ export function RepairsTab() {
                       </li>
                     ))}
                     {partQuery.trim() && (
-                      <li className="border-t border-gray-100">
+                      <li className="border-t border-outline-variant">
                         <div className="flex flex-col gap-1.5 px-3 py-2">
-                          <span className="text-xs italic text-gray-500">Add &quot;{partQuery.trim()}&quot;</span>
+                          <span className="text-xs italic text-on-surface-variant">Add &quot;{partQuery.trim()}&quot;</span>
                           <div className="flex items-center gap-2">
                             <div className="flex flex-1 flex-col gap-0.5">
-                              <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Cost {getCurrencySymbol()}</span>
+                              <span className="text-[10px] font-medium text-outline uppercase tracking-wide">Cost {getCurrencySymbol()}</span>
                               <input
                                 type="number" step="0.01" min="0"
                                 value={quickPartCost}
                                 onChange={(e) => setQuickPartCost(e.target.value)}
                                 placeholder="0.00"
-                                className="h-7 w-full rounded border border-gray-200 bg-gray-50 px-2 text-xs text-gray-900"
+                                className="h-7 w-full rounded border border-outline-variant bg-surface-container-low px-2 text-xs text-on-surface"
                                 onMouseDown={(e) => e.stopPropagation()}
                               />
                             </div>
                             <div className="flex flex-1 flex-col gap-0.5">
-                              <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Price {getCurrencySymbol()}</span>
+                              <span className="text-[10px] font-medium text-outline uppercase tracking-wide">Price {getCurrencySymbol()}</span>
                               <input
                                 type="number" step="0.01" min="0"
                                 value={quickPartPrice}
                                 onChange={(e) => setQuickPartPrice(e.target.value)}
                                 placeholder="0.00"
-                                className="h-7 w-full rounded border border-gray-300 px-2 text-xs text-gray-900"
+                                className="h-7 w-full rounded border border-outline px-2 text-xs text-on-surface"
                                 onMouseDown={(e) => e.stopPropagation()}
                               />
                             </div>
@@ -664,7 +664,7 @@ export function RepairsTab() {
                       </li>
                     )}
                     {partResults.length === 0 && !partSearchLoading && (
-                      <li className="px-3 py-2 text-xs italic text-gray-400">
+                      <li className="px-3 py-2 text-xs italic text-outline">
                         {partQuery.trim() ? 'No inventory parts found — use quick-add above.' : 'Type to search parts…'}
                       </li>
                     )}
@@ -674,13 +674,13 @@ export function RepairsTab() {
             </div>
 
             {repairParts.length > 0 && (
-              <div className="mt-2 overflow-hidden rounded-lg border border-gray-200">
+              <div className="mt-2 overflow-hidden rounded-lg border border-outline-variant">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-gray-50 font-semibold text-gray-500">
+                    <tr className="bg-surface-container-low font-semibold text-on-surface-variant">
                       <th className="px-3 py-1.5 text-left">Part</th>
                       <th className="w-16 px-2 py-1.5 text-center">Qty</th>
-                      <th className="w-20 px-2 py-1.5 text-right text-gray-400">Cost {getCurrencySymbol()}</th>
+                      <th className="w-20 px-2 py-1.5 text-right text-outline">Cost {getCurrencySymbol()}</th>
                       <th className="w-20 px-2 py-1.5 text-right">Price {getCurrencySymbol()}</th>
                       <th className="w-20 px-2 py-1.5 text-right">Total</th>
                       <th className="w-8" />
@@ -688,8 +688,8 @@ export function RepairsTab() {
                   </thead>
                   <tbody>
                     {repairParts.map((p) => (
-                      <tr key={p.tempId} className="border-t border-gray-100">
-                        <td className="px-3 py-1.5 text-gray-700">{p.name}</td>
+                      <tr key={p.tempId} className="border-t border-outline-variant">
+                        <td className="px-3 py-1.5 text-on-surface-variant">{p.name}</td>
                         <td className="px-2 py-1.5 text-center">
                           <input
                             type="number" min="1" max={p.max_stock ?? undefined} value={p.qty}
@@ -700,24 +700,24 @@ export function RepairsTab() {
                               if (requested > cap) toast.error(`Only ${cap} in stock for "${r.name}"`)
                               return { ...r, qty: Math.min(requested, cap) }
                             }))}
-                            className="h-6 w-12 rounded border border-gray-200 px-1 text-center text-xs"
+                            className="h-6 w-12 rounded border border-outline-variant px-1 text-center text-xs"
                           />
                         </td>
                         <td className="px-2 py-1.5 text-right">
                           <input
                             type="number" step="0.01" min="0" value={p.unit_cost}
                             onChange={(e) => setRepairParts(prev => prev.map(r => r.tempId === p.tempId ? { ...r, unit_cost: parseFloat(e.target.value) || 0 } : r))}
-                            className="h-6 w-16 rounded border border-gray-100 bg-gray-50 px-1 text-right text-xs text-gray-500"
+                            className="h-6 w-16 rounded border border-outline-variant bg-surface-container-low px-1 text-right text-xs text-on-surface-variant"
                           />
                         </td>
                         <td className="px-2 py-1.5 text-right">
                           <input
                             type="number" step="0.01" min="0" value={p.unit_price}
                             onChange={(e) => setRepairParts(prev => prev.map(r => r.tempId === p.tempId ? { ...r, unit_price: parseFloat(e.target.value) || 0 } : r))}
-                            className="h-6 w-16 rounded border border-gray-200 px-1 text-right text-xs"
+                            className="h-6 w-16 rounded border border-outline-variant px-1 text-right text-xs"
                           />
                         </td>
-                        <td className="px-2 py-1.5 text-right font-semibold text-gray-700">{formatCurrency(p.unit_price * p.qty)}</td>
+                        <td className="px-2 py-1.5 text-right font-semibold text-on-surface-variant">{formatCurrency(p.unit_price * p.qty)}</td>
                         <td className="px-1 py-1.5 text-center">
                           <button type="button" onClick={() => setRepairParts(prev => prev.filter(r => r.tempId !== p.tempId))} className="text-red-400 hover:text-red-600 transition-colors">
                             <X className="h-3.5 w-3.5" />
@@ -727,9 +727,9 @@ export function RepairsTab() {
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr className="border-t border-gray-200 bg-gray-50">
-                      <td colSpan={4} className="px-3 py-1.5 text-right text-xs font-bold text-gray-600">Parts Total:</td>
-                      <td className="px-2 py-1.5 text-right text-xs font-bold text-gray-900">{formatCurrency(repairParts.reduce((s, p) => s + p.unit_price * p.qty, 0))}</td>
+                    <tr className="border-t border-outline-variant bg-surface-container-low">
+                      <td colSpan={4} className="px-3 py-1.5 text-right text-xs font-bold text-on-surface-variant">Parts Total:</td>
+                      <td className="px-2 py-1.5 text-right text-xs font-bold text-on-surface">{formatCurrency(repairParts.reduce((s, p) => s + p.unit_price * p.qty, 0))}</td>
                       <td />
                     </tr>
                   </tfoot>
@@ -739,7 +739,7 @@ export function RepairsTab() {
           </div>
 
           {/* FAULT & ASSIGNMENT */}
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <div className="rounded-xl border border-outline-variant bg-surface p-4">
             <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-brand-teal">
               <Wrench className="h-3 w-3" /> Fault &amp; Assignment
             </p>
@@ -789,18 +789,18 @@ export function RepairsTab() {
           </div>
 
           {/* FINANCIALS & ASSIGNMENT */}
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <div className="rounded-xl border border-outline-variant bg-surface p-4">
             <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-brand-teal">
               <Banknote className="h-3 w-3" /> Financials &amp; Assignment
             </p>
             <label className="mb-3 flex w-fit cursor-pointer items-center gap-2.5">
               <div
                 onClick={() => setRepairDetails(p => ({ ...p, price_pending: !p.price_pending, estimated_cost: !p.price_pending ? '' : p.estimated_cost, deposit_paid: !p.price_pending ? '' : p.deposit_paid }))}
-                className={`relative flex h-5 w-9 items-center rounded-full transition-colors ${pricePending ? 'bg-amber-500' : 'bg-gray-300'}`}
+                className={`relative flex h-5 w-9 items-center rounded-full transition-colors ${pricePending ? 'bg-amber-500' : 'bg-surface-container-highest'}`}
               >
-                <span className={`absolute inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${pricePending ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                <span className={`absolute inline-block h-3.5 w-3.5 rounded-full bg-surface shadow transition-transform ${pricePending ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
               </div>
-              <span className="text-xs font-semibold text-gray-600">
+              <span className="text-xs font-semibold text-on-surface-variant">
                 {pricePending ? (
                   <span className="flex items-center gap-1 text-amber-600"><span>⚠</span> Issue Not Found — Price TBD</span>
                 ) : 'No fault found / Price TBD'}
@@ -810,7 +810,7 @@ export function RepairsTab() {
               <div>
                 <label className={lbl}>Job Fee (Labour)</label>
                 <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">{getCurrencySymbol()}</span>
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-outline">{getCurrencySymbol()}</span>
                   <input
                     type="number" step="0.01" min="0" disabled={pricePending}
                     value={repairDetails.job_fee}
@@ -828,7 +828,7 @@ export function RepairsTab() {
               <div>
                 <label className={lbl}>Total Charges {!pricePending && <span className="text-red-400">*</span>}</label>
                 <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">{getCurrencySymbol()}</span>
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-outline">{getCurrencySymbol()}</span>
                   <input
                     type="number" step="0.01" min="0" disabled={pricePending}
                     value={repairDetails.estimated_cost}
@@ -854,7 +854,7 @@ export function RepairsTab() {
               <div>
                 <label className={lbl}>Deposit</label>
                 <div className="relative">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">{getCurrencySymbol()}</span>
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-outline">{getCurrencySymbol()}</span>
                   <input
                     type="number" step="0.01" min="0" disabled={pricePending}
                     value={repairDetails.deposit_paid}
@@ -888,7 +888,7 @@ export function RepairsTab() {
             </div>
 
             <div className="mt-3">
-              <label className={lbl}>Payment Method <span className="font-normal normal-case text-gray-300">(opt, select multiple to split)</span></label>
+              <label className={lbl}>Payment Method <span className="font-normal normal-case text-outline-variant">(opt, select multiple to split)</span></label>
               <div className="flex flex-wrap gap-2">
                 {(['cash', 'card', 'store_credit', 'loyalty_points'] as const).map(m => {
                   const disabled = (m === 'store_credit' || m === 'loyalty_points') && !pos.customer
@@ -911,8 +911,8 @@ export function RepairsTab() {
                         active
                           ? 'border-gray-900 bg-gray-900 text-white'
                           : disabled
-                            ? 'border-gray-100 text-gray-300 cursor-not-allowed'
-                            : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                            ? 'border-outline-variant text-outline-variant cursor-not-allowed'
+                            : 'border-outline-variant bg-surface text-on-surface-variant hover:bg-surface-container-low'
                       }`}
                     >
                       {m === 'store_credit' && <Wallet className="h-3 w-3" />}
@@ -948,7 +948,7 @@ export function RepairsTab() {
               {repairDetails.payment_methods.includes('store_credit') && (
                 <div className="mt-2 space-y-1.5">
                   {creditBalance !== null && (
-                    <p className="text-xs text-gray-500">Available balance: <span className="font-semibold text-gray-800">{formatCurrency(creditBalance)}</span></p>
+                    <p className="text-xs text-on-surface-variant">Available balance: <span className="font-semibold text-on-surface">{formatCurrency(creditBalance)}</span></p>
                   )}
                   <div className="flex gap-2">
                     <input
@@ -969,8 +969,8 @@ export function RepairsTab() {
               {repairDetails.payment_methods.includes('loyalty_points') && (
                 <div className="mt-2 space-y-1.5">
                   {loyaltyBalance !== null && (
-                    <p className="text-xs text-gray-500">
-                      Points balance: <span className="font-semibold text-gray-800">{loyaltyBalance} pts</span> (≈ {formatCurrency(loyaltyBalance * loyaltyRate)})
+                    <p className="text-xs text-on-surface-variant">
+                      Points balance: <span className="font-semibold text-on-surface">{loyaltyBalance} pts</span> (≈ {formatCurrency(loyaltyBalance * loyaltyRate)})
                     </p>
                   )}
                   <div className="flex gap-2">
@@ -1005,7 +1005,7 @@ export function RepairsTab() {
           </div>
 
           {/* DEVICE LOCK */}
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <div className="rounded-xl border border-outline-variant bg-surface p-4">
             <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-brand-teal">
               <Lock className="h-3 w-3" /> Device Lock
             </p>
@@ -1015,7 +1015,7 @@ export function RepairsTab() {
                   key={t}
                   type="button"
                   onClick={() => setRepairDetails(p => ({ ...p, lock_type: t, passcode: '' }))}
-                  className={`rounded-md border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${repairDetails.lock_type === t ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
+                  className={`rounded-md border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${repairDetails.lock_type === t ? 'border-gray-900 bg-gray-900 text-white' : 'border-outline-variant bg-surface text-on-surface-variant hover:bg-surface-container-low'}`}
                 >
                   {t === '' ? 'None' : t}
                 </button>
@@ -1041,7 +1041,7 @@ export function RepairsTab() {
                   size={180}
                 />
                 {repairDetails.passcode && (
-                  <button type="button" onClick={() => setRepairDetails(d => ({ ...d, passcode: '' }))} className="mt-1 text-xs text-gray-400 hover:text-red-500 transition-colors">
+                  <button type="button" onClick={() => setRepairDetails(d => ({ ...d, passcode: '' }))} className="mt-1 text-xs text-outline hover:text-red-500 transition-colors">
                     Clear pattern
                   </button>
                 )}
@@ -1050,7 +1050,7 @@ export function RepairsTab() {
           </div>
 
           {/* POS EXTRAS */}
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <div className="rounded-xl border border-outline-variant bg-surface p-4">
             <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-brand-teal">
               <StickyNote className="h-3 w-3" /> Additional Details
             </p>
@@ -1085,9 +1085,9 @@ export function RepairsTab() {
                 type="checkbox" id="rush_job"
                 checked={repairDetails.is_rush}
                 onChange={(e) => setRepairDetails(d => ({ ...d, is_rush: e.target.checked }))}
-                className="h-4 w-4 rounded border-gray-300 text-brand-teal"
+                className="h-4 w-4 rounded border-outline text-brand-teal"
               />
-              <label htmlFor="rush_job" className="text-sm font-medium text-gray-700">Mark as Rush Job</label>
+              <label htmlFor="rush_job" className="text-sm font-medium text-on-surface-variant">Mark as Rush Job</label>
             </div>
           </div>
 
@@ -1109,12 +1109,12 @@ export function RepairsTab() {
       {/* Repair Job Created Success Overlay */}
       {success && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="rounded-2xl bg-white px-16 py-14 text-center shadow-2xl">
+          <div className="rounded-2xl bg-surface px-16 py-14 text-center shadow-2xl">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
               <CheckCircle2 className="h-9 w-9 text-green-600" />
             </div>
             <p className="text-xl font-bold text-green-700">Repair Job Created!</p>
-            <p className="mt-1 text-sm text-gray-500">Invoice has been sent to print.</p>
+            <p className="mt-1 text-sm text-on-surface-variant">Invoice has been sent to print.</p>
           </div>
         </div>
       )}

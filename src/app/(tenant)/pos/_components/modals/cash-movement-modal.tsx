@@ -123,7 +123,7 @@ export function CashMovementModal({
       <div className="space-y-4">
 
         {/* Type toggle */}
-        <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+        <div className="flex rounded-lg border border-outline-variant overflow-hidden">
           {(['cash_in', 'cash_out'] as const).map(t => (
             <button
               key={t}
@@ -131,7 +131,7 @@ export function CashMovementModal({
               className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
                 cashMovementType === t
                   ? t === 'cash_in' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-50'
+                  : 'text-on-surface-variant hover:bg-surface-container-low'
               }`}
             >
               {t === 'cash_in' ? '+ Cash In' : '- Cash Out'}
@@ -153,10 +153,10 @@ export function CashMovementModal({
             reimbursing the float via bank transfer) — either way, a Card
             movement must not affect the physical cash count on the Z-report. */}
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="mb-1 block text-sm font-medium text-on-surface-variant">
             {isCashOut ? 'Paid via' : 'Received via'}
           </label>
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+          <div className="flex rounded-lg border border-outline-variant overflow-hidden">
             {([
               ['cash', 'Cash', Banknote],
               ['card', 'Card', CreditCard],
@@ -168,7 +168,7 @@ export function CashMovementModal({
                 className={`flex flex-1 items-center justify-center gap-1.5 py-2 text-sm font-medium transition-colors ${
                   cashMovementPaymentType === value
                     ? 'bg-brand-teal text-white'
-                    : 'text-gray-600 hover:bg-gray-50'
+                    : 'text-on-surface-variant hover:bg-surface-container-low'
                 }`}
               >
                 <Icon className="h-4 w-4" />
@@ -177,7 +177,7 @@ export function CashMovementModal({
             ))}
           </div>
           {cashMovementPaymentType === 'card' && (
-            <p className="mt-1 text-xs text-gray-400">
+            <p className="mt-1 text-xs text-outline">
               {isCashOut
                 ? "Won't be counted against your physical cash drawer."
                 : "Won't be added to your physical cash drawer."}
@@ -186,12 +186,12 @@ export function CashMovementModal({
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="mb-1 block text-sm font-medium text-on-surface-variant">
             {isCashOut ? 'Description' : 'Notes'}{' '}
             {isCashOut && purpose === 'none' ? (
               <span className="text-red-500">*</span>
             ) : (
-              <span className="text-xs font-normal text-gray-400">(optional)</span>
+              <span className="text-xs font-normal text-outline">(optional)</span>
             )}
           </label>
           <textarea
@@ -200,14 +200,14 @@ export function CashMovementModal({
             placeholder={isCashOut ? 'e.g. Rent payment, petty cash for supplies…' : 'e.g. Petty cash for change'}
             value={cashMovementNotes}
             onChange={e => setCashMovementNotes(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
+            className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
           />
         </div>
 
         {/* Purpose — cash out only: plain removal, expense, or buyback */}
         {isCashOut && (
           <div className="space-y-3">
-            <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+            <div className="flex rounded-lg border border-outline-variant overflow-hidden text-xs font-medium">
               {([
                 ['none', 'Plain'],
                 ['expense', 'Expense'],
@@ -217,7 +217,7 @@ export function CashMovementModal({
                   key={value}
                   type="button"
                   onClick={() => setPurpose(value)}
-                  className={`flex-1 py-2 transition-colors ${purpose === value ? 'bg-brand-teal text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+                  className={`flex-1 py-2 transition-colors ${purpose === value ? 'bg-brand-teal text-white' : 'text-on-surface-variant hover:bg-surface-container-low'}`}
                 >
                   {label}
                 </button>
@@ -232,11 +232,11 @@ export function CashMovementModal({
 
             {purpose === 'expense' && (
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Expense Category <span className="text-xs font-normal text-gray-400">(select or create)</span>
+                <label className="mb-1 block text-sm font-medium text-on-surface-variant">
+                  Expense Category <span className="text-xs font-normal text-outline">(select or create)</span>
                 </label>
                 {catsLoading ? (
-                  <div className="h-9 animate-pulse rounded-lg bg-gray-100" />
+                  <div className="h-9 animate-pulse rounded-lg bg-surface-container" />
                 ) : (
                   <CreatableCombobox
                     options={categories.map(c => ({ value: c.id, label: c.name }))}
@@ -271,14 +271,14 @@ export function CashMovementModal({
                   onChange={e => setBuybackSellingPrice(e.target.value)}
                 />
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Barcode <span className="text-xs font-normal text-gray-400">(optional)</span></label>
+                  <label className="mb-1 block text-sm font-medium text-on-surface-variant">Barcode <span className="text-xs font-normal text-outline">(optional)</span></label>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       placeholder="Leave blank to auto-generate"
                       value={buybackBarcode}
                       onChange={e => setBuybackBarcode(e.target.value)}
-                      className={`flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal ${barcodeConflict ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                      className={`flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal ${barcodeConflict ? 'border-red-400 bg-red-50' : 'border-outline'}`}
                     />
                     <button
                       type="button"
@@ -291,14 +291,14 @@ export function CashMovementModal({
                   </div>
                   {barcodeConflict && <p className="mt-1 text-xs text-red-500">This barcode is already in use</p>}
                 </div>
-                <p className="text-xs text-gray-400">The amount above becomes this product's cost, and one unit is added to stock.</p>
+                <p className="text-xs text-outline">The amount above becomes this product's cost, and one unit is added to stock.</p>
               </div>
             )}
           </div>
         )}
 
         {!isCashOut && (
-          <p className="text-xs text-gray-400">Cash In always counts directly as Sales revenue.</p>
+          <p className="text-xs text-outline">Cash In always counts directly as Sales revenue.</p>
         )}
 
         <div className="flex gap-2">

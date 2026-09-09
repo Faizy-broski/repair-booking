@@ -52,9 +52,9 @@ export function RepairEmailPrompt({
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={!sending ? onClose : undefined} />
 
         {/* Panel */}
-        <div className="relative z-10 w-full max-w-md rounded-2xl bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="relative z-10 w-full max-w-md rounded-2xl bg-surface shadow-2xl animate-in zoom-in-95 duration-200">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+          <div className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
             <div className="flex items-center gap-2.5">
               <div className={cn(
                 'flex h-9 w-9 items-center justify-center rounded-full',
@@ -67,14 +67,14 @@ export function RepairEmailPrompt({
                     : <Mail className={cn('h-5 w-5', error ? 'text-red-500' : 'text-blue-600')} />
                 }
               </div>
-              <h2 className="text-base font-semibold text-gray-900">
+              <h2 className="text-base font-semibold text-on-surface">
                 {sent ? 'Email Sent!' : error ? 'Failed to Send' : 'Send Customer Notification'}
               </h2>
             </div>
             <button
               onClick={onClose}
               disabled={sending}
-              className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors disabled:opacity-30"
+              className="rounded-lg p-1.5 text-outline hover:bg-surface-container hover:text-on-surface-variant transition-colors disabled:opacity-30"
             >
               <X className="h-4 w-4" />
             </button>
@@ -88,8 +88,8 @@ export function RepairEmailPrompt({
                   <Check className="h-8 w-8 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-base font-semibold text-gray-900">Email sent successfully</p>
-                  <p className="mt-1 text-sm text-gray-500">Customer has been notified for job <span className="font-medium text-gray-700">{jobNumber}</span>.</p>
+                  <p className="text-base font-semibold text-on-surface">Email sent successfully</p>
+                  <p className="mt-1 text-sm text-on-surface-variant">Customer has been notified for job <span className="font-medium text-on-surface-variant">{jobNumber}</span>.</p>
                 </div>
               </div>
             ) : (
@@ -117,7 +117,7 @@ export function RepairEmailPrompt({
 
           {/* Footer */}
           {!sent && (
-            <div className="flex items-center justify-end gap-2.5 border-t border-gray-100 px-6 py-4">
+            <div className="flex items-center justify-end gap-2.5 border-t border-outline-variant px-6 py-4">
               <Button variant="outline" onClick={onClose} disabled={sending}>
                 Cancel
               </Button>
@@ -140,7 +140,7 @@ export function RepairEmailPrompt({
   return (
     <div
       className={cn(
-        'fixed bottom-6 right-6 z-50 flex w-80 items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-xl',
+        'fixed bottom-6 right-6 z-50 flex w-80 items-start gap-3 rounded-xl border border-outline-variant bg-surface p-4 shadow-xl',
         'animate-in slide-in-from-bottom-4 duration-300'
       )}
     >
@@ -157,10 +157,10 @@ export function RepairEmailPrompt({
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-900">
+        <p className="text-sm font-semibold text-on-surface">
           {sent ? 'Email sent!' : error ? 'Failed to send' : 'Notify customer?'}
         </p>
-        <p className="mt-0.5 text-xs text-gray-500 leading-relaxed">
+        <p className="mt-0.5 text-xs text-on-surface-variant leading-relaxed">
           {sent
             ? `Customer notified for job ${jobNumber}.`
             : error
@@ -180,7 +180,7 @@ export function RepairEmailPrompt({
         )}
       </div>
 
-      <button onClick={onClose} disabled={sending} className="shrink-0 text-gray-300 hover:text-gray-500 transition-colors disabled:opacity-30">
+      <button onClick={onClose} disabled={sending} className="shrink-0 text-outline-variant hover:text-on-surface-variant transition-colors disabled:opacity-30">
         <X className="h-4 w-4" />
       </button>
     </div>

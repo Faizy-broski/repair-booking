@@ -238,7 +238,7 @@ function StepCard({ step, stepIndex, totalSteps, brandColor, cardStyle, onNext, 
       <div style={{ height: 4, background: brandColor }} />
 
       {/* Progress bar */}
-      <div className="h-1 bg-gray-100">
+      <div className="h-1 bg-surface-container">
         <div
           className="h-full transition-all duration-500 ease-out"
           style={{ width: `${((stepIndex + 1) / totalSteps) * 100}%`, background: brandColor }}
@@ -255,10 +255,10 @@ function StepCard({ step, stepIndex, totalSteps, brandColor, cardStyle, onNext, 
             <Icon className="h-6 w-6" strokeWidth={1.8} />
           </div>
           <div className="flex flex-col items-end gap-1">
-            <span className="text-xs font-medium text-gray-400">{stepIndex + 1} / {totalSteps}</span>
+            <span className="text-xs font-medium text-outline">{stepIndex + 1} / {totalSteps}</span>
             <button
               onClick={onSkip}
-              className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              className="flex items-center gap-1 text-xs text-outline hover:text-on-surface-variant transition-colors"
               aria-label="Skip tour"
             >
               <X className="h-3 w-3" /> Skip tour
@@ -266,13 +266,13 @@ function StepCard({ step, stepIndex, totalSteps, brandColor, cardStyle, onNext, 
           </div>
         </div>
 
-        <h2 className="mt-3 text-lg font-bold text-gray-900 leading-tight">{step.title}</h2>
-        <p className="mt-1.5 text-sm leading-relaxed text-gray-600">{step.description}</p>
+        <h2 className="mt-3 text-lg font-bold text-on-surface leading-tight">{step.title}</h2>
+        <p className="mt-1.5 text-sm leading-relaxed text-on-surface-variant">{step.description}</p>
 
         {step.bullets && step.bullets.length > 0 && (
           <ul className="mt-3 space-y-1.5">
             {step.bullets.map((b) => (
-              <li key={b} className="flex items-start gap-2 text-sm text-gray-600">
+              <li key={b} className="flex items-start gap-2 text-sm text-on-surface-variant">
                 <span
                   className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full"
                   style={{ background: hexToRgba(brandColor, 0.12) }}
@@ -306,7 +306,7 @@ function StepCard({ step, stepIndex, totalSteps, brandColor, cardStyle, onNext, 
         <button
           onClick={onBack}
           disabled={isFirst}
-          className="flex items-center gap-1 rounded-lg border border-gray-200 px-3.5 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:pointer-events-none disabled:opacity-30"
+          className="flex items-center gap-1 rounded-lg border border-outline-variant px-3.5 py-2 text-sm font-medium text-on-surface-variant transition-colors hover:bg-surface-container-low disabled:pointer-events-none disabled:opacity-30"
         >
           <ChevronLeft className="h-4 w-4" /> Back
         </button>

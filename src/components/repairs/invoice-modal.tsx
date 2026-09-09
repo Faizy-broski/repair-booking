@@ -156,12 +156,12 @@ export function RepairInvoiceModal({ open, onClose, repair, justCreated }: Props
       )}
       <div className="flex flex-col h-[75vh]">
         {loading ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-500">
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-on-surface-variant">
             <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
             <p className="text-sm font-medium">Generating invoice...</p>
           </div>
         ) : isThermal && data ? (
-          <div className="flex-1 overflow-auto flex items-start justify-center rounded-lg border border-gray-200 bg-gray-50 py-8">
+          <div className="flex-1 overflow-auto flex items-start justify-center rounded-lg border border-outline-variant bg-surface-container-low py-8">
             <div style={{ transform: 'scale(1.3)', transformOrigin: 'top center' }}>
               <div className="shadow-lg">
                 <RepairReceiptHtml {...data} />
@@ -172,7 +172,7 @@ export function RepairInvoiceModal({ open, onClose, repair, justCreated }: Props
           <iframe
             ref={iframeRef}
             src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-            className="flex-1 w-full rounded-lg border border-gray-200"
+            className="flex-1 w-full rounded-lg border border-outline-variant"
           />
         ) : (
           <div className="flex-1 flex items-center justify-center text-red-500 text-sm">
@@ -181,7 +181,7 @@ export function RepairInvoiceModal({ open, onClose, repair, justCreated }: Props
         )}
       </div>
 
-      <div className="mt-4 flex justify-between items-center gap-3 border-t border-gray-100 pt-4">
+      <div className="mt-4 flex justify-between items-center gap-3 border-t border-outline-variant pt-4">
         <div className="flex flex-nowrap gap-2 overflow-x-auto">
           <Button variant="outline" className="whitespace-nowrap shrink-0" onClick={onClose}>Close</Button>
           {!isThermal && pdfUrl && (

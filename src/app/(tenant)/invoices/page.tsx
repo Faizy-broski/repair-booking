@@ -371,7 +371,7 @@ export default function InvoicesPage() {
               inv.status === 'paid' ? 'bg-green-100 text-green-800' :
               inv.status === 'unpaid' || inv.status === 'void' ? 'bg-red-100 text-red-800' :
               inv.status === 'partial' || inv.status === 'issued' ? 'bg-yellow-100 text-yellow-800' :
-              'bg-gray-100 text-gray-800'
+              'bg-surface-container text-on-surface'
             }`}
           >
             {INVOICE_STATUSES.map(s => (
@@ -417,29 +417,29 @@ export default function InvoicesPage() {
             )}
             <DropdownMenu.Root>
               <DropdownMenu.Trigger asChild>
-                <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none">
+                <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-outline bg-surface text-on-surface shadow-sm hover:bg-surface-container-low focus:outline-none">
                   <MoreVertical className="h-4 w-4 stroke-[2.5]" />
                 </button>
               </DropdownMenu.Trigger>
               <DropdownMenu.Portal>
-                <DropdownMenu.Content align="end" sideOffset={4} className="z-50 min-w-[160px] overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                <DropdownMenu.Content align="end" sideOffset={4} className="z-50 min-w-[160px] overflow-hidden rounded-lg border border-outline-variant bg-surface py-1 shadow-lg">
                   <DropdownMenu.Item
                     onSelect={() => downloadPdf(inv.id)}
                     onMouseEnter={() => prefetchPdf(`/api/invoices/${inv.id}/pdf`)}
-                    className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-50"
+                    className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-on-surface-variant outline-none hover:bg-surface-container-low"
                   >
                     {downloadingId === inv.id
-                      ? <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                      : <Download className="h-4 w-4 text-gray-400" />}
+                      ? <Loader2 className="h-4 w-4 animate-spin text-outline" />
+                      : <Download className="h-4 w-4 text-outline" />}
                     Download PDF
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     onSelect={() => sendWhatsApp(inv.id)}
-                    className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-50"
+                    className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-on-surface-variant outline-none hover:bg-surface-container-low"
                   >
                     {sendingWhatsAppId === inv.id
-                      ? <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-                      : <MessageCircle className="h-4 w-4 text-gray-400" />}
+                      ? <Loader2 className="h-4 w-4 animate-spin text-outline" />
+                      : <MessageCircle className="h-4 w-4 text-outline" />}
                     Send via WhatsApp
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
@@ -448,7 +448,7 @@ export default function InvoicesPage() {
                   >
                     <Pencil className="h-4 w-4" /> Edit Invoice
                   </DropdownMenu.Item>
-                  <DropdownMenu.Separator className="my-1 border-t border-gray-100" />
+                  <DropdownMenu.Separator className="my-1 border-t border-outline-variant" />
                   <DropdownMenu.Item
                     onSelect={() => setDeleteConfirmId(inv.id)}
                     className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-red-600 outline-none hover:bg-red-50"
@@ -475,8 +475,8 @@ export default function InvoicesPage() {
     <div className={`space-y-4 ${reduceTopSpace ? '-mt-4' : ''}`}>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Invoices</h1>
-          <p className="text-sm text-gray-500">{total} invoices</p>
+          <h1 className="text-xl font-bold text-on-surface">Invoices</h1>
+          <p className="text-sm text-on-surface-variant">{total} invoices</p>
         </div>
         <Button onClick={() => setSheetOpen(true)}>
           <Plus className="h-4 w-4" /> New Invoice
@@ -490,7 +490,7 @@ export default function InvoicesPage() {
             { label: 'Unpaid',  count: summary.unpaid,   total: summary.unpaid_total,  color: 'border-red-200 bg-red-50',    text: 'text-red-700',    filter: 'unpaid' },
             { label: 'Partial', count: summary.partial,  total: summary.partial_total, color: 'border-yellow-200 bg-yellow-50', text: 'text-yellow-700', filter: 'partial' },
             { label: 'Paid',    count: summary.paid,     total: summary.paid_total,    color: 'border-green-200 bg-green-50', text: 'text-green-700',  filter: 'paid' },
-            { label: 'Refunded',count: summary.refunded, total: null,                  color: 'border-gray-200 bg-gray-50',  text: 'text-gray-600',   filter: 'refunded' },
+            { label: 'Refunded',count: summary.refunded, total: null,                  color: 'border-outline-variant bg-surface-container-low',  text: 'text-on-surface-variant',   filter: 'refunded' },
           ].map((card) => (
             <button
               key={card.filter}
@@ -500,7 +500,7 @@ export default function InvoicesPage() {
               }`}
             >
               <p className={`text-2xl font-bold ${card.text}`}>{card.count}</p>
-              <p className="text-xs text-gray-500">{card.label}</p>
+              <p className="text-xs text-on-surface-variant">{card.label}</p>
               {card.total !== null && (
                 <p className={`text-xs font-medium ${card.text}`}>{formatCurrency(card.total, currency)}</p>
               )}
@@ -537,7 +537,7 @@ export default function InvoicesPage() {
         <form onSubmit={handleSubmit(onCreate)} className="space-y-4">
           <div>
             <div className="mb-1 flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-700">Customer (optional)</label>
+              <label className="text-sm font-medium text-on-surface-variant">Customer (optional)</label>
               <button
                 type="button"
                 onClick={() => setNewCustOpen(true)}
@@ -548,7 +548,7 @@ export default function InvoicesPage() {
             </div>
             <select
               {...register('customer_id')}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-outline px-3 py-2 text-sm"
             >
               <option value="">No customer</option>
               {customers.map((c) => (
@@ -560,16 +560,16 @@ export default function InvoicesPage() {
           {/* Line items */}
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-700">Line Items</label>
+              <label className="text-sm font-medium text-on-surface-variant">Line Items</label>
               <button type="button" onClick={addLineItem} className="text-xs text-blue-600 hover:underline">
                 + Add row
               </button>
             </div>
             {/* Column headers */}
             <div className="flex gap-1.5 mb-1 pr-5">
-              <span className="flex-1 text-xs font-medium text-gray-500">Description</span>
-              <span style={{ width: '4rem' }} className="text-xs font-medium text-gray-500">Qty</span>
-              <span style={{ width: '5rem' }} className="text-xs font-medium text-gray-500">Unit Price</span>
+              <span className="flex-1 text-xs font-medium text-on-surface-variant">Description</span>
+              <span style={{ width: '4rem' }} className="text-xs font-medium text-on-surface-variant">Qty</span>
+              <span style={{ width: '5rem' }} className="text-xs font-medium text-on-surface-variant">Unit Price</span>
             </div>
             <div className="space-y-1.5">
               {lineItems.map((item, idx) => {
@@ -586,7 +586,7 @@ export default function InvoicesPage() {
                           setLineItems(updated)
                           setValue('items', updated, { shouldValidate: true })
                         }}
-                        className={`h-8 min-w-0 flex-1 rounded-md border px-2 text-sm ${rowErrors?.description ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                        className={`h-8 min-w-0 flex-1 rounded-md border px-2 text-sm ${rowErrors?.description ? 'border-red-400 bg-red-50' : 'border-outline'}`}
                       />
                       <input
                         type="number"
@@ -599,7 +599,7 @@ export default function InvoicesPage() {
                           setValue('items', updated, { shouldValidate: true })
                         }}
                         style={{ width: '4rem' }}
-                        className={`h-8 shrink-0 rounded-md border px-2 text-sm ${rowErrors?.quantity ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                        className={`h-8 shrink-0 rounded-md border px-2 text-sm ${rowErrors?.quantity ? 'border-red-400 bg-red-50' : 'border-outline'}`}
                       />
                       <input
                         type="number"
@@ -614,13 +614,13 @@ export default function InvoicesPage() {
                           setValue('items', updated, { shouldValidate: true })
                         }}
                         style={{ width: '5rem' }}
-                        className={`h-8 shrink-0 rounded-md border px-2 text-sm ${rowErrors?.unit_price ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                        className={`h-8 shrink-0 rounded-md border px-2 text-sm ${rowErrors?.unit_price ? 'border-red-400 bg-red-50' : 'border-outline'}`}
                       />
                       {lineItems.length > 1 ? (
                         <button
                           type="button"
                           onClick={() => removeLineItem(idx)}
-                          className="shrink-0 text-gray-300 hover:text-red-500 text-lg leading-none"
+                          className="shrink-0 text-outline-variant hover:text-red-500 text-lg leading-none"
                         >
                           ×
                         </button>
@@ -643,20 +643,20 @@ export default function InvoicesPage() {
 
           {/* Discount */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Discount</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Discount</label>
             <div className="flex gap-2">
-              <div className="flex rounded-lg border border-gray-200 p-0.5 shrink-0">
+              <div className="flex rounded-lg border border-outline-variant p-0.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => setValue('discount_type', 'flat')}
-                  className={`rounded px-2.5 py-1 text-sm font-medium transition-colors ${discountType === 'flat' ? 'bg-brand-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  className={`rounded px-2.5 py-1 text-sm font-medium transition-colors ${discountType === 'flat' ? 'bg-brand-teal text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
                 >
                   {currSymbol}
                 </button>
                 <button
                   type="button"
                   onClick={() => setValue('discount_type', 'percent')}
-                  className={`rounded px-2.5 py-1 text-sm font-medium transition-colors ${discountType === 'percent' ? 'bg-brand-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  className={`rounded px-2.5 py-1 text-sm font-medium transition-colors ${discountType === 'percent' ? 'bg-brand-teal text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
                 >
                   %
                 </button>
@@ -667,7 +667,7 @@ export default function InvoicesPage() {
                 step="0.01"
                 placeholder="0"
                 {...register('discount_value')}
-                className="h-9 flex-1 rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none"
+                className="h-9 flex-1 rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none"
               />
             </div>
           </div>
@@ -685,8 +685,8 @@ export default function InvoicesPage() {
             const discounted = Math.max(0, lineItemSubtotal - discountAmt)
             const tax = editingInvoice ? (editingInvoice.tax ?? 0) : discounted * (taxRate / 100)
             return (
-              <div className="rounded-lg bg-gray-50 p-3 space-y-1.5 text-sm">
-                <div className="flex justify-between text-gray-500">
+              <div className="rounded-lg bg-surface-container-low p-3 space-y-1.5 text-sm">
+                <div className="flex justify-between text-on-surface-variant">
                   <span>Subtotal</span>
                   <span>{formatCurrency(lineItemSubtotal, currency)}</span>
                 </div>
@@ -697,12 +697,12 @@ export default function InvoicesPage() {
                   </div>
                 )}
                 {tax > 0 && (
-                  <div className="flex justify-between text-gray-500">
+                  <div className="flex justify-between text-on-surface-variant">
                     <span>Tax{!editingInvoice && taxRate > 0 ? ` (${taxRate}%)` : ''}</span>
                     <span>{formatCurrency(tax, currency)}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-bold text-gray-900 border-t border-gray-200 pt-1.5">
+                <div className="flex justify-between font-bold text-on-surface border-t border-outline-variant pt-1.5">
                   <span>Total</span>
                   <span>{formatCurrency(discounted + tax, currency)}</span>
                 </div>
@@ -711,8 +711,8 @@ export default function InvoicesPage() {
           })()}
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
-            <textarea rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" {...register('notes')} />
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes</label>
+            <textarea rows={2} className="w-full rounded-lg border border-outline px-3 py-2 text-sm" {...register('notes')} />
           </div>
 
           <Button type="submit" className="w-full" loading={isSubmitting}>
@@ -726,36 +726,36 @@ export default function InvoicesPage() {
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-700">First Name <span className="text-red-500">*</span></label>
+              <label className="mb-1 block text-xs font-medium text-on-surface-variant">First Name <span className="text-red-500">*</span></label>
               <input
                 value={newCust.first_name}
                 onChange={e => setNewCust(p => ({ ...p, first_name: e.target.value }))}
                 placeholder="First name"
-                className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none"
+                className="h-9 w-full rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-700">Last Name</label>
+              <label className="mb-1 block text-xs font-medium text-on-surface-variant">Last Name</label>
               <input
                 value={newCust.last_name}
                 onChange={e => setNewCust(p => ({ ...p, last_name: e.target.value }))}
                 placeholder="Last name"
-                className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none"
+                className="h-9 w-full rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none"
               />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-700">Email</label>
+            <label className="mb-1 block text-xs font-medium text-on-surface-variant">Email</label>
             <input
               type="email"
               value={newCust.email}
               onChange={e => setNewCust(p => ({ ...p, email: e.target.value }))}
               placeholder="email@example.com"
-              className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none"
+              className="h-9 w-full rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-700">Phone</label>
+            <label className="mb-1 block text-xs font-medium text-on-surface-variant">Phone</label>
             <PhoneInput
               value={newCust.phone}
               onChange={v => setNewCust(p => ({ ...p, phone: v }))}
@@ -763,22 +763,22 @@ export default function InvoicesPage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-700">Business Name</label>
+            <label className="mb-1 block text-xs font-medium text-on-surface-variant">Business Name</label>
             <input
               value={newCust.business_name}
               onChange={e => setNewCust(p => ({ ...p, business_name: e.target.value }))}
               placeholder="Company / business name"
-              className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none"
+              className="h-9 w-full rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-700">Address</label>
+            <label className="mb-1 block text-xs font-medium text-on-surface-variant">Address</label>
             <textarea
               value={newCust.address}
               onChange={e => setNewCust(p => ({ ...p, address: e.target.value }))}
               placeholder="Full address"
               rows={2}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none resize-none"
+              className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none resize-none"
             />
           </div>
           <div className="flex gap-2 pt-1">
@@ -797,10 +797,10 @@ export default function InvoicesPage() {
       >
         <div className="space-y-4">
           {paymentModal && (
-            <div className="rounded-lg bg-gray-50 p-3">
+            <div className="rounded-lg bg-surface-container-low p-3">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Remaining balance</span>
-                <span className="font-semibold text-gray-900">{formatCurrency(paymentModal.remaining, currency)}</span>
+                <span className="text-on-surface-variant">Remaining balance</span>
+                <span className="font-semibold text-on-surface">{formatCurrency(paymentModal.remaining, currency)}</span>
               </div>
             </div>
           )}
@@ -830,7 +830,7 @@ export default function InvoicesPage() {
         size="sm"
       >
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">Are you sure you want to delete this invoice? This action cannot be undone.</p>
+          <p className="text-sm text-on-surface-variant">Are you sure you want to delete this invoice? This action cannot be undone.</p>
           <div className="flex gap-2">
             <Button variant="outline" className="flex-1" onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
             <Button

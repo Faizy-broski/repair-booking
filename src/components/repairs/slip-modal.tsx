@@ -111,14 +111,14 @@ export function RepairSlipModal({ repair, onClose }: Props) {
     <Modal open={!!repair} onClose={onClose} title="Repair Job Sheet Slip" size="md">
       <div className="flex flex-col h-[40vh]">
         {loading ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-gray-500">
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-on-surface-variant">
             <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
             <p className="text-sm font-medium">Generating slip...</p>
           </div>
         ) : isThermal && data ? (
-          <div className="flex-1 overflow-auto flex items-start justify-center rounded-lg border border-gray-200 bg-gray-50 py-8">
+          <div className="flex-1 overflow-auto flex items-start justify-center rounded-lg border border-outline-variant bg-surface-container-low py-8">
             <div style={{ transform: 'scale(1.3)', transformOrigin: 'top center' }}>
-              <div className="mx-auto shadow-lg bg-white p-2" style={{ width: '240px', fontFamily: 'Arial, sans-serif', fontSize: '12px', color: '#000' }}>
+              <div className="mx-auto shadow-lg bg-surface p-2" style={{ width: '240px', fontFamily: 'Arial, sans-serif', fontSize: '12px', color: '#000' }}>
               <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px', marginBottom: '2px' }}>{data.businessName}</div>
               {data.branchAddress && <div style={{ textAlign: 'center', fontSize: '10px', marginBottom: '2px' }}>{data.branchAddress}</div>}
               {data.branchPhone && <div style={{ textAlign: 'center', fontSize: '10px', marginBottom: '6px' }}>Tel: {data.branchPhone}</div>}
@@ -141,7 +141,7 @@ export function RepairSlipModal({ repair, onClose }: Props) {
           <iframe
             ref={iframeRef}
             src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-            className="flex-1 w-full rounded-lg border border-gray-200"
+            className="flex-1 w-full rounded-lg border border-outline-variant"
           />
         ) : (
           <div className="flex-1 flex items-center justify-center text-red-500 text-sm">

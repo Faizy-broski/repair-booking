@@ -7,6 +7,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
 import { cn } from '@/lib/utils'
+import { useTheme } from 'next-themes'
 import { getBrandStyle } from '@/lib/brand-theme'
 
 const HEX_PATTERN = /^#[0-9A-Fa-f]{6}$/
@@ -29,6 +30,8 @@ const PRESET_COLORS = [
 
 export default function BrandingSettingsPage() {
   const { setBrandColor } = useAuthStore()
+  const { resolvedTheme } = useTheme()
+  const previewMode = resolvedTheme === 'dark' ? 'dark' : 'light'
   const [saved, setSaved] = useState(false)
   const form = useForm<BrandingFormData>({
     resolver: zodResolver(brandingSchema),
@@ -63,9 +66,9 @@ export default function BrandingSettingsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-gray-200 bg-white p-6">
-        <h3 className="mb-1 font-semibold text-gray-900">Brand Color</h3>
-        <p className="mb-4 text-sm text-gray-500">
+      <div className="rounded-xl border border-outline-variant bg-surface p-6">
+        <h3 className="mb-1 font-semibold text-on-surface">Brand Color</h3>
+        <p className="mb-4 text-sm text-on-surface-variant">
           Choose the color used across your dashboard sidebar, buttons, and customer-facing
           pricing widget.
         </p>
@@ -84,7 +87,7 @@ export default function BrandingSettingsPage() {
                     className={cn(
                       'h-9 w-9 rounded-full border-2 transition-transform',
                       field.value?.toLowerCase() === preset.toLowerCase()
-                        ? 'border-gray-900 scale-110'
+                        ? 'border-on-surface scale-110'
                         : 'border-transparent hover:scale-105'
                     )}
                     style={{ backgroundColor: preset }}
@@ -108,25 +111,25 @@ export default function BrandingSettingsPage() {
                   type="color"
                   value={isValidHex ? field.value : '#008080'}
                   onChange={(e) => field.onChange(e.target.value)}
-                  className="h-9 w-9 cursor-pointer rounded-lg border border-gray-300 p-0.5"
+                  className="h-9 w-9 cursor-pointer rounded-lg border border-outline p-0.5"
                 />
                 <input
                   type="text"
                   value={field.value}
                   onChange={(e) => field.onChange(e.target.value)}
                   placeholder="#008080"
-                  className="h-9 w-32 rounded-lg border border-gray-300 px-3 text-sm font-mono focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
+                  className="h-9 w-32 rounded-lg border border-outline px-3 text-sm font-mono focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
                 />
                 {form.formState.errors.brand_color && (
-                  <p className="text-xs text-red-600">{form.formState.errors.brand_color.message}</p>
+                  <p className="text-xs text-error">{form.formState.errors.brand_color.message}</p>
                 )}
               </div>
             )}
           />
 
-          {/* Live preview */}
-          <div className="rounded-xl border border-gray-200 overflow-hidden" style={isValidHex ? getBrandStyle(color) : undefined}>
-            <p className="px-4 pt-3 pb-2 text-xs font-medium uppercase tracking-wider text-gray-400 bg-white">Preview</p>
+          {/* Live preview — reflects your currently active theme (light/dark) */}
+          <div className="rounded-xl border border-outline-variant overflow-hidden" style={isValidHex ? getBrandStyle(color, previewMode) : undefined}>
+            <p className="px-4 pt-3 pb-2 text-xs font-medium uppercase tracking-wider text-on-surface-variant bg-surface-container-lowest">Preview</p>
             <div className="flex">
               {/* Sidebar strip */}
               <div className="w-32 bg-sidebar-bg px-3 py-4 flex flex-col gap-2 shrink-0">
@@ -144,7 +147,7 @@ export default function BrandingSettingsPage() {
                 </div>
               </div>
               {/* Main area */}
-              <div className="flex-1 bg-gray-50 p-4 flex items-start gap-3">
+              <div className="flex-1 bg-surface-container-low p-4 flex items-start gap-3">
                 <button
                   type="button"
                   className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-on-primary"

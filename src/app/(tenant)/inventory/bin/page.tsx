@@ -74,8 +74,8 @@ export default function BinPage() {
   const columns: ColumnDef<BinItemRow>[] = [
     { id: 'name', header: 'Item', cell: ({ row }) => (
       <div>
-        <p className="text-sm font-medium text-gray-900">{row.original.name}</p>
-        {row.original.sku && <p className="text-xs text-gray-400">{row.original.sku}</p>}
+        <p className="text-sm font-medium text-on-surface">{row.original.name}</p>
+        {row.original.sku && <p className="text-xs text-outline">{row.original.sku}</p>}
       </div>
     )},
     { accessorKey: 'quantity', header: 'Qty', cell: ({ getValue }) => (
@@ -88,7 +88,7 @@ export default function BinPage() {
       </span>
     )},
     { accessorKey: 'reason', header: 'Reason', cell: ({ getValue }) => (
-      <span className="text-sm text-gray-600">{(getValue() as string | null) ?? '—'}</span>
+      <span className="text-sm text-on-surface-variant">{(getValue() as string | null) ?? '—'}</span>
     )},
     { id: 'date', header: statusFilter === 'binned' ? 'Binned On' : 'Restored On', cell: ({ row }) => (
       formatDate(statusFilter === 'binned' ? row.original.binned_at : (row.original.restored_at ?? row.original.binned_at))
@@ -116,15 +116,15 @@ export default function BinPage() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 shrink-0 text-gray-500 hover:text-gray-900">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 shrink-0 text-on-surface-variant hover:text-on-surface">
             <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
           </Button>
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100">
             <Archive className="h-6 w-6 text-amber-600" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Bin</h1>
-            <p className="text-sm text-gray-500">Items written off as a 100% loss — removed from active inventory</p>
+            <h1 className="text-xl font-bold text-on-surface">Bin</h1>
+            <p className="text-sm text-on-surface-variant">Items written off as a 100% loss — removed from active inventory</p>
           </div>
         </div>
         {statusFilter === 'binned' && items.length > 0 && (
@@ -141,7 +141,7 @@ export default function BinPage() {
             key={s}
             onClick={() => setStatusFilter(s)}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              statusFilter === s ? 'bg-brand-teal text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              statusFilter === s ? 'bg-brand-teal text-white' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
             }`}
           >
             {s === 'binned' ? 'In Bin' : 'Restored History'}

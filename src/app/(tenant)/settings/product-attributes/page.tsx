@@ -106,8 +106,8 @@ export default function ProductAttributesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Product Attributes</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-xl font-bold text-on-surface">Product Attributes</h1>
+          <p className="text-sm text-on-surface-variant mt-0.5">
             Define attributes like Color, Size, or Storage to create product variants.
           </p>
         </div>
@@ -119,13 +119,13 @@ export default function ProductAttributesPage() {
       {/* Attribute list */}
       {loading ? (
         <div className="space-y-3">
-          {[1,2,3].map(i => <div key={i} className="h-16 animate-pulse rounded-xl bg-gray-100" />)}
+          {[1,2,3].map(i => <div key={i} className="h-16 animate-pulse rounded-xl bg-surface-container" />)}
         </div>
       ) : attributes.length === 0 ? (
-        <div className="rounded-xl border-2 border-dashed border-gray-200 py-16 text-center">
-          <Tag className="mx-auto h-8 w-8 text-gray-300 mb-3" />
-          <p className="text-sm font-medium text-gray-500">No attributes yet</p>
-          <p className="text-xs text-gray-400 mt-1">Add attributes to create product variants</p>
+        <div className="rounded-xl border-2 border-dashed border-outline-variant py-16 text-center">
+          <Tag className="mx-auto h-8 w-8 text-outline-variant mb-3" />
+          <p className="text-sm font-medium text-on-surface-variant">No attributes yet</p>
+          <p className="text-xs text-outline mt-1">Add attributes to create product variants</p>
           <Button size="sm" className="mt-4" onClick={openCreate}>
             <Plus className="h-4 w-4" /> Add First Attribute
           </Button>
@@ -136,12 +136,12 @@ export default function ProductAttributesPage() {
             const isExpanded = expanded[attr.id] ?? true
             const vals = attr.product_attribute_values
             return (
-              <div key={attr.id} className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+              <div key={attr.id} className="rounded-xl border border-outline-variant bg-surface overflow-hidden">
                 {/* Attribute header row */}
                 <div className="flex items-center gap-3 px-4 py-3">
                   <button
                     onClick={() => toggleExpand(attr.id)}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    className="text-outline hover:text-on-surface-variant transition-colors"
                   >
                     {isExpanded
                       ? <ChevronDown className="h-4 w-4" />
@@ -152,11 +152,11 @@ export default function ProductAttributesPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-gray-900 text-sm">{attr.name}</span>
+                      <span className="font-semibold text-on-surface text-sm">{attr.name}</span>
                       {attr.is_default && (
                         <Badge variant="secondary" className="text-xs">Default</Badge>
                       )}
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-outline">
                         {vals.length} {vals.length === 1 ? 'value' : 'values'}
                       </span>
                     </div>
@@ -164,21 +164,21 @@ export default function ProductAttributesPage() {
                   <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => { setAddingValueFor(attr.id); setNewValueText(''); setExpanded(p => ({ ...p, [attr.id]: true })) }}
-                      className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600 transition-colors"
+                      className="rounded p-1.5 text-outline hover:bg-surface-container hover:text-blue-600 transition-colors"
                       title="Add value"
                     >
                       <Plus className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => openEdit(attr)}
-                      className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                      className="rounded p-1.5 text-outline hover:bg-surface-container hover:text-on-surface-variant transition-colors"
                       title="Rename attribute"
                     >
                       <Edit2 className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => setDeleteAttr(attr)}
-                      className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-600 transition-colors"
+                      className="rounded p-1.5 text-outline hover:bg-surface-container hover:text-red-600 transition-colors"
                       title="Delete attribute"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -188,20 +188,20 @@ export default function ProductAttributesPage() {
 
                 {/* Values section */}
                 {isExpanded && (
-                  <div className="border-t border-gray-100 px-4 py-3 bg-gray-50">
+                  <div className="border-t border-outline-variant px-4 py-3 bg-surface-container-low">
                     <div className="flex flex-wrap gap-2 mb-2">
                       {vals.length === 0 && addingValueFor !== attr.id && (
-                        <span className="text-xs text-gray-400 italic">No values yet — click + to add</span>
+                        <span className="text-xs text-outline italic">No values yet — click + to add</span>
                       )}
                       {vals.map(v => (
                         <span
                           key={v.id}
-                          className="inline-flex items-center gap-1 rounded-full bg-white border border-gray-200 px-3 py-1 text-xs font-medium text-gray-700 shadow-sm"
+                          className="inline-flex items-center gap-1 rounded-full bg-surface border border-outline-variant px-3 py-1 text-xs font-medium text-on-surface-variant shadow-sm"
                         >
                           {v.value}
                           <button
                             onClick={() => deleteValue(v.id)}
-                            className="ml-0.5 text-gray-400 hover:text-red-500 transition-colors"
+                            className="ml-0.5 text-outline hover:text-red-500 transition-colors"
                           >
                             <X className="h-3 w-3" />
                           </button>
@@ -247,7 +247,7 @@ export default function ProductAttributesPage() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Attribute Name</label>
+            <label className="block text-sm font-medium text-on-surface-variant mb-1">Attribute Name</label>
             <Input
               autoFocus
               placeholder="e.g. Color, Size, Storage"
@@ -272,7 +272,7 @@ export default function ProductAttributesPage() {
         title="Delete Attribute"
       >
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-on-surface-variant">
             Are you sure you want to delete <strong>{deleteAttr?.name}</strong>?
             This will also remove all its values and may affect existing product variants.
           </p>

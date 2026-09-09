@@ -1,6 +1,7 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
-import { Menu, ChevronDown, MessageSquare, ArrowRight, User, Settings, LogOut, Megaphone, Info, AlertTriangle, Wrench, X, Loader2, Plus } from 'lucide-react'
+import { Menu, ChevronDown, MessageSquare, ArrowRight, User, Settings, LogOut, Megaphone, Info, AlertTriangle, Wrench, X, Loader2, Plus, Sun, Moon } from 'lucide-react'
+import { useTheme } from 'next-themes'
 import { useAuthStore } from '@/store/auth.store'
 import { useMessageStore } from '@/store/message.store'
 import { useBroadcastsStore } from '@/store/broadcasts.store'
@@ -23,7 +24,11 @@ const BROADCAST_ICON = {
 } as const
 
 export function Topbar({ onMenuClick }: TopbarProps) {
-  const { profile, branches, verticalTemplateSlug, clear: clearAuthStore } = useAuthStore()
+  const { profile, branches, verticalTemplateSlug, subscriptionStatus, clear: clearAuthStore } = useAuthStore()
+  const hasSubscriptionAccess = subscriptionStatus === null || subscriptionStatus.hasAccess
+  const { theme, resolvedTheme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
   const isRetail = verticalTemplateSlug === 'retail-store'
   const unreadCount = useMessageStore((s) => s.unreadCount)
   const unreadMessages = useMessageStore((s) => s.unreadMessages)
@@ -93,13 +98,23 @@ export function Topbar({ onMenuClick }: TopbarProps) {
 
       <div className="flex items-center gap-2 ml-auto">
         {!isRetail && (
-          <Link
-            href="/repairs?new=true"
-            className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-sm font-medium text-on-primary transition-colors hover:bg-primary-dim"
-          >
-            <Plus className="h-4 w-4" />
-            Book a Repair
-          </Link>
+          hasSubscriptionAccess ? (
+            <Link
+              href="/repairs?new=true"
+              className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-sm font-medium text-on-primary transition-colors hover:bg-primary-dim"
+            >
+              <Plus className="h-4 w-4" />
+              Book a Repair
+            </Link>
+          ) : (
+            <div
+              className="flex items-center gap-1.5 rounded-xl bg-primary/40 px-3 py-1.5 text-sm font-medium text-on-primary opacity-50 cursor-not-allowed select-none"
+              title="Your subscription has expired — renew to book new repairs"
+            >
+              <Plus className="h-4 w-4" />
+              Book a Repair
+            </div>
+          )
         )}
 
         {/* ── System Announcements (Megaphone) ── */}
@@ -163,6 +178,20 @@ export function Topbar({ onMenuClick }: TopbarProps) {
             </div>
           )}
         </div>
+
+        {/* ── Theme toggle ── */}
+        <button
+          onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+          className="rounded-xl p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface"
+          aria-label={resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          title={resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {mounted && resolvedTheme === 'dark' ? (
+            <Sun style={{ width: '1.125rem', height: '1.125rem' }} />
+          ) : (
+            <Moon style={{ width: '1.125rem', height: '1.125rem' }} />
+          )}
+        </button>
 
         {/* ── Bell / Messages dropdown ── */}
         <div ref={bellRef} className="relative">

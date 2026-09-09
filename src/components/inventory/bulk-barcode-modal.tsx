@@ -144,16 +144,16 @@ export function BulkBarcodeModal({ open, products, onClose }: Props) {
     <Modal open={open} onClose={onClose} title="Bulk Print Barcodes" size="lg">
       <div className="space-y-4">
         {preparing ? (
-          <div className="flex flex-col items-center justify-center py-10 text-gray-500">
+          <div className="flex flex-col items-center justify-center py-10 text-on-surface-variant">
             <Loader2 className="h-6 w-6 animate-spin mb-3" />
             <p className="text-sm">Preparing barcodes…</p>
           </div>
         ) : (
           <>
             {items.length > 0 ? (
-              <div className="rounded-lg border border-gray-200 overflow-hidden">
+              <div className="rounded-lg border border-outline-variant overflow-hidden">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                  <thead className="bg-surface-container-low text-xs uppercase text-on-surface-variant">
                     <tr>
                       <th className="px-3 py-2 text-left">Product</th>
                       <th className="px-3 py-2 text-left">Barcode</th>
@@ -161,22 +161,22 @@ export function BulkBarcodeModal({ open, products, onClose }: Props) {
                       <th className="px-3 py-2 text-right">Labels</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-outline-variant">
                     {items.map((i) => (
                       <tr key={i.id}>
-                        <td className="px-3 py-2 text-gray-900">{i.name}</td>
-                        <td className="px-3 py-2 text-gray-500">{i.barcode}</td>
-                        <td className="px-3 py-2 text-right text-gray-700">{i.quantity}</td>
-                        <td className="px-3 py-2 text-right font-medium text-gray-900">{i.quantity}</td>
+                        <td className="px-3 py-2 text-on-surface">{i.name}</td>
+                        <td className="px-3 py-2 text-on-surface-variant">{i.barcode}</td>
+                        <td className="px-3 py-2 text-right text-on-surface-variant">{i.quantity}</td>
+                        <td className="px-3 py-2 text-right font-medium text-on-surface">{i.quantity}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             ) : (
-              <div className="text-center py-8 border border-dashed border-gray-200 rounded-lg">
-                <Barcode className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">No labels to print for the selected products.</p>
+              <div className="text-center py-8 border border-dashed border-outline-variant rounded-lg">
+                <Barcode className="h-10 w-10 text-outline-variant mx-auto mb-2" />
+                <p className="text-sm text-on-surface-variant">No labels to print for the selected products.</p>
               </div>
             )}
 
@@ -195,8 +195,8 @@ export function BulkBarcodeModal({ open, products, onClose }: Props) {
             )}
 
             {items.length > 0 && (
-              <p className="text-sm text-gray-500">
-                <strong className="text-gray-900">{totalLabels}</strong> label{totalLabels !== 1 ? 's' : ''} will be printed for <strong className="text-gray-900">{items.length}</strong> product{items.length !== 1 ? 's' : ''}.
+              <p className="text-sm text-on-surface-variant">
+                <strong className="text-on-surface">{totalLabels}</strong> label{totalLabels !== 1 ? 's' : ''} will be printed for <strong className="text-on-surface">{items.length}</strong> product{items.length !== 1 ? 's' : ''}.
               </p>
             )}
           </>

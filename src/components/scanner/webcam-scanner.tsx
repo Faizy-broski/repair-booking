@@ -388,7 +388,7 @@ export function WebcamScanner({ onResult, active }: Props) {
         <select
           value={selectedDeviceId ?? ''}
           onChange={e => setSelectedDeviceId(e.target.value || undefined)}
-          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
+          className="w-full rounded-lg border border-outline bg-surface px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
         >
           {cameras.map(c => (
             <option key={c.deviceId} value={c.deviceId}>
@@ -435,12 +435,12 @@ export function WebcamScanner({ onResult, active }: Props) {
       </div>
 
       {permission === 'initialising' && (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-gray-50 border border-gray-200 px-6 py-10 text-center">
+        <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-surface-container-low border border-outline-variant px-6 py-10 text-center">
           <svg className="h-8 w-8 animate-spin text-brand-teal" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          <p className="text-sm text-gray-500">Requesting camera access…</p>
+          <p className="text-sm text-on-surface-variant">Requesting camera access…</p>
         </div>
       )}
 
@@ -450,29 +450,29 @@ export function WebcamScanner({ onResult, active }: Props) {
             <CameraOff className="h-7 w-7 text-red-500" />
           </div>
           <div>
-            <p className="font-semibold text-gray-900">Camera access denied</p>
-            <p className="mt-1 text-sm text-gray-500">Click the camera icon in your address bar and allow access.</p>
+            <p className="font-semibold text-on-surface">Camera access denied</p>
+            <p className="mt-1 text-sm text-on-surface-variant">Click the camera icon in your address bar and allow access.</p>
           </div>
-          <button onClick={retry} className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+          <button onClick={retry} className="flex items-center gap-1.5 rounded-lg border border-outline bg-surface px-4 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low">
             <RefreshCw className="h-4 w-4" /> Try again
           </button>
         </div>
       )}
 
       {permission === 'unavailable' && (
-        <div className="flex flex-col items-center justify-center gap-4 rounded-xl bg-gray-50 border border-gray-200 px-6 py-10 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
-            <MonitorSpeaker className="h-7 w-7 text-gray-400" />
+        <div className="flex flex-col items-center justify-center gap-4 rounded-xl bg-surface-container-low border border-outline-variant px-6 py-10 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-surface-container">
+            <MonitorSpeaker className="h-7 w-7 text-outline" />
           </div>
           <div>
-            <p className="font-semibold text-gray-900">No camera detected</p>
-            <p className="mt-1 text-sm text-gray-500">Switch to the Physical Scanner tab.</p>
+            <p className="font-semibold text-on-surface">No camera detected</p>
+            <p className="mt-1 text-sm text-on-surface-variant">Switch to the Physical Scanner tab.</p>
           </div>
         </div>
       )}
 
       {permission === 'granted' && (
-        <p className="text-center text-xs text-gray-400">
+        <p className="text-center text-xs text-outline">
           Fill the frame with the barcode — brackets are a visual guide only
         </p>
       )}

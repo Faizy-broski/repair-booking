@@ -39,7 +39,7 @@ const REPORT_LINKS = [
   { href: '/reports/payments',    label: 'Payments',    desc: 'Revenue split by payment method',          icon: CreditCard, color: 'bg-pink-50 text-pink-600' },
   { href: '/reports/employees',   label: 'Employees',   desc: 'Staff productivity & commission',          icon: Users,      color: 'bg-teal-50 text-teal-600' },
   { href: '/reports/inventory',   label: 'Inventory',   desc: 'Stock value, low stock & adjustments',     icon: Package,    color: 'bg-amber-50 text-amber-600' },
-  { href: '/reports/z-report',    label: 'Z-Report',    desc: 'Daily register sessions & cash variance',  icon: BarChart2,  color: 'bg-slate-50 text-slate-600' },
+  { href: '/reports/z-report',    label: 'Z-Report',    desc: 'Daily register sessions & cash variance',  icon: BarChart2,  color: 'bg-surface-container-low text-on-surface-variant' },
 ]
 
 export default function ReportsOverviewPage() {

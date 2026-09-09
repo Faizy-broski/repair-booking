@@ -55,7 +55,7 @@ function StarRating({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'lg
   return (
     <div className="flex gap-0.5">
       {Array.from({ length: 5 }, (_, i) => (
-        <Star key={i} className={`${cls} ${i < rating ? 'fill-amber-400 text-amber-400' : 'fill-gray-100 text-gray-200'}`} />
+        <Star key={i} className={`${cls} ${i < rating ? 'fill-amber-400 text-amber-400' : 'fill-gray-100 text-outline-variant'}`} />
       ))}
     </div>
   )
@@ -65,14 +65,14 @@ function StatCard({ label, value, sub, icon: Icon, color }: {
   label: string; value: string | number; sub?: string; icon: React.ElementType; color: string
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 flex items-start gap-4">
+    <div className="rounded-xl border border-outline-variant bg-surface p-5 flex items-start gap-4">
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${color}`}>
         <Icon className="h-5 w-5" />
       </div>
       <div className="min-w-0">
-        <p className="text-sm text-gray-500">{label}</p>
-        <p className="mt-0.5 text-2xl font-bold text-gray-900 tabular-nums">{value}</p>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+        <p className="text-sm text-on-surface-variant">{label}</p>
+        <p className="mt-0.5 text-2xl font-bold text-on-surface tabular-nums">{value}</p>
+        {sub && <p className="text-xs text-outline mt-0.5">{sub}</p>}
       </div>
     </div>
   )
@@ -82,12 +82,12 @@ function RatingBar({ star, count, max }: { star: number; count: number; max: num
   const pct = max > 0 ? (count / max) * 100 : 0
   return (
     <div className="flex items-center gap-2">
-      <span className="w-4 text-right text-xs font-medium text-gray-600">{star}</span>
+      <span className="w-4 text-right text-xs font-medium text-on-surface-variant">{star}</span>
       <Star className="h-3 w-3 fill-amber-400 text-amber-400 shrink-0" />
-      <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
+      <div className="flex-1 h-2 rounded-full bg-surface-container overflow-hidden">
         <div className="h-full rounded-full bg-amber-400 transition-all duration-500" style={{ width: `${pct}%` }} />
       </div>
-      <span className="w-6 text-right text-xs text-gray-400">{count}</span>
+      <span className="w-6 text-right text-xs text-outline">{count}</span>
     </div>
   )
 }
@@ -156,15 +156,15 @@ function BusinessSearchPanel({
   }
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+    <div className="rounded-xl border border-outline-variant bg-surface shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="border-b border-gray-100 bg-gray-50 px-6 py-4 flex items-center gap-3">
+      <div className="border-b border-outline-variant bg-surface-container-low px-6 py-4 flex items-center gap-3">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100">
           <Building2 className="h-4 w-4 text-amber-600" />
         </div>
         <div className="flex-1">
-          <h3 className="text-sm font-semibold text-gray-900">Find your Google Business listing</h3>
-          <p className="text-xs text-gray-500">Search by business name and postcode — no Google login required</p>
+          <h3 className="text-sm font-semibold text-on-surface">Find your Google Business listing</h3>
+          <p className="text-xs text-on-surface-variant">Search by business name and postcode — no Google login required</p>
         </div>
         {step === 'results' && (
           <button
@@ -189,7 +189,7 @@ function BusinessSearchPanel({
           <form onSubmit={handleSearch} className="space-y-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-gray-700">Business Name</label>
+                <label className="text-sm font-medium text-on-surface-variant">Business Name</label>
                 <Input
                   placeholder="e.g. Harrely Phone Repairs"
                   value={name}
@@ -198,7 +198,7 @@ function BusinessSearchPanel({
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-gray-700">Postcode / City</label>
+                <label className="text-sm font-medium text-on-surface-variant">Postcode / City</label>
                 <Input
                   placeholder="e.g. SW1A 1AA or London"
                   value={postcode}
@@ -211,7 +211,7 @@ function BusinessSearchPanel({
               <Search className="h-4 w-4" />
               {searching ? 'Searching…' : 'Search Google Business'}
             </Button>
-            <p className="text-center text-xs text-gray-400">
+            <p className="text-center text-xs text-outline">
               We search Google Places to find your listing and import reviews automatically
             </p>
           </form>
@@ -221,10 +221,10 @@ function BusinessSearchPanel({
         {step === 'results' && (
           <div className="space-y-3">
             {results.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-lg border border-gray-200 py-10 gap-2">
-                <Search className="h-8 w-8 text-gray-300" />
-                <p className="text-sm font-medium text-gray-600">No listings found</p>
-                <p className="text-xs text-gray-400">Try a different name or postcode</p>
+              <div className="flex flex-col items-center justify-center rounded-lg border border-outline-variant py-10 gap-2">
+                <Search className="h-8 w-8 text-outline-variant" />
+                <p className="text-sm font-medium text-on-surface-variant">No listings found</p>
+                <p className="text-xs text-outline">Try a different name or postcode</p>
                 <button
                   onClick={() => setStep('form')}
                   className="mt-1 text-xs text-blue-600 hover:underline"
@@ -234,23 +234,23 @@ function BusinessSearchPanel({
               </div>
             ) : (
               <>
-                <p className="text-xs text-gray-500">{results.length} listing{results.length !== 1 ? 's' : ''} found — pick yours</p>
+                <p className="text-xs text-on-surface-variant">{results.length} listing{results.length !== 1 ? 's' : ''} found — pick yours</p>
                 <div className="space-y-2">
                   {results.map((r) => (
                     <div
                       key={r.place_id}
-                      className="flex items-center gap-4 rounded-lg border border-gray-200 bg-white p-4 hover:border-amber-300 hover:bg-amber-50 transition-colors"
+                      className="flex items-center gap-4 rounded-lg border border-outline-variant bg-surface p-4 hover:border-amber-300 hover:bg-amber-50 transition-colors"
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">{r.name}</p>
-                        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500">
+                        <p className="text-sm font-semibold text-on-surface truncate">{r.name}</p>
+                        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-on-surface-variant">
                           <MapPin className="h-3 w-3 shrink-0" />
                           <span className="truncate">{r.address}</span>
                         </div>
                         {r.rating !== null && (
                           <div className="mt-1 flex items-center gap-1.5">
                             <StarRating rating={Math.round(r.rating)} />
-                            <span className="text-xs text-gray-400">{r.rating.toFixed(1)} · {r.review_count.toLocaleString()} reviews</span>
+                            <span className="text-xs text-outline">{r.rating.toFixed(1)} · {r.review_count.toLocaleString()} reviews</span>
                           </div>
                         )}
                       </div>
@@ -411,7 +411,7 @@ function GoogleReviewsInner() {
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100">
               <Star className="h-5 w-5 fill-amber-500 text-amber-500" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">Google Reviews</h1>
+            <h1 className="text-2xl font-bold text-on-surface">Google Reviews</h1>
             {isConnected && (
               <span className="flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700 border border-green-200">
                 <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -419,12 +419,12 @@ function GoogleReviewsInner() {
               </span>
             )}
           </div>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-on-surface-variant">
             {reviews.length > 0
               ? `${reviews.length} reviews · ${avgRatingStr} avg rating`
               : 'Connect your Google Business listing to import reviews'}
             {settings?.last_synced && (
-              <span className="text-gray-400"> · synced {formatDate(settings.last_synced)}</span>
+              <span className="text-outline"> · synced {formatDate(settings.last_synced)}</span>
             )}
           </p>
         </div>
@@ -434,7 +434,7 @@ function GoogleReviewsInner() {
             <>
               <button
                 onClick={disconnect}
-                className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-red-300 hover:text-red-600 transition-colors"
+                className="flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:border-red-300 hover:text-red-600 transition-colors"
               >
                 <LogOut className="h-3.5 w-3.5" /> Disconnect
               </button>
@@ -496,11 +496,11 @@ function GoogleReviewsInner() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-            <div className="lg:col-span-2 rounded-xl border border-gray-200 bg-white p-5">
+            <div className="lg:col-span-2 rounded-xl border border-outline-variant bg-surface p-5">
               <div className="mb-5">
-                <p className="text-3xl font-bold text-gray-900">{avgRatingStr}</p>
+                <p className="text-3xl font-bold text-on-surface">{avgRatingStr}</p>
                 <StarRating rating={Math.round(avgRating)} size="lg" />
-                <p className="mt-1 text-xs text-gray-400">{reviews.length} total reviews</p>
+                <p className="mt-1 text-xs text-outline">{reviews.length} total reviews</p>
               </div>
               <div className="space-y-2">
                 {ratingCounts.map(({ star, count }) => (
@@ -508,8 +508,8 @@ function GoogleReviewsInner() {
                 ))}
               </div>
             </div>
-            <div className="lg:col-span-3 rounded-xl border border-gray-200 bg-white p-5">
-              <p className="mb-4 text-sm font-semibold text-gray-700">Reviews Over Time (6 months)</p>
+            <div className="lg:col-span-3 rounded-xl border border-outline-variant bg-surface p-5">
+              <p className="mb-4 text-sm font-semibold text-on-surface-variant">Reviews Over Time (6 months)</p>
               <ResponsiveContainer width="100%" height={160}>
                 <LineChart data={trendData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
@@ -534,7 +534,7 @@ function GoogleReviewsInner() {
               <div className="flex gap-2 shrink-0">
                 <button
                   onClick={() => navigator.clipboard.writeText(reviewLink)}
-                  className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 transition-colors"
+                  className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-surface px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 transition-colors"
                 >
                   <Copy className="h-3.5 w-3.5" /> Copy
                 </button>
@@ -554,13 +554,13 @@ function GoogleReviewsInner() {
           {reviews.length > 0 && (
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-outline pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Search reviews…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full rounded-lg border border-outline-variant bg-surface pl-9 pr-3 py-2 text-sm text-on-surface placeholder:text-outline focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -574,7 +574,7 @@ function GoogleReviewsInner() {
                           ? 'border-amber-400 bg-amber-50 text-amber-700'
                           : filterStar === 0 && s === 0
                             ? 'border-gray-900 bg-gray-900 text-white'
-                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                            : 'border-outline-variant bg-surface text-on-surface-variant hover:border-outline'
                       }`}
                     >
                       {s === 0 ? 'All' : `${s}★`}
@@ -584,17 +584,17 @@ function GoogleReviewsInner() {
                 <div className="relative">
                   <button
                     onClick={() => setShowSortMenu((v) => !v)}
-                    className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:border-gray-300 transition-colors"
+                    className="flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-xs font-medium text-on-surface-variant hover:border-outline transition-colors"
                   >
                     <Filter className="h-3.5 w-3.5" />
                     {SORT_LABELS[sort]}
-                    <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+                    <ChevronDown className="h-3.5 w-3.5 text-outline" />
                   </button>
                   {showSortMenu && (
-                    <div className="absolute right-0 top-full mt-1 z-20 w-40 rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+                    <div className="absolute right-0 top-full mt-1 z-20 w-40 rounded-xl border border-outline-variant bg-surface py-1 shadow-lg">
                       {(Object.keys(SORT_LABELS) as SortOption[]).map((o) => (
                         <button key={o} onClick={() => { setSort(o); setShowSortMenu(false) }}
-                          className={`w-full px-3 py-2 text-left text-xs font-medium transition-colors ${sort === o ? 'bg-gray-50 text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`}>
+                          className={`w-full px-3 py-2 text-left text-xs font-medium transition-colors ${sort === o ? 'bg-surface-container-low text-on-surface' : 'text-on-surface-variant hover:bg-surface-container-low'}`}>
                           {SORT_LABELS[o]}
                         </button>
                       ))}
@@ -608,16 +608,16 @@ function GoogleReviewsInner() {
           {loading && (
             <div className="space-y-3">
               {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-28 animate-pulse rounded-xl bg-gray-100" />
+                <div key={i} className="h-28 animate-pulse rounded-xl bg-surface-container" />
               ))}
             </div>
           )}
 
           {!loading && reviews.length === 0 && isConnected && (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white py-16 gap-3">
-              <Clock className="h-10 w-10 text-gray-300" />
-              <p className="text-sm font-medium text-gray-600">No reviews synced yet</p>
-              <p className="text-xs text-gray-400">Click "Sync Now" to import your Google reviews</p>
+            <div className="flex flex-col items-center justify-center rounded-xl border border-outline-variant bg-surface py-16 gap-3">
+              <Clock className="h-10 w-10 text-outline-variant" />
+              <p className="text-sm font-medium text-on-surface-variant">No reviews synced yet</p>
+              <p className="text-xs text-outline">Click "Sync Now" to import your Google reviews</p>
               <Button size="sm" onClick={syncReviews} loading={syncing}>
                 <RefreshCw className="h-4 w-4" /> Sync Now
               </Button>
@@ -625,15 +625,15 @@ function GoogleReviewsInner() {
           )}
 
           {!loading && reviews.length > 0 && visibleReviews.length === 0 && (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-white py-10 gap-2">
-              <Search className="h-8 w-8 text-gray-300" />
-              <p className="text-sm text-gray-500">No reviews match your filter</p>
+            <div className="flex flex-col items-center justify-center rounded-xl border border-outline-variant bg-surface py-10 gap-2">
+              <Search className="h-8 w-8 text-outline-variant" />
+              <p className="text-sm text-on-surface-variant">No reviews match your filter</p>
               <button onClick={() => { setSearch(''); setFilterStar(0) }} className="text-xs text-blue-600 hover:underline">Clear filters</button>
             </div>
           )}
 
           {!loading && visibleReviews.map((review) => (
-            <div key={review.id} className="group rounded-xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md hover:border-gray-300 transition-all">
+            <div key={review.id} className="group rounded-xl border border-outline-variant bg-surface p-5 shadow-sm hover:shadow-md hover:border-outline transition-all">
               <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-sm font-bold text-white shadow-sm">
                   {review.author_name.charAt(0).toUpperCase()}
@@ -641,32 +641,32 @@ function GoogleReviewsInner() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2 flex-wrap">
                     <div>
-                      <p className="font-semibold text-gray-900">{review.author_name}</p>
+                      <p className="font-semibold text-on-surface">{review.author_name}</p>
                       <div className="mt-0.5 flex items-center gap-2">
                         <StarRating rating={review.rating} />
-                        <span className="text-xs text-gray-400">{formatDate(review.published_at)}</span>
+                        <span className="text-xs text-outline">{formatDate(review.published_at)}</span>
                       </div>
                     </div>
                     {settings?.place_id && (
                       <a
                         href={`https://www.google.com/maps/place/?q=place_id:${settings.place_id}`}
                         target="_blank" rel="noopener noreferrer"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-xs text-outline hover:text-blue-600"
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
                       </a>
                     )}
                   </div>
                   {review.text
-                    ? <p className="mt-2.5 text-sm text-gray-700 leading-relaxed">{review.text}</p>
-                    : <p className="mt-2.5 text-xs text-gray-400 italic">No written review</p>}
+                    ? <p className="mt-2.5 text-sm text-on-surface-variant leading-relaxed">{review.text}</p>
+                    : <p className="mt-2.5 text-xs text-outline italic">No written review</p>}
                 </div>
               </div>
             </div>
           ))}
 
           {!loading && visibleReviews.length > 0 && (
-            <p className="text-center text-xs text-gray-400 py-2">
+            <p className="text-center text-xs text-outline py-2">
               Showing {visibleReviews.length} of {reviews.length} reviews{filterStar > 0 && ` · filtered to ${filterStar}★`}
             </p>
           )}
@@ -680,7 +680,7 @@ function GoogleReviewsInner() {
 
 export default function GoogleReviewsPage() {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-gray-100" />}>
+    <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-surface-container" />}>
       <GoogleReviewsInner />
     </Suspense>
   )

@@ -133,45 +133,45 @@ export default function RepairCustomersPage() {
     {
       id: 'name', header: 'Name',
       cell: ({ row }) => (
-        <Link href={`/repairs/customers/${row.original.id}`} className="cursor-pointer font-medium text-gray-900 hover:text-blue-600 hover:underline transition-colors">
+        <Link href={`/repairs/customers/${row.original.id}`} className="cursor-pointer font-medium text-on-surface hover:text-blue-600 hover:underline transition-colors">
           {row.original.first_name} {row.original.last_name ?? ''}
         </Link>
       ),
     },
     {
       accessorKey: 'email', header: 'Email',
-      cell: ({ getValue }) => <span className="text-sm text-gray-600">{(getValue() as string) || 'N/A'}</span>,
+      cell: ({ getValue }) => <span className="text-sm text-on-surface-variant">{(getValue() as string) || 'N/A'}</span>,
     },
     {
       id: 'business', header: 'Business Name',
-      cell: ({ row }) => <span className="text-sm text-gray-600">{row.original.business_name || 'N/A'}</span>,
+      cell: ({ row }) => <span className="text-sm text-on-surface-variant">{row.original.business_name || 'N/A'}</span>,
     },
     {
       accessorKey: 'phone', header: 'Contact No',
-      cell: ({ getValue }) => <span className="text-sm text-gray-700 font-medium">{(getValue() as string) || 'N/A'}</span>,
+      cell: ({ getValue }) => <span className="text-sm text-on-surface-variant font-medium">{(getValue() as string) || 'N/A'}</span>,
     },
     {
       accessorKey: 'address', header: 'Address',
-      cell: ({ getValue }) => { const v = getValue() as string | null; return <span className="text-sm text-gray-600 max-w-[160px] truncate block" title={v ?? ''}>{v || 'N/A'}</span> },
+      cell: ({ getValue }) => { const v = getValue() as string | null; return <span className="text-sm text-on-surface-variant max-w-[160px] truncate block" title={v ?? ''}>{v || 'N/A'}</span> },
     },
     {
       id: 'actions', header: 'Action', size: 60,
       cell: ({ row }) => (
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
-            <button className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-gray-800 hover:bg-gray-100 hover:text-black transition-colors focus:outline-none">
+            <button className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-on-surface hover:bg-surface-container hover:text-black transition-colors focus:outline-none">
               <MoreHorizontal className="h-5 w-5" />
             </button>
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
-            <DropdownMenu.Content align="end" sideOffset={4} className="z-50 min-w-[140px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-              <DropdownMenu.Item onSelect={() => router.push(`/repairs/customers/${row.original.id}`)} className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 outline-none">
+            <DropdownMenu.Content align="end" sideOffset={4} className="z-50 min-w-[140px] rounded-lg border border-outline-variant bg-surface py-1 shadow-lg">
+              <DropdownMenu.Item onSelect={() => router.push(`/repairs/customers/${row.original.id}`)} className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-on-surface-variant hover:bg-surface-container-low outline-none">
                 <Eye className="h-3.5 w-3.5 text-blue-500" /> Details
               </DropdownMenu.Item>
-              <DropdownMenu.Item onSelect={() => openEdit(row.original)} className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 outline-none">
+              <DropdownMenu.Item onSelect={() => openEdit(row.original)} className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-on-surface-variant hover:bg-surface-container-low outline-none">
                 <Pencil className="h-3.5 w-3.5 text-amber-500" /> Edit
               </DropdownMenu.Item>
-              <DropdownMenu.Separator className="my-1 border-t border-gray-100" />
+              <DropdownMenu.Separator className="my-1 border-t border-outline-variant" />
               <DropdownMenu.Item onSelect={() => onDelete(row.original)} className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 outline-none">
                 <Trash2 className="h-3.5 w-3.5" /> Delete
               </DropdownMenu.Item>
@@ -190,8 +190,8 @@ export default function RepairCustomersPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Repairs Customers</h1>
-        <p className="text-sm font-semibold text-gray-600 mt-0.5">Manage Repairs Customers</p>
+        <h1 className="text-xl font-bold text-on-surface">Repairs Customers</h1>
+        <p className="text-sm font-semibold text-on-surface-variant mt-0.5">Manage Repairs Customers</p>
       </div>
 
       {/* Toolbar */}
@@ -210,9 +210,9 @@ export default function RepairCustomersPage() {
             <Columns className="h-3.5 w-3.5" /> Column visibility
           </button>
           {colMenuOpen && (
-            <div className="absolute left-0 top-full z-20 mt-1 w-44 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
+            <div className="absolute left-0 top-full z-20 mt-1 w-44 rounded-lg border border-outline-variant bg-surface p-2 shadow-lg">
               {TOGGLEABLE.map((key) => (
-                <label key={key} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50">
+                <label key={key} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs text-on-surface-variant hover:bg-surface-container-low">
                   <input type="checkbox" className="h-3.5 w-3.5 rounded" checked={colVisibility[key] !== false} onChange={(e) => setColVisibility((v) => ({ ...v, [key]: e.target.checked }))} />
                   {COL_LABELS[key]}
                 </label>
@@ -220,14 +220,14 @@ export default function RepairCustomersPage() {
             </div>
           )}
         </div>
-        <button onClick={() => exportPDF(customers)} className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors">
+        <button onClick={() => exportPDF(customers)} className="flex items-center gap-1.5 rounded-full border border-outline bg-surface px-3 py-1.5 text-xs text-on-surface-variant hover:bg-surface-container-low transition-colors">
           <FileText className="h-3.5 w-3.5" /> Export PDF
         </button>
 
         <div className="ml-auto relative max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
           <input type="search" placeholder="Search customers..." value={search} onChange={(e) => setSearch(e.target.value)}
-            className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none" />
+            className="h-9 w-full rounded-lg border border-outline bg-surface pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none" />
         </div>
       </div>
 
@@ -247,8 +247,8 @@ export default function RepairCustomersPage() {
             <Input label="Phone" type="tel" {...editForm.register('phone')} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Address</label>
-            <textarea rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" {...editForm.register('address')} />
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Address</label>
+            <textarea rows={2} className="w-full rounded-lg border border-outline px-3 py-2 text-sm" {...editForm.register('address')} />
           </div>
           <Button type="submit" className="w-full" loading={editForm.formState.isSubmitting}>Save Changes</Button>
         </form>

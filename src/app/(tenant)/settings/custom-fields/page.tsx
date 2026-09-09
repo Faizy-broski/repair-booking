@@ -4,11 +4,11 @@ import { CustomFieldBuilder } from '@/components/shared/custom-field-builder'
 
 export default function CustomFieldsSettingsPage() {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6 space-y-6">
+    <div className="rounded-xl border border-outline-variant bg-surface p-6 space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="font-semibold text-gray-900">Custom Fields</h3>
-          <p className="mt-0.5 text-sm text-gray-500">
+          <h3 className="font-semibold text-on-surface">Custom Fields</h3>
+          <p className="mt-0.5 text-sm text-on-surface-variant">
             Add extra fields to repairs, customers, and other records. For repairs, optionally scope fields to a specific repair category (e.g. Phone Repair, Computer Repair) so they only appear on matching tickets.
           </p>
         </div>

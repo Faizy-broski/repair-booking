@@ -27,7 +27,7 @@ export function InventoryNav() {
   ]
 
   return (
-    <div className="flex overflow-x-auto gap-1 border-b border-gray-200 pb-3 no-scrollbar">
+    <div className="flex overflow-x-auto gap-1 border-b border-outline-variant pb-3 no-scrollbar">
       {items.map(({ label, href }) => (
         <Link
           key={href}
@@ -35,7 +35,7 @@ export function InventoryNav() {
           className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
             (href === '/inventory' ? pathname === '/inventory' : pathname.startsWith(href))
               ? 'bg-brand-teal text-white'
-              : 'text-gray-600 hover:bg-gray-100'
+              : 'text-on-surface-variant hover:bg-surface-container'
           }`}
         >
           {label}

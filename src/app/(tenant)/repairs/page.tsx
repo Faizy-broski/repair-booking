@@ -95,19 +95,19 @@ function ActionsMenu({ onEdit, onSlip, onInvoice, onDelete, onMessage, onEmail, 
   onEmail: () => void
   canEmail: boolean
 }) {
-  const item = 'flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors'
+  const item = 'flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low focus:outline-none transition-colors'
 
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <button className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-gray-800 hover:bg-gray-100 hover:text-black transition-colors focus:outline-none">
+        <button className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-on-surface hover:bg-surface-container hover:text-black transition-colors focus:outline-none">
           <MoreHorizontal className="h-5 w-5" />
         </button>
       </DropdownMenu.Trigger>
 
       <DropdownMenu.Portal>
         <DropdownMenu.Content
-          className="z-50 w-40 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden p-0 animate-in fade-in zoom-in-95 duration-100"
+          className="z-50 w-40 rounded-lg border border-outline-variant bg-surface shadow-lg overflow-hidden p-0 animate-in fade-in zoom-in-95 duration-100"
           sideOffset={5}
           align="end"
         >
@@ -129,7 +129,7 @@ function ActionsMenu({ onEdit, onSlip, onInvoice, onDelete, onMessage, onEmail, 
           >
             <Send className="h-3.5 w-3.5 text-teal-500" /> Email
           </DropdownMenu.Item>
-          <DropdownMenu.Separator className="h-px bg-gray-100" />
+          <DropdownMenu.Separator className="h-px bg-surface-container" />
           <DropdownMenu.Item className={`${item} text-red-600 hover:bg-red-50`} onSelect={onDelete}>
             <Trash2 className="h-3.5 w-3.5" /> Delete
           </DropdownMenu.Item>
@@ -223,10 +223,10 @@ function ComboInput({ value, onChange, options, placeholder }: {
         onChange={(e) => { onChange(e.target.value); setOpen(true) }}
         onFocus={() => setOpen(true)}
         placeholder={placeholder}
-        className="h-8 w-full rounded-md border border-gray-200 bg-white px-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
+        className="h-8 w-full rounded-md border border-outline-variant bg-surface px-2.5 text-sm text-on-surface placeholder:text-outline transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
       />
       {open && filtered.length > 0 && (
-        <ul className="absolute z-50 mt-1 max-h-44 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+        <ul className="absolute z-50 mt-1 max-h-44 w-full overflow-y-auto rounded-lg border border-outline-variant bg-surface shadow-lg">
           {filtered.map((o) => (
             <li key={o}>
               <button
@@ -234,7 +234,7 @@ function ComboInput({ value, onChange, options, placeholder }: {
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50"
                 onMouseDown={(e) => { e.preventDefault(); onChange(o); setOpen(false) }}
               >
-                <span className="text-gray-700">{o}</span>
+                <span className="text-on-surface-variant">{o}</span>
               </button>
             </li>
           ))}
@@ -1663,8 +1663,8 @@ export default function RepairsPage() {
       {
         id: 'assigned_to', header: 'Fitter', cell: ({ row }: { row: { original: RepairRow } }) => {
           const e = row.original.employees
-          if (!e) return <span className="text-gray-400">Unassigned</span>
-          return <span className="text-xs text-gray-700">{e.first_name} {e.last_name ?? ''}</span>
+          if (!e) return <span className="text-outline">Unassigned</span>
+          return <span className="text-xs text-on-surface-variant">{e.first_name} {e.last_name ?? ''}</span>
         }
       },
     ] as ColumnDef<RepairRow>[] : [
@@ -1682,7 +1682,7 @@ export default function RepairsPage() {
       accessorKey: 'issue', header: 'Fault', size: 180,
       cell: ({ getValue }) => {
         const v = getValue() as string
-        if (!v || v.toLowerCase() === 'not specified') return <span className="text-gray-400">—</span>
+        if (!v || v.toLowerCase() === 'not specified') return <span className="text-outline">—</span>
         return (
           <span className="inline-block max-w-[170px] rounded-lg bg-violet-100 px-2.5 py-1 text-xs font-semibold leading-snug text-violet-800 break-words whitespace-normal">
             {v}
@@ -1734,10 +1734,10 @@ export default function RepairsPage() {
         const spansDays = !!end && s.toDateString() !== end.toDateString()
         return (
           <div className="text-[11px] leading-tight">
-            <div className="font-semibold text-gray-900">
+            <div className="font-semibold text-on-surface">
               {spansDays ? `${date(s)} – ${date(end!)}` : date(s)}
             </div>
-            <div className="text-gray-500">{time(s)}{end ? `–${time(end)}` : ''}</div>
+            <div className="text-on-surface-variant">{time(s)}{end ? `–${time(end)}` : ''}</div>
           </div>
         )
       }
@@ -1748,10 +1748,10 @@ export default function RepairsPage() {
         const d = new Date(cf.due_date)
         return (
           <div className="text-[11px] leading-tight">
-            <div className="font-semibold text-gray-900">
+            <div className="font-semibold text-on-surface">
               {d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
             </div>
-            <div className="text-gray-500">{d.getFullYear()}</div>
+            <div className="text-on-surface-variant">{d.getFullYear()}</div>
           </div>
         )
       }
@@ -1780,9 +1780,9 @@ export default function RepairsPage() {
         const styles: Record<string, string> = {
           Paid: 'bg-green-100 text-green-700',
           Partial: 'bg-amber-100 text-amber-700',
-          Unpaid: 'bg-gray-100 text-gray-500',
+          Unpaid: 'bg-surface-container text-on-surface-variant',
         }
-        const item = 'flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors'
+        const item = 'flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-xs text-on-surface-variant hover:bg-surface-container-low focus:outline-none transition-colors'
         return (
           <DropdownMenu.Root>
             {/* Unpaid is one-click (writes deposit_paid to zero). Partial needs
@@ -1800,7 +1800,7 @@ export default function RepairsPage() {
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
               <DropdownMenu.Content
-                className="z-50 w-32 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden p-0 animate-in fade-in zoom-in-95 duration-100"
+                className="z-50 w-32 rounded-lg border border-outline-variant bg-surface shadow-lg overflow-hidden p-0 animate-in fade-in zoom-in-95 duration-100"
                 sideOffset={5}
                 align="start"
                 onClick={(e) => e.stopPropagation()}
@@ -1818,7 +1818,7 @@ export default function RepairsPage() {
                   </DropdownMenu.SubTrigger>
                   <DropdownMenu.Portal>
                     <DropdownMenu.SubContent
-                      className="z-50 w-28 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden p-0 animate-in fade-in zoom-in-95 duration-100"
+                      className="z-50 w-28 rounded-lg border border-outline-variant bg-surface shadow-lg overflow-hidden p-0 animate-in fade-in zoom-in-95 duration-100"
                       sideOffset={2}
                     >
                       <DropdownMenu.Item className={item} onSelect={() => handlePaymentStatusChange(r.id, 'Paid', total, paid, 'cash')}>
@@ -1841,10 +1841,10 @@ export default function RepairsPage() {
         const d = new Date(getValue() as string)
         return (
           <div className="text-[11px] leading-tight">
-            <div className="font-semibold text-gray-900 whitespace-nowrap">
+            <div className="font-semibold text-on-surface whitespace-nowrap">
               {d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
             </div>
-            <div className="text-gray-500">
+            <div className="text-on-surface-variant">
               {d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>
@@ -2146,7 +2146,7 @@ export default function RepairsPage() {
           <button
             onClick={() => fetchRepairs()}
             disabled={repairsFetching}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 hover:border-gray-300 hover:text-gray-900 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-medium text-on-surface-variant hover:border-outline hover:text-on-surface transition-colors disabled:opacity-50"
             title="Refresh repairs"
           >
             <RefreshCw className={`h-4 w-4 ${repairsFetching ? 'animate-spin' : ''}`} />
@@ -2162,13 +2162,13 @@ export default function RepairsPage() {
       {view === 'list' && (
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
             <input
               type="search"
               placeholder="Search by job #, device, email or phone..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(0) }}
-              className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
+              className="h-9 w-full rounded-lg border border-outline bg-surface pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
             />
           </div>
           <Select
@@ -2182,7 +2182,7 @@ export default function RepairsPage() {
             className="w-40"
           />
 
-          <div className="h-6 w-px bg-gray-200 mx-1" />
+          <div className="h-6 w-px bg-surface-container-high mx-1" />
 
           <button
             onClick={() => exportCSV(repairs)}
@@ -2211,15 +2211,15 @@ export default function RepairsPage() {
             </button>
             {colMenuOpen && (
               <div className="absolute left-0 top-full z-20 mt-1 w-48 rounded-xl border border-gray-700 bg-gray-900 py-2 shadow-xl">
-                <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-500">Toggle columns</p>
+                <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant">Toggle columns</p>
                 {TOGGLEABLE_COLS.map((key) => {
                   const isCustomerDetail = key === 'customer_phone' || key === 'customer_email'
                   const checked = effectiveColVisibility[key] !== false
                   return (
-                    <label key={key} className={`flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-xs text-gray-200 hover:bg-gray-800 transition-colors ${isCustomerDetail ? 'pl-6' : ''}`}>
-                      <span className={isCustomerDetail ? 'text-gray-400' : ''}>{isCustomerDetail ? '↳ ' : ''}{COL_LABELS[key]}</span>
+                    <label key={key} className={`flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 transition-colors ${isCustomerDetail ? 'pl-6' : ''}`}>
+                      <span className={isCustomerDetail ? 'text-outline' : ''}>{isCustomerDetail ? '↳ ' : ''}{COL_LABELS[key]}</span>
                       <span className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${checked ? 'bg-teal-500' : 'bg-gray-600'}`}>
-                        <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                        <span className={`inline-block h-3 w-3 transform rounded-full bg-surface shadow transition-transform ${checked ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
                         <input
                           type="checkbox"
                           className="absolute inset-0 opacity-0 cursor-pointer"
@@ -2254,7 +2254,7 @@ export default function RepairsPage() {
           {loading ? (
             <div className="flex gap-3">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-64 w-60 shrink-0 animate-pulse rounded-lg bg-gray-100" />
+                <div key={i} className="h-64 w-60 shrink-0 animate-pulse rounded-lg bg-surface-container" />
               ))}
             </div>
           ) : (
@@ -2279,13 +2279,13 @@ export default function RepairsPage() {
         <div className="mb-5 flex items-center gap-2">
           {[1, 2].map((s) => (
             <div key={s} className="flex items-center gap-2">
-              <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${modalStep === s ? 'bg-gray-900 text-white' : modalStep > s ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
+              <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${modalStep === s ? 'bg-gray-900 text-white' : modalStep > s ? 'bg-green-500 text-white' : 'bg-surface-container-high text-on-surface-variant'}`}>
                 {s}
               </div>
-              <span className={`text-sm font-medium ${modalStep === s ? 'text-gray-900' : 'text-gray-400'}`}>
+              <span className={`text-sm font-medium ${modalStep === s ? 'text-on-surface' : 'text-outline'}`}>
                 {s === 1 ? 'Customer' : 'Job Details'}
               </span>
-              {s < 2 && <div className="mx-1 h-px w-8 bg-gray-200" />}
+              {s < 2 && <div className="mx-1 h-px w-8 bg-surface-container-high" />}
             </div>
           ))}
         </div>
@@ -2321,7 +2321,7 @@ export default function RepairsPage() {
             <div className="grid grid-cols-2 gap-3">
               {/* Customer Name — autocomplete on type */}
               <div className="relative">
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
                   Customer Name <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -2336,31 +2336,31 @@ export default function RepairsPage() {
                   placeholder="Enter Customer Name"
                   className={`h-9 w-full rounded-lg border px-3 text-sm transition focus:outline-none focus:ring-2 ${
                     selectedCustomer
-                      ? 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed'
-                      : 'border-gray-300 focus:border-gray-900 focus:ring-gray-900/10'
+                      ? 'border-outline-variant bg-surface-container-low text-on-surface-variant cursor-not-allowed'
+                      : 'border-outline focus:border-on-surface focus:ring-on-surface/10'
                   }`}
                 />
                 {custSearchLoading && showSuggestions === null && newCust.first_name.length >= 2 && (
-                  <div className="absolute right-3 top-8 h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
+                  <div className="absolute right-3 top-8 h-4 w-4 animate-spin rounded-full border-2 border-outline border-t-transparent" />
                 )}
                 {showSuggestions === 'name' && custSuggestions.length > 0 && (
-                  <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+                  <div className="absolute z-50 mt-1 w-full rounded-lg border border-outline-variant bg-surface shadow-lg">
                     <ul className="max-h-52 overflow-y-auto py-1">
                       {custSuggestions.map((c) => (
                         <li key={c.id}>
                           <button
                             type="button"
                             onMouseDown={(e) => { e.preventDefault(); handleCustSuggestionSelect(c) }}
-                            className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-gray-50 transition-colors"
+                            className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-surface-container-low transition-colors"
                           >
-                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600">
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-xs font-bold text-on-surface-variant">
                               {c.first_name.charAt(0).toUpperCase()}
                             </div>
                             <div className="min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">
+                              <p className="text-sm font-medium text-on-surface truncate">
                                 {c.first_name} {c.last_name ?? ''}
                               </p>
-                              <p className="text-xs text-gray-500 truncate">{c.phone ?? c.email ?? ''}</p>
+                              <p className="text-xs text-on-surface-variant truncate">{c.phone ?? c.email ?? ''}</p>
                             </div>
                           </button>
                         </li>
@@ -2372,7 +2372,7 @@ export default function RepairsPage() {
 
               {/* Email */}
               <div className="relative">
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Customer Email</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Customer Email</label>
                 <input
                   type="email"
                   readOnly={!!selectedCustomer}
@@ -2386,28 +2386,28 @@ export default function RepairsPage() {
                   placeholder="Enter Customer Email"
                   className={`h-9 w-full rounded-lg border px-3 text-sm transition focus:outline-none focus:ring-2 ${
                     selectedCustomer
-                      ? 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed'
-                      : 'border-gray-300 focus:border-gray-900 focus:ring-gray-900/10'
+                      ? 'border-outline-variant bg-surface-container-low text-on-surface-variant cursor-not-allowed'
+                      : 'border-outline focus:border-on-surface focus:ring-on-surface/10'
                   }`}
                 />
                 {showSuggestions === 'email' && custSuggestions.length > 0 && (
-                  <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+                  <div className="absolute z-50 mt-1 w-full rounded-lg border border-outline-variant bg-surface shadow-lg">
                     <ul className="max-h-52 overflow-y-auto py-1">
                       {custSuggestions.map((c) => (
                         <li key={c.id}>
                           <button
                             type="button"
                             onMouseDown={(e) => { e.preventDefault(); handleCustSuggestionSelect(c) }}
-                            className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-gray-50 transition-colors"
+                            className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-surface-container-low transition-colors"
                           >
-                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600">
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-xs font-bold text-on-surface-variant">
                               {c.first_name.charAt(0).toUpperCase()}
                             </div>
                             <div className="min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">
+                              <p className="text-sm font-medium text-on-surface truncate">
                                 {c.first_name} {c.last_name ?? ''}
                               </p>
-                              <p className="text-xs text-gray-500 truncate">{c.email ?? c.phone ?? ''}</p>
+                              <p className="text-xs text-on-surface-variant truncate">{c.email ?? c.phone ?? ''}</p>
                             </div>
                           </button>
                         </li>
@@ -2422,7 +2422,7 @@ export default function RepairsPage() {
             <div className="grid grid-cols-2 gap-3">
               {/* Business Name */}
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Business Name</label>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Business Name</label>
                 <input
                   readOnly={!!selectedCustomer}
                   value={newCust.business_name}
@@ -2430,15 +2430,15 @@ export default function RepairsPage() {
                   placeholder="Enter Business Name"
                   className={`h-9 w-full rounded-lg border px-3 text-sm transition focus:outline-none focus:ring-2 ${
                     selectedCustomer
-                      ? 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed'
-                      : 'border-gray-300 focus:border-gray-900 focus:ring-gray-900/10'
+                      ? 'border-outline-variant bg-surface-container-low text-on-surface-variant cursor-not-allowed'
+                      : 'border-outline focus:border-on-surface focus:ring-on-surface/10'
                   }`}
                 />
               </div>
 
               {/* Phone Number — autocomplete on type */}
               <div className="relative">
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
                   Phone Number
                 </label>
                 <input
@@ -2460,33 +2460,33 @@ export default function RepairsPage() {
                   maxLength={20}
                   className={`h-9 w-full rounded-lg border px-3 text-sm transition focus:outline-none focus:ring-2 ${
                     selectedCustomer
-                      ? 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed'
+                      ? 'border-outline-variant bg-surface-container-low text-on-surface-variant cursor-not-allowed'
                       : phoneError
                         ? 'border-red-400 focus:border-red-400 focus:ring-red-400/20'
-                        : 'border-gray-300 focus:border-gray-900 focus:ring-gray-900/10'
+                        : 'border-outline focus:border-on-surface focus:ring-on-surface/10'
                   }`}
                 />
                 {phoneError && !selectedCustomer && (
                   <p className="mt-1 text-xs text-red-500">{phoneError}</p>
                 )}
                 {showSuggestions === 'phone' && custSuggestions.length > 0 && (
-                  <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+                  <div className="absolute z-50 mt-1 w-full rounded-lg border border-outline-variant bg-surface shadow-lg">
                     <ul className="max-h-52 overflow-y-auto py-1">
                       {custSuggestions.map((c) => (
                         <li key={c.id}>
                           <button
                             type="button"
                             onMouseDown={(e) => { e.preventDefault(); handleCustSuggestionSelect(c) }}
-                            className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-gray-50 transition-colors"
+                            className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-surface-container-low transition-colors"
                           >
-                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-600">
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-container-high text-xs font-bold text-on-surface-variant">
                               {c.first_name.charAt(0).toUpperCase()}
                             </div>
                             <div className="min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">
+                              <p className="text-sm font-medium text-on-surface truncate">
                                 {c.first_name} {c.last_name ?? ''}
                               </p>
-                              <p className="text-xs text-gray-500 truncate">{c.phone ?? c.email ?? ''}</p>
+                              <p className="text-xs text-on-surface-variant truncate">{c.phone ?? c.email ?? ''}</p>
                             </div>
                           </button>
                         </li>
@@ -2499,7 +2499,7 @@ export default function RepairsPage() {
 
             {/* Address — full width */}
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Customer Address</label>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Customer Address</label>
               <textarea
                 rows={2}
                 readOnly={!!selectedCustomer}
@@ -2508,8 +2508,8 @@ export default function RepairsPage() {
                 placeholder="Enter Customer Address"
                 className={`w-full rounded-lg border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 resize-none ${
                   selectedCustomer
-                    ? 'border-gray-200 bg-gray-50 text-gray-600 cursor-not-allowed'
-                    : 'border-gray-300 focus:border-gray-900 focus:ring-gray-900/10'
+                    ? 'border-outline-variant bg-surface-container-low text-on-surface-variant cursor-not-allowed'
+                    : 'border-outline focus:border-on-surface focus:ring-on-surface/10'
                 }`}
               />
             </div>
@@ -2518,7 +2518,7 @@ export default function RepairsPage() {
               <p className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-600">{step1Error}</p>
             )}
 
-            <div className="flex justify-end gap-2 border-t border-gray-100 pt-3">
+            <div className="flex justify-end gap-2 border-t border-outline-variant pt-3">
               <Button variant="outline" onClick={() => setModalOpen(false)}>Close</Button>
               <Button onClick={goToStep2}>Next →</Button>
             </div>
@@ -2560,7 +2560,7 @@ export default function RepairsPage() {
             : (parseFloat(jobData.discount_value) || 0)
           const remaining = (parseFloat(jobData.estimated_cost) || 0) - Math.max(0, jobDiscountAmount) - (parseFloat(jobData.deposit_paid) || 0)
           const pricePending = jobData.price_pending
-          const inp = 'h-8 w-full rounded-md border-2 border-gray-200 bg-white px-2.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20'
+          const inp = 'h-8 w-full rounded-md border-2 border-outline-variant bg-surface px-2.5 text-sm text-on-surface placeholder:text-outline transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20'
           const sel = `${inp} appearance-none`
           const lbl = 'mb-0.5 block text-[11px] font-bold uppercase tracking-wide text-brand-teal'
 
@@ -2588,7 +2588,7 @@ export default function RepairsPage() {
                         value={jobData.location_notes}
                         onChange={(e) => setJobData((p) => ({ ...p, location_notes: e.target.value }))}
                         placeholder="e.g. M25 Junction 10, northbound hard shoulder"
-                        className="w-full rounded-md border-2 border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20 resize-none"
+                        className="w-full rounded-md border-2 border-outline-variant bg-surface px-2.5 py-1.5 text-sm text-on-surface placeholder:text-outline transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20 resize-none"
                       />
                     </div>
                   </div>
@@ -2688,7 +2688,7 @@ export default function RepairsPage() {
                     <div>
                       <label className={`${lbl} flex items-center gap-1`}>
                         Brand <span className="text-red-400">*</span>
-                        {!jobData.device_type && <Lock className="h-2.5 w-2.5 text-gray-300" />}
+                        {!jobData.device_type && <Lock className="h-2.5 w-2.5 text-outline-variant" />}
                       </label>
                       {jobData.device_type ? (
                         <CreatableCombobox
@@ -2702,7 +2702,7 @@ export default function RepairsPage() {
                           createLabel="Add brand"
                         />
                       ) : (
-                        <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                        <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-sm text-outline-variant select-none">
                           <Lock className="h-3.5 w-3.5 shrink-0" />
                           Select type first
                         </div>
@@ -2713,7 +2713,7 @@ export default function RepairsPage() {
                     <div>
                       <label className={`${lbl} flex items-center gap-1`}>
                         Model <span className="text-red-400">*</span>
-                        {!jobData.device_brand && <Lock className="h-2.5 w-2.5 text-gray-300" />}
+                        {!jobData.device_brand && <Lock className="h-2.5 w-2.5 text-outline-variant" />}
                       </label>
                       {jobData.device_brand ? (
                         <CreatableCombobox
@@ -2727,7 +2727,7 @@ export default function RepairsPage() {
                           createLabel="Add model"
                         />
                       ) : (
-                        <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 text-sm text-gray-300 select-none">
+                        <div className="flex h-9 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-sm text-outline-variant select-none">
                           <Lock className="h-3.5 w-3.5 shrink-0" />
                           Select brand first
                         </div>
@@ -2747,7 +2747,7 @@ export default function RepairsPage() {
                 )}
               </div>
 
-              <div className="h-px bg-gray-100" />
+              <div className="h-px bg-surface-container" />
 
               {/* REPAIR PARTS */}
               <div>
@@ -2775,7 +2775,7 @@ export default function RepairsPage() {
                       <button
                         type="button"
                         onClick={() => setShowNewTyre((v) => !v)}
-                        className="flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:border-brand-teal hover:bg-teal-50 hover:text-brand-teal transition-colors"
+                        className="flex items-center gap-1 rounded-full border border-dashed border-outline px-2.5 py-1 text-xs font-medium text-on-surface-variant hover:border-brand-teal hover:bg-teal-50 hover:text-brand-teal transition-colors"
                       >
                         <Plus className="h-3 w-3" /> Tyre Size
                       </button>
@@ -2784,7 +2784,7 @@ export default function RepairsPage() {
                           key={name}
                           type="button"
                           onClick={() => addPresetExtra(name)}
-                          className="flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-600 hover:border-brand-teal hover:bg-teal-50 hover:text-brand-teal transition-colors"
+                          className="flex items-center gap-1 rounded-full border border-dashed border-outline px-2.5 py-1 text-xs font-medium text-on-surface-variant hover:border-brand-teal hover:bg-teal-50 hover:text-brand-teal transition-colors"
                         >
                           <Plus className="h-3 w-3" /> {name}
                         </button>
@@ -2799,9 +2799,9 @@ export default function RepairsPage() {
                       </button>
                     </div>
                     {showCustomExtra && (
-                      <div className="flex items-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2">
+                      <div className="flex items-end gap-2 rounded-lg border border-outline-variant bg-surface-container-low p-2">
                         <div className="flex-1">
-                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">Extra Name</label>
+                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-outline">Extra Name</label>
                           <input
                             autoFocus
                             type="text"
@@ -2809,22 +2809,22 @@ export default function RepairsPage() {
                             onChange={(e) => setCustomExtraName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && addCustomExtra()}
                             placeholder="e.g. Puncture Repair"
-                            className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-brand-teal focus:outline-none"
+                            className="h-8 w-full rounded-md border border-outline bg-surface px-2 text-sm focus:border-brand-teal focus:outline-none"
                           />
                         </div>
                         <div className="w-28">
-                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">Tyre Size</label>
+                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-outline">Tyre Size</label>
                           <input
                             type="text"
                             value={customExtraTyreSize}
                             onChange={(e) => setCustomExtraTyreSize(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && addCustomExtra()}
                             placeholder="205/55R16"
-                            className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-brand-teal focus:outline-none"
+                            className="h-8 w-full rounded-md border border-outline bg-surface px-2 text-sm focus:border-brand-teal focus:outline-none"
                           />
                         </div>
                         <div className="w-24">
-                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">Price {getCurrencySymbol()}</label>
+                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-outline">Price {getCurrencySymbol()}</label>
                           <input
                             type="number"
                             step="0.01"
@@ -2833,7 +2833,7 @@ export default function RepairsPage() {
                             onChange={(e) => setCustomExtraPrice(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && addCustomExtra()}
                             placeholder="0.00"
-                            className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-brand-teal focus:outline-none"
+                            className="h-8 w-full rounded-md border border-outline bg-surface px-2 text-sm focus:border-brand-teal focus:outline-none"
                           />
                         </div>
                         <button
@@ -2847,16 +2847,16 @@ export default function RepairsPage() {
                         <button
                           type="button"
                           onClick={() => { setShowCustomExtra(false); setCustomExtraName(''); setCustomExtraPrice(''); setCustomExtraTyreSize('') }}
-                          className="h-8 w-8 shrink-0 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 flex items-center justify-center"
+                          className="h-8 w-8 shrink-0 rounded-md text-outline hover:bg-surface-container hover:text-on-surface-variant flex items-center justify-center"
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     )}
                     {showNewTyre && (
-                      <div className="flex items-end gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2">
+                      <div className="flex items-end gap-2 rounded-lg border border-outline-variant bg-surface-container-low p-2">
                         <div className="flex-1">
-                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">Tyre Size <span className="text-red-400">*</span></label>
+                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-outline">Tyre Size <span className="text-red-400">*</span></label>
                           <input
                             autoFocus
                             type="text"
@@ -2864,11 +2864,11 @@ export default function RepairsPage() {
                             onChange={(e) => setNewTyreSize(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && addNewTyre()}
                             placeholder="e.g. 205/55R16"
-                            className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-brand-teal focus:outline-none"
+                            className="h-8 w-full rounded-md border border-outline bg-surface px-2 text-sm focus:border-brand-teal focus:outline-none"
                           />
                         </div>
                         <div className="w-24">
-                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-gray-400">Price {getCurrencySymbol()}</label>
+                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-outline">Price {getCurrencySymbol()}</label>
                           <input
                             type="number"
                             step="0.01"
@@ -2877,7 +2877,7 @@ export default function RepairsPage() {
                             onChange={(e) => setNewTyrePrice(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && addNewTyre()}
                             placeholder="0.00"
-                            className="h-8 w-full rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-brand-teal focus:outline-none"
+                            className="h-8 w-full rounded-md border border-outline bg-surface px-2 text-sm focus:border-brand-teal focus:outline-none"
                           />
                         </div>
                         <button
@@ -2891,7 +2891,7 @@ export default function RepairsPage() {
                         <button
                           type="button"
                           onClick={() => { setShowNewTyre(false); setNewTyreSize(''); setNewTyrePrice('') }}
-                          className="h-8 w-8 shrink-0 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 flex items-center justify-center"
+                          className="h-8 w-8 shrink-0 rounded-md text-outline hover:bg-surface-container hover:text-on-surface-variant flex items-center justify-center"
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
@@ -2904,7 +2904,7 @@ export default function RepairsPage() {
                 <div className="relative" ref={partDropRef}>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
-                      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-outline" />
                       <input
                         value={partQuery}
                         onChange={(e) => { setPartQuery(e.target.value); searchParts(e.target.value) }}
@@ -2914,7 +2914,7 @@ export default function RepairsPage() {
                         disabled={isTyreShop ? !selectedVehicle : !jobData.device_model}
                       />
                       {partSearchLoading && (
-                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-transparent" />
+                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin rounded-full border-2 border-outline border-t-transparent" />
                       )}
                     </div>
                     {isTyreShop && (
@@ -2931,21 +2931,21 @@ export default function RepairsPage() {
                   </div>
 
                   {showPartDrop && (
-                    <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+                    <div className="absolute z-50 mt-1 w-full rounded-lg border border-outline-variant bg-surface shadow-lg">
                       {variantsFor ? (
                         <div>
                           <button
                             type="button"
                             onMouseDown={(e) => { e.preventDefault(); setVariantsFor(null); setVariantOptions([]) }}
-                            className="flex w-full items-center gap-1 border-b border-gray-100 px-3 py-2 text-left text-xs font-semibold text-gray-500 hover:text-gray-700"
+                            className="flex w-full items-center gap-1 border-b border-outline-variant px-3 py-2 text-left text-xs font-semibold text-on-surface-variant hover:text-on-surface-variant"
                           >
                             <ChevronLeft className="h-3.5 w-3.5" /> {variantsFor.name} — select variant
                           </button>
                           <ul className="max-h-44 overflow-y-auto py-1">
                             {variantsLoading ? (
-                              <li className="px-3 py-2 text-xs italic text-gray-400">Loading variants…</li>
+                              <li className="px-3 py-2 text-xs italic text-outline">Loading variants…</li>
                             ) : variantOptions.length === 0 ? (
-                              <li className="px-3 py-2 text-xs italic text-gray-400">No variants found</li>
+                              <li className="px-3 py-2 text-xs italic text-outline">No variants found</li>
                             ) : (
                               variantOptions.map((v) => (
                                 <li key={v.id}>
@@ -2954,8 +2954,8 @@ export default function RepairsPage() {
                                     className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
                                     onMouseDown={(e) => { e.preventDefault(); addPartFromInventory(variantsFor, v) }}
                                   >
-                                    <span className="min-w-0 flex-1 truncate text-gray-700">{v.name}</span>
-                                    <span className={`shrink-0 text-xs font-medium ${(v.stock ?? 0) > 0 ? 'text-gray-400' : 'text-red-500'}`}>
+                                    <span className="min-w-0 flex-1 truncate text-on-surface-variant">{v.name}</span>
+                                    <span className={`shrink-0 text-xs font-medium ${(v.stock ?? 0) > 0 ? 'text-outline' : 'text-red-500'}`}>
                                       {(v.stock ?? 0) > 0 ? `${v.stock} in stock` : 'Out of stock'}
                                     </span>
                                     <span className="shrink-0 text-xs font-semibold text-teal-700">{formatCurrency(v.selling_price ?? 0)}</span>
@@ -2974,13 +2974,13 @@ export default function RepairsPage() {
                               className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
                               onMouseDown={(e) => { e.preventDefault(); if (p.has_variants) loadPartVariants(p); else addPartFromInventory(p) }}
                             >
-                              <span className="min-w-0 flex-1 truncate text-gray-700">{p.name}</span>
+                              <span className="min-w-0 flex-1 truncate text-on-surface-variant">{p.name}</span>
                               {p.has_variants ? (
                                 <span className="shrink-0 text-xs font-semibold text-brand-teal">Select variant →</span>
                               ) : (
                                 <>
                                   {!p.is_service && (
-                                    <span className={`shrink-0 text-xs font-medium ${(p.on_hand ?? 0) > 0 ? 'text-gray-400' : 'text-red-500'}`}>
+                                    <span className={`shrink-0 text-xs font-medium ${(p.on_hand ?? 0) > 0 ? 'text-outline' : 'text-red-500'}`}>
                                       {(p.on_hand ?? 0) > 0 ? `${p.on_hand} in stock` : 'Out of stock'}
                                     </span>
                                   )}
@@ -2991,25 +2991,25 @@ export default function RepairsPage() {
                           </li>
                         ))}
                         {partQuery.trim() && (
-                          <li className="border-t border-gray-100">
+                          <li className="border-t border-outline-variant">
                             <div className="flex flex-col gap-1.5 px-3 py-2">
-                              <span className="text-xs italic text-gray-500">Add &quot;{partQuery.trim()}&quot;</span>
+                              <span className="text-xs italic text-on-surface-variant">Add &quot;{partQuery.trim()}&quot;</span>
                               {isTyreShop && (
                                 <div className="flex flex-col gap-0.5">
-                                  <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Tyre Size</span>
+                                  <span className="text-[10px] font-medium text-outline uppercase tracking-wide">Tyre Size</span>
                                   <input
                                     type="text"
                                     value={quickPartTyreSize}
                                     onChange={(e) => setQuickPartTyreSize(e.target.value)}
                                     placeholder="e.g. 205/55R16"
-                                    className="h-7 w-full rounded border border-gray-200 bg-gray-50 px-2 text-xs text-gray-900"
+                                    className="h-7 w-full rounded border border-outline-variant bg-surface-container-low px-2 text-xs text-on-surface"
                                     onMouseDown={(e) => e.stopPropagation()}
                                   />
                                 </div>
                               )}
                               <div className="flex items-center gap-2">
                                 <div className="flex flex-1 flex-col gap-0.5">
-                                  <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Cost {getCurrencySymbol()}</span>
+                                  <span className="text-[10px] font-medium text-outline uppercase tracking-wide">Cost {getCurrencySymbol()}</span>
                                   <input
                                     type="number"
                                     step="0.01"
@@ -3017,12 +3017,12 @@ export default function RepairsPage() {
                                     value={quickPartCost}
                                     onChange={(e) => setQuickPartCost(e.target.value)}
                                     placeholder="0.00"
-                                    className="h-7 w-full rounded border border-gray-200 bg-gray-50 px-2 text-xs text-gray-900"
+                                    className="h-7 w-full rounded border border-outline-variant bg-surface-container-low px-2 text-xs text-on-surface"
                                     onMouseDown={(e) => e.stopPropagation()}
                                   />
                                 </div>
                                 <div className="flex flex-1 flex-col gap-0.5">
-                                  <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">Price {getCurrencySymbol()}</span>
+                                  <span className="text-[10px] font-medium text-outline uppercase tracking-wide">Price {getCurrencySymbol()}</span>
                                   <input
                                     type="number"
                                     step="0.01"
@@ -3030,7 +3030,7 @@ export default function RepairsPage() {
                                     value={quickPartPrice}
                                     onChange={(e) => setQuickPartPrice(e.target.value)}
                                     placeholder="0.00"
-                                    className="h-7 w-full rounded border border-gray-300 px-2 text-xs text-gray-900"
+                                    className="h-7 w-full rounded border border-outline px-2 text-xs text-on-surface"
                                     onMouseDown={(e) => e.stopPropagation()}
                                   />
                                 </div>
@@ -3046,7 +3046,7 @@ export default function RepairsPage() {
                           </li>
                         )}
                         {partResults.length === 0 && !partSearchLoading && (
-                          <li className="px-3 py-2 text-xs italic text-gray-400">
+                          <li className="px-3 py-2 text-xs italic text-outline">
                             {partQuery.trim() ? 'No inventory parts found — use quick-add above.' : 'Type to search parts…'}
                           </li>
                         )}
@@ -3058,13 +3058,13 @@ export default function RepairsPage() {
 
                 {/* Parts line items table */}
                 {repairParts.length > 0 && (
-                  <div className="mt-2 overflow-hidden rounded-lg border border-gray-200">
+                  <div className="mt-2 overflow-hidden rounded-lg border border-outline-variant">
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="bg-gray-50 font-semibold text-gray-500">
+                        <tr className="bg-surface-container-low font-semibold text-on-surface-variant">
                           <th className="px-3 py-1.5 text-left">Part</th>
                           <th className="w-16 px-2 py-1.5 text-center">Qty</th>
-                          <th className="w-20 px-2 py-1.5 text-right text-gray-400">Cost {getCurrencySymbol()}</th>
+                          <th className="w-20 px-2 py-1.5 text-right text-outline">Cost {getCurrencySymbol()}</th>
                           <th className="w-20 px-2 py-1.5 text-right">Price {getCurrencySymbol()}</th>
                           <th className="w-24 px-2 py-1.5 text-right">Discount</th>
                           <th className="w-20 px-2 py-1.5 text-right">Total</th>
@@ -3073,8 +3073,8 @@ export default function RepairsPage() {
                       </thead>
                       <tbody>
                         {repairParts.map((p) => (
-                          <tr key={p.tempId} className="border-t border-gray-100">
-                            <td className="px-3 py-1.5 text-gray-700">{p.name}</td>
+                          <tr key={p.tempId} className="border-t border-outline-variant">
+                            <td className="px-3 py-1.5 text-on-surface-variant">{p.name}</td>
                             <td className="px-2 py-1.5 text-center">
                               <input
                                 type="number"
@@ -3088,7 +3088,7 @@ export default function RepairsPage() {
                                   if (requested > cap) toast.error(`Only ${cap} in stock for "${r.name}"`)
                                   return { ...r, qty: Math.min(requested, cap) }
                                 }))}
-                                className="h-6 w-12 rounded border border-gray-200 px-1 text-center text-xs"
+                                className="h-6 w-12 rounded border border-outline-variant px-1 text-center text-xs"
                               />
                             </td>
                             <td className="px-2 py-1.5 text-right">
@@ -3098,7 +3098,7 @@ export default function RepairsPage() {
                                 min="0"
                                 value={p.unit_cost}
                                 onChange={(e) => setRepairParts((prev) => prev.map((r) => r.tempId === p.tempId ? { ...r, unit_cost: parseFloat(e.target.value) || 0 } : r))}
-                                className="h-6 w-16 rounded border border-gray-100 bg-gray-50 px-1 text-right text-xs text-gray-500"
+                                className="h-6 w-16 rounded border border-outline-variant bg-surface-container-low px-1 text-right text-xs text-on-surface-variant"
                               />
                             </td>
                             <td className="px-2 py-1.5 text-right">
@@ -3108,7 +3108,7 @@ export default function RepairsPage() {
                                 min="0"
                                 value={p.unit_price}
                                 onChange={(e) => setRepairParts((prev) => prev.map((r) => r.tempId === p.tempId ? { ...r, unit_price: parseFloat(e.target.value) || 0 } : r))}
-                                className="h-6 w-16 rounded border border-gray-200 px-1 text-right text-xs"
+                                className="h-6 w-16 rounded border border-outline-variant px-1 text-right text-xs"
                               />
                             </td>
                             <td className="px-2 py-1.5 text-right">
@@ -3119,19 +3119,19 @@ export default function RepairsPage() {
                                   min="0"
                                   value={p.discount_value}
                                   onChange={(e) => setRepairParts((prev) => prev.map((r) => r.tempId === p.tempId ? { ...r, discount_value: parseFloat(e.target.value) || 0 } : r))}
-                                  className="h-6 w-14 rounded border border-gray-200 px-1 text-right text-xs"
+                                  className="h-6 w-14 rounded border border-outline-variant px-1 text-right text-xs"
                                 />
                                 <button
                                   type="button"
                                   onClick={() => setRepairParts((prev) => prev.map((r) => r.tempId === p.tempId ? { ...r, discount_type: r.discount_type === 'percent' ? 'fixed' : 'percent' } : r))}
                                   title={p.discount_type === 'percent' ? 'Switch to fixed amount' : 'Switch to percentage'}
-                                  className="h-6 w-6 shrink-0 rounded border border-gray-200 text-[10px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                                  className="h-6 w-6 shrink-0 rounded border border-outline-variant text-[10px] font-semibold text-on-surface-variant hover:bg-surface-container-low transition-colors"
                                 >
                                   {p.discount_type === 'percent' ? '%' : getCurrencySymbol()}
                                 </button>
                               </div>
                             </td>
-                            <td className="px-2 py-1.5 text-right font-semibold text-gray-700">{formatCurrency(lineNetTotal(p.qty, p.unit_price, p.discount_type, p.discount_value))}</td>
+                            <td className="px-2 py-1.5 text-right font-semibold text-on-surface-variant">{formatCurrency(lineNetTotal(p.qty, p.unit_price, p.discount_type, p.discount_value))}</td>
                             <td className="px-1 py-1.5 text-center">
                               <button
                                 type="button"
@@ -3145,9 +3145,9 @@ export default function RepairsPage() {
                         ))}
                       </tbody>
                       <tfoot>
-                        <tr className="border-t border-gray-200 bg-gray-50">
-                          <td colSpan={5} className="px-3 py-1.5 text-right text-xs font-bold text-gray-600">Parts Total:</td>
-                          <td className="px-2 py-1.5 text-right text-xs font-bold text-gray-900">
+                        <tr className="border-t border-outline-variant bg-surface-container-low">
+                          <td colSpan={5} className="px-3 py-1.5 text-right text-xs font-bold text-on-surface-variant">Parts Total:</td>
+                          <td className="px-2 py-1.5 text-right text-xs font-bold text-on-surface">
                             {formatCurrency(repairParts.reduce((s, p) => s + lineNetTotal(p.qty, p.unit_price, p.discount_type, p.discount_value), 0))}
                           </td>
                           <td />
@@ -3158,7 +3158,7 @@ export default function RepairsPage() {
                 )}
               </div>
 
-              <div className="h-px bg-gray-100" />
+              <div className="h-px bg-surface-container" />
 
               {/* Row B: Fault | Due Date | Status | Assigned To */}
               <div>
@@ -3214,7 +3214,7 @@ export default function RepairsPage() {
                 </div>
               </div>
 
-              <div className="h-px bg-gray-100" />
+              <div className="h-px bg-surface-container" />
 
               {/* Row C: Total | Deposit | Remaining | Assigned To */}
               <div>
@@ -3227,11 +3227,11 @@ export default function RepairsPage() {
                 {!isTyreShop && <label className="mb-2 flex cursor-pointer items-center gap-2.5 w-fit">
                   <div
                     onClick={() => setJobData((p) => ({ ...p, price_pending: !p.price_pending, estimated_cost: !p.price_pending ? '' : p.estimated_cost, deposit_paid: !p.price_pending ? '' : p.deposit_paid }))}
-                    className={`relative flex h-5 w-9 items-center rounded-full transition-colors ${pricePending ? 'bg-amber-500' : 'bg-gray-300'}`}
+                    className={`relative flex h-5 w-9 items-center rounded-full transition-colors ${pricePending ? 'bg-amber-500' : 'bg-surface-container-highest'}`}
                   >
-                    <span className={`absolute inline-block h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${pricePending ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                    <span className={`absolute inline-block h-3.5 w-3.5 rounded-full bg-surface shadow transition-transform ${pricePending ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
                   </div>
-                  <span className="text-[11px] font-semibold text-gray-600">
+                  <span className="text-[11px] font-semibold text-on-surface-variant">
                     {pricePending ? (
                       <span className="flex items-center gap-1 text-amber-600"><span>⚠</span> Issue Not Found — Price TBD</span>
                     ) : 'No fault found / Price TBD'}
@@ -3242,7 +3242,7 @@ export default function RepairsPage() {
                   <div>
                     <label className={lbl}>Job Fee (Labour)</label>
                     <div className="relative">
-                      <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">£</span>
+                      <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-outline">£</span>
                       <input
                         type="number"
                         step="0.01"
@@ -3264,7 +3264,7 @@ export default function RepairsPage() {
                     <label className={lbl}>Discount</label>
                     <div className="flex gap-1">
                       <div className="relative flex-1">
-                        <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                        <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-outline">
                           {jobData.discount_type === 'percent' ? '%' : '£'}
                         </span>
                         <input
@@ -3289,7 +3289,7 @@ export default function RepairsPage() {
                           setJobData((p) => ({ ...p, discount_type: nextType }))
                         }}
                         title={jobData.discount_type === 'percent' ? 'Switch to fixed amount' : 'Switch to percentage'}
-                        className={`h-8 w-8 shrink-0 rounded-md border text-xs font-semibold transition-colors ${pricePending ? 'opacity-40 cursor-not-allowed border-gray-200 text-gray-300' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+                        className={`h-8 w-8 shrink-0 rounded-md border text-xs font-semibold transition-colors ${pricePending ? 'opacity-40 cursor-not-allowed border-outline-variant text-outline-variant' : 'border-outline text-on-surface-variant hover:bg-surface-container-low'}`}
                       >
                         {jobData.discount_type === 'percent' ? '%' : '£'}
                       </button>
@@ -3299,7 +3299,7 @@ export default function RepairsPage() {
                   <div>
                     <label className={lbl}>Total Charges {!pricePending && <span className="text-red-400">*</span>}</label>
                     <div className="relative">
-                      <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">£</span>
+                      <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-outline">£</span>
                       <input
                         type="number"
                         step="0.01"
@@ -3330,7 +3330,7 @@ export default function RepairsPage() {
                   <div>
                     <label className={lbl}>Deposit</label>
                     <div className="relative">
-                      <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">£</span>
+                      <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-outline">£</span>
                       <input type="number" step="0.01" min="0" disabled={pricePending} value={jobData.deposit_paid} onChange={(e) => setJobData((p) => ({ ...p, deposit_paid: e.target.value }))} placeholder={pricePending ? 'TBD' : '0.00'} className={`${inp} pl-6 ${pricePending ? 'opacity-40 cursor-not-allowed' : ''}`} />
                     </div>
                   </div>
@@ -3346,7 +3346,7 @@ export default function RepairsPage() {
                   </div>
                   <div>
                     <div className="mb-0.5 flex items-center justify-between">
-                      <label className={`${lbl} !mb-0`}>{isTyreShop ? 'Fitter' : 'Assigned To'} <span className="font-normal normal-case text-gray-300">(opt)</span></label>
+                      <label className={`${lbl} !mb-0`}>{isTyreShop ? 'Fitter' : 'Assigned To'} <span className="font-normal normal-case text-outline-variant">(opt)</span></label>
                       {isTyreShop && (
                         <button
                           type="button"
@@ -3371,7 +3371,7 @@ export default function RepairsPage() {
                       />
                     )}
                     {showNewFitter && (
-                      <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2">
+                      <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-low p-2">
                         <input
                           autoFocus
                           type="text"
@@ -3379,7 +3379,7 @@ export default function RepairsPage() {
                           onChange={(e) => setNewFitterName(e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && submitNewFitter()}
                           placeholder="Fitter name…"
-                          className="h-8 flex-1 rounded-md border border-gray-300 bg-white px-2 text-sm focus:border-brand-teal focus:outline-none"
+                          className="h-8 flex-1 rounded-md border border-outline bg-surface px-2 text-sm focus:border-brand-teal focus:outline-none"
                         />
                         <button
                           type="button"
@@ -3392,7 +3392,7 @@ export default function RepairsPage() {
                         <button
                           type="button"
                           onClick={() => { setShowNewFitter(false); setNewFitterName('') }}
-                          className="h-8 w-8 shrink-0 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 flex items-center justify-center"
+                          className="h-8 w-8 shrink-0 rounded-md text-outline hover:bg-surface-container hover:text-on-surface-variant flex items-center justify-center"
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
@@ -3449,7 +3449,7 @@ export default function RepairsPage() {
                   </p>
                 )}
                 <div className="mt-2">
-                  <label className={lbl}>Payment Method <span className="font-normal normal-case text-gray-300">(opt, select multiple to split)</span></label>
+                  <label className={lbl}>Payment Method <span className="font-normal normal-case text-outline-variant">(opt, select multiple to split)</span></label>
                   <div className="flex flex-wrap gap-2">
                     {(['cash', 'card', 'store_credit', 'loyalty_points'] as const).map((m) => {
                       const disabled = (m === 'store_credit' || m === 'loyalty_points') && !selectedCustomer
@@ -3472,8 +3472,8 @@ export default function RepairsPage() {
                             active
                               ? 'border-gray-900 bg-gray-900 text-white'
                               : disabled
-                                ? 'border-gray-100 text-gray-300 cursor-not-allowed'
-                                : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                                ? 'border-outline-variant text-outline-variant cursor-not-allowed'
+                                : 'border-outline-variant bg-surface text-on-surface-variant hover:bg-surface-container-low'
                           }`}
                         >
                           {m === 'store_credit' && <Wallet className="h-3 w-3" />}
@@ -3509,7 +3509,7 @@ export default function RepairsPage() {
                   {jobData.payment_methods.includes('store_credit') && (
                     <div className="mt-2 space-y-1.5">
                       {creditBalance !== null && (
-                        <p className="text-xs text-gray-500">Available balance: <span className="font-semibold text-gray-800">£{creditBalance.toFixed(2)}</span></p>
+                        <p className="text-xs text-on-surface-variant">Available balance: <span className="font-semibold text-on-surface">£{creditBalance.toFixed(2)}</span></p>
                       )}
                       <div className="flex gap-2">
                         <input
@@ -3530,8 +3530,8 @@ export default function RepairsPage() {
                   {jobData.payment_methods.includes('loyalty_points') && (
                     <div className="mt-2 space-y-1.5">
                       {loyaltyBalance !== null && (
-                        <p className="text-xs text-gray-500">
-                          Points balance: <span className="font-semibold text-gray-800">{loyaltyBalance} pts</span> (≈ £{(loyaltyBalance * loyaltyRate).toFixed(2)})
+                        <p className="text-xs text-on-surface-variant">
+                          Points balance: <span className="font-semibold text-on-surface">{loyaltyBalance} pts</span> (≈ £{(loyaltyBalance * loyaltyRate).toFixed(2)})
                         </p>
                       )}
                       <div className="flex gap-2">
@@ -3566,7 +3566,7 @@ export default function RepairsPage() {
                 </div>
               </div>
 
-              {!isRetail && !isTyreShop && <div className="h-px bg-gray-100" />}
+              {!isRetail && !isTyreShop && <div className="h-px bg-surface-container" />}
 
               {/* Row D: Lock / Passcode / Pattern — device-repair shops only.
                   Not applicable to retail (no device) or tyre jobs (no device to lock). */}
@@ -3580,7 +3580,7 @@ export default function RepairsPage() {
                       key={t}
                       type="button"
                       onClick={() => setJobData((p) => ({ ...p, lock_type: t, passcode: '' }))}
-                      className={`rounded-md border px-3 py-1 text-xs font-medium capitalize transition-colors ${jobData.lock_type === t ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'}`}
+                      className={`rounded-md border px-3 py-1 text-xs font-medium capitalize transition-colors ${jobData.lock_type === t ? 'border-gray-900 bg-gray-900 text-white' : 'border-outline-variant bg-surface text-on-surface-variant hover:bg-surface-container-low'}`}
                     >
                       {t === '' ? 'None' : t}
                     </button>
@@ -3610,7 +3610,7 @@ export default function RepairsPage() {
                       <button
                         type="button"
                         onClick={() => setJobData((p) => ({ ...p, passcode: '' }))}
-                        className="mt-1 text-xs text-gray-400 hover:text-red-500 transition-colors"
+                        className="mt-1 text-xs text-outline hover:text-red-500 transition-colors"
                       >
                         Clear pattern
                       </button>
@@ -3619,7 +3619,7 @@ export default function RepairsPage() {
                 )}
               </div>}
 
-              <div className="h-px bg-gray-100" />
+              <div className="h-px bg-surface-container" />
 
               {/* Row E: Customer Note | Staff Note */}
               <div>
@@ -3629,18 +3629,18 @@ export default function RepairsPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className={lbl}>Customer Note</label>
-                    <textarea rows={2} value={jobData.customer_note} onChange={(e) => setJobData((p) => ({ ...p, customer_note: e.target.value }))} placeholder="Visible to customer…" className="w-full resize-none rounded-md border border-indigo-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400/20" />
+                    <textarea rows={2} value={jobData.customer_note} onChange={(e) => setJobData((p) => ({ ...p, customer_note: e.target.value }))} placeholder="Visible to customer…" className="w-full resize-none rounded-md border border-indigo-200 bg-surface px-2.5 py-1.5 text-sm text-on-surface placeholder:text-outline transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400/20" />
                   </div>
                   <div>
                     <label className={lbl}>Staff Note</label>
-                    <textarea rows={2} value={jobData.staff_note} onChange={(e) => setJobData((p) => ({ ...p, staff_note: e.target.value }))} placeholder="Internal only…" className="w-full resize-none rounded-md border border-indigo-200 bg-white px-2.5 py-1.5 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400/20" />
+                    <textarea rows={2} value={jobData.staff_note} onChange={(e) => setJobData((p) => ({ ...p, staff_note: e.target.value }))} placeholder="Internal only…" className="w-full resize-none rounded-md border border-indigo-200 bg-surface px-2.5 py-1.5 text-sm text-on-surface placeholder:text-outline transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400/20" />
                   </div>
                 </div>
               </div>
 
               {/* Footer */}
-              <div className="flex items-center justify-between gap-2 border-t border-gray-100 pt-2.5">
-                <button onClick={() => setModalStep(1)} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 transition-colors">
+              <div className="flex items-center justify-between gap-2 border-t border-outline-variant pt-2.5">
+                <button onClick={() => setModalStep(1)} className="flex items-center gap-1 text-sm text-on-surface-variant hover:text-on-surface transition-colors">
                   <ChevronLeft className="h-4 w-4" /> Back
                 </button>
                 <div className="flex gap-2">
@@ -3674,14 +3674,14 @@ export default function RepairsPage() {
           const deposit = parseFloat(editData.deposit_paid) || 0
           const editDiscountAmount = Math.max(0, Math.min(total, editData.discount_type === 'percent' ? total * ((parseFloat(editData.discount_value) || 0) / 100) : (parseFloat(editData.discount_value) || 0)))
           const remaining = total - editDiscountAmount - deposit
-          const inp = 'h-10 w-full rounded-lg border border-gray-300 px-3 text-sm text-gray-900 placeholder:text-gray-400 transition focus:border-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-700/10'
-          const lbl = 'mb-1 block text-sm font-semibold text-gray-800'
+          const inp = 'h-10 w-full rounded-lg border border-outline px-3 text-sm text-on-surface placeholder:text-outline transition focus:border-on-surface focus:outline-none focus:ring-2 focus:ring-on-surface/10'
+          const lbl = 'mb-1 block text-sm font-semibold text-on-surface'
           return (
             <div className="space-y-4">
               {/* Ticket No */}
               <div>
                 <label className={lbl}>Ticket No <span className="text-red-500">*</span></label>
-                <input readOnly value={editRepair.job_number} className="h-10 w-full rounded-lg border border-gray-200 bg-gray-100 px-3 text-sm text-gray-500 cursor-not-allowed" />
+                <input readOnly value={editRepair.job_number} className="h-10 w-full rounded-lg border border-outline-variant bg-surface-container px-3 text-sm text-on-surface-variant cursor-not-allowed" />
               </div>
 
               {/* Due Date — not applicable to tyre jobs, which use the dispatch
@@ -3736,7 +3736,7 @@ export default function RepairsPage() {
                 <label className={lbl}>Discount</label>
                 <div className="flex gap-1">
                   <div className="relative flex-1">
-                    <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                    <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-outline">
                       {editData.discount_type === 'percent' ? '%' : '£'}
                     </span>
                     <input
@@ -3758,7 +3758,7 @@ export default function RepairsPage() {
                       setEditData((p) => ({ ...p, discount_type: nextType }))
                     }}
                     title={editData.discount_type === 'percent' ? 'Switch to fixed amount' : 'Switch to percentage'}
-                    className="h-10 w-10 shrink-0 rounded-lg border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                    className="h-10 w-10 shrink-0 rounded-lg border border-outline text-sm font-semibold text-on-surface-variant hover:bg-surface-container-low transition-colors"
                   >
                     {editData.discount_type === 'percent' ? '%' : '£'}
                   </button>
@@ -3772,7 +3772,7 @@ export default function RepairsPage() {
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                   <label className={lbl}>Lab / 3rd-Party Fee</label>
                   <div className="relative">
-                    <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">£</span>
+                    <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-outline">£</span>
                     <input
                       type="number"
                       step="0.01"
@@ -3780,7 +3780,7 @@ export default function RepairsPage() {
                       value={editData.lab_fee}
                       onChange={(e) => setEditData((p) => ({ ...p, lab_fee: e.target.value }))}
                       placeholder="0.00"
-                      className={`${inp} pl-6 bg-white`}
+                      className={`${inp} pl-6 bg-surface`}
                     />
                   </div>
                   <p className="mt-1.5 text-xs text-amber-700">
@@ -3831,7 +3831,7 @@ export default function RepairsPage() {
 
               {/* Payment Method */}
               <div>
-                <label className={lbl}>Payment Method <span className="font-normal normal-case text-gray-300">(select multiple to split the new payment)</span> :</label>
+                <label className={lbl}>Payment Method <span className="font-normal normal-case text-outline-variant">(select multiple to split the new payment)</span> :</label>
                 <div className="flex gap-2">
                   {(['cash', 'card', 'store_credit', 'loyalty_points'] as const).map((m) => {
                     const disabled = (m === 'store_credit' || m === 'loyalty_points') && !editRepair?.customer_id
@@ -3854,8 +3854,8 @@ export default function RepairsPage() {
                           active
                             ? 'border-gray-900 bg-gray-900 text-white'
                             : disabled
-                              ? 'border-gray-100 text-gray-300 cursor-not-allowed'
-                              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                              ? 'border-outline-variant text-outline-variant cursor-not-allowed'
+                              : 'border-outline bg-surface text-on-surface-variant hover:bg-surface-container-low'
                         }`}
                       >
                         {m === 'store_credit' && <Wallet className="h-3.5 w-3.5" />}
@@ -3895,7 +3895,7 @@ export default function RepairsPage() {
                       {editData.payment_methods.includes('store_credit') && (
                         <div className="mt-2 space-y-1.5">
                           {editCreditBalance !== null && (
-                            <p className="text-xs text-gray-500">Available balance: <span className="font-semibold text-gray-800">£{editCreditBalance.toFixed(2)}</span> · applying to new payment of £{editDelta.toFixed(2)}</p>
+                            <p className="text-xs text-on-surface-variant">Available balance: <span className="font-semibold text-on-surface">£{editCreditBalance.toFixed(2)}</span> · applying to new payment of £{editDelta.toFixed(2)}</p>
                           )}
                           <div className="flex gap-2">
                             <input
@@ -3915,8 +3915,8 @@ export default function RepairsPage() {
                       {editData.payment_methods.includes('loyalty_points') && (
                         <div className="mt-2 space-y-1.5">
                           {editLoyaltyBalance !== null && (
-                            <p className="text-xs text-gray-500">
-                              Points balance: <span className="font-semibold text-gray-800">{editLoyaltyBalance} pts</span> (≈ £{(editLoyaltyBalance * editLoyaltyRate).toFixed(2)}) · applying to new payment of £{editDelta.toFixed(2)}
+                            <p className="text-xs text-on-surface-variant">
+                              Points balance: <span className="font-semibold text-on-surface">{editLoyaltyBalance} pts</span> (≈ £{(editLoyaltyBalance * editLoyaltyRate).toFixed(2)}) · applying to new payment of £{editDelta.toFixed(2)}
                             </p>
                           )}
                           <div className="flex gap-2">
@@ -3961,8 +3961,8 @@ export default function RepairsPage() {
               </div>
 
               {/* Footer */}
-              <div className="flex justify-end gap-2 border-t border-gray-100 pt-3">
-                <button onClick={() => setEditOpen(false)} className="rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              <div className="flex justify-end gap-2 border-t border-outline-variant pt-3">
+                <button onClick={() => setEditOpen(false)} className="rounded-lg border border-outline bg-surface px-5 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low transition-colors">
                   Close
                 </button>
                 <Button onClick={saveEdit} loading={editSaving} className="px-6">

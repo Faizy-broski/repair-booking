@@ -54,7 +54,7 @@ export function DataTable<T>({
       <div className="relative overflow-x-auto rounded-xl border border-outline-variant/50 shadow-sm">
         {/* Spinner overlay during re-fetch — keeps existing rows visible, no layout shift */}
         {refetching && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/60 backdrop-blur-[1px]">
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-surface/60 backdrop-blur-[1px]">
             <BrandSpinner size="md" />
           </div>
         )}
@@ -112,8 +112,8 @@ export function DataTable<T>({
                 <tr
                   key={row.id}
                   onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                  className={`border-t border-gray-100 transition-colors hover:bg-teal-50 ${onRowClick ? 'cursor-pointer' : ''} ${
-                    i % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                  className={`border-t border-outline-variant transition-colors hover:bg-teal-50 ${onRowClick ? 'cursor-pointer' : ''} ${
+                    i % 2 === 0 ? 'bg-surface' : 'bg-surface-container-low'
                   }`}
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -139,11 +139,11 @@ export function DataTable<T>({
             </span>
             {onPageSizeChange && (
               <div className="flex items-center gap-1.5">
-                <span className="text-xs text-gray-400">Rows:</span>
+                <span className="text-xs text-outline">Rows:</span>
                 <select
                   value={pageSize}
                   onChange={(e) => { onPageChange(0); onPageSizeChange(Number(e.target.value)) }}
-                  className="h-7 rounded-md border border-gray-300 bg-white px-2 text-xs text-gray-700 focus:border-primary focus:outline-none"
+                  className="h-7 rounded-md border border-outline bg-surface px-2 text-xs text-on-surface-variant focus:border-primary focus:outline-none"
                 >
                   {PAGE_SIZE_OPTIONS.map((n) => (
                     <option key={n} value={n}>{n}</option>
@@ -160,7 +160,7 @@ export function DataTable<T>({
                 size="sm"
                 onClick={() => onPageChange(pageIndex - 1)}
                 disabled={pageIndex === 0}
-                className="h-9 px-4 flex items-center gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm transition-all disabled:bg-gray-200 disabled:text-gray-400 disabled:opacity-100"
+                className="h-9 px-4 flex items-center gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm transition-all disabled:bg-surface-container-high disabled:text-outline disabled:opacity-100"
               >
                 <ChevronLeft className="h-4 w-4" />
                 <span className="font-medium">Previous</span>
@@ -175,7 +175,7 @@ export function DataTable<T>({
                 size="sm"
                 onClick={() => onPageChange(pageIndex + 1)}
                 disabled={pageIndex + 1 >= totalPages}
-                className="h-9 px-4 flex items-center gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm transition-all disabled:bg-gray-200 disabled:text-gray-400 disabled:opacity-100"
+                className="h-9 px-4 flex items-center gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm transition-all disabled:bg-surface-container-high disabled:text-outline disabled:opacity-100"
               >
                 <span className="font-medium">Next</span>
                 <ChevronRight className="h-4 w-4" />

@@ -58,8 +58,8 @@ export default function ModuleSettingsPage() {
   return (
     <div className="max-w-4xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Module Settings</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-semibold text-on-surface">Module Settings</h1>
+        <p className="mt-1 text-sm text-on-surface-variant">
           Configure which modules are active for your business and customise their behaviour.
           Module availability is controlled by your subscription plan.
         </p>
@@ -68,7 +68,7 @@ export default function ModuleSettingsPage() {
       {configs === null ? (
         <div className="grid gap-3 sm:grid-cols-2">
           {MODULES.map((m) => (
-            <div key={m} className="h-24 rounded-xl border border-gray-200 bg-gray-50 animate-pulse" />
+            <div key={m} className="h-24 rounded-xl border border-outline-variant bg-surface-container-low animate-pulse" />
           ))}
         </div>
       ) : (
@@ -86,33 +86,33 @@ export default function ModuleSettingsPage() {
               <div
                 key={mod}
                 className={`flex items-start gap-4 rounded-xl border p-4 transition-colors ${
-                  enabled ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-60'
+                  enabled ? 'border-outline-variant bg-surface' : 'border-outline-variant bg-surface-container-low opacity-60'
                 }`}
               >
                 <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                  enabled ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'
+                  enabled ? 'bg-blue-100 text-blue-600' : 'bg-surface-container text-outline'
                 }`}>
                   <Icon className="h-4 w-4" />
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-gray-900">{meta.label}</span>
+                    <span className="text-sm font-medium text-on-surface">{meta.label}</span>
                     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
                       enabled
                         ? 'bg-green-50 text-green-700'
-                        : 'bg-gray-100 text-gray-500'
+                        : 'bg-surface-container text-on-surface-variant'
                     }`}>
                       {enabled ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
                       {enabled ? 'Active' : 'Inactive'}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-gray-500 truncate">{meta.description}</p>
+                  <p className="mt-0.5 text-xs text-on-surface-variant truncate">{meta.description}</p>
                   {templateName && (
                     <p className="mt-1 flex items-center gap-1 text-xs text-blue-600">
                       <Layers className="h-3 w-3" />
                       {templateName}
-                      {hasOverride && <span className="text-gray-400">(customised)</span>}
+                      {hasOverride && <span className="text-outline">(customised)</span>}
                     </p>
                   )}
                 </div>
@@ -120,7 +120,7 @@ export default function ModuleSettingsPage() {
                 {enabled && (
                   <Link
                     href={`/settings/modules/${mod}`}
-                    className="mt-1 shrink-0 rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                    className="mt-1 shrink-0 rounded-lg p-1.5 text-outline hover:bg-surface-container hover:text-on-surface-variant"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Link>
@@ -131,7 +131,7 @@ export default function ModuleSettingsPage() {
         </div>
       )}
 
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-outline">
         To enable or disable modules beyond your plan limits, contact your account manager.
         Business owners can customise module settings by clicking the arrow on any active module.
       </p>

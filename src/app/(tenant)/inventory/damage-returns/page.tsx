@@ -48,24 +48,24 @@ export default function DamageReturnsPage() {
 
   const columns: ColumnDef<SupplierReturnRow>[] = [
     { id: 'return_number', header: 'Return #', cell: ({ row }) => (
-      <span className="font-mono text-sm font-medium text-gray-900">{row.original.return_number}</span>
+      <span className="font-mono text-sm font-medium text-on-surface">{row.original.return_number}</span>
     )},
     { id: 'supplier', header: 'Supplier', cell: ({ row }) => (
-      <span className="text-sm text-gray-700">{row.original.suppliers?.name ?? '—'}</span>
+      <span className="text-sm text-on-surface-variant">{row.original.suppliers?.name ?? '—'}</span>
     )},
     { id: 'po', header: 'Linked PO', cell: ({ row }) => (
       row.original.purchase_orders?.po_number
-        ? <span className="font-mono text-xs text-gray-600">{row.original.purchase_orders.po_number}</span>
-        : <span className="text-sm text-gray-400">—</span>
+        ? <span className="font-mono text-xs text-on-surface-variant">{row.original.purchase_orders.po_number}</span>
+        : <span className="text-sm text-outline">—</span>
     )},
     { accessorKey: 'total_value', header: 'Total Value', cell: ({ getValue }) => (
-      <span className="font-semibold text-gray-900">{formatCurrency(Number(getValue() ?? 0))}</span>
+      <span className="font-semibold text-on-surface">{formatCurrency(Number(getValue() ?? 0))}</span>
     )},
     { id: 'status', header: 'Status', cell: ({ row }) => (
       <Badge variant={STATUS_VARIANT[row.original.status] ?? 'default'}>{row.original.status}</Badge>
     )},
     { id: 'created_at', header: 'Created', cell: ({ row }) => (
-      <span className="text-sm text-gray-500">{formatDate(row.original.created_at)}</span>
+      <span className="text-sm text-on-surface-variant">{formatDate(row.original.created_at)}</span>
     )},
   ]
 
@@ -79,8 +79,8 @@ export default function DamageReturnsPage() {
             <Undo2 className="h-6 w-6 text-orange-600" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Damage Returns</h1>
-            <p className="text-sm text-gray-500">Return damaged stock to suppliers and track resolution</p>
+            <h1 className="text-xl font-bold text-on-surface">Damage Returns</h1>
+            <p className="text-sm text-on-surface-variant">Return damaged stock to suppliers and track resolution</p>
           </div>
         </div>
         <Button size="sm" onClick={() => router.push('/inventory/damage-returns/new')}>
@@ -94,7 +94,7 @@ export default function DamageReturnsPage() {
             key={s}
             onClick={() => setStatusFilter(s)}
             className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors ${
-              statusFilter === s ? 'bg-brand-teal text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              statusFilter === s ? 'bg-brand-teal text-white' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
             }`}
           >
             {s}

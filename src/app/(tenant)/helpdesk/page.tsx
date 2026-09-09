@@ -56,7 +56,7 @@ const STATUS_STYLES: Record<string, string> = {
   open:        'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
   in_progress: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
   resolved:    'bg-green-50 text-green-700 ring-1 ring-green-200',
-  closed:      'bg-gray-100 text-gray-500 ring-1 ring-gray-200',
+  closed:      'bg-surface-container text-on-surface-variant ring-1 ring-outline-variant',
 }
 const STATUS_LABELS: Record<string, string> = {
   open: 'open', in_progress: 'in progress', resolved: 'resolved', closed: 'closed',
@@ -70,14 +70,14 @@ const PRIORITY_STYLES: Record<string, string> = {
 
 function StatusBadge({ status }: { status: string }) {
   return (
-    <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', STATUS_STYLES[status] ?? 'bg-gray-100 text-gray-500')}>
+    <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', STATUS_STYLES[status] ?? 'bg-surface-container text-on-surface-variant')}>
       {STATUS_LABELS[status] ?? status}
     </span>
   )
 }
 function PriorityBadge({ priority }: { priority: string }) {
   return (
-    <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', PRIORITY_STYLES[priority] ?? 'bg-gray-100 text-gray-500')}>
+    <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', PRIORITY_STYLES[priority] ?? 'bg-surface-container text-on-surface-variant')}>
       {priority}
     </span>
   )
@@ -222,8 +222,8 @@ export default function HelpdeskPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Helpdesk Tickets</h1>
-          <p className="mt-0.5 text-sm text-gray-500">Raise and track support requests with the platform team</p>
+          <h1 className="text-xl font-bold text-on-surface">Helpdesk Tickets</h1>
+          <p className="mt-0.5 text-sm text-on-surface-variant">Raise and track support requests with the platform team</p>
         </div>
         <Button onClick={() => { reset(); setDescription(''); setCreateOpen(true) }} className="bg-brand-teal hover:bg-brand-teal-dark">
           <Plus className="h-4 w-4" /> New Ticket
@@ -233,21 +233,21 @@ export default function HelpdeskPage() {
       {/* Filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-outline" />
           <input
             type="text"
             placeholder="Search tickets…"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(0) }}
-            className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 text-sm focus:border-brand-teal focus:outline-none"
+            className="w-full rounded-lg border border-outline-variant bg-surface py-2 pl-9 pr-3 text-sm focus:border-brand-teal focus:outline-none"
           />
           {search && (
             <button onClick={() => { setSearch(''); setPage(0) }} className="absolute right-3 top-1/2 -translate-y-1/2">
-              <X className="h-3.5 w-3.5 text-gray-400" />
+              <X className="h-3.5 w-3.5 text-outline" />
             </button>
           )}
         </div>
-        <div className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white p-1">
+        <div className="flex items-center gap-1 rounded-lg border border-outline-variant bg-surface p-1">
           {STATUSES.map(({ value, label }) => (
             <button
               key={value}
@@ -256,7 +256,7 @@ export default function HelpdeskPage() {
                 'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
                 statusFilter === value
                   ? 'bg-brand-teal text-white shadow-sm'
-                  : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                  : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface-variant'
               )}
             >
               {label}
@@ -266,45 +266,45 @@ export default function HelpdeskPage() {
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <table className="min-w-full divide-y divide-gray-100">
-          <thead className="bg-gray-50">
+      <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
+        <table className="min-w-full divide-y divide-outline-variant">
+          <thead className="bg-surface-container-low">
             <tr>
               {['Ticket ID', 'Title', 'Category', 'Status', 'Priority', 'Created By', 'Actions'].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">{h}</th>
+                <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">{h}</th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-outline-variant">
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i}>
                   {Array.from({ length: 7 }).map((_, j) => (
-                    <td key={j} className="px-4 py-3"><div className="h-4 w-full animate-pulse rounded bg-gray-100" /></td>
+                    <td key={j} className="px-4 py-3"><div className="h-4 w-full animate-pulse rounded bg-surface-container" /></td>
                   ))}
                 </tr>
               ))
             ) : tickets.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-sm text-gray-400">
+                <td colSpan={7} className="px-4 py-12 text-center text-sm text-outline">
                   No tickets found. Raise a new ticket to get support.
                 </td>
               </tr>
             ) : (
               tickets.map((t) => (
-                <tr key={t.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={t.id} className="hover:bg-surface-container-low transition-colors">
                   <td className="px-4 py-3">
                     <button onClick={() => setViewTicket(t)} className="font-mono text-sm font-semibold text-brand-teal hover:underline">
                       #{String(t.ticket_number).padStart(8, '0')}
                     </button>
                   </td>
                   <td className="px-4 py-3 max-w-[220px]">
-                    <span className="block truncate text-sm font-medium text-gray-900">{t.title}</span>
+                    <span className="block truncate text-sm font-medium text-on-surface">{t.title}</span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{t.category}</td>
+                  <td className="px-4 py-3 text-sm text-on-surface-variant">{t.category}</td>
                   <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
                   <td className="px-4 py-3"><PriorityBadge priority={t.priority} /></td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{t.profiles?.full_name ?? 'You'}</td>
+                  <td className="px-4 py-3 text-sm text-on-surface-variant">{t.profiles?.full_name ?? 'You'}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <button onClick={() => setViewTicket(t)} title="View" className="text-brand-teal hover:text-brand-teal-dark">
@@ -325,8 +325,8 @@ export default function HelpdeskPage() {
         </table>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
-            <span className="text-xs text-gray-500">
+          <div className="flex items-center justify-between border-t border-outline-variant px-4 py-3">
+            <span className="text-xs text-on-surface-variant">
               Showing {page * pageSize + 1}–{Math.min((page + 1) * pageSize, total)} of {total}
             </span>
             <div className="flex items-center gap-1">
@@ -341,25 +341,25 @@ export default function HelpdeskPage() {
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Create Helpdesk Ticket" size="lg">
         <form onSubmit={handleSubmit(onCreateSubmit)} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Title <span className="text-red-500">*</span></label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Title <span className="text-red-500">*</span></label>
             <input
               {...register('title', { required: 'Title is required' })}
               placeholder="Enter ticket title"
-              className={cn('w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:border-brand-teal', errors.title ? 'border-red-400' : 'border-gray-200')}
+              className={cn('w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:border-brand-teal', errors.title ? 'border-red-400' : 'border-outline-variant')}
             />
             {errors.title && <p className="mt-1 text-xs text-red-500">{errors.title.message}</p>}
           </div>
           <RichTextEditor label="Description" value={description} onChange={setDescription} placeholder="Describe your issue in detail…" minHeight={150} />
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Category</label>
-              <select {...register('category')} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none">
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Category</label>
+              <select {...register('category')} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-brand-teal focus:outline-none">
                 {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Priority</label>
-              <select {...register('priority')} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none">
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Priority</label>
+              <select {...register('priority')} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-brand-teal focus:outline-none">
                 {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
             </div>
@@ -378,15 +378,15 @@ export default function HelpdeskPage() {
             <div className="flex items-center gap-2 flex-wrap">
               <StatusBadge status={viewTicket.status} />
               <PriorityBadge priority={viewTicket.priority} />
-              <span className="text-xs text-gray-400">{viewTicket.category}</span>
+              <span className="text-xs text-outline">{viewTicket.category}</span>
             </div>
-            <h3 className="text-base font-semibold text-gray-900">{viewTicket.title}</h3>
+            <h3 className="text-base font-semibold text-on-surface">{viewTicket.title}</h3>
             {viewTicket.description ? (
-              <div className="helpdesk-body rounded-lg bg-gray-50 px-4 py-3 text-sm text-gray-700" dangerouslySetInnerHTML={{ __html: viewTicket.description }} />
+              <div className="helpdesk-body rounded-lg bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant" dangerouslySetInnerHTML={{ __html: viewTicket.description }} />
             ) : (
-              <p className="text-sm text-gray-400 italic">No description provided.</p>
+              <p className="text-sm text-outline italic">No description provided.</p>
             )}
-            <div className="flex items-center justify-between text-xs text-gray-400 border-t border-gray-100 pt-3">
+            <div className="flex items-center justify-between text-xs text-outline border-t border-outline-variant pt-3">
               <span>Raised by {viewTicket.profiles?.full_name ?? 'You'}</span>
               <span>{new Date(viewTicket.created_at).toLocaleString()}</span>
             </div>
@@ -408,30 +408,30 @@ export default function HelpdeskPage() {
         <Modal open={!!editTicket} onClose={() => setEditTicket(null)} title="Edit Ticket" size="lg">
           <form onSubmit={handleEditSubmit(onEditSubmit)} className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Title <span className="text-red-500">*</span></label>
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Title <span className="text-red-500">*</span></label>
               <input
                 {...regEdit('title', { required: 'Title is required' })}
-                className={cn('w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:border-brand-teal', editErrors.title ? 'border-red-400' : 'border-gray-200')}
+                className={cn('w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:border-brand-teal', editErrors.title ? 'border-red-400' : 'border-outline-variant')}
               />
               {editErrors.title && <p className="mt-1 text-xs text-red-500">{editErrors.title.message}</p>}
             </div>
             <RichTextEditor label="Description" value={editDescription} onChange={setEditDescription} minHeight={140} />
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Category</label>
-                <select {...regEdit('category')} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none">
+                <label className="mb-1 block text-sm font-medium text-on-surface-variant">Category</label>
+                <select {...regEdit('category')} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-brand-teal focus:outline-none">
                   {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Priority</label>
-                <select {...regEdit('priority')} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none">
+                <label className="mb-1 block text-sm font-medium text-on-surface-variant">Priority</label>
+                <select {...regEdit('priority')} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-brand-teal focus:outline-none">
                   {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Status</label>
-                <select value={editStatus} onChange={(e) => setEditStatus(e.target.value as Ticket['status'])} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none">
+                <label className="mb-1 block text-sm font-medium text-on-surface-variant">Status</label>
+                <select value={editStatus} onChange={(e) => setEditStatus(e.target.value as Ticket['status'])} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-brand-teal focus:outline-none">
                   <option value="open">Open</option>
                   <option value="in_progress">In Progress</option>
                   <option value="resolved">Resolved</option>
@@ -451,9 +451,9 @@ export default function HelpdeskPage() {
       {deleteTarget && (
         <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete Ticket" size="sm">
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-on-surface-variant">
               Are you sure you want to delete ticket{' '}
-              <span className="font-mono font-semibold text-gray-900">
+              <span className="font-mono font-semibold text-on-surface">
                 #{String(deleteTarget.ticket_number).padStart(8, '0')}
               </span>
               ? This cannot be undone.

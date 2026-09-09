@@ -84,7 +84,7 @@ export function ProductVariantPicker({ open, onClose, onSelect, branchId, title 
       {variantFor ? (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <button onClick={() => setVariantFor(null)} className="text-gray-400 hover:text-gray-600">
+            <button onClick={() => setVariantFor(null)} className="text-outline hover:text-on-surface-variant">
               <ChevronLeft className="h-4 w-4" />
             </button>
             <p className="text-sm font-semibold">{variantFor.name} — Select variant</p>
@@ -100,18 +100,18 @@ export function ProductVariantPicker({ open, onClose, onSelect, branchId, title 
                   className="flex flex-col items-start rounded-lg border p-2.5 text-left text-sm hover:border-brand-teal hover:bg-brand-teal-light/20 transition-colors"
                 >
                   <span className="font-medium">{v.name}</span>
-                  <span className="text-xs text-gray-500">Cost: {formatCurrency(v.cost_price ?? variantFor.next_batch_cost ?? variantFor.cost_price ?? 0)}</span>
-                  {v.stock != null && <span className="text-[10px] text-gray-400">{v.stock} in stock</span>}
+                  <span className="text-xs text-on-surface-variant">Cost: {formatCurrency(v.cost_price ?? variantFor.next_batch_cost ?? variantFor.cost_price ?? 0)}</span>
+                  {v.stock != null && <span className="text-[10px] text-outline">{v.stock} in stock</span>}
                 </button>
               ))}
-              {variants.length === 0 && <p className="col-span-2 py-4 text-center text-sm text-gray-400">No variants found</p>}
+              {variants.length === 0 && <p className="col-span-2 py-4 text-center text-sm text-outline">No variants found</p>}
             </div>
           )}
         </div>
       ) : (
         <>
           <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-outline" />
             <input
               className="w-full rounded-md border py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal"
               placeholder="Search products by name or SKU…"
@@ -119,7 +119,7 @@ export function ProductVariantPicker({ open, onClose, onSelect, branchId, title 
               onChange={e => setSearch(e.target.value)}
               autoFocus
             />
-            {searching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />}
+            {searching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-outline" />}
           </div>
 
           {results.length > 0 && (
@@ -131,14 +131,14 @@ export function ProductVariantPicker({ open, onClose, onSelect, branchId, title 
                   className="flex flex-col items-start rounded-lg border p-2.5 text-left text-sm hover:border-brand-teal hover:bg-brand-teal-light/20 transition-colors"
                 >
                   <span className="font-medium truncate w-full">{p.name}</span>
-                  <span className="text-xs text-gray-500">Cost: {formatCurrency(p.next_batch_cost ?? p.cost_price ?? 0)}</span>
+                  <span className="text-xs text-on-surface-variant">Cost: {formatCurrency(p.next_batch_cost ?? p.cost_price ?? 0)}</span>
                   {p.has_variants && <span className="text-[10px] text-brand-teal">Select variant →</span>}
                 </button>
               ))}
             </div>
           )}
           {!searching && search && results.length === 0 && (
-            <p className="py-4 text-center text-sm text-gray-400">No products found</p>
+            <p className="py-4 text-center text-sm text-outline">No products found</p>
           )}
         </>
       )}

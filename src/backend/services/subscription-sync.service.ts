@@ -7,6 +7,7 @@
  */
 import Stripe from 'stripe'
 import { getAdminSupabase } from '@/backend/config/supabase'
+import { EmailService } from '@/backend/services/email.service'
 
 interface CustomPlanOverrides {
   maxBranches: number
@@ -194,6 +195,24 @@ export const SubscriptionSyncService = {
                 .from('businesses')
                 .update({ is_active: stripeSub.status !== 'canceled' })
                 .eq('id', row.business_id)
+            }
+
+            // Safety net: if a missed/misrouted webhook meant we never emailed
+            // the owner when this subscription actually expired, catch up here.
+            if (stripeSub.status === 'canceled' && row.status !== 'canceled') {
+              const { data: business } = await supabase
+                .from('businesses')
+                .select('email, name, subdomain')
+                .eq('id', row.business_id)
+                .maybeSingle()
+
+              if (business?.email) {
+                EmailService.sendSubscriptionExpired({
+                  to:           business.email,
+                  businessName: business.name,
+                  subdomain:    business.subdomain,
+                }).catch(err => console.error('[reconcileAllFromStripe] sendSubscriptionExpired error:', err))
+              }
             }
 
             corrected += 1

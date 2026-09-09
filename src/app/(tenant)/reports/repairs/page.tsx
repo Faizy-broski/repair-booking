@@ -10,6 +10,7 @@ import { exportExcel } from '@/lib/export-excel'
 import { DateRangeBar } from '../_components/date-range-bar'
 import Link from 'next/link'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { chartTooltipStyle } from '@/lib/chart-theme'
 import type { ColumnDef } from '@tanstack/react-table'
 
 interface RepairRow { key: string; name: string; count: number; total_value: number }
@@ -176,7 +177,10 @@ export default function RepairsReportPage() {
                   <Cell key={row.key} fill={getColor(row.key, i)} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value: number, _: unknown, props: { payload?: RepairRow }) => [value, props.payload?.name ?? '']} />
+              <Tooltip
+                formatter={(value: number, _: unknown, props: { payload?: RepairRow }) => [value, props.payload?.name ?? '']}
+                {...chartTooltipStyle}
+              />
               <Legend
                 payload={data.map((row, i) => ({
                   value: row.name,
@@ -184,7 +188,7 @@ export default function RepairsReportPage() {
                   color: getColor(row.key, i),
                 }))}
                 formatter={(value: string) => (
-                  <span style={{ color: '#374151', fontSize: 13 }}>{value}</span>
+                  <span style={{ color: 'var(--on-surface-variant)', fontSize: 13 }}>{value}</span>
                 )}
               />
             </PieChart>

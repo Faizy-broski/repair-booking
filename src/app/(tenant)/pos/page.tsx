@@ -440,7 +440,7 @@ export default function PosPage() {
 
   if (sessionLoading) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-3.5rem)] text-sm text-gray-500">
+      <div className="flex items-center justify-center h-[calc(100vh-3.5rem)] text-sm text-on-surface-variant">
         Loading session...
       </div>
     )
@@ -492,7 +492,7 @@ export default function PosPage() {
   // ── Main layout ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="absolute inset-0 flex flex-col overflow-hidden bg-gray-100">
+    <div className="absolute inset-0 flex flex-col overflow-hidden bg-surface-container">
 
       {/* Register open banner */}
       {pos.session && (
@@ -555,7 +555,7 @@ export default function PosPage() {
           - (sessionStats.total_refunds - (sessionStats.card_refunds ?? 0))
           - (sessionStats.repair_cash_refunds ?? 0)
         return (
-          <div className="relative shrink-0 border-b border-gray-200 bg-gray-50 px-3 py-2 sm:px-5">
+          <div className="relative shrink-0 border-b border-outline-variant bg-surface-container-low px-3 py-2 sm:px-5">
             <div
               ref={statsScrollRef}
               onScroll={updateStatsScrollState}
@@ -596,8 +596,8 @@ export default function PosPage() {
                 // is computed).
                 ['Cash Drawer Only', cashDrawerExpected,                    'text-lime-700',   'bg-lime-500'],
               ] as [string, number, string, string][]).map(([label, value, textCls, dotCls]) => (
-                <div key={label} className="flex shrink-0 flex-col gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-sm">
-                  <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-bold uppercase tracking-wide text-gray-500">
+                <div key={label} className="flex shrink-0 flex-col gap-1 rounded-lg border border-outline-variant bg-surface px-3 py-2 shadow-sm">
+                  <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-bold uppercase tracking-wide text-on-surface-variant">
                     <span className={`h-2 w-2 shrink-0 rounded-full ${dotCls}`} />
                     {label}
                   </span>
@@ -613,7 +613,7 @@ export default function PosPage() {
                 actually more to scroll to. */}
             {statsCanScrollLeft && (
               <>
-                <div className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-gray-50 to-transparent sm:left-2" />
+                <div className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-surface-container-low to-transparent sm:left-2" />
                 <button
                   type="button"
                   aria-label="Scroll stats left"
@@ -626,7 +626,7 @@ export default function PosPage() {
             )}
             {statsCanScrollRight && (
               <>
-                <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-gray-50 to-transparent sm:right-2" />
+                <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-surface-container-low to-transparent sm:right-2" />
                 <button
                   type="button"
                   aria-label="Scroll stats right"
@@ -669,7 +669,7 @@ export default function PosPage() {
           )}
 
           {/* Tab content */}
-          <div className="flex flex-1 flex-col overflow-hidden bg-gray-50">
+          <div className="flex flex-1 flex-col overflow-hidden bg-surface-container-low">
             {activeTab === 'repairs' && <RepairsTab />}
             {activeTab === 'products' && <ProductsTab />}
           </div>
@@ -677,17 +677,17 @@ export default function PosPage() {
       </div>
 
       {/* ── Mobile bottom nav ── */}
-      <div className="flex shrink-0 lg:hidden border-t border-gray-200 bg-white">
+      <div className="flex shrink-0 lg:hidden border-t border-outline-variant bg-surface">
         <button
           onClick={() => setMobileView('browse')}
-          className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-semibold transition-colors ${mobileView === 'browse' ? 'text-brand-teal bg-brand-teal/5' : 'text-gray-400'}`}
+          className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-semibold transition-colors ${mobileView === 'browse' ? 'text-brand-teal bg-brand-teal/5' : 'text-outline'}`}
         >
           <Wrench className="h-5 w-5" />
           Browse
         </button>
         <button
           onClick={() => setMobileView('cart')}
-          className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-semibold transition-colors ${mobileView === 'cart' ? 'text-brand-teal bg-brand-teal/5' : 'text-gray-400'}`}
+          className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-semibold transition-colors ${mobileView === 'cart' ? 'text-brand-teal bg-brand-teal/5' : 'text-outline'}`}
         >
           <ShoppingBag className="h-5 w-5" />
           Cart

@@ -94,7 +94,7 @@ function getRowBadge(row: SaleRow): { label: string; cls: string } {
   if (row.is_exchange) return { label: 'Exchange', cls: STATUS_COLORS.exchange }
   if (row.is_refund && row.refund_reason === 'Product exchange') return { label: 'Exchange Return', cls: STATUS_COLORS.exchange_return }
   const label = getStatusLabel(row.payment_status, row.payment_method)
-  return { label, cls: STATUS_COLORS[row.payment_status] ?? 'bg-gray-100 text-gray-800' }
+  return { label, cls: STATUS_COLORS[row.payment_status] ?? 'bg-surface-container text-on-surface' }
 }
 const STATUS_LABELS: Record<string, string> = {
   paid: 'Paid', refunded: 'Refunded', partial: 'Partial Refund', on_account: 'On Account',
@@ -871,7 +871,7 @@ export default function SalesPage() {
         return (
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
-              <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400 shadow-sm transition-all hover:border-gray-300 hover:bg-gray-50 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-200">
+              <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-outline-variant bg-surface text-outline shadow-sm transition-all hover:border-outline hover:bg-surface-container-low hover:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-outline-variant">
                 <MoreVertical className="h-4 w-4" />
               </button>
             </DropdownMenu.Trigger>
@@ -879,15 +879,15 @@ export default function SalesPage() {
               <DropdownMenu.Content
                 align="end"
                 sideOffset={4}
-                className="z-50 min-w-[188px] overflow-hidden rounded-xl border border-gray-100 bg-white p-1 shadow-xl shadow-black/10 ring-1 ring-black/5"
+                className="z-50 min-w-[188px] overflow-hidden rounded-xl border border-outline-variant bg-surface p-1 shadow-xl shadow-black/10 ring-1 ring-black/5"
               >
                 {/* View Details */}
                 <DropdownMenu.Item
                   onSelect={() => viewDetail(sale)}
-                  className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-none transition-colors hover:bg-gray-50"
+                  className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-on-surface-variant outline-none transition-colors hover:bg-surface-container-low"
                 >
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 transition-colors group-hover:bg-gray-200">
-                    <Eye className="h-3.5 w-3.5 text-gray-500" />
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-surface-container transition-colors group-hover:bg-surface-container-high">
+                    <Eye className="h-3.5 w-3.5 text-on-surface-variant" />
                   </span>
                   <span className="font-medium">View Details</span>
                 </DropdownMenu.Item>
@@ -895,7 +895,7 @@ export default function SalesPage() {
                 {/* Delete Cash Movement — only "plain" movements; expense/buyback stay tied to their linked record */}
                 {isCash && canDelete && (sale.purpose === 'plain' || !sale.purpose) && (
                   <>
-                    <DropdownMenu.Separator className="my-1 -mx-1 border-t border-gray-100" />
+                    <DropdownMenu.Separator className="my-1 -mx-1 border-t border-outline-variant" />
                     <DropdownMenu.Item
                       onSelect={() => handleDeleteSale(sale.id)}
                       className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-red-50"
@@ -908,7 +908,7 @@ export default function SalesPage() {
                   </>
                 )}
 
-                {!isCash && <DropdownMenu.Separator className="my-1 -mx-1 border-t border-gray-100" />}
+                {!isCash && <DropdownMenu.Separator className="my-1 -mx-1 border-t border-outline-variant" />}
 
                 {/* Edit Sale */}
                 {!isCash && canDelete && !sale.is_refund && (
@@ -961,7 +961,7 @@ export default function SalesPage() {
                   </DropdownMenu.Item>
                 )}
 
-                {!isCash && <DropdownMenu.Separator className="my-1 -mx-1 border-t border-gray-100" />}
+                {!isCash && <DropdownMenu.Separator className="my-1 -mx-1 border-t border-outline-variant" />}
 
                 {/* Download Receipt */}
                 {!isCash && (
@@ -969,12 +969,12 @@ export default function SalesPage() {
                     onSelect={() => fetchAndDownloadReceipt(sale.id)}
                     onMouseEnter={() => prefetchPdf(`/api/pos/sales/${sale.id}/pdf`)}
                     disabled={isDownloading}
-                    className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-700 outline-none transition-colors hover:bg-gray-50 disabled:opacity-40"
+                    className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-on-surface-variant outline-none transition-colors hover:bg-surface-container-low disabled:opacity-40"
                   >
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 transition-colors group-hover:bg-gray-200">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-surface-container transition-colors group-hover:bg-surface-container-high">
                       {isDownloading
-                        ? <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-500" />
-                        : <Download className="h-3.5 w-3.5 text-gray-500" />}
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin text-on-surface-variant" />
+                        : <Download className="h-3.5 w-3.5 text-on-surface-variant" />}
                     </span>
                     <span className="font-medium">{isDownloading ? 'Generating…' : 'Download Receipt'}</span>
                   </DropdownMenu.Item>
@@ -983,7 +983,7 @@ export default function SalesPage() {
                 {/* Delete Sale */}
                 {!isCash && canDelete && !sale.is_refund && (
                   <>
-                    <DropdownMenu.Separator className="my-1 -mx-1 border-t border-gray-100" />
+                    <DropdownMenu.Separator className="my-1 -mx-1 border-t border-outline-variant" />
                     <DropdownMenu.Item
                       onSelect={() => handleDeleteSale(sale.id)}
                       className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-red-50"
@@ -1011,7 +1011,7 @@ export default function SalesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Sales</h1>
-          <p className="text-sm text-gray-500">View all POS transactions</p>
+          <p className="text-sm text-on-surface-variant">View all POS transactions</p>
         </div>
         <Button variant="outline" size="sm" onClick={refreshSales} disabled={isFetching}>
           <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
@@ -1059,7 +1059,7 @@ export default function SalesPage() {
             <button
               key={label}
               onClick={() => { setDateFrom(range.from); setDateTo(range.to); setPage(0) }}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${active ? 'bg-teal-700 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${active ? 'bg-teal-700 text-white' : 'text-on-surface-variant hover:bg-surface-container'}`}
             >
               {label}
             </button>
@@ -1070,7 +1070,7 @@ export default function SalesPage() {
       {/* Filters */}
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex-1 min-w-[220px]">
-          <label className="mb-1 block text-xs font-medium text-gray-500">Search</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Search</label>
           <div className="relative">
             <input
               type="text"
@@ -1080,22 +1080,22 @@ export default function SalesPage() {
               onChange={e => setSearchInput(e.target.value)}
             />
             {searchInput && (
-              <button className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" onClick={() => { setSearchInput(''); setSearch('') }}>
+              <button className="absolute right-2 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface-variant" onClick={() => { setSearchInput(''); setSearch('') }}>
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500">From</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">From</label>
           <input type="date" className="rounded-md border px-3 py-1.5 text-sm" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(0) }} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500">To</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">To</label>
           <input type="date" className="rounded-md border px-3 py-1.5 text-sm" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(0) }} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500">Status</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Status</label>
           <select className="rounded-md border px-3 py-1.5 text-sm" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0) }}>
             <option value="">All</option>
             <option value="paid">Paid</option>
@@ -1105,7 +1105,7 @@ export default function SalesPage() {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500">Type</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Type</label>
           <select className="rounded-md border px-3 py-1.5 text-sm" value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(0) }}>
             <option value="">All</option>
             <option value="sale">Sale</option>
@@ -1143,13 +1143,13 @@ export default function SalesPage() {
           <div className="space-y-4">
             {/* Sale info */}
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><span className="text-gray-500">Sale #</span><br /><span className="font-mono">{detail.id.slice(-8).toUpperCase()}</span></div>
-              <div><span className="text-gray-500">Date</span><br />{formatDateTime(detail.created_at)}</div>
-              <div><span className="text-gray-500">Customer</span><br />{customerName(detail.customers)}</div>
-              <div><span className="text-gray-500">Cashier</span><br />{detail.profiles?.full_name ?? '—'}</div>
-              <div><span className="text-gray-500">Payment</span><br />{PAYMENT_LABELS[detail.payment_method] ?? detail.payment_method}</div>
+              <div><span className="text-on-surface-variant">Sale #</span><br /><span className="font-mono">{detail.id.slice(-8).toUpperCase()}</span></div>
+              <div><span className="text-on-surface-variant">Date</span><br />{formatDateTime(detail.created_at)}</div>
+              <div><span className="text-on-surface-variant">Customer</span><br />{customerName(detail.customers)}</div>
+              <div><span className="text-on-surface-variant">Cashier</span><br />{detail.profiles?.full_name ?? '—'}</div>
+              <div><span className="text-on-surface-variant">Payment</span><br />{PAYMENT_LABELS[detail.payment_method] ?? detail.payment_method}</div>
               <div>
-                <span className="text-gray-500">Status</span><br />
+                <span className="text-on-surface-variant">Status</span><br />
                 {(() => { const b = getRowBadge(detail as unknown as SaleRow); return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${b.cls}`}>{b.label}</span> })()}
               </div>
             </div>
@@ -1177,8 +1177,8 @@ export default function SalesPage() {
 
             {/* Split payment details */}
             {detail.payment_method === 'split' && detail.payment_splits?.length ? (
-              <div className="rounded-md bg-gray-50 p-3">
-                <p className="mb-1 text-xs font-medium text-gray-500">Payment Split</p>
+              <div className="rounded-md bg-surface-container-low p-3">
+                <p className="mb-1 text-xs font-medium text-on-surface-variant">Payment Split</p>
                 {detail.payment_splits.map((s, i) => (
                   <div key={i} className="flex justify-between text-sm">
                     <span>{PAYMENT_LABELS[s.method] ?? s.method}</span>
@@ -1228,7 +1228,7 @@ export default function SalesPage() {
               <p className="mb-2 text-sm font-medium">Items</p>
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b text-left text-gray-500">
+                  <tr className="border-b text-left text-on-surface-variant">
                     <th className="pb-1">Item</th>
                     <th className="pb-1 text-center">Qty</th>
                     <th className="pb-1 text-right">Price</th>
@@ -1251,13 +1251,13 @@ export default function SalesPage() {
             </div>
 
             {/* Totals */}
-            <div className="rounded-md bg-gray-50 p-3 text-sm">
-              <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span>{detail.is_refund ? '-' : ''}{formatCurrency(Math.abs(Number(detail.subtotal)))}</span></div>
+            <div className="rounded-md bg-surface-container-low p-3 text-sm">
+              <div className="flex justify-between"><span className="text-on-surface-variant">Subtotal</span><span>{detail.is_refund ? '-' : ''}{formatCurrency(Math.abs(Number(detail.subtotal)))}</span></div>
               {Number(detail.discount) > 0 && (
                 <div className="flex justify-between text-green-600"><span>Discount</span><span>-{formatCurrency(Math.abs(Number(detail.discount)))}</span></div>
               )}
               {Number(detail.tax) > 0 && (
-                <div className="flex justify-between"><span className="text-gray-500">Tax</span><span>{formatCurrency(Math.abs(Number(detail.tax)))}</span></div>
+                <div className="flex justify-between"><span className="text-on-surface-variant">Tax</span><span>{formatCurrency(Math.abs(Number(detail.tax)))}</span></div>
               )}
               <div className="mt-1 flex justify-between border-t pt-1 font-bold">
                 <span>Total</span>
@@ -1267,7 +1267,7 @@ export default function SalesPage() {
 
             {detail.notes && (
               <div className="text-sm">
-                <span className="text-gray-500">Notes:</span>{' '}
+                <span className="text-on-surface-variant">Notes:</span>{' '}
                 {detail.is_refund
                   ? detail.notes.replace(
                       /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi,
@@ -1316,7 +1316,7 @@ export default function SalesPage() {
             </Button>
           </div>
         ) : (
-          <p className="py-8 text-center text-gray-400">Sale not found</p>
+          <p className="py-8 text-center text-outline">Sale not found</p>
         )}
       </Modal>
 
@@ -1341,16 +1341,16 @@ export default function SalesPage() {
           return (
             <div className="space-y-4">
               {/* Mode toggle */}
-              <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-sm">
+              <div className="flex rounded-lg border border-outline-variant bg-surface-container-low p-0.5 text-sm">
                 <button
                   onClick={() => setRefundMode('items')}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 font-semibold transition-all ${refundMode === 'items' ? 'bg-orange-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 font-semibold transition-all ${refundMode === 'items' ? 'bg-orange-500 text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
                 >
                   <Package className="h-3.5 w-3.5" /> Return Items
                 </button>
                 <button
                   onClick={() => setRefundMode('amount')}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 font-semibold transition-all ${refundMode === 'amount' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 font-semibold transition-all ${refundMode === 'amount' ? 'bg-blue-600 text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
                 >
                   <DollarSign className="h-3.5 w-3.5" /> Refund Amount
                 </button>
@@ -1358,7 +1358,7 @@ export default function SalesPage() {
 
               {refundMode === 'items' ? (
                 <>
-                  <p className="text-sm text-gray-500">Select items and quantities to return. Inventory will be restocked.</p>
+                  <p className="text-sm text-on-surface-variant">Select items and quantities to return. Inventory will be restocked.</p>
                   {/* Item qty selectors */}
                   <div className="divide-y rounded-md border">
                     {(detail.sale_items ?? []).map(item => {
@@ -1385,20 +1385,20 @@ export default function SalesPage() {
                         <div key={item.id} className="flex items-center justify-between px-3 py-2">
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{item.name}</p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-on-surface-variant">
                               {formatCurrency(Number(item.total) / item.quantity)} × {item.quantity}
                               {Number(item.discount) > 0 && <span className="ml-1 text-green-600">(-{formatCurrency(Number(item.discount))} disc)</span>}
                             </p>
                           </div>
                           <div className="ml-3 flex items-center gap-2">
                             <button
-                              className="flex h-6 w-6 items-center justify-center rounded border text-gray-500 hover:bg-gray-50 disabled:opacity-30"
+                              className="flex h-6 w-6 items-center justify-center rounded border text-on-surface-variant hover:bg-surface-container-low disabled:opacity-30"
                               onClick={() => setRefundQtys(q => ({ ...q, [item.id]: Math.max(0, (q[item.id] ?? 0) - 1) }))}
                               disabled={(refundQtys[item.id] ?? 0) <= 0}
                             >−</button>
                             <span className="w-6 text-center text-sm font-medium">{refundQtys[item.id] ?? 0}</span>
                             <button
-                              className="flex h-6 w-6 items-center justify-center rounded border text-gray-500 hover:bg-gray-50 disabled:opacity-30"
+                              className="flex h-6 w-6 items-center justify-center rounded border text-on-surface-variant hover:bg-surface-container-low disabled:opacity-30"
                               onClick={() => setRefundQtys(q => ({ ...q, [item.id]: Math.min(remaining, (q[item.id] ?? 0) + 1) }))}
                               disabled={(refundQtys[item.id] ?? 0) >= remaining}
                             >+</button>
@@ -1418,7 +1418,7 @@ export default function SalesPage() {
                 </>
               ) : (
                 <>
-                  <p className="text-sm text-gray-500">Enter the amount to refund per item. Stock will <strong>not</strong> be restocked.</p>
+                  <p className="text-sm text-on-surface-variant">Enter the amount to refund per item. Stock will <strong>not</strong> be restocked.</p>
                   <div className="divide-y rounded-md border">
                     {(detail.sale_items ?? []).map(item => {
                       const alreadyRefundedAmt = getAlreadyRefundedAmount(item)
@@ -1437,14 +1437,14 @@ export default function SalesPage() {
                         <div key={item.id} className="flex items-center gap-3 px-3 py-2.5">
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{item.name}</p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-on-surface-variant">
                               {formatCurrency(Number(item.unit_price))} × {item.quantity}
-                              {' · '}<span className="text-gray-400">max {formatCurrency(itemMax)}</span>
+                              {' · '}<span className="text-outline">max {formatCurrency(itemMax)}</span>
                               {alreadyRefundedAmt > 0 && <span className="ml-1 text-orange-500">({formatCurrency(alreadyRefundedAmt)} already refunded)</span>}
                             </p>
                           </div>
                           <div className="relative w-28 shrink-0">
-                            <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-gray-400 text-sm">{currencySymbol}</span>
+                            <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-outline text-sm">{currencySymbol}</span>
                             <input
                               type="number"
                               min={0}
@@ -1460,7 +1460,7 @@ export default function SalesPage() {
                             />
                           </div>
                           <div className="w-16 shrink-0 text-right text-sm font-semibold text-blue-700">
-                            {itemAmt > 0 ? formatCurrency(itemAmt) : <span className="text-gray-300">—</span>}
+                            {itemAmt > 0 ? formatCurrency(itemAmt) : <span className="text-outline-variant">—</span>}
                           </div>
                         </div>
                       )
@@ -1483,7 +1483,7 @@ export default function SalesPage() {
 
               {/* Reason */}
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Reason (optional)</label>
+                <label className="mb-1 block text-xs font-medium text-on-surface-variant">Reason (optional)</label>
                 <input
                   className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g. Customer changed mind, defective item…"
@@ -1495,20 +1495,20 @@ export default function SalesPage() {
               {/* Return payment method */}
               {isSplitOriginal ? (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">
+                  <label className="mb-1 block text-xs font-medium text-on-surface-variant">
                     Return Via — this sale was split-tender, split the refund the same way
                   </label>
                   <div className="space-y-2">
                     {splitChannels.map(m => (
                       <div key={m} className="flex items-center gap-3">
-                        <span className="w-20 shrink-0 text-sm font-medium text-gray-600">
+                        <span className="w-20 shrink-0 text-sm font-medium text-on-surface-variant">
                           {PAYMENT_LABELS[m] ?? m}
                         </span>
                         <input
                           type="number" min={0} step={0.01} placeholder="0.00"
                           value={refundSplits[m] ?? ''}
                           onChange={e => setRefundSplits(r => ({ ...r, [m]: e.target.value }))}
-                          className="h-9 flex-1 rounded-md border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="h-9 flex-1 rounded-md border border-outline-variant px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
                     ))}
@@ -1521,7 +1521,7 @@ export default function SalesPage() {
                 </div>
               ) : (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-gray-600">Return Via</label>
+                  <label className="mb-1 block text-xs font-medium text-on-surface-variant">Return Via</label>
                   <select
                     className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={refundPaymentMethod}
@@ -1567,7 +1567,7 @@ export default function SalesPage() {
 
             {/* Customer picker — dropdown portalled to body to escape modal overflow */}
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">Customer</label>
+              <label className="mb-1 block text-xs font-medium text-on-surface-variant">Customer</label>
               {editForm.customer_id ? (
                 <div className="flex items-center justify-between rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-sm">
                   <span className="font-medium text-blue-800">
@@ -1613,18 +1613,18 @@ export default function SalesPage() {
                     }}
                   />
                   {editCustomerSearching && (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-400 mt-1 ml-auto" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-outline mt-1 ml-auto" />
                   )}
                   {editDropdownOpen && (() => {
                     const listToShow = editCustomerSearch.trim() ? editCustomerResults : editRecentCustomers
                     if (!listToShow.length) return null
                     return (
                       <ul
-                        className="mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-48 overflow-y-auto"
+                        className="mt-1 w-full rounded-md border border-outline-variant bg-surface shadow-lg max-h-48 overflow-y-auto"
                         onMouseDown={e => e.preventDefault()}
                       >
                         {!editCustomerSearch.trim() && (
-                          <li className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 bg-gray-50 border-b">
+                          <li className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-outline bg-surface-container-low border-b">
                             Recent Customers
                           </li>
                         )}
@@ -1642,8 +1642,8 @@ export default function SalesPage() {
                                 setEditDropdownOpen(false)
                               }}
                             >
-                              <span className="font-medium text-gray-800">{c.first_name} {c.last_name ?? ''}</span>
-                              {c.phone && <span className="text-xs text-gray-400">{c.phone}</span>}
+                              <span className="font-medium text-on-surface">{c.first_name} {c.last_name ?? ''}</span>
+                              {c.phone && <span className="text-xs text-outline">{c.phone}</span>}
                             </button>
                           </li>
                         ))}
@@ -1657,7 +1657,7 @@ export default function SalesPage() {
             {/* Metadata */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Payment Method</label>
+                <label className="mb-1 block text-xs font-medium text-on-surface-variant">Payment Method</label>
                 <select
                   className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={editForm.payment_method}
@@ -1670,7 +1670,7 @@ export default function SalesPage() {
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Payment Status</label>
+                <label className="mb-1 block text-xs font-medium text-on-surface-variant">Payment Status</label>
                 <select
                   className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   value={editForm.payment_status}
@@ -1690,7 +1690,7 @@ export default function SalesPage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">Notes</label>
+              <label className="mb-1 block text-xs font-medium text-on-surface-variant">Notes</label>
               <textarea
                 className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 rows={2}
@@ -1702,7 +1702,7 @@ export default function SalesPage() {
 
             {/* Items */}
             <div>
-              <p className="mb-2 text-sm font-semibold text-gray-700">Items</p>
+              <p className="mb-2 text-sm font-semibold text-on-surface-variant">Items</p>
               <div className="rounded-md border divide-y">
                 {editForm.items.map(item => {
                   const alreadyRefunded = getAlreadyRefunded({ id: item.id, name: item.name, quantity: item.quantity, unit_price: item.unit_price, discount: item.discount, total: item.total })
@@ -1712,15 +1712,15 @@ export default function SalesPage() {
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">{item.name}</span>
                         {item.product_id && (
-                          <span className="text-xs text-gray-400">Inventory tracked</span>
+                          <span className="text-xs text-outline">Inventory tracked</span>
                         )}
                       </div>
                       <div className="grid grid-cols-4 gap-2">
                         <div>
-                          <label className="mb-0.5 block text-xs text-gray-500">Qty</label>
+                          <label className="mb-0.5 block text-xs text-on-surface-variant">Qty</label>
                           <div className="flex items-center gap-1">
                             <button
-                              className="flex h-7 w-7 items-center justify-center rounded border text-gray-500 hover:bg-gray-50 disabled:opacity-30"
+                              className="flex h-7 w-7 items-center justify-center rounded border text-on-surface-variant hover:bg-surface-container-low disabled:opacity-30"
                               onClick={() => editItemField(item.id, 'quantity', Math.max(minQty, item.quantity - 1))}
                               disabled={item.quantity <= minQty}
                             >−</button>
@@ -1732,13 +1732,13 @@ export default function SalesPage() {
                               onChange={e => editItemField(item.id, 'quantity', Math.max(minQty, Number(e.target.value) || 1))}
                             />
                             <button
-                              className="flex h-7 w-7 items-center justify-center rounded border text-gray-500 hover:bg-gray-50"
+                              className="flex h-7 w-7 items-center justify-center rounded border text-on-surface-variant hover:bg-surface-container-low"
                               onClick={() => editItemField(item.id, 'quantity', item.quantity + 1)}
                             >+</button>
                           </div>
                         </div>
                         <div>
-                          <label className="mb-0.5 block text-xs text-gray-500">Unit Price</label>
+                          <label className="mb-0.5 block text-xs text-on-surface-variant">Unit Price</label>
                           <input
                             type="number"
                             min={0}
@@ -1749,7 +1749,7 @@ export default function SalesPage() {
                           />
                         </div>
                         <div>
-                          <label className="mb-0.5 block text-xs text-gray-500">Item Disc.</label>
+                          <label className="mb-0.5 block text-xs text-on-surface-variant">Item Disc.</label>
                           <input
                             type="number"
                             min={0}
@@ -1760,7 +1760,7 @@ export default function SalesPage() {
                           />
                         </div>
                         <div>
-                          <label className="mb-0.5 block text-xs text-gray-500">Line Total</label>
+                          <label className="mb-0.5 block text-xs text-on-surface-variant">Line Total</label>
                           <p className="py-1 text-sm font-medium">{formatCurrency(item.total)}</p>
                         </div>
                       </div>
@@ -1776,7 +1776,7 @@ export default function SalesPage() {
             {/* Sale-level adjustments */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Sale Discount</label>
+                <label className="mb-1 block text-xs font-medium text-on-surface-variant">Sale Discount</label>
                 <input
                   type="number"
                   min={0}
@@ -1787,7 +1787,7 @@ export default function SalesPage() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Tax</label>
+                <label className="mb-1 block text-xs font-medium text-on-surface-variant">Tax</label>
                 <input
                   type="number"
                   min={0}
@@ -1800,8 +1800,8 @@ export default function SalesPage() {
             </div>
 
             {/* Totals preview */}
-            <div className="rounded-md bg-gray-50 p-3 text-sm space-y-1">
-              <div className="flex justify-between text-gray-500">
+            <div className="rounded-md bg-surface-container-low p-3 text-sm space-y-1">
+              <div className="flex justify-between text-on-surface-variant">
                 <span>Subtotal</span><span>{formatCurrency(editSubtotal())}</span>
               </div>
               {editForm.discount > 0 && (
@@ -1810,7 +1810,7 @@ export default function SalesPage() {
                 </div>
               )}
               {editForm.tax > 0 && (
-                <div className="flex justify-between text-gray-500">
+                <div className="flex justify-between text-on-surface-variant">
                   <span>Tax</span><span>+{formatCurrency(editForm.tax)}</span>
                 </div>
               )}
@@ -1855,28 +1855,28 @@ export default function SalesPage() {
                 <p className={`text-xl font-bold ${cashDetailRow.record_type === 'cash_in' ? 'text-teal-700' : 'text-rose-600'}`}>
                   {cashDetailRow.record_type === 'cash_out' ? '-' : ''}{formatCurrency(Math.abs(Number(cashDetailRow.total)))}
                 </p>
-                <p className="text-xs text-gray-500 font-mono">{cashDetailRow.reference}</p>
+                <p className="text-xs text-on-surface-variant font-mono">{cashDetailRow.reference}</p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><span className="text-gray-500">Date</span><br />{formatDateTime(cashDetailRow.created_at)}</div>
-              <div><span className="text-gray-500">Cashier</span><br />{cashDetailRow.profiles?.full_name ?? '—'}</div>
-              <div><span className="text-gray-500">Method</span><br />{PAYMENT_LABELS[cashDetailRow.payment_method] ?? cashDetailRow.payment_method}</div>
+              <div><span className="text-on-surface-variant">Date</span><br />{formatDateTime(cashDetailRow.created_at)}</div>
+              <div><span className="text-on-surface-variant">Cashier</span><br />{cashDetailRow.profiles?.full_name ?? '—'}</div>
+              <div><span className="text-on-surface-variant">Method</span><br />{PAYMENT_LABELS[cashDetailRow.payment_method] ?? cashDetailRow.payment_method}</div>
               <div>
-                <span className="text-gray-500">Purpose</span><br />
+                <span className="text-on-surface-variant">Purpose</span><br />
                 {PURPOSE_LABELS[cashDetailRow.purpose ?? 'plain'] ?? 'Plain'}
               </div>
               {cashDetailRow.purpose === 'buyback' && (
                 <div className="col-span-2">
-                  <span className="text-gray-500">Product</span><br />
+                  <span className="text-on-surface-variant">Product</span><br />
                   {cashDetailRow.product_name ?? '—'}
                 </div>
               )}
             </div>
             {cashDetailRow.notes && (
-              <div className="rounded-md bg-gray-50 p-3 text-sm">
-                <p className="mb-1 text-xs font-medium text-gray-500">Notes</p>
-                <p className="text-gray-700">{cashDetailRow.notes}</p>
+              <div className="rounded-md bg-surface-container-low p-3 text-sm">
+                <p className="mb-1 text-xs font-medium text-on-surface-variant">Notes</p>
+                <p className="text-on-surface-variant">{cashDetailRow.notes}</p>
               </div>
             )}
           </div>
@@ -1892,7 +1892,7 @@ export default function SalesPage() {
           <Modal open={!!deleteConfirmId} onClose={() => setDeleteConfirmId(null)} title={isCash ? 'Delete Cash Movement' : 'Delete Sale'} size="sm">
             <div className="space-y-4">
               {isCash ? (
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-on-surface-variant">
                   This will permanently delete this {row?.record_type === 'cash_in' ? 'Cash In' : 'Cash Out'} record. This action cannot be undone.
                 </p>
               ) : row?.payment_status === 'partial' ? (
@@ -1901,7 +1901,7 @@ export default function SalesPage() {
                   <p>Deleting it will also delete all associated refund records. Only the unrefunded inventory will be restored. This cannot be undone.</p>
                 </div>
               ) : (
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-on-surface-variant">
                   This will permanently delete the sale and restore inventory quantities. This action cannot be undone.
                 </p>
               )}
@@ -1940,7 +1940,7 @@ export default function SalesPage() {
           return (
             <div className="space-y-4">
               {/* Stepper */}
-              <div className="flex items-center gap-0 rounded-xl border border-gray-200 bg-gray-50 p-0.5 text-sm">
+              <div className="flex items-center gap-0 rounded-xl border border-outline-variant bg-surface-container-low p-0.5 text-sm">
                 {(['Return Items', 'Replacement', 'Settlement'] as const).map((label, idx) => {
                   const step = (idx + 1) as 1 | 2 | 3
                   const active = exchangeStep === step
@@ -1949,17 +1949,17 @@ export default function SalesPage() {
                     <div key={label} className="flex flex-1 items-center">
                       <button
                         className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 font-semibold transition-all
-                          ${active ? 'bg-indigo-600 text-white shadow-sm' : done ? 'text-indigo-600' : 'text-gray-400'}`}
+                          ${active ? 'bg-indigo-600 text-white shadow-sm' : done ? 'text-indigo-600' : 'text-outline'}`}
                         onClick={() => { if (done || active) setExchangeStep(step) }}
                         disabled={step === 2 && !hasReturns || step === 3 && !hasNew}
                       >
                         <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold
-                          ${active ? 'bg-white/20' : done ? 'bg-indigo-100' : 'bg-gray-200'}`}>
+                          ${active ? 'bg-white/20' : done ? 'bg-indigo-100' : 'bg-surface-container-high'}`}>
                           {step}
                         </span>
                         {label}
                       </button>
-                      {idx < 2 && <ChevronRight className="h-3 w-3 shrink-0 text-gray-300" />}
+                      {idx < 2 && <ChevronRight className="h-3 w-3 shrink-0 text-outline-variant" />}
                     </div>
                   )
                 })}
@@ -1968,7 +1968,7 @@ export default function SalesPage() {
               {/* ── Step 1: Return Items ─────────────────────────────────────────── */}
               {exchangeStep === 1 && (
                 <>
-                  <p className="text-sm text-gray-500">Select items and quantities to return. Inventory will be restocked.</p>
+                  <p className="text-sm text-on-surface-variant">Select items and quantities to return. Inventory will be restocked.</p>
                   <div className="divide-y rounded-md border max-h-72 overflow-y-auto">
                     {(detail.sale_items ?? []).map(item => {
                       const alreadyRefunded = getAlreadyRefunded(item)
@@ -2001,26 +2001,26 @@ export default function SalesPage() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-on-surface-variant">
                               {formatCurrency(unitPrice)} × {item.quantity}
                               {alreadyRefunded > 0 && <span className="ml-1 text-orange-500">({alreadyRefunded} already returned)</span>}
                             </p>
                           </div>
                           <div className="flex items-center gap-1.5">
-                            <button className="flex h-6 w-6 items-center justify-center rounded border text-gray-500 hover:bg-gray-50 disabled:opacity-30"
+                            <button className="flex h-6 w-6 items-center justify-center rounded border text-on-surface-variant hover:bg-surface-container-low disabled:opacity-30"
                               onClick={() => setExchangeReturnQtys(q => ({ ...q, [item.id]: Math.max(0, (q[item.id] ?? 0) - 1) }))}
                               disabled={qty <= 0}>
                               <Minus className="h-3 w-3" />
                             </button>
                             <span className="w-5 text-center text-sm font-medium">{qty}</span>
-                            <button className="flex h-6 w-6 items-center justify-center rounded border text-gray-500 hover:bg-gray-50 disabled:opacity-30"
+                            <button className="flex h-6 w-6 items-center justify-center rounded border text-on-surface-variant hover:bg-surface-container-low disabled:opacity-30"
                               onClick={() => setExchangeReturnQtys(q => ({ ...q, [item.id]: Math.min(remaining, (q[item.id] ?? 0) + 1) }))}
                               disabled={qty >= remaining}>
                               <Plus className="h-3 w-3" />
                             </button>
                           </div>
                           <span className="w-16 text-right text-sm font-semibold text-indigo-700">
-                            {qty > 0 ? formatCurrency(unitPrice * qty) : <span className="text-gray-300">—</span>}
+                            {qty > 0 ? formatCurrency(unitPrice * qty) : <span className="text-outline-variant">—</span>}
                           </span>
                         </div>
                       )
@@ -2045,7 +2045,7 @@ export default function SalesPage() {
                   {exchangeVariantFor ? (
                     <div className="space-y-3">
                       <div className="flex items-center gap-2">
-                        <button onClick={() => setExchangeVariantFor(null)} className="text-gray-400 hover:text-gray-600">
+                        <button onClick={() => setExchangeVariantFor(null)} className="text-outline hover:text-on-surface-variant">
                           <ChevronLeft className="h-4 w-4" />
                         </button>
                         <p className="text-sm font-semibold">{exchangeVariantFor.name} — Select variant</p>
@@ -2058,8 +2058,8 @@ export default function SalesPage() {
                             <button key={v.id} onClick={() => addExchangeNewItem(exchangeVariantFor, v)}
                               className="flex flex-col items-start rounded-lg border p-2.5 text-left text-sm hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
                               <span className="font-medium">{v.name}</span>
-                              <span className="text-xs text-gray-500">{formatCurrency(v.selling_price ?? exchangeVariantFor.selling_price)}</span>
-                              {v.stock != null && <span className={`text-[10px] ${v.stock <= 0 ? 'text-red-500' : 'text-gray-400'}`}>{v.stock <= 0 ? 'Out of stock' : `${v.stock} in stock`}</span>}
+                              <span className="text-xs text-on-surface-variant">{formatCurrency(v.selling_price ?? exchangeVariantFor.selling_price)}</span>
+                              {v.stock != null && <span className={`text-[10px] ${v.stock <= 0 ? 'text-red-500' : 'text-outline'}`}>{v.stock <= 0 ? 'Out of stock' : `${v.stock} in stock`}</span>}
                             </button>
                           ))}
                         </div>
@@ -2069,7 +2069,7 @@ export default function SalesPage() {
                     <>
                       {/* Product search */}
                       <div className="relative">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-outline" />
                         <input
                           className="w-full rounded-md border py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
                           placeholder="Search products to add as replacement…"
@@ -2077,7 +2077,7 @@ export default function SalesPage() {
                           onChange={e => setExchangeProductSearch(e.target.value)}
                           autoFocus
                         />
-                        {exchangeSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400" />}
+                        {exchangeSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-outline" />}
                       </div>
 
                       {/* Results grid */}
@@ -2091,42 +2091,42 @@ export default function SalesPage() {
                               }}
                               className="flex flex-col items-start rounded-lg border p-2.5 text-left text-sm hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
                               <span className="font-medium truncate w-full">{p.name}</span>
-                              <span className="text-xs text-gray-500">{formatCurrency(p.selling_price ?? 0)}</span>
+                              <span className="text-xs text-on-surface-variant">{formatCurrency(p.selling_price ?? 0)}</span>
                               {p.has_variants && <span className="text-[10px] text-indigo-500">Select variant →</span>}
                             </button>
                           ))}
                         </div>
                       )}
                       {!exchangeSearching && exchangeProductSearch && exchangeProductResults.length === 0 && (
-                        <p className="py-4 text-center text-sm text-gray-400">No products found</p>
+                        <p className="py-4 text-center text-sm text-outline">No products found</p>
                       )}
 
                       {/* Selected new items */}
                       {exchangeNewItems.length > 0 && (
                         <>
                           <div className="border-t pt-3">
-                            <p className="mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Selected replacements</p>
+                            <p className="mb-2 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Selected replacements</p>
                             <div className="divide-y rounded-md border">
                               {exchangeNewItems.map((item, idx) => (
                                 <div key={idx} className="flex items-center gap-2 px-3 py-2">
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium truncate">{item.name}</p>
-                                    <p className="text-xs text-gray-500">{formatCurrency(item.unit_price)}</p>
+                                    <p className="text-xs text-on-surface-variant">{formatCurrency(item.unit_price)}</p>
                                   </div>
                                   <div className="flex items-center gap-1">
-                                    <button className="flex h-5 w-5 items-center justify-center rounded border text-gray-400 hover:bg-gray-50 disabled:opacity-30"
+                                    <button className="flex h-5 w-5 items-center justify-center rounded border text-outline hover:bg-surface-container-low disabled:opacity-30"
                                       onClick={() => setExchangeNewItems(prev => prev.map((i, n) => n === idx && i.quantity > 1 ? { ...i, quantity: i.quantity - 1, total: i.unit_price * (i.quantity - 1) } : i))}
                                       disabled={item.quantity <= 1}>
                                       <Minus className="h-2.5 w-2.5" />
                                     </button>
                                     <span className="w-4 text-center text-xs font-medium">{item.quantity}</span>
-                                    <button className="flex h-5 w-5 items-center justify-center rounded border text-gray-400 hover:bg-gray-50"
+                                    <button className="flex h-5 w-5 items-center justify-center rounded border text-outline hover:bg-surface-container-low"
                                       onClick={() => setExchangeNewItems(prev => prev.map((i, n) => n === idx ? { ...i, quantity: i.quantity + 1, total: i.unit_price * (i.quantity + 1) } : i))}>
                                       <Plus className="h-2.5 w-2.5" />
                                     </button>
                                   </div>
                                   <span className="w-14 text-right text-sm font-semibold">{formatCurrency(item.total)}</span>
-                                  <button className="text-gray-300 hover:text-red-400 transition-colors"
+                                  <button className="text-outline-variant hover:text-red-400 transition-colors"
                                     onClick={() => setExchangeNewItems(prev => prev.filter((_, n) => n !== idx))}>
                                     <X className="h-3.5 w-3.5" />
                                   </button>
@@ -2158,18 +2158,18 @@ export default function SalesPage() {
               {exchangeStep === 3 && (
                 <>
                   {/* Summary card */}
-                  <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 space-y-2">
+                  <div className="rounded-xl border border-outline-variant bg-surface-container-low p-4 space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">Return credit</span>
+                      <span className="text-on-surface-variant">Return credit</span>
                       <span className="font-semibold text-green-700">− {formatCurrency(returnedTotal)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-500">New items</span>
+                      <span className="text-on-surface-variant">New items</span>
                       <span className="font-semibold text-blue-700">+ {formatCurrency(newTotal)}</span>
                     </div>
                     <div className="border-t pt-2 mt-1 flex justify-between text-base font-bold">
                       <span>{net > 0 ? 'Customer pays' : net < 0 ? 'Customer receives' : 'No payment needed'}</span>
-                      <span className={net > 0 ? 'text-red-600' : net < 0 ? 'text-green-700' : 'text-gray-500'}>
+                      <span className={net > 0 ? 'text-red-600' : net < 0 ? 'text-green-700' : 'text-on-surface-variant'}>
                         {net === 0 ? '—' : formatCurrency(Math.abs(net))}
                       </span>
                     </div>
@@ -2178,13 +2178,13 @@ export default function SalesPage() {
                   {/* Payment method (if customer pays more) */}
                   {net > 0 && (
                     <div>
-                      <p className="mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Customer pays via</p>
+                      <p className="mb-2 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Customer pays via</p>
                       <div className="flex gap-2">
                         {(['cash', 'card', 'on_account'] as const).map(m => (
                           <button key={m}
                             onClick={() => setExchangePayMethod(m)}
                             className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-all
-                              ${exchangePayMethod === m ? m === 'on_account' ? 'bg-purple-600 text-white border-purple-600' : 'bg-indigo-600 text-white border-indigo-600' : 'text-gray-500 hover:bg-gray-50'}`}>
+                              ${exchangePayMethod === m ? m === 'on_account' ? 'bg-purple-600 text-white border-purple-600' : 'bg-indigo-600 text-white border-indigo-600' : 'text-on-surface-variant hover:bg-surface-container-low'}`}>
                             {m === 'cash' ? 'Cash' : m === 'card' ? 'Card' : 'Credit'}
                           </button>
                         ))}
@@ -2195,9 +2195,9 @@ export default function SalesPage() {
 
                           {/* Deposit amount */}
                           <div>
-                            <label className="mb-1 block text-xs font-semibold text-gray-500">Deposit amount (optional)</label>
+                            <label className="mb-1 block text-xs font-semibold text-on-surface-variant">Deposit amount (optional)</label>
                             <div className="relative">
-                              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-gray-400">
+                              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-outline">
                                 {formatCurrency(0).replace(/[\d.,\s]/g, '').trim() || '€'}
                               </span>
                               <input
@@ -2206,7 +2206,7 @@ export default function SalesPage() {
                                 max={net}
                                 step={0.01}
                                 placeholder="0.00"
-                                className="w-full rounded-lg border border-purple-200 bg-white py-2 pl-7 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                                className="w-full rounded-lg border border-purple-200 bg-surface py-2 pl-7 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
                                 value={exchangeDepositAmount}
                                 onChange={e => {
                                   const v = Math.min(parseFloat(e.target.value) || 0, net)
@@ -2219,12 +2219,12 @@ export default function SalesPage() {
                           {/* Deposit payment method */}
                           {parseFloat(exchangeDepositAmount) > 0 && (
                             <div>
-                              <label className="mb-1 block text-xs font-semibold text-gray-500">Deposit paid via</label>
+                              <label className="mb-1 block text-xs font-semibold text-on-surface-variant">Deposit paid via</label>
                               <div className="flex gap-2">
                                 {(['cash', 'card'] as const).map(m => (
                                   <button key={m} onClick={() => setExchangeDepositMethod(m)}
                                     className={`flex-1 rounded-lg border py-1.5 text-sm font-semibold transition-all
-                                      ${exchangeDepositMethod === m ? 'bg-purple-600 text-white border-purple-600' : 'text-gray-500 hover:bg-gray-50'}`}>
+                                      ${exchangeDepositMethod === m ? 'bg-purple-600 text-white border-purple-600' : 'text-on-surface-variant hover:bg-surface-container-low'}`}>
                                     {m === 'cash' ? 'Cash' : 'Card'}
                                   </button>
                                 ))}
@@ -2234,7 +2234,7 @@ export default function SalesPage() {
 
                           {/* Balance preview */}
                           <div className="flex justify-between border-t border-purple-100 pt-2 text-sm">
-                            <span className="text-gray-500">Outstanding balance</span>
+                            <span className="text-on-surface-variant">Outstanding balance</span>
                             <span className="font-bold text-purple-700">
                               {formatCurrency(Math.max(0, net - (parseFloat(exchangeDepositAmount) || 0)))}
                             </span>
@@ -2247,13 +2247,13 @@ export default function SalesPage() {
                   {/* Refund method (if customer gets money back) */}
                   {net < 0 && (
                     <div>
-                      <p className="mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Customer refund via</p>
+                      <p className="mb-2 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Customer refund via</p>
                       <div className="flex gap-2">
                         {(['cash', 'card', 'store_credit'] as const).map(m => (
                           <button key={m}
                             onClick={() => setExchangeRefundMethod(m)}
                             className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-all
-                              ${exchangeRefundMethod === m ? 'bg-green-600 text-white border-green-600' : 'text-gray-500 hover:bg-gray-50'}`}>
+                              ${exchangeRefundMethod === m ? 'bg-green-600 text-white border-green-600' : 'text-on-surface-variant hover:bg-surface-container-low'}`}>
                             {m === 'cash' ? 'Cash' : m === 'card' ? 'Card' : 'Store Credit'}
                           </button>
                         ))}
@@ -2293,8 +2293,8 @@ export default function SalesPage() {
 
 function SummaryCard({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
-    <div className="rounded-lg border bg-white p-4">
-      <p className="text-xs text-gray-500">{label}</p>
+    <div className="rounded-lg border bg-surface p-4">
+      <p className="text-xs text-on-surface-variant">{label}</p>
       <p className={`mt-1 text-xl font-bold ${className ?? ''}`}>{value}</p>
     </div>
   )

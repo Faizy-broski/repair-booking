@@ -27,7 +27,7 @@ export function StatsCard({ title, value, subtitle, icon, trend, color = 'blue',
 
       {/* Row 1: title (left) + icon (right) — both small, same line */}
       <div className="flex items-start justify-between gap-2">
-        <p className="min-h-[1.5rem] text-[9px] sm:text-[10px] font-bold uppercase leading-tight tracking-[0.05em] text-gray-700">{title}</p>
+        <p className="min-h-[1.5rem] text-[9px] sm:text-[10px] font-bold uppercase leading-tight tracking-[0.05em] text-on-surface-variant">{title}</p>
         {icon && (
           <div className={cn('flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl shadow-sm', colors.iconBg)}>
             <span className={colors.icon}>{icon}</span>
@@ -36,7 +36,7 @@ export function StatsCard({ title, value, subtitle, icon, trend, color = 'blue',
       </div>
 
       {/* Row 2: large value — always full width, never blocked by icon */}
-      <p className="mt-2 text-base sm:text-2xl font-bold tracking-tight text-gray-900 leading-none truncate" title={String(value)}>{value}</p>
+      <p className="mt-2 text-base sm:text-2xl font-bold tracking-tight text-on-surface leading-none truncate" title={String(value)}>{value}</p>
 
       {/* Row 3: subtitle / trend */}
       {subtitle && (

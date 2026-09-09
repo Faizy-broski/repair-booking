@@ -292,46 +292,46 @@ export function EmployeeReportTab({ branchId }: { branchId: string }) {
   // ── Employee list table (no selection yet) ─────────────────────────────
   if (!selectedId) {
     return (
-      <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+      <div className="rounded-xl border border-outline-variant bg-surface overflow-hidden">
 
         {/* Filter bar */}
-        <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-3 gap-3">
-          <p className="text-sm font-semibold text-gray-700">Monthly Summary</p>
+        <div className="flex items-center justify-between border-b border-outline-variant bg-surface-container-low px-5 py-3 gap-3">
+          <p className="text-sm font-semibold text-on-surface-variant">Monthly Summary</p>
           <div className="flex items-center gap-2">
             <select value={month} onChange={e => setMonth(parseInt(e.target.value, 10))}
-              className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-xs font-medium text-gray-700 focus:border-brand-teal focus:outline-none">
+              className="h-8 rounded-lg border border-outline-variant bg-surface px-2 text-xs font-medium text-on-surface-variant focus:border-brand-teal focus:outline-none">
               {MONTH_NAMES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
             </select>
             <select value={year} onChange={e => setYear(parseInt(e.target.value, 10))}
-              className="h-8 rounded-lg border border-gray-200 bg-white px-2 text-xs font-medium text-gray-700 focus:border-brand-teal focus:outline-none">
+              className="h-8 rounded-lg border border-outline-variant bg-surface px-2 text-xs font-medium text-on-surface-variant focus:border-brand-teal focus:outline-none">
               {[now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2].map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
         </div>
 
         {/* Table head */}
-        <div className="grid grid-cols-[44px_2fr_1fr_140px_140px_120px_220px] items-center gap-4 border-b border-gray-200 bg-gray-50/60 px-5 py-2.5">
+        <div className="grid grid-cols-[44px_2fr_1fr_140px_140px_120px_220px] items-center gap-4 border-b border-outline-variant bg-surface-container-low/60 px-5 py-2.5">
           <div />
-          <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Employee</div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Role</div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Attendance</div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Commission</div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">Status</div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 text-right">Actions</div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Employee</div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Role</div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Attendance</div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Commission</div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Status</div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant text-right">Actions</div>
         </div>
 
         {employees.length === 0 ? (
           <div className="py-16 text-center">
-            <User className="mx-auto h-8 w-8 text-gray-300 mb-2" />
-            <p className="text-sm text-gray-400">No employees yet.</p>
+            <User className="mx-auto h-8 w-8 text-outline-variant mb-2" />
+            <p className="text-sm text-outline">No employees yet.</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-outline-variant">
             {employees.map(e => {
               const summary = summaries[e.id]
               const daysInMonth = new Date(year, month, 0).getDate()
               return (
-                <div key={e.id} className="grid grid-cols-[44px_2fr_1fr_140px_140px_120px_220px] items-center gap-4 px-5 py-3.5 hover:bg-gray-50/60 transition-colors">
+                <div key={e.id} className="grid grid-cols-[44px_2fr_1fr_140px_140px_120px_220px] items-center gap-4 px-5 py-3.5 hover:bg-surface-container-low/60 transition-colors">
                   {/* Avatar */}
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-teal/10 text-brand-teal text-xs font-bold">
                     {e.first_name[0]?.toUpperCase()}{e.last_name?.[0]?.toUpperCase() ?? ''}
@@ -339,8 +339,8 @@ export function EmployeeReportTab({ branchId }: { branchId: string }) {
 
                   {/* Name */}
                   <div className="min-w-0">
-                    <p className="font-semibold text-sm text-gray-900 truncate">{e.first_name} {e.last_name ?? ''}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{(e.role ?? 'employee').replace(/_/g, ' ')}</p>
+                    <p className="font-semibold text-sm text-on-surface truncate">{e.first_name} {e.last_name ?? ''}</p>
+                    <p className="text-xs text-outline mt-0.5">{(e.role ?? 'employee').replace(/_/g, ' ')}</p>
                   </div>
 
                   {/* Role */}
@@ -353,31 +353,31 @@ export function EmployeeReportTab({ branchId }: { branchId: string }) {
                   {/* Attendance */}
                   <div>
                     {loadingSummaries ? (
-                      <div className="h-4 w-20 animate-pulse rounded bg-gray-100" />
+                      <div className="h-4 w-20 animate-pulse rounded bg-surface-container" />
                     ) : summary ? (
                       <div className="flex items-center gap-1.5">
                         <CalendarCheck className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                        <span className="text-sm font-semibold text-gray-900">{summary.daysPresent}</span>
-                        <span className="text-xs text-gray-400">/ {daysInMonth} days</span>
+                        <span className="text-sm font-semibold text-on-surface">{summary.daysPresent}</span>
+                        <span className="text-xs text-outline">/ {daysInMonth} days</span>
                       </div>
                     ) : (
-                      <span className="text-xs text-gray-400">—</span>
+                      <span className="text-xs text-outline">—</span>
                     )}
                   </div>
 
                   {/* Commission */}
                   <div>
                     {loadingSummaries ? (
-                      <div className="h-4 w-16 animate-pulse rounded bg-gray-100" />
+                      <div className="h-4 w-16 animate-pulse rounded bg-surface-container" />
                     ) : summary ? (
                       <div className="flex items-center gap-1.5">
                         <TrendingUp className="h-3.5 w-3.5 text-green-500 shrink-0" />
-                        <span className={`text-sm font-semibold ${summary.totalCommission > 0 ? 'text-green-700' : 'text-gray-400'}`}>
+                        <span className={`text-sm font-semibold ${summary.totalCommission > 0 ? 'text-green-700' : 'text-outline'}`}>
                           {formatCurrency(summary.totalCommission)}
                         </span>
                       </div>
                     ) : (
-                      <span className="text-xs text-gray-400">—</span>
+                      <span className="text-xs text-outline">—</span>
                     )}
                   </div>
 
@@ -413,8 +413,8 @@ export function EmployeeReportTab({ branchId }: { branchId: string }) {
 
         {/* Footer */}
         {employees.length > 0 && (
-          <div className="border-t border-gray-100 bg-gray-50/60 px-5 py-3">
-            <p className="text-xs text-gray-500">{employees.length} employee{employees.length !== 1 ? 's' : ''}</p>
+          <div className="border-t border-outline-variant bg-surface-container-low/60 px-5 py-3">
+            <p className="text-xs text-on-surface-variant">{employees.length} employee{employees.length !== 1 ? 's' : ''}</p>
           </div>
         )}
       </div>
@@ -425,16 +425,16 @@ export function EmployeeReportTab({ branchId }: { branchId: string }) {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <button onClick={() => setSelectedId(null)} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 print:hidden">
+        <button onClick={() => setSelectedId(null)} className="flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-on-surface print:hidden">
           <ChevronLeft className="h-4 w-4" /> Back to employees
         </button>
         <div className="flex items-center gap-2 flex-wrap">
           <select value={month} onChange={e => setMonth(parseInt(e.target.value, 10))}
-            className="h-9 rounded-lg border border-gray-200 px-3 text-sm focus:border-brand-teal focus:outline-none print:hidden">
+            className="h-9 rounded-lg border border-outline-variant px-3 text-sm focus:border-brand-teal focus:outline-none print:hidden">
             {MONTH_NAMES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
           </select>
           <select value={year} onChange={e => setYear(parseInt(e.target.value, 10))}
-            className="h-9 rounded-lg border border-gray-200 px-3 text-sm focus:border-brand-teal focus:outline-none print:hidden">
+            className="h-9 rounded-lg border border-outline-variant px-3 text-sm focus:border-brand-teal focus:outline-none print:hidden">
             {[now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
           <div className="flex items-center gap-2 print:hidden">
@@ -463,40 +463,40 @@ export function EmployeeReportTab({ branchId }: { branchId: string }) {
           {selected?.first_name?.[0]?.toUpperCase()}{selected?.last_name?.[0]?.toUpperCase() ?? ''}
         </div>
         <div>
-          <h3 className="text-lg font-bold text-gray-900">{selected?.first_name} {selected?.last_name ?? ''}</h3>
-          <p className="text-sm text-gray-500">{selected?.role ?? 'Employee'} — {MONTH_NAMES[month - 1]} {year}</p>
+          <h3 className="text-lg font-bold text-on-surface">{selected?.first_name} {selected?.last_name ?? ''}</h3>
+          <p className="text-sm text-on-surface-variant">{selected?.role ?? 'Employee'} — {MONTH_NAMES[month - 1]} {year}</p>
         </div>
       </div>
 
       {/* Summary cards */}
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 flex items-center gap-3">
+        <div className="rounded-xl border border-outline-variant bg-surface px-4 py-3 flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 text-blue-600"><Clock className="h-4 w-4" /></div>
           <div>
-            <p className="text-xs text-gray-500">Total Hours</p>
-            <p className="text-lg font-bold text-gray-900">{totalHours.toFixed(1)}h</p>
+            <p className="text-xs text-on-surface-variant">Total Hours</p>
+            <p className="text-lg font-bold text-on-surface">{totalHours.toFixed(1)}h</p>
           </div>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 flex items-center gap-3">
+        <div className="rounded-xl border border-outline-variant bg-surface px-4 py-3 flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-100 text-green-600"><TrendingUp className="h-4 w-4" /></div>
           <div>
-            <p className="text-xs text-gray-500">Total Commission</p>
-            <p className="text-lg font-bold text-gray-900">{formatCurrency(totalCommission)}</p>
+            <p className="text-xs text-on-surface-variant">Total Commission</p>
+            <p className="text-lg font-bold text-on-surface">{formatCurrency(totalCommission)}</p>
           </div>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 flex items-center gap-3">
+        <div className="rounded-xl border border-outline-variant bg-surface px-4 py-3 flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100 text-amber-600"><CalendarCheck className="h-4 w-4" /></div>
           <div>
-            <p className="text-xs text-gray-500">Days Present</p>
-            <p className="text-lg font-bold text-gray-900">{daysPresent} / {daysInMonth}</p>
+            <p className="text-xs text-on-surface-variant">Days Present</p>
+            <p className="text-lg font-bold text-on-surface">{daysPresent} / {daysInMonth}</p>
           </div>
         </div>
       </div>
 
       {/* Charts */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <p className="text-sm font-semibold text-gray-700 mb-2">Hours Worked Per Day</p>
+        <div className="rounded-xl border border-outline-variant bg-surface p-4">
+          <p className="text-sm font-semibold text-on-surface-variant mb-2">Hours Worked Per Day</p>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -507,8 +507,8 @@ export function EmployeeReportTab({ branchId }: { branchId: string }) {
             </BarChart>
           </ResponsiveContainer>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <p className="text-sm font-semibold text-gray-700 mb-2">Commission Earned Per Day</p>
+        <div className="rounded-xl border border-outline-variant bg-surface p-4">
+          <p className="text-sm font-semibold text-on-surface-variant mb-2">Commission Earned Per Day</p>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -524,11 +524,11 @@ export function EmployeeReportTab({ branchId }: { branchId: string }) {
       {/* Detail tables */}
       <div className="grid gap-4 lg:grid-cols-2">
         <div>
-          <p className="text-sm font-semibold text-gray-700 mb-2">Attendance Records</p>
+          <p className="text-sm font-semibold text-on-surface-variant mb-2">Attendance Records</p>
           <DataTable data={clockRows} columns={clockColumns} isLoading={loadingClock} emptyMessage="No attendance records for this month." />
         </div>
         <div>
-          <p className="text-sm font-semibold text-gray-700 mb-2">Commission Records</p>
+          <p className="text-sm font-semibold text-on-surface-variant mb-2">Commission Records</p>
           <DataTable data={commRows} columns={commColumns} isLoading={loadingComm} emptyMessage="No commissions for this month." />
         </div>
       </div>

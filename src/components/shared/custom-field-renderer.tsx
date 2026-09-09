@@ -81,16 +81,16 @@ export function CustomFieldRenderer({
                   checked={!!val}
                   disabled={readOnly}
                   onChange={e => set(field.field_key, e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-brand-teal accent-[var(--brand-teal)] disabled:opacity-60"
+                  className="h-4 w-4 rounded border-outline text-brand-teal accent-[var(--brand-teal)] disabled:opacity-60"
                 />
-                <label htmlFor={field.field_key} className="text-sm text-gray-700 cursor-pointer select-none">
+                <label htmlFor={field.field_key} className="text-sm text-on-surface-variant cursor-pointer select-none">
                   {field.label}
                   {field.is_required && <span className="ml-0.5 text-red-500">*</span>}
                 </label>
               </>
             ) : (
               <>
-                <label className="block text-xs font-medium text-gray-600">
+                <label className="block text-xs font-medium text-on-surface-variant">
                   {field.label}
                   {field.is_required && <span className="ml-0.5 text-red-500">*</span>}
                 </label>
@@ -100,7 +100,7 @@ export function CustomFieldRenderer({
                     value={String(val ?? '')}
                     disabled={readOnly}
                     onChange={e => set(field.field_key, e.target.value)}
-                    className="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-brand-teal focus:outline-none disabled:bg-gray-50 disabled:text-gray-500"
+                    className="h-9 w-full rounded-lg border border-outline bg-surface px-3 text-sm text-on-surface focus:border-brand-teal focus:outline-none disabled:bg-surface-container-low disabled:text-on-surface-variant"
                   >
                     <option value="">— Select —</option>
                     {choices.map(c => (
@@ -114,7 +114,7 @@ export function CustomFieldRenderer({
                     disabled={readOnly}
                     onChange={e => set(field.field_key, e.target.value)}
                     required={field.is_required}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-teal focus:outline-none disabled:bg-gray-50 disabled:text-gray-500"
+                    className="w-full rounded-lg border border-outline px-3 py-2 text-sm text-on-surface focus:border-brand-teal focus:outline-none disabled:bg-surface-container-low disabled:text-on-surface-variant"
                   />
                 ) : (
                   <input
@@ -129,7 +129,7 @@ export function CustomFieldRenderer({
                     disabled={readOnly}
                     onChange={e => set(field.field_key, e.target.value)}
                     required={field.is_required}
-                    className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm text-gray-900 focus:border-brand-teal focus:outline-none disabled:bg-gray-50 disabled:text-gray-500"
+                    className="h-9 w-full rounded-lg border border-outline px-3 text-sm text-on-surface focus:border-brand-teal focus:outline-none disabled:bg-surface-container-low disabled:text-on-surface-variant"
                   />
                 )}
               </>

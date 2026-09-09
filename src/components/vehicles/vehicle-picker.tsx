@@ -108,13 +108,13 @@ export function VehiclePicker({ customerId, value, onChange }: VehiclePickerProp
       <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
         <Car className="h-4 w-4 shrink-0 text-blue-600" />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900 truncate">
+          <p className="text-sm font-medium text-on-surface truncate">
             {value.registration_number.toUpperCase()}
             {!value.id && <span className="ml-1.5 text-[10px] font-semibold uppercase text-blue-600">New</span>}
           </p>
-          <p className="text-xs text-gray-500 truncate">{[value.make, value.model].filter(Boolean).join(' ') || 'No make/model'}{value.tyre_size ? ` · ${value.tyre_size}` : ''}</p>
+          <p className="text-xs text-on-surface-variant truncate">{[value.make, value.model].filter(Boolean).join(' ') || 'No make/model'}{value.tyre_size ? ` · ${value.tyre_size}` : ''}</p>
         </div>
-        <button type="button" onClick={clear} className="shrink-0 rounded p-0.5 text-gray-400 hover:text-gray-600">
+        <button type="button" onClick={clear} className="shrink-0 rounded p-0.5 text-outline hover:text-on-surface-variant">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -125,8 +125,8 @@ export function VehiclePicker({ customerId, value, onChange }: VehiclePickerProp
     // No customer selected yet (new customer being created) — nothing to search,
     // so go straight to the new-vehicle form.
     return (
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
-        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Vehicle</p>
+      <div className="rounded-lg border border-outline-variant bg-surface-container-low p-3 space-y-2">
+        <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">Vehicle</p>
         <NewVehicleFields draft={draft} setDraft={setDraft} />
         <PlateWarningBanner warning={plateWarning} />
         <Button type="button" size="sm" onClick={confirmNewVehicle} disabled={!draft.registration_number.trim() || checkingPlate}>
@@ -139,10 +139,10 @@ export function VehiclePicker({ customerId, value, onChange }: VehiclePickerProp
   return (
     <div className="space-y-2">
       {loading ? (
-        <p className="text-xs text-gray-400">Loading vehicles…</p>
+        <p className="text-xs text-outline">Loading vehicles…</p>
       ) : vehicles.length > 0 && !showNew ? (
         <div className="space-y-1.5">
-          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+          <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
             Select a vehicle <span className="text-red-500">*</span>
           </p>
           <div className="flex flex-wrap gap-2">
@@ -151,24 +151,24 @@ export function VehiclePicker({ customerId, value, onChange }: VehiclePickerProp
               key={v.id}
               type="button"
               onClick={() => selectVehicle(v)}
-              className="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:border-blue-400 hover:bg-blue-50"
+              className="rounded-md border border-outline bg-surface px-2.5 py-1.5 text-xs font-medium text-on-surface-variant hover:border-blue-400 hover:bg-blue-50"
             >
               {v.registration_number.toUpperCase()}
-              {(v.make || v.model) && <span className="ml-1 font-normal text-gray-400">{[v.make, v.model].filter(Boolean).join(' ')}</span>}
+              {(v.make || v.model) && <span className="ml-1 font-normal text-outline">{[v.make, v.model].filter(Boolean).join(' ')}</span>}
             </button>
           ))}
           <button
             type="button"
             onClick={() => setShowNew(true)}
-            className="flex items-center gap-1 rounded-md border border-dashed border-gray-300 px-2.5 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50"
+            className="flex items-center gap-1 rounded-md border border-dashed border-outline px-2.5 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50"
           >
             <Plus className="h-3 w-3" /> New vehicle
           </button>
           </div>
         </div>
       ) : (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
-          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+        <div className="rounded-lg border border-outline-variant bg-surface-container-low p-3 space-y-2">
+          <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
             {vehicles.length > 0 ? 'New Vehicle' : 'No vehicles on file — add one'}
           </p>
           <NewVehicleFields draft={draft} setDraft={setDraft} />

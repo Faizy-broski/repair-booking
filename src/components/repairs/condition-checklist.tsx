@@ -93,27 +93,27 @@ export function ConditionChecklist({ repairId, stage, title }: ConditionChecklis
   }
 
   return (
-    <div className="rounded-lg border border-gray-200">
+    <div className="rounded-lg border border-outline-variant">
       {/* Header */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-gray-50"
+        className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-surface-container-low"
       >
-        <span className="text-sm font-medium text-gray-900">{title}</span>
+        <span className="text-sm font-medium text-on-surface">{title}</span>
         <div className="flex items-center gap-2">
           {items.length > 0 && open && (
-            <span className="text-xs text-gray-400">{items.length} items</span>
+            <span className="text-xs text-outline">{items.length} items</span>
           )}
-          {open ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
+          {open ? <ChevronDown className="h-4 w-4 text-outline" /> : <ChevronRight className="h-4 w-4 text-outline" />}
         </div>
       </button>
 
       {/* Body */}
       {open && (
-        <div className="border-t border-gray-100 px-4 pb-4 pt-3">
+        <div className="border-t border-outline-variant px-4 pb-4 pt-3">
           {loading ? (
             <div className="space-y-2">
-              {[1, 2, 3].map((i) => <div key={i} className="h-8 animate-pulse rounded bg-gray-100" />)}
+              {[1, 2, 3].map((i) => <div key={i} className="h-8 animate-pulse rounded bg-surface-container" />)}
             </div>
           ) : (
             <div className="space-y-2">
@@ -123,23 +123,23 @@ export function ConditionChecklist({ repairId, stage, title }: ConditionChecklis
                     value={item.label}
                     onChange={(e) => updateItem(idx, { label: e.target.value })}
                     placeholder="Component name"
-                    className="h-8 flex-1 rounded border border-gray-200 px-2 text-sm focus:border-blue-400 focus:outline-none"
+                    className="h-8 flex-1 rounded border border-outline-variant px-2 text-sm focus:border-blue-400 focus:outline-none"
                   />
                   {/* Status toggle */}
-                  <div className="flex rounded-md border border-gray-200 overflow-hidden">
+                  <div className="flex rounded-md border border-outline-variant overflow-hidden">
                     {(Object.keys(STATUS_CONFIG) as Array<keyof typeof STATUS_CONFIG>).map((s) => (
                       <button
                         key={s}
                         onClick={() => updateItem(idx, { status: s })}
                         className={`px-2 py-1 text-xs font-medium transition-colors ${
-                          item.status === s ? STATUS_CONFIG[s].color : 'text-gray-400 hover:bg-gray-50'
+                          item.status === s ? STATUS_CONFIG[s].color : 'text-outline hover:bg-surface-container-low'
                         }`}
                       >
                         {STATUS_CONFIG[s].label}
                       </button>
                     ))}
                   </div>
-                  <button onClick={() => removeItem(idx)} className="text-gray-300 hover:text-red-400">
+                  <button onClick={() => removeItem(idx)} className="text-outline-variant hover:text-red-400">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>

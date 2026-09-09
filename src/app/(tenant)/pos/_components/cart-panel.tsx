@@ -661,20 +661,20 @@ export function CartPanel({ mobileView }: Props) {
   }
 
   return (
-    <div className={`flex-col border-r border-gray-200 bg-white overflow-hidden lg:flex lg:w-[35%] lg:min-w-[300px] lg:max-w-[460px] lg:shrink-0 ${mobileView === 'cart' ? 'flex w-full' : 'hidden'}`}>
+    <div className={`flex-col border-r border-outline-variant bg-surface overflow-hidden lg:flex lg:w-[35%] lg:min-w-[300px] lg:max-w-[460px] lg:shrink-0 ${mobileView === 'cart' ? 'flex w-full' : 'hidden'}`}>
 
       {/* Re-open ticket shortcut */}
-      <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-1.5">
+      <div className="flex items-center gap-2 border-b border-outline-variant px-3 py-1.5">
         <button
           onClick={() => router.push('/repairs')}
-          className="shrink-0 rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-200 whitespace-nowrap"
+          className="shrink-0 rounded-md bg-surface-container px-2.5 py-1 text-xs font-semibold text-on-surface-variant hover:bg-surface-container-high whitespace-nowrap"
         >
           Re-open in POS
         </button>
       </div>
 
       {/* Customer section */}
-      <div className="border-b border-gray-100 px-3 py-2" ref={customerRef}>
+      <div className="border-b border-outline-variant px-3 py-2" ref={customerRef}>
         {pos.customer ? (
           <div>
             <div className="flex items-center justify-between">
@@ -683,7 +683,7 @@ export function CartPanel({ mobileView }: Props) {
                   {pos.customer.first_name?.[0]?.toUpperCase()}{pos.customer.last_name?.[0]?.toUpperCase() ?? ''}
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate font-semibold text-gray-900 text-sm">{pos.customer.first_name} {pos.customer.last_name ?? ''}</p>
+                  <p className="truncate font-semibold text-on-surface text-sm">{pos.customer.first_name} {pos.customer.last_name ?? ''}</p>
                   {outstandingBalance > 0 && (
                     <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600">
                       <AlertTriangle className="h-3 w-3" /> Outstanding {formatCurrency(outstandingBalance)}
@@ -692,15 +692,15 @@ export function CartPanel({ mobileView }: Props) {
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-0.5 ml-1">
-                <button onClick={() => router.push(`/customers/${pos.customer!.id}`)} className="rounded p-1 text-gray-400 hover:text-brand-teal">
+                <button onClick={() => router.push(`/customers/${pos.customer!.id}`)} className="rounded p-1 text-outline hover:text-brand-teal">
                   <ExternalLink className="h-3 w-3" />
                 </button>
-                <button onClick={() => pos.setCustomer(null)} className="rounded p-1 text-gray-400 hover:text-red-500">
+                <button onClick={() => pos.setCustomer(null)} className="rounded p-1 text-outline hover:text-red-500">
                   <X className="h-3 w-3" />
                 </button>
               </div>
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500">
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-on-surface-variant">
               {pos.customer.phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{pos.customer.phone}</span>}
               {pos.customer.email && <span className="flex items-center gap-1 min-w-0"><Mail className="h-3 w-3" /><span className="truncate">{pos.customer.email}</span></span>}
               <button onClick={() => router.push(`/invoices?customer_id=${pos.customer!.id}`)} className="flex items-center gap-0.5 text-blue-500 hover:underline">
@@ -712,12 +712,12 @@ export function CartPanel({ mobileView }: Props) {
           <div className="relative">
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-outline" />
                 <input
                   type="text" placeholder="Search customer by name, phone, email..."
                   value={customerSearch} onChange={e => setCustomerSearch(e.target.value)}
                   onFocus={() => customerResults.length > 0 && setCustomerDropdownOpen(true)}
-                  className="h-9 w-full rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-2 text-sm focus:border-brand-teal focus:bg-white focus:outline-none"
+                  className="h-9 w-full rounded-lg border border-outline-variant bg-surface-container-low pl-8 pr-2 text-sm focus:border-brand-teal focus:bg-surface focus:outline-none"
                 />
               </div>
               <button
@@ -729,25 +729,25 @@ export function CartPanel({ mobileView }: Props) {
               </button>
             </div>
             {customerDropdownOpen && (
-              <div className="absolute left-0 right-0 top-full z-30 mt-1 rounded-lg border border-gray-200 bg-white shadow-xl">
+              <div className="absolute left-0 right-0 top-full z-30 mt-1 rounded-lg border border-outline-variant bg-surface shadow-xl">
                 {customerSearching ? (
-                  <div className="px-3 py-2 text-xs text-gray-400">Searching...</div>
+                  <div className="px-3 py-2 text-xs text-outline">Searching...</div>
                 ) : customerResults.length === 0 ? (
-                  <div className="px-3 py-2 text-xs text-gray-400">No results</div>
+                  <div className="px-3 py-2 text-xs text-outline">No results</div>
                 ) : customerResults.map(c => (
-                  <button key={c.id} onMouseDown={() => attachCustomer(c)} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-gray-50">
+                  <button key={c.id} onMouseDown={() => attachCustomer(c)} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-surface-container-low">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-teal-light text-sm font-bold text-brand-teal">
                       {c.first_name?.[0]?.toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-gray-900">{c.first_name} {c.last_name ?? ''}</p>
-                      {c.phone && <p className="text-sm text-gray-500">{c.phone}</p>}
+                      <p className="truncate text-sm font-medium text-on-surface">{c.first_name} {c.last_name ?? ''}</p>
+                      {c.phone && <p className="text-sm text-on-surface-variant">{c.phone}</p>}
                     </div>
                   </button>
                 ))}
                 <button
                   onMouseDown={() => { setCustomerDropdownOpen(false); setNewCustomerOpen(true) }}
-                  className="flex w-full items-center gap-2 border-t border-gray-100 px-3 py-2 text-xs font-medium text-brand-teal hover:bg-brand-teal-light"
+                  className="flex w-full items-center gap-2 border-t border-outline-variant px-3 py-2 text-xs font-medium text-brand-teal hover:bg-brand-teal-light"
                 >
                   <UserPlus className="h-3.5 w-3.5" /> Add new customer
                 </button>
@@ -758,12 +758,12 @@ export function CartPanel({ mobileView }: Props) {
       </div>
 
       {/* Barcode scan */}
-      <div className="border-b border-gray-100 px-4 py-3">
+      <div className="border-b border-outline-variant px-4 py-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
           <input
             type="text" placeholder="Enter item name, SKU or scan barcode"
-            className="h-10 w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-2 text-base focus:border-brand-teal focus:bg-white focus:outline-none"
+            className="h-10 w-full rounded-lg border border-outline-variant bg-surface-container-low pl-9 pr-2 text-base focus:border-brand-teal focus:bg-surface focus:outline-none"
             onKeyDown={async e => {
               if (e.key === 'Enter') {
                 const val = (e.target as HTMLInputElement).value.trim()
@@ -778,33 +778,33 @@ export function CartPanel({ mobileView }: Props) {
       {/* Cart table */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {pos.cart.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-base text-gray-400">No items added yet</div>
+          <div className="flex h-full items-center justify-center text-base text-outline">No items added yet</div>
         ) : (
           <table className="w-full table-fixed text-base">
-            <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
+            <thead className="sticky top-0 z-10 bg-surface-container-low border-b border-outline-variant">
               <tr>
-                <th className="w-[88px] px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">QTY</th>
-                <th className="px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Item</th>
-                <th className="w-[72px] px-2 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Unit</th>
-                <th className="w-[78px] px-2 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Disc</th>
-                <th className="w-[80px] px-2 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Total</th>
+                <th className="w-[88px] px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">QTY</th>
+                <th className="px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Item</th>
+                <th className="w-[72px] px-2 py-3 text-right text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Unit</th>
+                <th className="w-[78px] px-2 py-3 text-right text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Disc</th>
+                <th className="w-[80px] px-2 py-3 text-right text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Total</th>
                 <th className="w-[32px]"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-outline-variant">
               {pos.cart.map(item => {
                 const lineTotal = (item.unitPrice - item.discount) * item.quantity
                 const isDiscount = item.isDiscount ?? false
                 const originalPrice = cartItemOriginalPrice(item)
                 const hasSaleDiscount = isDiscount && originalPrice !== undefined && originalPrice > item.unitPrice
                 return (
-                  <tr key={`${item.product.id}-${item.variant?.id}-${isDiscount}`} className="bg-white hover:bg-gray-50">
+                  <tr key={`${item.product.id}-${item.variant?.id}-${isDiscount}`} className="bg-surface hover:bg-surface-container-low">
                     <td className="px-2 py-2.5 align-middle">
                       <div className="flex items-center justify-center gap-1.5">
                         <button onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity - 1, isDiscount)} className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-md bg-red-100 hover:bg-red-200 text-red-600 transition-colors">
                           <Minus className="h-3.5 w-3.5" />
                         </button>
-                        <span className="w-5 sm:w-7 text-center text-sm font-bold text-gray-900">{item.quantity}</span>
+                        <span className="w-5 sm:w-7 text-center text-sm font-bold text-on-surface">{item.quantity}</span>
                         <button
                           disabled={item.quantity >= (item.maxStock ?? Infinity)}
                           onClick={() => pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity + 1, isDiscount)}
@@ -815,7 +815,7 @@ export function CartPanel({ mobileView }: Props) {
                       </div>
                     </td>
                     <td className="px-2 py-2.5 align-middle overflow-hidden">
-                      <p className="truncate text-sm font-semibold text-gray-900">
+                      <p className="truncate text-sm font-semibold text-on-surface">
                         {item.product.name}
                         {item.variant && <span className="font-normal text-indigo-600"> · {item.variant.name}</span>}
                         {isDiscount && (
@@ -823,7 +823,7 @@ export function CartPanel({ mobileView }: Props) {
                         )}
                       </p>
                       {(item.variant?.sku ?? item.product.sku) && (
-                        <p className="text-gray-400 text-xs truncate mb-1">#{item.variant?.sku ?? item.product.sku}</p>
+                        <p className="text-outline text-xs truncate mb-1">#{item.variant?.sku ?? item.product.sku}</p>
                       )}
                       {item.product.is_serialized && (
                         <div className="mt-1 flex flex-col gap-1 pr-1">
@@ -832,14 +832,14 @@ export function CartPanel({ mobileView }: Props) {
                             placeholder="IMEI / S/N (optional)"
                             value={item.imei || ''}
                             onChange={e => pos.setItemImei(item.product.id, item.variant?.id ?? null, e.target.value, isDiscount)}
-                            className="w-full text-[11px] rounded border border-gray-200 px-1.5 py-0.5 focus:border-brand-teal focus:outline-none placeholder:text-gray-300"
+                            className="w-full text-[11px] rounded border border-outline-variant px-1.5 py-0.5 focus:border-brand-teal focus:outline-none placeholder:text-outline-variant"
                           />
                           <input
                             type="text"
                             placeholder="Faults (optional)"
                             value={item.faults || ''}
                             onChange={e => pos.setItemFaults(item.product.id, item.variant?.id ?? null, e.target.value, isDiscount)}
-                            className="w-full text-[11px] rounded border border-gray-200 px-1.5 py-0.5 focus:border-brand-teal focus:outline-none placeholder:text-gray-300"
+                            className="w-full text-[11px] rounded border border-outline-variant px-1.5 py-0.5 focus:border-brand-teal focus:outline-none placeholder:text-outline-variant"
                           />
                         </div>
                       )}
@@ -848,11 +848,11 @@ export function CartPanel({ mobileView }: Props) {
                     <td className="px-2 py-2.5 align-middle text-right">
                       {hasSaleDiscount ? (
                         <div>
-                          <p className="text-[10px] text-gray-400 line-through">{formatCurrency(originalPrice!)}</p>
+                          <p className="text-[10px] text-outline line-through">{formatCurrency(originalPrice!)}</p>
                           <p className="text-xs font-bold text-brand-teal">{formatCurrency(item.unitPrice)}</p>
                         </div>
                       ) : (
-                        <p className="text-xs text-gray-500">{formatCurrency(item.unitPrice)}</p>
+                        <p className="text-xs text-on-surface-variant">{formatCurrency(item.unitPrice)}</p>
                       )}
                     </td>
                     <td className="px-2 py-2.5 align-middle">
@@ -860,10 +860,10 @@ export function CartPanel({ mobileView }: Props) {
                         value={item.discount}
                         max={item.unitPrice}
                         onChange={v => pos.setItemDiscount(item.product.id, item.variant?.id ?? null, v, isDiscount)}
-                        className="h-8 sm:h-9 w-full rounded-md border border-gray-300 px-1.5 text-right text-sm font-medium text-green-600 focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/30"
+                        className="h-8 sm:h-9 w-full rounded-md border border-outline px-1.5 text-right text-sm font-medium text-green-600 focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/30"
                       />
                     </td>
-                    <td className="px-2 py-2.5 align-middle text-right font-bold text-gray-900 text-xs">{formatCurrency(lineTotal)}</td>
+                    <td className="px-2 py-2.5 align-middle text-right font-bold text-on-surface text-xs">{formatCurrency(lineTotal)}</td>
                     <td className="px-2 py-2.5 align-middle">
                       <button onClick={() => pos.removeFromCart(item.product.id, item.variant?.id ?? null, isDiscount)} className="text-red-400 hover:text-red-600 transition-colors">
                         <Trash2 className="h-4 w-4" />
@@ -878,33 +878,33 @@ export function CartPanel({ mobileView }: Props) {
       </div>
 
       {/* Checkout panel — collapsible on mobile */}
-      <div className="shrink-0 border-t-2 border-gray-200 bg-gray-50 overflow-y-auto max-h-[55vh] lg:max-h-[50vh]">
+      <div className="shrink-0 border-t-2 border-outline-variant bg-surface-container-low overflow-y-auto max-h-[55vh] lg:max-h-[50vh]">
 
         {/* Expanded details (Discount, Gift Card, Sub Total breakdown) */}
         {showFullTotals && (
           <div className="px-4 pt-3 pb-2 space-y-2">
-            <div className="flex justify-between text-sm text-gray-500"><span>Total Items</span><span className="font-semibold text-gray-700">{pos.itemCount()}</span></div>
-            <div className="flex justify-between text-sm text-gray-600"><span>Sub Total</span><span className="font-medium text-gray-800">{formatCurrency(grossSubtotal)}</span></div>
+            <div className="flex justify-between text-sm text-on-surface-variant"><span>Total Items</span><span className="font-semibold text-on-surface-variant">{pos.itemCount()}</span></div>
+            <div className="flex justify-between text-sm text-on-surface-variant"><span>Sub Total</span><span className="font-medium text-on-surface">{formatCurrency(grossSubtotal)}</span></div>
 
             {/* Order-level discount input — always shown */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-medium text-gray-600">Discount</span>
-                <div className="flex overflow-hidden rounded border border-gray-200">
-                  <button onClick={() => setDiscountType('fixed')}   className={`px-2 py-0.5 text-sm font-medium ${discountType === 'fixed'   ? 'bg-brand-teal text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>£</button>
-                  <button onClick={() => setDiscountType('percent')} className={`px-2 py-0.5 text-sm font-medium ${discountType === 'percent' ? 'bg-brand-teal text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>%</button>
+                <span className="text-sm font-medium text-on-surface-variant">Discount</span>
+                <div className="flex overflow-hidden rounded border border-outline-variant">
+                  <button onClick={() => setDiscountType('fixed')}   className={`px-2 py-0.5 text-sm font-medium ${discountType === 'fixed'   ? 'bg-brand-teal text-white' : 'bg-surface text-on-surface-variant hover:bg-surface-container-low'}`}>£</button>
+                  <button onClick={() => setDiscountType('percent')} className={`px-2 py-0.5 text-sm font-medium ${discountType === 'percent' ? 'bg-brand-teal text-white' : 'bg-surface text-on-surface-variant hover:bg-surface-container-low'}`}>%</button>
                 </div>
               </div>
               <input
                 type="number" min="0" step="0.01" placeholder="0"
                 value={pos.discount || ''}
                 onChange={e => pos.setDiscount(Math.max(0, parseFloat(e.target.value) || 0))}
-                className="h-8 w-24 rounded border border-gray-200 px-2 text-right text-sm text-green-700 focus:border-brand-teal focus:outline-none"
+                className="h-8 w-24 rounded border border-outline-variant px-2 text-right text-sm text-green-700 focus:border-brand-teal focus:outline-none"
               />
             </div>
 
             {/* Collective discount summary — always visible, 0 if none */}
-            <div className={`flex justify-between text-sm font-medium rounded-md px-2 py-1 ${totalDiscount > 0 ? 'bg-green-50 text-green-600' : 'text-gray-400'}`}>
+            <div className={`flex justify-between text-sm font-medium rounded-md px-2 py-1 ${totalDiscount > 0 ? 'bg-green-50 text-green-600' : 'text-outline'}`}>
               <span>Total Discount</span>
               <span>{totalDiscount > 0 ? '-' : ''}{formatCurrency(totalDiscount)}</span>
             </div>
@@ -913,14 +913,14 @@ export function CartPanel({ mobileView }: Props) {
             <div className="flex items-center justify-between gap-2">
               <div className="flex shrink-0 items-center gap-1.5">
                 <Gift className="h-4 w-4 text-purple-500" />
-                <span className="text-sm font-medium text-gray-600 whitespace-nowrap">Gift Card</span>
+                <span className="text-sm font-medium text-on-surface-variant whitespace-nowrap">Gift Card</span>
               </div>
               <div className="flex min-w-0 flex-1 items-center gap-1.5 justify-end">
                 <input
                   type="text" placeholder="Enter code"
                   value={gcCode}
                   onChange={e => { setGcCode(e.target.value); setGcError('') }}
-                  className="h-8 min-w-0 flex-1 max-w-[120px] rounded border border-gray-200 px-2 text-right text-sm text-purple-700 focus:border-purple-400 focus:outline-none"
+                  className="h-8 min-w-0 flex-1 max-w-[120px] rounded border border-outline-variant px-2 text-right text-sm text-purple-700 focus:border-purple-400 focus:outline-none"
                 />
                 <button
                   onClick={() => pos.cart.length > 0 && setGcModalOpen(true)}
@@ -933,7 +933,7 @@ export function CartPanel({ mobileView }: Props) {
             </div>
             {gcError && <p className="text-xs text-red-500">{gcError}</p>}
             {pos.taxRate > 0 && (
-              <div className="flex justify-between text-sm text-gray-500"><span>Tax ({pos.taxRate}%)</span><span>{formatCurrency(taxAmt)}</span></div>
+              <div className="flex justify-between text-sm text-on-surface-variant"><span>Tax ({pos.taxRate}%)</span><span>{formatCurrency(taxAmt)}</span></div>
             )}
           </div>
         )}
@@ -941,21 +941,21 @@ export function CartPanel({ mobileView }: Props) {
         {/* Always-visible total bar + toggle */}
         <button
           onClick={() => setShowFullTotals(v => !v)}
-          className="flex w-full items-center justify-between px-4 py-2.5 hover:bg-gray-100 transition-colors"
+          className="flex w-full items-center justify-between px-4 py-2.5 hover:bg-surface-container transition-colors"
         >
-          <span className="text-base font-bold text-gray-900">Total</span>
+          <span className="text-base font-bold text-on-surface">Total</span>
           <div className="flex items-center gap-2">
-            <span className="text-xl font-bold text-gray-900">{formatCurrency(total)}</span>
+            <span className="text-xl font-bold text-on-surface">{formatCurrency(total)}</span>
             {showFullTotals
-              ? <ChevronDown className="h-4 w-4 text-gray-500" />
-              : <ChevronUp className="h-4 w-4 text-gray-500" />
+              ? <ChevronDown className="h-4 w-4 text-on-surface-variant" />
+              : <ChevronUp className="h-4 w-4 text-on-surface-variant" />
             }
           </div>
         </button>
 
         {/* Served By employee selector + per-sale commission (retail-store only) */}
         {activeBranch && isRetailTemplate && isModuleEnabled('employees') && (
-          <div className="border-t border-gray-100 bg-white px-4 py-2 space-y-2">
+          <div className="border-t border-outline-variant bg-surface px-4 py-2 space-y-2">
             <AsyncEmployeeSelect
               branchId={activeBranch.id}
               value={servedByEmployeeId}
@@ -966,20 +966,20 @@ export function CartPanel({ mobileView }: Props) {
             />
             {servedByEmployeeId && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Commission for this sale</label>
+                <label className="block text-sm font-medium text-on-surface-variant mb-1">Commission for this sale</label>
                 <div className="flex gap-2">
-                  <div className="flex rounded-lg border border-gray-200 p-0.5 shrink-0">
+                  <div className="flex rounded-lg border border-outline-variant p-0.5 shrink-0">
                     <button
                       type="button"
                       onClick={() => setCommissionType('flat')}
-                      className={`rounded px-2.5 py-1.5 text-sm font-medium transition-colors ${commissionType === 'flat' ? 'bg-brand-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                      className={`rounded px-2.5 py-1.5 text-sm font-medium transition-colors ${commissionType === 'flat' ? 'bg-brand-teal text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
                     >
                       {getCurrencySymbol(currency)}
                     </button>
                     <button
                       type="button"
                       onClick={() => setCommissionType('percentage')}
-                      className={`rounded px-2.5 py-1.5 text-sm font-medium transition-colors ${commissionType === 'percentage' ? 'bg-brand-teal text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                      className={`rounded px-2.5 py-1.5 text-sm font-medium transition-colors ${commissionType === 'percentage' ? 'bg-brand-teal text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
                     >
                       %
                     </button>
@@ -989,10 +989,10 @@ export function CartPanel({ mobileView }: Props) {
                     placeholder={commissionType === 'percentage' ? 'e.g. 5' : '0.00'}
                     value={commissionAmount}
                     onChange={e => setCommissionAmount(e.target.value)}
-                    className="h-9 flex-1 rounded-lg border border-gray-200 px-3 text-sm focus:border-brand-teal focus:outline-none"
+                    className="h-9 flex-1 rounded-lg border border-outline-variant px-3 text-sm focus:border-brand-teal focus:outline-none"
                   />
                   {commissionType === 'percentage' && commissionAmount && (
-                    <span className="shrink-0 text-xs text-gray-500 whitespace-nowrap">
+                    <span className="shrink-0 text-xs text-on-surface-variant whitespace-nowrap">
                       = {formatCurrency((parseFloat(commissionAmount) || 0) / 100 * total)}
                     </span>
                   )}
@@ -1004,7 +1004,7 @@ export function CartPanel({ mobileView }: Props) {
       </div>
 
       {/* Payment buttons — this business gets its own row at the top instead (see above) */}
-      <div className="shrink-0 border-t border-gray-200 bg-white px-3 py-2.5">
+      <div className="shrink-0 border-t border-outline-variant bg-surface px-3 py-2.5">
         <div className="flex gap-1.5">
           <button
             onClick={() => { pos.setPaymentMethod('split'); setSplits(Object.fromEntries(splitChannels.map(c => [c, '']))); pos.cart.length > 0 && setPaymentOpen(true) }}
@@ -1047,7 +1047,7 @@ export function CartPanel({ mobileView }: Props) {
           </button>
         </div>
         {!showTopPaymentButtons && !pos.customer && pos.cart.length > 0 && (
-          <p className="mt-1 text-center text-xs text-gray-400">Select a customer to enable Credit payment</p>
+          <p className="mt-1 text-center text-xs text-outline">Select a customer to enable Credit payment</p>
         )}
       </div>
 
@@ -1057,16 +1057,16 @@ export function CartPanel({ mobileView }: Props) {
       <Modal open={creditOpen} onClose={() => { if (!processing) { setCreditOpen(false); setCreditIsEmployee(false); setCreditEmployeeId(''); setCreditEmployeeName(''); setCreditCustomerSearch(''); setCreditCustomerResults([]) } }} title="Credit Payment" size="sm">
         <div className="space-y-4">
           {/* Customer vs Employee toggle */}
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm font-medium">
+          <div className="flex rounded-lg border border-outline-variant overflow-hidden text-sm font-medium">
             <button
               onClick={() => { setCreditIsEmployee(false); setCreditEmployeeId(''); setCreditEmployeeName('') }}
-              className={`flex-1 py-2 transition-colors ${!creditIsEmployee ? 'bg-purple-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+              className={`flex-1 py-2 transition-colors ${!creditIsEmployee ? 'bg-purple-600 text-white' : 'text-on-surface-variant hover:bg-surface-container-low'}`}
             >
               Customer Credit
             </button>
             <button
               onClick={() => setCreditIsEmployee(true)}
-              className={`flex-1 py-2 transition-colors ${creditIsEmployee ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+              className={`flex-1 py-2 transition-colors ${creditIsEmployee ? 'bg-indigo-600 text-white' : 'text-on-surface-variant hover:bg-surface-container-low'}`}
             >
               Employee Purchase
             </button>
@@ -1075,7 +1075,7 @@ export function CartPanel({ mobileView }: Props) {
           {/* Who is buying */}
           {creditIsEmployee ? (
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">Employee</label>
+              <label className="mb-1 block text-xs font-medium text-on-surface-variant">Employee</label>
               <div className="flex items-end gap-1.5">
                 <div className="flex-1">
                   <AsyncEmployeeSelect
@@ -1108,10 +1108,10 @@ export function CartPanel({ mobileView }: Props) {
             </div>
           ) : (
             <div className="relative">
-              <label className="mb-1 block text-xs font-medium text-gray-600">Customer</label>
+              <label className="mb-1 block text-xs font-medium text-on-surface-variant">Customer</label>
               <div className="flex items-center gap-1.5">
                 <div className="relative flex-1">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-outline" />
                   <input
                     type="text"
                     placeholder="Search customer by name…"
@@ -1121,7 +1121,7 @@ export function CartPanel({ mobileView }: Props) {
                     autoFocus
                   />
                   {creditCustomerSearching && (
-                    <Loader2 className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-gray-400" />
+                    <Loader2 className="absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-outline" />
                   )}
                 </div>
                 <button
@@ -1134,13 +1134,13 @@ export function CartPanel({ mobileView }: Props) {
                 </button>
               </div>
               {creditCustomerResults.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+                <div className="absolute z-10 mt-1 w-full rounded-lg border border-outline-variant bg-surface shadow-lg">
                   {creditCustomerResults.map(c => (
                     <button key={c.id}
                       onClick={() => { pos.setCustomer(c); setCreditCustomerSearch(''); setCreditCustomerResults([]) }}
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-purple-50">
                       <span className="font-medium">{c.first_name} {c.last_name ?? ''}</span>
-                      {c.email && <span className="text-xs text-gray-400">{c.email}</span>}
+                      {c.email && <span className="text-xs text-outline">{c.email}</span>}
                     </button>
                   ))}
                 </div>
@@ -1158,8 +1158,8 @@ export function CartPanel({ mobileView }: Props) {
 
           {/* Deposit input */}
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">
-              Deposit paid now <span className="font-normal text-gray-400">(enter 0 for full credit)</span>
+            <label className="mb-1 block text-xs font-medium text-on-surface-variant">
+              Deposit paid now <span className="font-normal text-outline">(enter 0 for full credit)</span>
             </label>
             <input
               type="number" min={0} max={total} step={0.01}
@@ -1172,11 +1172,11 @@ export function CartPanel({ mobileView }: Props) {
 
           {parseFloat(creditDepositAmount) > 0 && (
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">Deposit paid via</label>
+              <label className="mb-1 block text-xs font-medium text-on-surface-variant">Deposit paid via</label>
               <div className="flex gap-2">
                 {(['cash', 'card'] as const).map(m => (
                   <button key={m} onClick={() => setCreditDepositMethod(m)}
-                    className={`flex-1 rounded-lg border py-2 text-sm font-medium capitalize transition-colors ${creditDepositMethod === m ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+                    className={`flex-1 rounded-lg border py-2 text-sm font-medium capitalize transition-colors ${creditDepositMethod === m ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-outline-variant text-on-surface-variant hover:bg-surface-container-low'}`}>
                     {m}
                   </button>
                 ))}
@@ -1189,7 +1189,7 @@ export function CartPanel({ mobileView }: Props) {
             <span className="font-bold text-amber-700">{formatCurrency(Math.max(0, total - (parseFloat(creditDepositAmount) || 0)))}</span>
           </div>
 
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-outline">
             {creditIsEmployee
               ? 'Amount tracked under employee profile and deductible from payroll.'
               : 'Payment can be recorded later from the Customer Credit page.'}
@@ -1197,7 +1197,7 @@ export function CartPanel({ mobileView }: Props) {
 
           <div className="flex justify-end gap-3">
             <button onClick={() => { setCreditOpen(false); setCreditIsEmployee(false); setCreditEmployeeId(''); setCreditEmployeeName(''); setCreditCustomerSearch(''); setCreditCustomerResults([]) }} disabled={processing}
-              className="rounded-lg border px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40">
+              className="rounded-lg border px-4 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low disabled:opacity-40">
               Cancel
             </button>
             <button onClick={processCreditPayment} disabled={processing || (creditIsEmployee ? !creditEmployeeId : !pos.customer)}
@@ -1244,9 +1244,9 @@ export function CartPanel({ mobileView }: Props) {
       {/* Outstanding Balance */}
       <Modal open={outstandingOpen} onClose={() => setOutstandingOpen(false)} title="" size="sm">
         <div className="py-2">
-          <div className="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3">
+          <div className="flex items-center justify-between rounded-lg bg-surface-container-low px-4 py-3">
             <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-gray-500" />
+              <DollarSign className="h-5 w-5 text-on-surface-variant" />
               <button
                 onClick={() => { setOutstandingOpen(false); router.push(`/invoices?customer_id=${pos.customer?.id}&status=unpaid`) }}
                 className="font-semibold text-blue-600 underline"
@@ -1259,7 +1259,7 @@ export function CartPanel({ mobileView }: Props) {
               {formatCurrency(outstandingBalance)}
             </span>
           </div>
-          <p className="mt-3 text-xs text-gray-500">
+          <p className="mt-3 text-xs text-on-surface-variant">
             Unsettled dues from previous transactions. Click &apos;Outstanding Balance&apos; to check due invoices.
           </p>
         </div>
@@ -1269,29 +1269,29 @@ export function CartPanel({ mobileView }: Props) {
       {paymentOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           {success ? (
-            <div className="rounded-2xl bg-white px-16 py-14 text-center shadow-2xl">
+            <div className="rounded-2xl bg-surface px-16 py-14 text-center shadow-2xl">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
                 <CheckCircle2 className="h-9 w-9 text-green-600" />
               </div>
               <p className="text-xl font-bold text-green-700">Payment Successful!</p>
-              <p className="mt-1 text-sm text-gray-500">Receipt has been processed.</p>
+              <p className="mt-1 text-sm text-on-surface-variant">Receipt has been processed.</p>
             </div>
           ) : (
-            <div className="flex w-[600px] max-h-[90vh] overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex w-[600px] max-h-[90vh] overflow-hidden rounded-2xl bg-surface shadow-2xl">
               <div className="flex flex-1 flex-col p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-gray-900">Split Payment</h3>
-                  <button onClick={() => setPaymentOpen(false)} className="text-gray-400 hover:text-gray-600"><X className="h-4 w-4" /></button>
+                  <h3 className="font-bold text-on-surface">Split Payment</h3>
+                  <button onClick={() => setPaymentOpen(false)} className="text-outline hover:text-on-surface-variant"><X className="h-4 w-4" /></button>
                 </div>
                 <div className="flex flex-1 flex-col gap-3">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Split Amounts</p>
+                  <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">Split Amounts</p>
                   {splitChannels.map(m => (
                     <div key={m} className="flex items-center gap-3">
-                      <span className="w-20 shrink-0 text-sm text-gray-600 font-medium">{channelLabel(m)}</span>
+                      <span className="w-20 shrink-0 text-sm text-on-surface-variant font-medium">{channelLabel(m)}</span>
                       <input
                         type="number" min="0" step="0.01" placeholder="0.00"
                         value={splits[m] ?? ''} onChange={e => setSplits(s => ({ ...s, [m]: e.target.value }))}
-                        className="h-9 flex-1 rounded-lg border border-gray-200 px-3 text-sm focus:border-brand-teal focus:outline-none"
+                        className="h-9 flex-1 rounded-lg border border-outline-variant px-3 text-sm focus:border-brand-teal focus:outline-none"
                       />
                     </div>
                   ))}
@@ -1300,15 +1300,15 @@ export function CartPanel({ mobileView }: Props) {
                   </div>
                 </div>
               </div>
-              <div className="flex w-64 shrink-0 flex-col border-l border-gray-100 p-5">
+              <div className="flex w-64 shrink-0 flex-col border-l border-outline-variant p-5">
                 <div className="flex-1 space-y-2 text-sm">
-                  <div className="flex justify-between text-gray-500"><span>Total Items</span><span>{pos.itemCount()}</span></div>
-                  <div className="flex justify-between text-gray-500"><span>Sub Total</span><span>{formatCurrency(grossSubtotal)}</span></div>
+                  <div className="flex justify-between text-on-surface-variant"><span>Total Items</span><span>{pos.itemCount()}</span></div>
+                  <div className="flex justify-between text-on-surface-variant"><span>Sub Total</span><span>{formatCurrency(grossSubtotal)}</span></div>
                   {totalDiscount > 0 && (
                     <div className="flex justify-between text-green-600"><span>Discount</span><span>-{formatCurrency(totalDiscount)}</span></div>
                   )}
-                  <div className="flex justify-between text-gray-500"><span>Tax</span><span>{formatCurrency(taxAmt)}</span></div>
-                  <div className="flex justify-between border-t border-gray-200 pt-2 text-base font-bold text-gray-900">
+                  <div className="flex justify-between text-on-surface-variant"><span>Tax</span><span>{formatCurrency(taxAmt)}</span></div>
+                  <div className="flex justify-between border-t border-outline-variant pt-2 text-base font-bold text-on-surface">
                     <span>TOTAL</span><span>{formatCurrency(totalDue)}</span>
                   </div>
                 </div>
@@ -1331,12 +1331,12 @@ export function CartPanel({ mobileView }: Props) {
       {/* Cash Payment Success Overlay */}
       {success && !paymentOpen && !gcModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="rounded-2xl bg-white px-16 py-14 text-center shadow-2xl">
+          <div className="rounded-2xl bg-surface px-16 py-14 text-center shadow-2xl">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
               <CheckCircle2 className="h-9 w-9 text-green-600" />
             </div>
             <p className="text-xl font-bold text-green-700">Payment Successful!</p>
-            <p className="mt-1 text-sm text-gray-500">Receipt has been sent to print.</p>
+            <p className="mt-1 text-sm text-on-surface-variant">Receipt has been sent to print.</p>
           </div>
         </div>
       )}
@@ -1363,37 +1363,37 @@ export function CartPanel({ mobileView }: Props) {
       {gcModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           {success ? (
-            <div className="rounded-2xl bg-white px-16 py-14 text-center shadow-2xl">
+            <div className="rounded-2xl bg-surface px-16 py-14 text-center shadow-2xl">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
                 <CheckCircle2 className="h-9 w-9 text-green-600" />
               </div>
               <p className="text-xl font-bold text-green-700">Payment Successful!</p>
-              <p className="mt-1 text-sm text-gray-500">Receipt has been processed.</p>
+              <p className="mt-1 text-sm text-on-surface-variant">Receipt has been processed.</p>
             </div>
           ) : (
-            <div className="w-[420px] rounded-2xl bg-white shadow-2xl overflow-hidden">
-              <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+            <div className="w-[420px] rounded-2xl bg-surface shadow-2xl overflow-hidden">
+              <div className="flex items-center justify-between border-b border-outline-variant px-5 py-4">
                 <div className="flex items-center gap-2">
                   <Gift className="h-5 w-5 text-purple-600" />
-                  <h3 className="font-bold text-gray-900">Gift Card Payment</h3>
+                  <h3 className="font-bold text-on-surface">Gift Card Payment</h3>
                 </div>
-                <button onClick={() => { setGcModalOpen(false); pos.clearGiftCard() }} className="text-gray-400 hover:text-gray-600"><X className="h-4 w-4" /></button>
+                <button onClick={() => { setGcModalOpen(false); pos.clearGiftCard() }} className="text-outline hover:text-on-surface-variant"><X className="h-4 w-4" /></button>
               </div>
               <div className="p-5 space-y-4">
-                <div className="rounded-lg bg-gray-50 px-4 py-3 flex justify-between text-sm font-medium text-gray-700">
+                <div className="rounded-lg bg-surface-container-low px-4 py-3 flex justify-between text-sm font-medium text-on-surface-variant">
                   <span>Total Due</span>
-                  <span className="font-bold text-gray-900">{formatCurrency(totalDue)}</span>
+                  <span className="font-bold text-on-surface">{formatCurrency(totalDue)}</span>
                 </div>
                 {!pos.giftCardId ? (
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Gift Card Code</label>
+                    <label className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">Gift Card Code</label>
                     <div className="flex gap-2">
                       <input
                         type="text" placeholder="Enter gift card code"
                         value={gcCode}
                         onChange={e => { setGcCode(e.target.value); setGcError('') }}
                         onKeyDown={e => e.key === 'Enter' && lookupGiftCard()}
-                        className="h-10 flex-1 rounded-lg border border-gray-200 px-3 text-sm focus:border-purple-500 focus:outline-none"
+                        className="h-10 flex-1 rounded-lg border border-outline-variant px-3 text-sm focus:border-purple-500 focus:outline-none"
                         autoFocus
                       />
                       <button

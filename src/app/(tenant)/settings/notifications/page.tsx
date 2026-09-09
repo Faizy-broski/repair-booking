@@ -163,8 +163,8 @@ export default function NotificationTemplatesPage() {
             <Mail className="h-5 w-5 text-indigo-600" />
           </div>
           <div>
-            <h1 className="text-lg sm:text-2xl font-bold text-gray-900">Notification Templates</h1>
-            <p className="text-sm text-gray-500">Customize the messages sent to customers for each event</p>
+            <h1 className="text-lg sm:text-2xl font-bold text-on-surface">Notification Templates</h1>
+            <p className="text-sm text-on-surface-variant">Customize the messages sent to customers for each event</p>
           </div>
         </div>
         {templates.length === 0 && (
@@ -177,27 +177,27 @@ export default function NotificationTemplatesPage() {
       {/* Template list */}
       <div className="space-y-3">
         {templates.length === 0 && (
-          <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center">
-            <Bell className="mx-auto mb-3 h-10 w-10 text-gray-300" />
-            <p className="text-gray-500">No notification templates configured yet.</p>
+          <div className="rounded-lg border border-dashed border-outline p-8 text-center">
+            <Bell className="mx-auto mb-3 h-10 w-10 text-outline-variant" />
+            <p className="text-on-surface-variant">No notification templates configured yet.</p>
             <Button className="mt-3" onClick={seedDefaults} loading={loading}>Load Default Templates</Button>
           </div>
         )}
         {templates.map((t) => (
-          <div key={t.id} className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow sm:flex-row sm:items-center sm:justify-between">
+          <div key={t.id} className="flex flex-col gap-3 rounded-lg border border-outline-variant bg-surface p-4 shadow-sm hover:shadow-md transition-shadow sm:flex-row sm:items-center sm:justify-between">
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium text-gray-900">{TRIGGER_LABELS[t.trigger_event] ?? t.trigger_event}</span>
+                <span className="font-medium text-on-surface">{TRIGGER_LABELS[t.trigger_event] ?? t.trigger_event}</span>
                 <Badge variant={t.is_active ? 'success' : 'secondary'}>{t.is_active ? 'Active' : 'Inactive'}</Badge>
                 <Badge variant={t.channel === 'email' ? 'default' : t.channel === 'sms' ? 'success' : 'purple'}>
                   {t.channel === 'both' ? 'Email + SMS' : t.channel.toUpperCase()}
                 </Badge>
               </div>
-              {t.subject && <p className="mt-1 text-sm text-gray-500 truncate max-w-xl">{t.subject}</p>}
+              {t.subject && <p className="mt-1 text-sm text-on-surface-variant truncate max-w-xl">{t.subject}</p>}
               {macroCatalog[t.trigger_event] && (
                 <div className="mt-1.5 flex flex-wrap gap-1">
                   {macroCatalog[t.trigger_event].map((m) => (
-                    <code key={m} className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">{`{{${m}}}`}</code>
+                    <code key={m} className="rounded bg-surface-container px-1.5 py-0.5 text-xs text-on-surface-variant">{`{{${m}}}`}</code>
                   ))}
                 </div>
               )}
@@ -239,10 +239,10 @@ export default function NotificationTemplatesPage() {
               <input
                 type="checkbox"
                 checked={editForm.is_active}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                className="h-4 w-4 rounded border-outline text-blue-600"
                 onChange={(e) => setEditForm((f) => ({ ...f, is_active: e.target.checked }))}
               />
-              <span className="text-sm text-gray-700">Active</span>
+              <span className="text-sm text-on-surface-variant">Active</span>
             </label>
           </div>
 
@@ -255,12 +255,12 @@ export default function NotificationTemplatesPage() {
                 placeholder="Subject line with {{macros}}"
               />
               <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Email Body (HTML)</label>
+                <label className="mb-1 block text-sm font-medium text-on-surface-variant">Email Body (HTML)</label>
                 <textarea
                   rows={8}
                   value={editForm.email_body}
                   onChange={(e) => setEditForm((f) => ({ ...f, email_body: e.target.value }))}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full rounded-lg border border-outline px-3 py-2 text-sm font-mono focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   placeholder="HTML email body with {{macros}}"
                 />
               </div>
@@ -269,15 +269,15 @@ export default function NotificationTemplatesPage() {
 
           {(editForm.channel === 'sms' || editForm.channel === 'both') && (
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">SMS Body</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">SMS Body</label>
               <textarea
                 rows={3}
                 value={editForm.sms_body}
                 onChange={(e) => setEditForm((f) => ({ ...f, sms_body: e.target.value }))}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 placeholder="SMS text with {{macros}} (160 char segments)"
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-on-surface-variant">
                 {editForm.sms_body.length} characters ({Math.ceil(editForm.sms_body.length / 160) || 1} SMS segment{editForm.sms_body.length > 160 ? 's' : ''})
               </p>
             </div>
@@ -285,13 +285,13 @@ export default function NotificationTemplatesPage() {
 
           {editModal.template && macroCatalog[editModal.template.trigger_event] && (
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Available Macros</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Available Macros</label>
               <div className="flex flex-wrap gap-1.5">
                 {macroCatalog[editModal.template.trigger_event].map((m) => (
                   <button
                     key={m}
                     type="button"
-                    className="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200 transition-colors font-mono"
+                    className="rounded bg-surface-container px-2 py-1 text-xs text-on-surface-variant hover:bg-surface-container-high transition-colors font-mono"
                     onClick={() => navigator.clipboard.writeText(`{{${m}}}`)}
                     title={`Click to copy {{${m}}}`}
                   >
@@ -319,25 +319,25 @@ export default function NotificationTemplatesPage() {
         <div className="space-y-4">
           {previewModal.subject && (
             <div>
-              <label className="text-xs font-medium text-gray-500 uppercase">Subject</label>
-              <p className="mt-1 text-sm font-medium text-gray-900">{previewModal.subject}</p>
+              <label className="text-xs font-medium text-on-surface-variant uppercase">Subject</label>
+              <p className="mt-1 text-sm font-medium text-on-surface">{previewModal.subject}</p>
             </div>
           )}
           {previewModal.emailBody && (
             <div>
-              <label className="text-xs font-medium text-gray-500 uppercase">Email Preview</label>
+              <label className="text-xs font-medium text-on-surface-variant uppercase">Email Preview</label>
               <div
-                className="mt-1 rounded-lg border border-gray-200 bg-gray-50 p-4"
+                className="mt-1 rounded-lg border border-outline-variant bg-surface-container-low p-4"
                 dangerouslySetInnerHTML={{ __html: previewModal.emailBody }}
               />
             </div>
           )}
           {previewModal.smsBody && (
             <div>
-              <label className="text-xs font-medium text-gray-500 uppercase">SMS Preview</label>
-              <div className="mt-1 rounded-lg border border-gray-200 bg-green-50 p-3">
-                <p className="text-sm text-gray-800 whitespace-pre-wrap">{previewModal.smsBody}</p>
-                <p className="mt-1 text-xs text-gray-500">{previewModal.smsBody.length} chars</p>
+              <label className="text-xs font-medium text-on-surface-variant uppercase">SMS Preview</label>
+              <div className="mt-1 rounded-lg border border-outline-variant bg-green-50 p-3">
+                <p className="text-sm text-on-surface whitespace-pre-wrap">{previewModal.smsBody}</p>
+                <p className="mt-1 text-xs text-on-surface-variant">{previewModal.smsBody.length} chars</p>
               </div>
             </div>
           )}

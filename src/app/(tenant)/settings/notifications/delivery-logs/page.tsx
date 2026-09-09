@@ -55,8 +55,8 @@ export default function DeliveryLogsPage() {
             <Bell className="h-5 w-5 text-purple-600" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Delivery Logs</h1>
-            <p className="text-sm text-gray-500">History of all notifications sent to customers</p>
+            <h1 className="text-2xl font-bold text-on-surface">Delivery Logs</h1>
+            <p className="text-sm text-on-surface-variant">History of all notifications sent to customers</p>
           </div>
         </div>
         <Button variant="outline" size="sm" onClick={() => refetch()} loading={loading}>
@@ -65,38 +65,38 @@ export default function DeliveryLogsPage() {
       </div>
 
       {logEntries.length === 0 && !loading ? (
-        <div className="rounded-lg border border-dashed border-gray-300 p-12 text-center">
-          <Bell className="mx-auto mb-3 h-10 w-10 text-gray-300" />
-          <p className="text-gray-500">No notifications sent yet.</p>
-          <p className="text-sm text-gray-400 mt-1">Logs will appear here once notifications are triggered.</p>
+        <div className="rounded-lg border border-dashed border-outline p-12 text-center">
+          <Bell className="mx-auto mb-3 h-10 w-10 text-outline-variant" />
+          <p className="text-on-surface-variant">No notifications sent yet.</p>
+          <p className="text-sm text-outline mt-1">Logs will appear here once notifications are triggered.</p>
         </div>
       ) : (
         <>
-          <div className="overflow-hidden rounded-lg border border-gray-200 shadow-sm">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div className="overflow-hidden rounded-lg border border-outline-variant shadow-sm">
+            <table className="min-w-full divide-y divide-outline-variant">
+              <thead className="bg-surface-container-low">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Event</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Channel</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recipient</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">Event</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">Channel</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">Recipient</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">Date</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 bg-white">
+              <tbody className="divide-y divide-outline-variant bg-surface">
                 {loading
                   ? Array.from({ length: 5 }).map((_, i) => (
                       <tr key={i}>
                         {Array.from({ length: 5 }).map((__, j) => (
                           <td key={j} className="px-4 py-3">
-                            <div className="h-4 bg-gray-100 rounded animate-pulse w-24" />
+                            <div className="h-4 bg-surface-container rounded animate-pulse w-24" />
                           </td>
                         ))}
                       </tr>
                     ))
                   : logEntries.map((entry) => (
-                      <tr key={entry.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3 text-sm text-gray-900">
+                      <tr key={entry.id} className="hover:bg-surface-container-low transition-colors">
+                        <td className="px-4 py-3 text-sm text-on-surface">
                           {TRIGGER_LABELS[entry.trigger_event] ?? entry.trigger_event}
                         </td>
                         <td className="px-4 py-3">
@@ -104,7 +104,7 @@ export default function DeliveryLogsPage() {
                             {entry.channel.toUpperCase()}
                           </Badge>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-600 max-w-[200px] truncate">
+                        <td className="px-4 py-3 text-sm text-on-surface-variant max-w-[200px] truncate">
                           {entry.recipient}
                         </td>
                         <td className="px-4 py-3">
@@ -121,7 +121,7 @@ export default function DeliveryLogsPage() {
                           )}
                           {entry.status === 'queued' && <Badge variant="warning">Queued</Badge>}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-500">
+                        <td className="px-4 py-3 text-sm text-on-surface-variant">
                           {new Date(entry.created_at).toLocaleString()}
                         </td>
                       </tr>
@@ -134,7 +134,7 @@ export default function DeliveryLogsPage() {
           {/* Pagination */}
           {logTotal > 20 && (
             <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-on-surface-variant">
                 Showing {(logPage - 1) * 20 + 1}–{Math.min(logPage * 20, logTotal)} of {logTotal}
               </p>
               <div className="flex gap-2">

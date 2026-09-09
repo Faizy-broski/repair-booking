@@ -116,24 +116,24 @@ export function QuickCreateModal({ open, onClose, barcode, branchId, onCreated, 
 
         {/* Barcode — pre-filled, readonly */}
         <div>
-          <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-gray-500">
+          <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-on-surface-variant">
             <ScanLine className="h-3.5 w-3.5" /> Scanned Barcode
           </label>
           <input
             {...register('barcode')}
             readOnly
-            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-mono text-gray-700 cursor-default"
+            className="w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-sm font-mono text-on-surface-variant cursor-default"
           />
         </div>
 
         {/* Item type toggle */}
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-gray-500">Item Type</label>
-          <div className="flex overflow-hidden rounded-lg border border-gray-200">
+          <label className="mb-1.5 block text-xs font-medium text-on-surface-variant">Item Type</label>
+          <div className="flex overflow-hidden rounded-lg border border-outline-variant">
             {(['product', 'part'] as const).map((type) => (
               <label
                 key={type}
-                className="flex flex-1 cursor-pointer items-center justify-center py-2 text-sm font-medium transition-colors has-[:checked]:bg-brand-teal has-[:checked]:text-white text-gray-600 hover:bg-gray-50"
+                className="flex flex-1 cursor-pointer items-center justify-center py-2 text-sm font-medium transition-colors has-[:checked]:bg-brand-teal has-[:checked]:text-white text-on-surface-variant hover:bg-surface-container-low"
               >
                 <input type="radio" value={type} {...register('item_type')} className="sr-only" />
                 {type === 'product' ? 'Product' : 'Part'}
@@ -144,69 +144,69 @@ export function QuickCreateModal({ open, onClose, barcode, branchId, onCreated, 
 
         {/* Product name */}
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-gray-700">
+          <label className="mb-1.5 block text-xs font-medium text-on-surface-variant">
             Product Name <span className="text-red-500">*</span>
           </label>
           <input
             {...register('name')}
             autoFocus
             placeholder="e.g. iPhone 14 Screen"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
+            className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
           />
           {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>}
         </div>
 
         {/* SKU (optional) */}
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-gray-700">SKU (optional)</label>
+          <label className="mb-1.5 block text-xs font-medium text-on-surface-variant">SKU (optional)</label>
           <input
             {...register('sku')}
             placeholder="Leave blank to assign later"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
+            className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
           />
         </div>
 
         {/* Pricing row */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-gray-700">
+            <label className="mb-1.5 block text-xs font-medium text-on-surface-variant">
               Selling Price <span className="text-red-500">*</span>
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">£</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-outline">£</span>
               <input
                 {...register('selling_price')}
                 type="number"
                 step="0.01"
                 min="0"
                 placeholder="0.00"
-                className="w-full rounded-lg border border-gray-300 py-2 pl-7 pr-3 text-sm focus:border-brand-teal focus:outline-none"
+                className="w-full rounded-lg border border-outline py-2 pl-7 pr-3 text-sm focus:border-brand-teal focus:outline-none"
               />
             </div>
             {errors.selling_price && <p className="mt-1 text-xs text-red-500">{errors.selling_price.message}</p>}
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-gray-700">Cost Price</label>
+            <label className="mb-1.5 block text-xs font-medium text-on-surface-variant">Cost Price</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">£</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-outline">£</span>
               <input
                 {...register('cost_price')}
                 type="number"
                 step="0.01"
                 min="0"
                 placeholder="0.00"
-                className="w-full rounded-lg border border-gray-300 py-2 pl-7 pr-3 text-sm focus:border-brand-teal focus:outline-none"
+                className="w-full rounded-lg border border-outline py-2 pl-7 pr-3 text-sm focus:border-brand-teal focus:outline-none"
               />
             </div>
           </div>
         </div>
 
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-outline">
           Category, brand, supplier and stock levels can be added from the inventory page after creation.
         </p>
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-2 border-t border-gray-100 pt-4">
+        <div className="flex items-center justify-end gap-2 border-t border-outline-variant pt-4">
           <Button type="button" variant="outline" size="sm" onClick={handleClose} disabled={saving}>
             Cancel
           </Button>

@@ -106,7 +106,7 @@ export function FeatureTabs() {
                 'group flex flex-col items-center gap-2 px-5 py-3.5 rounded-xl text-center transition-all duration-200 min-w-[120px] shrink-0 snap-start sm:snap-align-none',
                 isActive
                   ? `${c.bg} border-b-2 ${c.border}`
-                  : 'hover:bg-gray-50 border-b-2 border-transparent'
+                  : 'hover:bg-surface-container-low border-b-2 border-transparent'
               )}
             >
               <Icon
@@ -120,7 +120,7 @@ export function FeatureTabs() {
               <span
                 className={cn(
                   'text-xs font-semibold leading-tight transition-colors whitespace-nowrap',
-                  isActive ? 'text-gray-900' : 'text-gray-500'
+                  isActive ? 'text-on-surface' : 'text-on-surface-variant'
                 )}
               >
                 {label}
@@ -134,9 +134,9 @@ export function FeatureTabs() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
         {/* Left: visual placeholder */}
         <div className="relative">
-          <div className="rounded-2xl border border-gray-100 bg-gradient-to-br from-gray-50 to-white shadow-sm overflow-hidden flex items-center justify-center p-2 min-h-[300px]">
+          <div className="rounded-2xl border border-outline-variant bg-gradient-to-br from-surface-container-low to-surface shadow-sm overflow-hidden flex items-center justify-center p-2 min-h-[300px]">
             {active.image ? (
-              <img src={active.image} alt={active.title} className="w-full h-auto rounded-xl object-contain shadow-sm border border-gray-100/50" />
+              <img src={active.image} alt={active.title} className="w-full h-auto rounded-xl object-contain shadow-sm border border-outline-variant/50" />
             ) : (
               <div className="w-full h-full p-6">
                 <div className="flex items-center gap-2 mb-6">
@@ -148,19 +148,19 @@ export function FeatureTabs() {
                 <div className="space-y-3">
                   <div className="flex gap-3">
                     <div className="h-8 w-28 rounded-lg bg-brand-teal/10" />
-                    <div className="h-8 w-20 rounded-lg bg-gray-100" />
-                    <div className="h-8 w-24 rounded-lg bg-gray-100" />
-                    <div className="h-8 flex-1 rounded-lg bg-gray-100" />
+                    <div className="h-8 w-20 rounded-lg bg-surface-container" />
+                    <div className="h-8 w-24 rounded-lg bg-surface-container" />
+                    <div className="h-8 flex-1 rounded-lg bg-surface-container" />
                   </div>
                   <div className="grid grid-cols-3 gap-3">
                     <div className="h-24 rounded-xl bg-brand-teal/5 border border-brand-teal/10" />
                     <div className="h-24 rounded-xl bg-brand-yellow/5 border border-brand-yellow/10" />
                     <div className="h-24 rounded-xl bg-indigo-50 border border-indigo-100" />
                   </div>
-                  <div className="h-32 rounded-xl bg-gray-50 border border-gray-100" />
+                  <div className="h-32 rounded-xl bg-surface-container-low border border-outline-variant" />
                   <div className="flex gap-3">
                     <div className="h-10 w-32 rounded-lg bg-brand-teal/20" />
-                    <div className="h-10 w-28 rounded-lg bg-gray-100" />
+                    <div className="h-10 w-28 rounded-lg bg-surface-container" />
                   </div>
                 </div>
               </div>
@@ -173,10 +173,10 @@ export function FeatureTabs() {
 
         {/* Right: text content */}
         <div>
-          <h3 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight mb-4">
+          <h3 className="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight mb-4">
             {active.title}
           </h3>
-          <p className="text-gray-500 leading-relaxed mb-6">
+          <p className="text-on-surface-variant leading-relaxed mb-6">
             {active.desc}
           </p>
           <ul className="space-y-3 mb-8">
@@ -185,7 +185,7 @@ export function FeatureTabs() {
                 <div className={cn('mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full', colors.bg)}>
                   <Check className={cn('h-3 w-3', colors.text)} strokeWidth={3} />
                 </div>
-                <span className="text-sm text-gray-600">{h}</span>
+                <span className="text-sm text-on-surface-variant">{h}</span>
               </li>
             ))}
           </ul>

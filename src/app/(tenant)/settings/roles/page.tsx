@@ -118,7 +118,7 @@ export default function RolesPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-40 text-gray-400">
+      <div className="flex items-center justify-center h-40 text-outline">
         Loading permissions...
       </div>
     )
@@ -128,11 +128,11 @@ export default function RolesPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+          <h1 className="text-xl font-bold text-on-surface flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-blue-600" />
             Role Permissions
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="text-sm text-on-surface-variant mt-0.5">
             Control what each role can access. PIN-required actions prompt a confirmation code.
           </p>
         </div>
@@ -142,16 +142,16 @@ export default function RolesPage() {
         </Button>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-x-auto rounded-xl border border-outline-variant bg-surface">
         <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-surface-container-low border-b border-outline-variant">
             <tr>
-              <th className="py-3 px-4 text-left font-semibold text-gray-700 w-36">Module</th>
-              <th className="py-3 px-4 text-left font-semibold text-gray-700 w-24">Action</th>
+              <th className="py-3 px-4 text-left font-semibold text-on-surface-variant w-36">Module</th>
+              <th className="py-3 px-4 text-left font-semibold text-on-surface-variant w-24">Action</th>
               {ROLES.map((role) => (
-                <th key={role.key} className="py-3 px-4 text-center font-semibold text-gray-700" colSpan={2}>
+                <th key={role.key} className="py-3 px-4 text-center font-semibold text-on-surface-variant" colSpan={2}>
                   {role.label}
-                  <div className="flex justify-center gap-4 mt-1 text-xs font-normal text-gray-400">
+                  <div className="flex justify-center gap-4 mt-1 text-xs font-normal text-outline">
                     <span>Allow</span>
                     <span>PIN</span>
                   </div>
@@ -166,17 +166,17 @@ export default function RolesPage() {
                 return (
                   <tr
                     key={buildKey('_', mod.key, action)}
-                    className={`border-b border-gray-100 ${modIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                    className={`border-b border-outline-variant ${modIdx % 2 === 0 ? 'bg-surface' : 'bg-surface-container-low/50'}`}
                   >
                     {isFirstAction && (
                       <td
-                        className="py-2 px-4 font-medium text-gray-800 align-top"
+                        className="py-2 px-4 font-medium text-on-surface align-top"
                         rowSpan={ACTIONS.length}
                       >
                         {mod.label}
                       </td>
                     )}
-                    <td className="py-2 px-4 text-gray-500 capitalize">{action}</td>
+                    <td className="py-2 px-4 text-on-surface-variant capitalize">{action}</td>
                     {ROLES.map((role) => {
                       const perm = matrix[mod.key]?.[role.key]?.[action]
                       if (!perm) return <td key={role.key} colSpan={2} />
@@ -190,7 +190,7 @@ export default function RolesPage() {
                               className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
                                 perm.allowed
                                   ? 'bg-blue-600 border-blue-600 text-white'
-                                  : 'border-gray-300 bg-white'
+                                  : 'border-outline bg-surface'
                               }`}
                               title="Toggle access"
                             >
@@ -208,7 +208,7 @@ export default function RolesPage() {
                               className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
                                 perm.requires_pin && perm.allowed
                                   ? 'bg-amber-500 border-amber-500 text-white'
-                                  : 'border-gray-200 bg-white opacity-50'
+                                  : 'border-outline-variant bg-surface opacity-50'
                               }`}
                               title="Require PIN for this action"
                             >
@@ -230,7 +230,7 @@ export default function RolesPage() {
         </table>
       </div>
 
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-outline">
         Note: business_owner and super_admin always have full access regardless of these settings.
       </p>
     </div>

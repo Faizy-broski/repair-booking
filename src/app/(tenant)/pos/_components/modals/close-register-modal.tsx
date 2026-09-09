@@ -91,19 +91,19 @@ export function CloseRegisterModal({
     <Modal open={open} onClose={onClose} title="End Shift" size={zReport ? 'xl' : showBreakdown ? 'xl' : 'lg'}>
       {zReport ? (
         <div className="space-y-5">
-          <p className="-mt-2 text-sm text-gray-500">Register closed successfully. Here&apos;s the summary for this shift.</p>
+          <p className="-mt-2 text-sm text-on-surface-variant">Register closed successfully. Here&apos;s the summary for this shift.</p>
 
           {/* Sales breakdown: product vs repair */}
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Sales Breakdown</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-outline">Sales Breakdown</p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-xl border border-gray-200 bg-white p-4">
-                <p className="text-xs font-medium text-gray-500">Product Sales</p>
-                <p className="mt-1 text-xl font-semibold text-gray-900">{formatCurrency(zReport.total_sales ?? 0)}</p>
+              <div className="rounded-xl border border-outline-variant bg-surface p-4">
+                <p className="text-xs font-medium text-on-surface-variant">Product Sales</p>
+                <p className="mt-1 text-xl font-semibold text-on-surface">{formatCurrency(zReport.total_sales ?? 0)}</p>
               </div>
-              <div className="rounded-xl border border-gray-200 bg-white p-4">
-                <p className="text-xs font-medium text-gray-500">Repair Sales</p>
-                <p className="mt-1 text-xl font-semibold text-gray-900">{formatCurrency(zReport.repair_sales ?? 0)}</p>
+              <div className="rounded-xl border border-outline-variant bg-surface p-4">
+                <p className="text-xs font-medium text-on-surface-variant">Repair Sales</p>
+                <p className="mt-1 text-xl font-semibold text-on-surface">{formatCurrency(zReport.repair_sales ?? 0)}</p>
                 {(zReport.repair_refunds ?? 0) > 0 && (
                   <p className="mt-0.5 text-xs text-red-600">-{formatCurrency(zReport.repair_refunds ?? 0)} refunded</p>
                 )}
@@ -123,7 +123,7 @@ export function CloseRegisterModal({
               itself combines these two numbers, so it can never disagree
               with it. See Part 11 of the plan. */}
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Total Tendered (Product + Repair)</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-outline">Total Tendered (Product + Repair)</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-xl border border-teal-300 bg-teal-50 p-4">
                 <p className="text-xs font-medium text-teal-700">Total Cash Sales</p>
@@ -138,7 +138,7 @@ export function CloseRegisterModal({
 
           {/* Cash flow for the shift */}
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Cash Flow (Product Sales Only — see Repair Sales Detail below for repair tenders)</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-outline">Cash Flow (Product Sales Only — see Repair Sales Detail below for repair tenders)</p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {([
                 ['Product Cash Sales', zReport.cash_sales ?? 0],
@@ -159,9 +159,9 @@ export function CloseRegisterModal({
                 ['Refunds (Cash)', -((zReport.total_refunds ?? 0) - (zReport.card_refunds ?? 0))],
                 ['Refunds (Card)', -(zReport.card_refunds ?? 0)],
               ] as [string, number][]).map(([l, v]) => (
-                <div key={l} className="rounded-xl border border-gray-200 bg-white p-3">
-                  <p className="text-xs text-gray-500">{l}</p>
-                  <p className={`mt-0.5 font-semibold ${l.startsWith('Refunds') && v < 0 ? 'text-red-600' : 'text-gray-900'}`}>{formatCurrency(v)}</p>
+                <div key={l} className="rounded-xl border border-outline-variant bg-surface p-3">
+                  <p className="text-xs text-on-surface-variant">{l}</p>
+                  <p className={`mt-0.5 font-semibold ${l.startsWith('Refunds') && v < 0 ? 'text-red-600' : 'text-on-surface'}`}>{formatCurrency(v)}</p>
                 </div>
               ))}
               {(zReport.cash_in ?? 0) > 0 && (
@@ -202,19 +202,19 @@ export function CloseRegisterModal({
               )}
             </div>
             {(zReport.expenses ?? 0) > 0 && (
-              <p className="mt-2 text-xs text-gray-400 italic">Expense reflects business expenses logged for this branch since the shift opened — shown for information only and excluded from the cash reconciliation below (cash-drawer expenses are already captured in Cash Out).</p>
+              <p className="mt-2 text-xs text-outline italic">Expense reflects business expenses logged for this branch since the shift opened — shown for information only and excluded from the cash reconciliation below (cash-drawer expenses are already captured in Cash Out).</p>
             )}
             {((zReport.cash_in ?? 0) > 0 || (zReport.cash_out ?? 0) > 0) && (
-              <p className="mt-2 text-xs text-gray-400 italic">Cash In/Out are manual drawer adjustments for the whole shift — not tied to product or repair sales specifically. Buyback is a subset of Cash Out, shown separately for clarity. The card-tendered portion (shown above) is excluded from Expected Cash below, since it never touched the physical till.</p>
+              <p className="mt-2 text-xs text-outline italic">Cash In/Out are manual drawer adjustments for the whole shift — not tied to product or repair sales specifically. Buyback is a subset of Cash Out, shown separately for clarity. The card-tendered portion (shown above) is excluded from Expected Cash below, since it never touched the physical till.</p>
             )}
             {(zReport.credit_repayments_cash ?? 0) > 0 && (
-              <p className="mt-1 text-xs text-gray-400 italic">Credit Repaid (Cash) is cash collected today against a balance sold in a prior shift — it affects Expected Cash but is not new revenue this shift.</p>
+              <p className="mt-1 text-xs text-outline italic">Credit Repaid (Cash) is cash collected today against a balance sold in a prior shift — it affects Expected Cash but is not new revenue this shift.</p>
             )}
           </div>
 
           {/* Repair sales tender breakdown */}
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Repair Sales Detail</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-outline">Repair Sales Detail</p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {([
                 ['Cash Sales',         zReport.repair_cash_sales ?? 0],
@@ -224,32 +224,32 @@ export function CloseRegisterModal({
                 ['Other (pickup etc)', zReport.repair_other_sales ?? 0],
                 ['Refunds',            -(zReport.repair_refunds ?? 0)],
               ] as [string, number][]).map(([l, v]) => (
-                <div key={l} className="rounded-xl border border-gray-200 bg-white p-3">
-                  <p className="text-xs text-gray-500">{l}</p>
-                  <p className={`mt-0.5 font-semibold ${l === 'Refunds' && v < 0 ? 'text-red-600' : 'text-gray-900'}`}>{formatCurrency(v)}</p>
+                <div key={l} className="rounded-xl border border-outline-variant bg-surface p-3">
+                  <p className="text-xs text-on-surface-variant">{l}</p>
+                  <p className={`mt-0.5 font-semibold ${l === 'Refunds' && v < 0 ? 'text-red-600' : 'text-on-surface'}`}>{formatCurrency(v)}</p>
                 </div>
               ))}
             </div>
-            <p className="mt-2 text-xs text-gray-400 italic">Cash/Card reflects deposits only — pickup payments have no recorded tender yet.</p>
+            <p className="mt-2 text-xs text-outline italic">Cash/Card reflects deposits only — pickup payments have no recorded tender yet.</p>
           </div>
 
           {/* Store credit / loyalty redemption trail for this shift */}
           {(zReport.credit_activity?.length ?? 0) > 0 && (
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Credit &amp; Loyalty Activity</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-outline">Credit &amp; Loyalty Activity</p>
                 <Link href="/credits" className="text-xs font-medium text-brand-teal hover:underline">View Full History</Link>
               </div>
-              <div className="divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white">
+              <div className="divide-y divide-outline-variant rounded-xl border border-outline-variant bg-surface">
                 {zReport.credit_activity!.map((entry, i) => (
                   <div key={i} className="flex items-center justify-between px-4 py-2.5 text-sm">
                     <div>
-                      <p className="font-medium text-gray-900">{entry.customer_name || 'Unknown customer'}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="font-medium text-on-surface">{entry.customer_name || 'Unknown customer'}</p>
+                      <p className="text-xs text-on-surface-variant">
                         {entry.type === 'store_credit' ? 'Store Credit' : 'Loyalty Points'} · {entry.reference_type} #{entry.reference_id.slice(-8)}
                       </p>
                     </div>
-                    <span className="font-semibold text-gray-900">
+                    <span className="font-semibold text-on-surface">
                       {entry.type === 'store_credit' ? formatCurrency(entry.amount) : `${entry.amount} pts`}
                     </span>
                   </div>
@@ -260,8 +260,8 @@ export function CloseRegisterModal({
 
           {/* Cash drawer reconciliation */}
           <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Cash Reconciliation</p>
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-outline">Cash Reconciliation</p>
+            <div className="rounded-xl border border-outline-variant bg-surface p-4">
               <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
                 {([
                   ['Opening Float', zReport.opening_float],
@@ -270,8 +270,8 @@ export function CloseRegisterModal({
                   ['Card Total',    zReport.closing_card_total],
                 ] as [string, number | undefined][]).map(([l, v]) => (
                   <div key={l}>
-                    <p className="text-xs text-gray-500">{l}</p>
-                    <p className="mt-0.5 font-semibold text-gray-900">{formatCurrency(v ?? 0)}</p>
+                    <p className="text-xs text-on-surface-variant">{l}</p>
+                    <p className="mt-0.5 font-semibold text-on-surface">{formatCurrency(v ?? 0)}</p>
                   </div>
                 ))}
               </div>
@@ -279,8 +279,8 @@ export function CloseRegisterModal({
                 <span className={`text-sm font-medium ${(zReport.variance ?? 0) < 0 ? 'text-red-700' : 'text-green-700'}`}>Difference (Over/Short)</span>
                 <span className={`text-lg font-bold ${(zReport.variance ?? 0) < 0 ? 'text-red-700' : 'text-green-700'}`}>{formatCurrency(zReport.variance ?? 0)}</span>
               </div>
-              <p className="mt-2 text-xs text-gray-400 italic">Expected Cash includes both cash and card takings; Closing Cash is what was physically counted and Card Total is what was entered from the card machine&apos;s report. Repair balances collected outside POS aren&apos;t captured with a payment method today, so they&apos;re shown above for information only and excluded here.</p>
-              <p className="mt-2 text-xs text-gray-400">Transactions: {zReport.transaction_count ?? 0}</p>
+              <p className="mt-2 text-xs text-outline italic">Expected Cash includes both cash and card takings; Closing Cash is what was physically counted and Card Total is what was entered from the card machine&apos;s report. Repair balances collected outside POS aren&apos;t captured with a payment method today, so they&apos;re shown above for information only and excluded here.</p>
+              <p className="mt-2 text-xs text-outline">Transactions: {zReport.transaction_count ?? 0}</p>
             </div>
           </div>
 
@@ -301,11 +301,11 @@ export function CloseRegisterModal({
           </div>
 
           <div>
-            <p className="mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Count Denominations</p>
+            <p className="mb-2 text-xs font-semibold text-on-surface-variant uppercase tracking-wide">Count Denominations</p>
             <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
               {DENOMINATIONS.map(d => (
-                <div key={d.value} className="flex min-w-0 flex-col gap-1 rounded-lg border border-gray-200 bg-white p-1.5 shadow-sm">
-                  <span className="truncate text-[10px] font-bold text-gray-400 uppercase text-center">{d.label}</span>
+                <div key={d.value} className="flex min-w-0 flex-col gap-1 rounded-lg border border-outline-variant bg-surface p-1.5 shadow-sm">
+                  <span className="truncate text-[10px] font-bold text-outline uppercase text-center">{d.label}</span>
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
@@ -313,7 +313,7 @@ export function CloseRegisterModal({
                         const v = (closingDenoms[String(d.value)] ?? 0)
                         if (v > 0) setClosingDenoms(prev => ({ ...prev, [String(d.value)]: v - 1 }))
                       }}
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200 sm:h-6 sm:w-6"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-surface-container text-on-surface-variant hover:bg-surface-container-high sm:h-6 sm:w-6"
                     >
                       <Minus className="h-3 w-3" />
                     </button>
@@ -324,7 +324,7 @@ export function CloseRegisterModal({
                         const v = parseInt(e.target.value) || 0
                         setClosingDenoms(prev => ({ ...prev, [String(d.value)]: v }))
                       }}
-                      className="h-7 w-full min-w-0 bg-transparent text-center text-sm font-bold text-gray-900 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none sm:h-6"
+                      className="h-7 w-full min-w-0 bg-transparent text-center text-sm font-bold text-on-surface focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none sm:h-6"
                     />
                     <button
                       type="button"
@@ -343,14 +343,14 @@ export function CloseRegisterModal({
           </div>
 
           <div>
-            <p className="mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Card Total</p>
+            <p className="mb-2 text-xs font-semibold text-on-surface-variant uppercase tracking-wide">Card Total</p>
             <input
               type="number" min="0" step="0.01" placeholder="0.00"
               value={closingCardTotal}
               onChange={e => setClosingCardTotal(e.target.value)}
-              className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none"
+              className="h-9 w-full rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none"
             />
-            <p className="mt-1 text-xs text-gray-400">Enter today&apos;s total card payments from your card machine&apos;s report — Expected Cash now includes card takings, so this is needed to verify against it.</p>
+            <p className="mt-1 text-xs text-outline">Enter today&apos;s total card payments from your card machine&apos;s report — Expected Cash now includes card takings, so this is needed to verify against it.</p>
             {expectedNetCardTotal !== null && (
               <p className="mt-1 text-xs font-medium text-amber-600">
                 {(sessionStats?.card_refunds ?? 0) > 0
@@ -371,7 +371,7 @@ export function CloseRegisterModal({
                 <button
                   type="button"
                   onClick={() => setShowBreakdown(v => !v)}
-                  className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:bg-gray-50"
+                  className="flex w-full items-center justify-between rounded-lg border border-outline-variant bg-surface px-3 py-2 text-xs font-semibold uppercase tracking-wide text-on-surface-variant hover:bg-surface-container-low"
                 >
                   View Full Breakdown
                   {showBreakdown ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
@@ -380,15 +380,15 @@ export function CloseRegisterModal({
                   <div className="mt-2 space-y-4">
                     {/* Sales breakdown: product vs repair */}
                     <div>
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Sales Breakdown</p>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-outline">Sales Breakdown</p>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                        <div className="rounded-xl border border-gray-200 bg-white p-4">
-                          <p className="text-xs font-medium text-gray-500">Product Sales</p>
-                          <p className="mt-1 text-xl font-semibold text-gray-900">{formatCurrency(sessionStats.total_sales ?? 0)}</p>
+                        <div className="rounded-xl border border-outline-variant bg-surface p-4">
+                          <p className="text-xs font-medium text-on-surface-variant">Product Sales</p>
+                          <p className="mt-1 text-xl font-semibold text-on-surface">{formatCurrency(sessionStats.total_sales ?? 0)}</p>
                         </div>
-                        <div className="rounded-xl border border-gray-200 bg-white p-4">
-                          <p className="text-xs font-medium text-gray-500">Repair Sales</p>
-                          <p className="mt-1 text-xl font-semibold text-gray-900">{formatCurrency(sessionStats.repair_sales ?? 0)}</p>
+                        <div className="rounded-xl border border-outline-variant bg-surface p-4">
+                          <p className="text-xs font-medium text-on-surface-variant">Repair Sales</p>
+                          <p className="mt-1 text-xl font-semibold text-on-surface">{formatCurrency(sessionStats.repair_sales ?? 0)}</p>
                           {(sessionStats.repair_refunds ?? 0) > 0 && (
                             <p className="mt-0.5 text-xs text-red-600">-{formatCurrency(sessionStats.repair_refunds ?? 0)} refunded</p>
                           )}
@@ -404,7 +404,7 @@ export function CloseRegisterModal({
                         repair combined -- see the post-close view's comment
                         above for why this is computed this specific way. */}
                     <div>
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Total Tendered (Product + Repair)</p>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-outline">Total Tendered (Product + Repair)</p>
                       <div className="grid grid-cols-2 gap-3">
                         <div className="rounded-xl border border-teal-300 bg-teal-50 p-4">
                           <p className="text-xs font-medium text-teal-700">Total Cash Sales</p>
@@ -419,7 +419,7 @@ export function CloseRegisterModal({
 
                     {/* Cash flow for the shift so far */}
                     <div>
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Cash Flow (Product Sales Only — see Repair Sales Detail below for repair tenders)</p>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-outline">Cash Flow (Product Sales Only — see Repair Sales Detail below for repair tenders)</p>
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                         {([
                           ['Product Cash Sales', sessionStats.cash_sales ?? 0],
@@ -436,9 +436,9 @@ export function CloseRegisterModal({
                           ['Refunds (Cash)', -((sessionStats.total_refunds ?? 0) - (sessionStats.card_refunds ?? 0))],
                           ['Refunds (Card)', -(sessionStats.card_refunds ?? 0)],
                         ] as [string, number][]).map(([l, v]) => (
-                          <div key={l} className="rounded-xl border border-gray-200 bg-white p-3">
-                            <p className="text-xs text-gray-500">{l}</p>
-                            <p className={`mt-0.5 font-semibold ${l.startsWith('Refunds') && v < 0 ? 'text-red-600' : 'text-gray-900'}`}>{formatCurrency(v)}</p>
+                          <div key={l} className="rounded-xl border border-outline-variant bg-surface p-3">
+                            <p className="text-xs text-on-surface-variant">{l}</p>
+                            <p className={`mt-0.5 font-semibold ${l.startsWith('Refunds') && v < 0 ? 'text-red-600' : 'text-on-surface'}`}>{formatCurrency(v)}</p>
                           </div>
                         ))}
                         {(sessionStats.cash_in ?? 0) > 0 && (
@@ -479,19 +479,19 @@ export function CloseRegisterModal({
                         )}
                       </div>
                       {(sessionStats.expenses ?? 0) > 0 && (
-                        <p className="mt-2 text-xs text-gray-400 italic">Expense reflects business expenses logged for this branch since the shift opened — shown for information only and excluded from the cash reconciliation below (cash-drawer expenses are already captured in Cash Out).</p>
+                        <p className="mt-2 text-xs text-outline italic">Expense reflects business expenses logged for this branch since the shift opened — shown for information only and excluded from the cash reconciliation below (cash-drawer expenses are already captured in Cash Out).</p>
                       )}
                       {((sessionStats.cash_in ?? 0) > 0 || (sessionStats.cash_out ?? 0) > 0) && (
-                        <p className="mt-2 text-xs text-gray-400 italic">Cash In/Out are manual drawer adjustments for the whole shift — not tied to product or repair sales specifically. Buyback is a subset of Cash Out, shown separately for clarity. The card-tendered portion (shown above) is excluded from Expected Cash below, since it never touched the physical till.</p>
+                        <p className="mt-2 text-xs text-outline italic">Cash In/Out are manual drawer adjustments for the whole shift — not tied to product or repair sales specifically. Buyback is a subset of Cash Out, shown separately for clarity. The card-tendered portion (shown above) is excluded from Expected Cash below, since it never touched the physical till.</p>
                       )}
                       {(sessionStats.credit_repayments_cash ?? 0) > 0 && (
-                        <p className="mt-1 text-xs text-gray-400 italic">Credit Repaid (Cash) is cash collected today against a balance sold in a prior shift — it affects Expected Cash but is not new revenue this shift.</p>
+                        <p className="mt-1 text-xs text-outline italic">Credit Repaid (Cash) is cash collected today against a balance sold in a prior shift — it affects Expected Cash but is not new revenue this shift.</p>
                       )}
                     </div>
 
                     {/* Repair sales tender breakdown */}
                     <div>
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Repair Sales Detail</p>
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-outline">Repair Sales Detail</p>
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                         {([
                           ['Cash Sales',         sessionStats.repair_cash_sales ?? 0],
@@ -501,13 +501,13 @@ export function CloseRegisterModal({
                           ['Other (pickup etc)', sessionStats.repair_other_sales ?? 0],
                           ['Refunds',            -(sessionStats.repair_refunds ?? 0)],
                         ] as [string, number][]).map(([l, v]) => (
-                          <div key={l} className="rounded-xl border border-gray-200 bg-white p-3">
-                            <p className="text-xs text-gray-500">{l}</p>
-                            <p className={`mt-0.5 font-semibold ${l === 'Refunds' && v < 0 ? 'text-red-600' : 'text-gray-900'}`}>{formatCurrency(v)}</p>
+                          <div key={l} className="rounded-xl border border-outline-variant bg-surface p-3">
+                            <p className="text-xs text-on-surface-variant">{l}</p>
+                            <p className={`mt-0.5 font-semibold ${l === 'Refunds' && v < 0 ? 'text-red-600' : 'text-on-surface'}`}>{formatCurrency(v)}</p>
                           </div>
                         ))}
                       </div>
-                      <p className="mt-2 text-xs text-gray-400 italic">Cash/Card reflects deposits only — pickup payments have no recorded tender yet.</p>
+                      <p className="mt-2 text-xs text-outline italic">Cash/Card reflects deposits only — pickup payments have no recorded tender yet.</p>
                     </div>
                   </div>
                 )}
@@ -515,19 +515,19 @@ export function CloseRegisterModal({
             )
           })()}
 
-          <div className="rounded-lg bg-gray-50 px-4 py-2.5 text-sm">
-            <div className="flex items-center justify-between text-gray-600">
+          <div className="rounded-lg bg-surface-container-low px-4 py-2.5 text-sm">
+            <div className="flex items-center justify-between text-on-surface-variant">
               <span>Expected Cash</span>
-              <span className="font-semibold text-gray-900">
+              <span className="font-semibold text-on-surface">
                 {expectedCashLoading ? 'Calculating…' : formatCurrency(expectedCash ?? 0)}
               </span>
             </div>
-            <div className="mt-1.5 flex items-center justify-between font-semibold text-gray-900">
+            <div className="mt-1.5 flex items-center justify-between font-semibold text-on-surface">
               <span>Verified Total</span>
               <span className="text-base">{formatCurrency(verifiedTotal)}</span>
             </div>
             {difference !== null && (
-              <div className={`mt-1.5 flex items-center justify-between border-t border-gray-200 pt-1.5 text-sm font-semibold ${difference < 0 ? 'text-red-600' : 'text-green-600'}`}>
+              <div className={`mt-1.5 flex items-center justify-between border-t border-outline-variant pt-1.5 text-sm font-semibold ${difference < 0 ? 'text-red-600' : 'text-green-600'}`}>
                 <span>Difference</span>
                 <span>{formatCurrency(difference)}</span>
               </div>
@@ -540,7 +540,7 @@ export function CloseRegisterModal({
           )}
 
           <div>
-            <label className={`mb-1 block text-xs font-medium ${hasDiscrepancy ? 'text-amber-700' : 'text-gray-600'}`}>
+            <label className={`mb-1 block text-xs font-medium ${hasDiscrepancy ? 'text-amber-700' : 'text-on-surface-variant'}`}>
               {hasDiscrepancy ? (
                 <>
                   Discrepancy Note <span className="text-red-500">*</span>
@@ -556,7 +556,7 @@ export function CloseRegisterModal({
               value={closingNote}
               onChange={e => setClosingNote(e.target.value)}
               className={`w-full rounded-lg border px-3 py-2 text-sm focus:outline-none ${
-                hasDiscrepancy ? 'border-amber-300 focus:border-amber-500' : 'border-gray-300 focus:border-brand-teal'
+                hasDiscrepancy ? 'border-amber-300 focus:border-amber-500' : 'border-outline focus:border-brand-teal'
               }`}
             />
           </div>

@@ -116,11 +116,11 @@ function RowActionsMenu({
         ref={btnRef}
         onClick={toggle}
         disabled={duplicating}
-        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-gray-800 hover:bg-gray-100 hover:text-black transition-colors disabled:opacity-60"
+        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-on-surface hover:bg-surface-container hover:text-black transition-colors disabled:opacity-60"
         title={duplicating ? 'Duplicating…' : 'More actions'}
       >
         {duplicating
-          ? <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-brand-teal" />
+          ? <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-outline border-t-brand-teal" />
           : <MoreVertical className="h-5 w-5" />
         }
       </button>
@@ -129,19 +129,19 @@ function RowActionsMenu({
         <div
           ref={menuRef}
           style={{ position: 'absolute', top: pos.top, left: pos.left, zIndex: 9999 }}
-          className="w-36 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+          className="w-36 rounded-lg border border-outline-variant bg-surface py-1 shadow-lg"
         >
           <Link
             href={`/inventory/${productId}`}
             onClick={() => setOpen(false)}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low"
           >
             <Edit2 className="h-3.5 w-3.5" />
             Edit
           </Link>
           <button
             onClick={() => { onDuplicate(); setOpen(false) }}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low"
           >
             <Copy className="h-3.5 w-3.5" />
             Duplicate
@@ -256,12 +256,12 @@ function DiscountModal({
   return (
     <Modal open={!!product} onClose={onClose} title={existing ? 'Edit Sale Price' : 'Put Stock on Sale'} size="sm">
       <div className="space-y-4">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-on-surface-variant">
           Mark part of <strong>{targetName}</strong>'s stock at a discount price. The rest stays at the normal price ({formatCurrency(sellingPrice)}) — cashiers choose which to sell at checkout.
         </p>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500">Quantity to discount</label>
+            <label className="mb-1 block text-xs font-medium text-on-surface-variant">Quantity to discount</label>
             <input
               type="number" min={1} max={onHand}
               className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
@@ -276,7 +276,7 @@ function DiscountModal({
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500">Discount price</label>
+            <label className="mb-1 block text-xs font-medium text-on-surface-variant">Discount price</label>
             <input
               type="number" min={0} step="0.01"
               className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
@@ -286,7 +286,7 @@ function DiscountModal({
           </div>
         </div>
         {existing && (
-          <p className="text-xs text-gray-400">{existing.quantity_remaining} unit(s) currently on sale at {formatCurrency(existing.discount_price)}.</p>
+          <p className="text-xs text-outline">{existing.quantity_remaining} unit(s) currently on sale at {formatCurrency(existing.discount_price)}.</p>
         )}
         <div className="flex gap-2">
           {existing && (
@@ -372,12 +372,12 @@ function BinModal({
   return (
     <Modal open={!!product} onClose={onClose} title="Move to Bin" size="sm">
       <div className="space-y-4">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-on-surface-variant">
           Move stock of <strong>{product.name}</strong> to the Bin as a 100% loss. It's removed from active inventory and can be restored later if this was a mistake.
         </p>
         {product.has_variants && (
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500">Variant</label>
+            <label className="mb-1 block text-xs font-medium text-on-surface-variant">Variant</label>
             <select
               className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
               value={variantId}
@@ -392,7 +392,7 @@ function BinModal({
           </div>
         )}
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500">Quantity to move to Bin</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Quantity to move to Bin</label>
           <input
             type="number" min={1} max={onHand || undefined}
             className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
@@ -407,7 +407,7 @@ function BinModal({
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500">Reason (optional)</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Reason (optional)</label>
           <input
             type="text"
             className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
@@ -508,11 +508,11 @@ function ReturnToSupplierModal({
   return (
     <Modal open={!!product} onClose={onClose} title="Return to Supplier" size="sm">
       <div className="space-y-4">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-on-surface-variant">
           Create a draft damage return for <strong>{product.name}</strong>. Stock is only deducted once you ship the return to the supplier.
         </p>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500">Supplier</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Supplier</label>
           <select
             className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
             value={supplierId}
@@ -526,7 +526,7 @@ function ReturnToSupplierModal({
         </div>
         {product.has_variants && (
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-500">Variant</label>
+            <label className="mb-1 block text-xs font-medium text-on-surface-variant">Variant</label>
             <select
               className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
               value={variantId}
@@ -541,7 +541,7 @@ function ReturnToSupplierModal({
           </div>
         )}
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500">Quantity to return</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Quantity to return</label>
           <input
             type="number" min={1} max={onHand || undefined}
             className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
@@ -556,7 +556,7 @@ function ReturnToSupplierModal({
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500">Reason (e.g. water damaged, screen cracked)</label>
+          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Reason (e.g. water damaged, screen cracked)</label>
           <input
             type="text"
             className="w-full rounded-md border px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
@@ -828,7 +828,7 @@ export default function InventoryPage() {
               setSelectedIds((prev) => { const n = new Set(prev); displayProducts.forEach((p: ProductRow) => n.add(p.id)); return n })
             }
           }}
-          className="rounded border-gray-300 cursor-pointer"
+          className="rounded border-outline cursor-pointer"
         />
       ),
       cell: ({ row }) => (
@@ -843,7 +843,7 @@ export default function InventoryPage() {
               return n
             })
           }}
-          className="rounded border-gray-300 cursor-pointer"
+          className="rounded border-outline cursor-pointer"
         />
       ),
     },
@@ -853,15 +853,15 @@ export default function InventoryPage() {
       cell: ({ row }) => (
         <div>
           <div className="flex items-center gap-2">
-            <Link href={`/inventory/${row.original.id}`} className="font-medium text-gray-900 text-sm hover:text-blue-600 transition-colors">
+            <Link href={`/inventory/${row.original.id}`} className="font-medium text-on-surface text-sm hover:text-blue-600 transition-colors">
               {row.original.name}
             </Link>
             {row.original.is_draft && <Badge variant="warning" className="text-xs">Draft</Badge>}
           </div>
           <div className="flex items-center gap-2 mt-0.5">
-            {row.original.sku && <span className="text-xs text-gray-400">SKU: {row.original.sku}</span>}
-            {row.original.barcode && <span className="text-xs text-gray-400">· {row.original.barcode}</span>}
-            {row.original.imei && <span className="text-xs text-gray-400">· IMEI: {row.original.imei}</span>}
+            {row.original.sku && <span className="text-xs text-outline">SKU: {row.original.sku}</span>}
+            {row.original.barcode && <span className="text-xs text-outline">· {row.original.barcode}</span>}
+            {row.original.imei && <span className="text-xs text-outline">· IMEI: {row.original.imei}</span>}
           </div>
         </div>
       ),
@@ -871,22 +871,22 @@ export default function InventoryPage() {
       header: useSimpleCatalog ? 'Category' : 'Device Type',
       cell: ({ row }) => row.original.categories?.name
         ? <Badge variant="secondary">{row.original.categories.name}</Badge>
-        : <span className="text-gray-300">—</span>,
+        : <span className="text-outline-variant">—</span>,
     },
     {
       id: 'brand',
       header: 'Brand',
       cell: ({ row }) => row.original.brands?.name
-        ? <span className="text-sm text-gray-600">{row.original.brands.name}</span>
-        : <span className="text-gray-300">—</span>,
+        ? <span className="text-sm text-on-surface-variant">{row.original.brands.name}</span>
+        : <span className="text-outline-variant">—</span>,
     },
     ...(!useSimpleCatalog ? [
       {
         id: 'model',
         header: 'Model',
         cell: ({ row }: any) => (row.original as any).service_devices?.name
-          ? <span className="text-sm text-gray-600">{(row.original as any).service_devices.name}</span>
-          : <span className="text-gray-300">—</span>,
+          ? <span className="text-sm text-on-surface-variant">{(row.original as any).service_devices.name}</span>
+          : <span className="text-outline-variant">—</span>,
       },
       {
         id: 'type',
@@ -899,7 +899,7 @@ export default function InventoryPage() {
                 {t === 'part' ? 'Part' : 'Product'}
               </Badge>
               {row.original.part_type && (
-                <span className="text-[10px] uppercase text-gray-500 font-semibold tracking-wider">
+                <span className="text-[10px] uppercase text-on-surface-variant font-semibold tracking-wider">
                   {row.original.part_type}
                 </span>
               )}
@@ -936,7 +936,7 @@ export default function InventoryPage() {
       header: 'Stock',
       cell: ({ row }) => {
         const p = row.original
-        if (p.is_service) return <span className="text-xs text-gray-400">Service</span>
+        if (p.is_service) return <span className="text-xs text-outline">Service</span>
         if ((p.variant_count ?? 0) > 0 || p.has_variants) {
           return (
             <button
@@ -952,7 +952,7 @@ export default function InventoryPage() {
         const isOut = p.on_hand === 0
         return (
           <div className="flex items-center gap-1.5">
-            <span className={`text-sm font-medium ${isOut ? 'text-red-600' : isLow ? 'text-amber-600' : 'text-gray-900'}`}>
+            <span className={`text-sm font-medium ${isOut ? 'text-red-600' : isLow ? 'text-amber-600' : 'text-on-surface'}`}>
               {p.on_hand}
             </span>
             {isOut && <Badge variant="destructive" className="text-xs">Out</Badge>}
@@ -996,8 +996,8 @@ export default function InventoryPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Inventory</h1>
-          <p className="text-sm text-gray-500">{total} products found</p>
+          <h1 className="text-xl font-bold text-on-surface">Inventory</h1>
+          <p className="text-sm text-on-surface-variant">{total} products found</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={() => window.open(`/api/products/export`, '_blank')}>
@@ -1075,15 +1075,15 @@ export default function InventoryPage() {
             <div 
               key={s.label} 
               onClick={s.onClick}
-              className={`relative overflow-hidden rounded-xl border bg-white pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm ${s.onClick ? 'cursor-pointer hover:shadow-md transition-all' : ''} ${s.isActive ? 'border-amber-500 ring-1 ring-amber-500' : 'border-gray-200'}`}
+              className={`relative overflow-hidden rounded-xl border bg-surface pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm ${s.onClick ? 'cursor-pointer hover:shadow-md transition-all' : ''} ${s.isActive ? 'border-amber-500 ring-1 ring-amber-500' : 'border-outline-variant'}`}
             >
               <div className="flex items-start justify-between gap-2 sm:gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-gray-500 truncate">{s.label}</p>
+                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">{s.label}</p>
                   {s.value !== null ? (
-                    <p className="mt-2 text-sm sm:text-base lg:text-lg font-bold text-gray-900 leading-tight tracking-tight tabular-nums whitespace-nowrap" title={String(s.value)}>{s.value}</p>
+                    <p className="mt-2 text-sm sm:text-base lg:text-lg font-bold text-on-surface leading-tight tracking-tight tabular-nums whitespace-nowrap" title={String(s.value)}>{s.value}</p>
                   ) : (
-                    <div className="mt-2 h-8 w-24 rounded bg-gray-100 animate-pulse" />
+                    <div className="mt-2 h-8 w-24 rounded bg-surface-container animate-pulse" />
                   )}
                 </div>
                 <div className={`flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl ${s.iconBg}`}>
@@ -1095,7 +1095,7 @@ export default function InventoryPage() {
                   {s.subtitle}
                 </p>
               ) : (
-                <div className="mt-3 h-4 w-24 rounded bg-gray-100 animate-pulse" />
+                <div className="mt-3 h-4 w-24 rounded bg-surface-container animate-pulse" />
               )}
               <div className={`absolute bottom-0 left-0 right-0 h-1 ${s.borderColor}`} />
             </div>
@@ -1104,13 +1104,13 @@ export default function InventoryPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="rounded-xl border border-gray-200 bg-white p-3 space-y-3">
+      <div className="rounded-xl border border-outline-variant bg-surface p-3 space-y-3">
         {/* Simplified-catalog verticals (Retail, Tyre Fitting): category quick-filter pills */}
         {useSimpleCatalog && categories.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap pb-1 border-b border-gray-100">
+          <div className="flex items-center gap-1.5 flex-wrap pb-1 border-b border-outline-variant">
             <button
               onClick={() => { setCategoryFilter(''); setPage(0) }}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${!categoryFilter ? 'bg-brand-teal text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${!categoryFilter ? 'bg-brand-teal text-white' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}`}
             >
               All
             </button>
@@ -1118,7 +1118,7 @@ export default function InventoryPage() {
               <button
                 key={c.id}
                 onClick={() => { setCategoryFilter(categoryFilter === c.id ? '' : c.id); setPage(0) }}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${categoryFilter === c.id ? 'bg-brand-teal text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${categoryFilter === c.id ? 'bg-brand-teal text-white' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}`}
               >
                 {c.name}
               </button>
@@ -1129,22 +1129,22 @@ export default function InventoryPage() {
         {/* Row 1: search + type tabs + advanced toggle */}
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 min-w-[200px] max-w-xs">
-            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
             <input
               type="search"
               placeholder={useSimpleCatalog ? 'Search by name, SKU, barcode...' : 'Search by name, SKU, barcode, IMEI...'}
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(0) }}
-              className="h-9 w-full rounded-lg border border-gray-300 bg-white pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
+              className="h-9 w-full rounded-lg border border-outline bg-surface pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
             />
           </div>
           {!useSimpleCatalog && (
-            <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 gap-0.5">
+            <div className="flex rounded-lg border border-outline-variant bg-surface-container-low p-0.5 gap-0.5">
               {(['all', 'product', 'part'] as const).map((f) => (
                 <button
                   key={f}
                   onClick={() => { setTypeFilter(f); setPage(0) }}
-                  className={`rounded px-3 py-1 text-xs font-medium transition-colors ${typeFilter === f ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                  className={`rounded px-3 py-1 text-xs font-medium transition-colors ${typeFilter === f ? 'bg-surface shadow-sm text-on-surface' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
                 >
                   {f === 'all' ? 'All' : f === 'product' ? 'Products' : 'Parts'}
                 </button>
@@ -1153,7 +1153,7 @@ export default function InventoryPage() {
           )}
           <button
             onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${showAdvancedFilters ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${showAdvancedFilters ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-outline-variant text-on-surface-variant hover:bg-surface-container-low'}`}
           >
             <Filter className="h-4 w-4" />
             Filters
@@ -1161,7 +1161,7 @@ export default function InventoryPage() {
             {hasActiveFilters && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-blue-500" />}
           </button>
           {hasActiveFilters && (
-            <button onClick={clearFilters} className="text-xs text-gray-400 hover:text-gray-600 underline">
+            <button onClick={clearFilters} className="text-xs text-outline hover:text-on-surface-variant underline">
               Clear filters
             </button>
           )}
@@ -1169,9 +1169,9 @@ export default function InventoryPage() {
 
         {/* Row 2: advanced filters */}
         {showAdvancedFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-gray-100">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-outline-variant">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">{useSimpleCatalog ? 'Category' : 'Device Type / Category'}</label>
+              <label className="block text-xs font-medium text-on-surface-variant mb-1">{useSimpleCatalog ? 'Category' : 'Device Type / Category'}</label>
               <Select
                 options={[{ value: '', label: 'All Categories' }, ...categories.map(c => ({ value: c.id, label: c.name }))]}
                 value={categoryFilter}
@@ -1179,7 +1179,7 @@ export default function InventoryPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Brand</label>
+              <label className="block text-xs font-medium text-on-surface-variant mb-1">Brand</label>
               <Select
                 options={[{ value: '', label: 'All Brands' }, ...brands.map(b => ({ value: b.id, label: b.name }))]}
                 value={brandFilter}
@@ -1187,7 +1187,7 @@ export default function InventoryPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Supplier</label>
+              <label className="block text-xs font-medium text-on-surface-variant mb-1">Supplier</label>
               <Select
                 options={[{ value: '', label: 'All Suppliers' }, ...suppliers.map(s => ({ value: s.id, label: s.name }))]}
                 value={supplierFilter}
@@ -1196,7 +1196,7 @@ export default function InventoryPage() {
             </div>
             {!isRetail && (
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Valuation Method</label>
+                <label className="block text-xs font-medium text-on-surface-variant mb-1">Valuation Method</label>
                 <Select
                   options={[
                     { value: '', label: 'All Methods' },
@@ -1215,18 +1215,18 @@ export default function InventoryPage() {
                   type="checkbox"
                   checked={hideOutOfStock}
                   onChange={(e) => { setHideOutOfStock(e.target.checked); setPage(0) }}
-                  className="rounded border-gray-300"
+                  className="rounded border-outline"
                 />
-                <span className="text-sm text-gray-700">Hide out of stock</span>
+                <span className="text-sm text-on-surface-variant">Hide out of stock</span>
               </label>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input
                   type="checkbox"
                   checked={lowStockOnly}
                   onChange={(e) => { setLowStockOnly(e.target.checked); setPage(0) }}
-                  className="rounded border-gray-300"
+                  className="rounded border-outline"
                 />
-                <span className="text-sm text-gray-700">Low stock</span>
+                <span className="text-sm text-on-surface-variant">Low stock</span>
               </label>
             </div>
           </div>
@@ -1243,7 +1243,7 @@ export default function InventoryPage() {
           <Button size="sm" variant="destructive" onClick={() => setShowBulkDeleteConfirm(true)}>
             <Trash2 className="h-4 w-4" /> Delete selected
           </Button>
-          <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-xs text-gray-400 hover:text-gray-600 underline">
+          <button onClick={() => setSelectedIds(new Set())} className="ml-auto text-xs text-outline hover:text-on-surface-variant underline">
             Clear selection
           </button>
         </div>
@@ -1264,7 +1264,7 @@ export default function InventoryPage() {
       {/* Bulk Delete Confirm Modal */}
       <Modal open={showBulkDeleteConfirm} onClose={() => !bulkDeleting && setShowBulkDeleteConfirm(false)} title="Delete Products" size="sm">
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-on-surface-variant">
             Are you sure you want to delete <strong>{selectedIds.size} product{selectedIds.size !== 1 ? 's' : ''}</strong>? Stock movement history is preserved.
           </p>
           <div className="flex gap-2">
@@ -1279,7 +1279,7 @@ export default function InventoryPage() {
       {/* Delete Confirm Modal */}
       <Modal open={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)} title="Delete Product" size="sm">
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-on-surface-variant">
             Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This will hide it from the POS and inventory. Stock movements history is preserved.
           </p>
           <div className="flex gap-2">
@@ -1295,21 +1295,21 @@ export default function InventoryPage() {
       {variantDrawer && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm transition-opacity" onClick={() => setVariantDrawer(null)} />
-          <div className="relative w-full max-w-md bg-white shadow-2xl flex flex-col h-full animate-in slide-in-from-right duration-200">
+          <div className="relative w-full max-w-md bg-surface shadow-2xl flex flex-col h-full animate-in slide-in-from-right duration-200">
             {/* Brand accent bar */}
             <div className="h-1.5 w-full bg-brand-teal" />
             
-            <div className="flex items-center justify-between border-b border-gray-100 bg-white px-5 py-4">
+            <div className="flex items-center justify-between border-b border-outline-variant bg-surface px-5 py-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-teal-light/50 border border-brand-teal/10 text-brand-teal">
                   <Layers className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="font-bold text-gray-900 tracking-tight flex items-center gap-2">
+                  <h2 className="font-bold text-on-surface tracking-tight flex items-center gap-2">
                     {variantDrawer.name}
                     {drawerLoading && <Loader2 className="h-4 w-4 animate-spin text-brand-teal" />}
                   </h2>
-                  <p className="text-xs font-medium text-gray-500 mt-0.5">
+                  <p className="text-xs font-medium text-on-surface-variant mt-0.5">
                     {drawerLoading ? 'Loading variants...' : `${drawerVariants.length} variant${drawerVariants.length !== 1 ? 's' : ''}`}
                   </p>
                 </div>
@@ -1317,31 +1317,31 @@ export default function InventoryPage() {
               <div className="flex items-center gap-2">
                 <Link
                   href={`/inventory/${variantDrawer.id}`}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-outline hover:bg-surface-container hover:text-on-surface-variant transition-colors"
                   title="Open product"
                 >
                   <ExternalLink className="h-4 w-4" />
                 </Link>
-                <button onClick={() => setVariantDrawer(null)} className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors">
+                <button onClick={() => setVariantDrawer(null)} className="flex h-8 w-8 items-center justify-center rounded-full text-outline hover:bg-surface-container hover:text-on-surface-variant transition-colors">
                   <X className="h-4 w-4" />
                 </button>
               </div>
             </div>
             
-            <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
+            <div className="flex-1 overflow-y-auto bg-surface-container-low p-4">
               {drawerLoading ? (
                 <div className="flex flex-col items-center justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-brand-teal mb-6" />
                   <div className="w-full space-y-4">
                     {[1, 2, 3].map(i => (
-                      <div key={i} className="h-32 w-full animate-pulse rounded-2xl bg-gray-200" />
+                      <div key={i} className="h-32 w-full animate-pulse rounded-2xl bg-surface-container-high" />
                     ))}
                   </div>
                 </div>
               ) : drawerVariants.length === 0 ? (
-                <div className="py-20 text-center text-sm text-gray-400 flex flex-col items-center">
-                  <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
-                    <Layers className="h-6 w-6 text-gray-300" />
+                <div className="py-20 text-center text-sm text-outline flex flex-col items-center">
+                  <div className="h-12 w-12 rounded-full bg-surface-container flex items-center justify-center mb-3">
+                    <Layers className="h-6 w-6 text-outline-variant" />
                   </div>
                   No variants found
                 </div>
@@ -1352,8 +1352,8 @@ export default function InventoryPage() {
                     return (
                       <div
                         key={v.id}
-                        className={`rounded-2xl border bg-white p-4 transition-all hover:shadow-sm ${
-                          isSale ? 'border-brand-teal/30 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.1)]' : 'border-gray-200'
+                        className={`rounded-2xl border bg-surface p-4 transition-all hover:shadow-sm ${
+                          isSale ? 'border-brand-teal/30 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.1)]' : 'border-outline-variant'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -1382,21 +1382,21 @@ export default function InventoryPage() {
                           </div>
                         </div>
 
-                        <div className="mt-4 grid grid-cols-3 gap-3 border-t border-gray-100 pt-3">
+                        <div className="mt-4 grid grid-cols-3 gap-3 border-t border-outline-variant pt-3">
                           <div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Barcode</p>
-                            <p className="text-sm font-medium text-gray-700 truncate">{v.barcode ?? '—'}</p>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-outline mb-1">Barcode</p>
+                            <p className="text-sm font-medium text-on-surface-variant truncate">{v.barcode ?? '—'}</p>
                           </div>
                           <div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Stock</p>
-                            <p className="text-sm font-bold text-gray-900">{v.stock ?? '—'}</p>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-outline mb-1">Stock</p>
+                            <p className="text-sm font-bold text-on-surface">{v.stock ?? '—'}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Price</p>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-outline mb-1">Price</p>
                             {isSale ? (
                               <div className="flex flex-col items-end leading-tight">
                                 <span className="text-base font-extrabold text-brand-teal">{formatCurrency(v.active_discount!.discount_price)}</span>
-                                <span className="text-[10px] font-medium text-gray-400 line-through mt-0.5">{formatCurrency(v.selling_price)}</span>
+                                <span className="text-[10px] font-medium text-outline line-through mt-0.5">{formatCurrency(v.selling_price)}</span>
                               </div>
                             ) : (
                               <span className="text-base font-bold text-brand-teal">{formatCurrency(v.selling_price)}</span>
@@ -1417,9 +1417,9 @@ export default function InventoryPage() {
               )}
             </div>
             
-            <div className="border-t border-gray-100 bg-white p-4">
+            <div className="border-t border-outline-variant bg-surface p-4">
               <Link href={`/inventory/${variantDrawer.id}?tab=variants`} className="block">
-                <Button variant="outline" className="w-full font-semibold border-gray-200 hover:border-brand-teal/50 hover:bg-brand-teal-light/20 hover:text-brand-teal transition-all">
+                <Button variant="outline" className="w-full font-semibold border-outline-variant hover:border-brand-teal/50 hover:bg-brand-teal-light/20 hover:text-brand-teal transition-all">
                   Manage Variants
                 </Button>
               </Link>

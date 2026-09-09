@@ -90,12 +90,12 @@ export default function TradeInsPage() {
       header: 'Device',
       cell: ({ getValue, row }) => (
         <div>
-          <p className="font-medium text-gray-800">
+          <p className="font-medium text-on-surface">
             {(getValue() as TradeIn['products'])?.name ?? '—'}
-            {row.original.product_variants?.name && <span className="text-gray-500"> – {row.original.product_variants.name}</span>}
+            {row.original.product_variants?.name && <span className="text-on-surface-variant"> – {row.original.product_variants.name}</span>}
           </p>
-          {row.original.serial_number && <p className="text-xs text-gray-400">S/N: {row.original.serial_number}</p>}
-          {row.original.imei && <p className="text-xs text-gray-400">IMEI: {row.original.imei}</p>}
+          {row.original.serial_number && <p className="text-xs text-outline">S/N: {row.original.serial_number}</p>}
+          {row.original.imei && <p className="text-xs text-outline">IMEI: {row.original.imei}</p>}
         </div>
       ),
     },
@@ -104,7 +104,7 @@ export default function TradeInsPage() {
       header: 'Customer',
       cell: ({ getValue }) => {
         const c = getValue() as TradeIn['customers']
-        return c ? <span className="text-gray-700">{[c.first_name, c.last_name].filter(Boolean).join(' ')}</span> : <span className="text-gray-400">—</span>
+        return c ? <span className="text-on-surface-variant">{[c.first_name, c.last_name].filter(Boolean).join(' ')}</span> : <span className="text-outline">—</span>
       },
     },
     {
@@ -131,8 +131,8 @@ export default function TradeInsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Trade-In Items</h1>
-          <p className="text-sm text-gray-500">{total} transactions</p>
+          <h1 className="text-xl font-bold text-on-surface">Trade-In Items</h1>
+          <p className="text-sm text-on-surface-variant">{total} transactions</p>
         </div>
         <Button onClick={() => setModalOpen(true)}>
           <Plus className="h-4 w-4" /> Record Trade-In
@@ -154,7 +154,7 @@ export default function TradeInsPage() {
       <Modal open={modalOpen} onClose={() => { setModalOpen(false); setSaveError(null) }} title="Record Trade-In" size="sm">
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Device / Product *</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Device / Product *</label>
             {form.product_id ? (
               <button
                 type="button"
@@ -163,7 +163,7 @@ export default function TradeInsPage() {
               >
                 <span className="truncate">
                   {form.product_name}
-                  {form.variant_name && <span className="text-gray-500"> – {form.variant_name}</span>}
+                  {form.variant_name && <span className="text-on-surface-variant"> – {form.variant_name}</span>}
                 </span>
                 <span className="shrink-0 text-xs text-brand-teal">Change</span>
               </button>
@@ -171,7 +171,7 @@ export default function TradeInsPage() {
               <button
                 type="button"
                 onClick={() => setPickerOpen(true)}
-                className="flex h-9 w-full items-center rounded-lg border border-dashed border-gray-300 px-3 text-sm text-gray-400 hover:border-brand-teal/40 hover:text-brand-teal"
+                className="flex h-9 w-full items-center rounded-lg border border-dashed border-outline px-3 text-sm text-outline hover:border-brand-teal/40 hover:text-brand-teal"
               >
                 Select product…
               </button>
@@ -196,11 +196,11 @@ export default function TradeInsPage() {
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Condition Grade *</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Condition Grade *</label>
               <select
                 value={form.condition_grade}
                 onChange={(e) => setForm((f) => ({ ...f, condition_grade: e.target.value }))}
-                className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
               >
                 {['A','B','C','D','faulty'].map((g) => (
                   <option key={g} value={g}>Grade {g}{g === 'A' ? ' (Like New)' : g === 'faulty' ? ' (Faulty)' : ''}</option>
@@ -208,47 +208,47 @@ export default function TradeInsPage() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Trade-In Value *</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Trade-In Value *</label>
               <input
                 type="number" min="0" step="0.01"
                 value={form.trade_in_value}
                 onChange={(e) => setForm((f) => ({ ...f, trade_in_value: Number(e.target.value) }))}
-                className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Serial Number</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Serial Number</label>
               <input
                 value={form.serial_number}
                 onChange={(e) => setForm((f) => ({ ...f, serial_number: e.target.value }))}
-                className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">IMEI</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">IMEI</label>
               <input
                 value={form.imei}
                 onChange={(e) => setForm((f) => ({ ...f, imei: e.target.value }))}
-                className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes</label>
             <textarea
               rows={2}
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-outline px-3 py-2 text-sm"
             />
           </div>
 
           {form.trade_in_value > 0 && (
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-outline">
               This will remove {formatCurrency(form.trade_in_value)} from the register&apos;s expected cash.
             </p>
           )}

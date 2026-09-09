@@ -42,15 +42,15 @@ export default function LoyaltySettingsPage() {
   return (
     <div className="space-y-6 max-w-lg">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Loyalty Programme</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Reward customers with points for purchases.</p>
+        <h1 className="text-xl font-bold text-on-surface">Loyalty Programme</h1>
+        <p className="text-sm text-on-surface-variant mt-0.5">Reward customers with points for purchases.</p>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-6 space-y-4">
+      <div className="rounded-xl border border-outline-variant bg-surface p-6 space-y-4">
         <label className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Star className="h-4 w-4 text-yellow-500" />
-            <span className="font-medium text-gray-800">Enable Loyalty Programme</span>
+            <span className="font-medium text-on-surface">Enable Loyalty Programme</span>
           </div>
           <input
             type="checkbox"
@@ -71,7 +71,7 @@ export default function LoyaltySettingsPage() {
                 value={settings.earn_rate}
                 onChange={(e) => setSettings((s) => ({ ...s, earn_rate: Number(e.target.value) }))}
               />
-              <p className="mt-1 text-xs text-gray-400">A £100 sale earns {exampleEarn} points</p>
+              <p className="mt-1 text-xs text-outline">A £100 sale earns {exampleEarn} points</p>
             </div>
             <div>
               <Input
@@ -82,7 +82,7 @@ export default function LoyaltySettingsPage() {
                 value={settings.redeem_rate}
                 onChange={(e) => setSettings((s) => ({ ...s, redeem_rate: Number(e.target.value) }))}
               />
-              <p className="mt-1 text-xs text-gray-400">{settings.min_redeem_points} pts = £{exampleRedeem}</p>
+              <p className="mt-1 text-xs text-outline">{settings.min_redeem_points} pts = £{exampleRedeem}</p>
             </div>
           </div>
 

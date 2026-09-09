@@ -34,7 +34,7 @@ export function InlineFormSheet({
             }
           }}
           className={cn(
-            'fixed top-0 z-50 h-full bg-white shadow-xl',
+            'fixed top-0 z-50 h-full bg-surface shadow-xl',
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             side === 'right'
               ? 'right-0 data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right'
@@ -44,16 +44,16 @@ export function InlineFormSheet({
         >
           <div className="flex h-full flex-col">
             {/* Header */}
-            <div className="flex items-start justify-between border-b border-gray-200 px-6 py-4">
+            <div className="flex items-start justify-between border-b border-outline-variant px-6 py-4">
               <div>
-                <Dialog.Title className="text-base font-semibold text-gray-900">{title}</Dialog.Title>
+                <Dialog.Title className="text-base font-semibold text-on-surface">{title}</Dialog.Title>
                 {description && (
-                  <Dialog.Description className="mt-0.5 text-sm text-gray-500">{description}</Dialog.Description>
+                  <Dialog.Description className="mt-0.5 text-sm text-on-surface-variant">{description}</Dialog.Description>
                 )}
               </div>
               <button
                 onClick={onClose}
-                className="ml-4 rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                className="ml-4 rounded-md p-1 text-outline hover:bg-surface-container hover:text-on-surface-variant"
               >
                 <X className="h-5 w-5" />
               </button>

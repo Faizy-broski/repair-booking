@@ -12,6 +12,7 @@ import Link from 'next/link'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
+import { chartAxisTick, chartGridStroke, chartTooltipStyle, chartLegendStyle } from '@/lib/chart-theme'
 import type { ColumnDef } from '@tanstack/react-table'
 
 interface EmployeeRow {
@@ -88,13 +89,13 @@ export default function EmployeesReportPage() {
           <h3 className="mb-3 text-base font-semibold text-on-surface">Revenue by Employee</h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="employee_name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `£${v}`} />
-              <Tooltip formatter={(v: unknown) => formatCurrency(v as number)} />
-              <Legend />
-              <Bar dataKey="sales_revenue"  name="Sales"   fill="#0d9488" stackId="a" />
-              <Bar dataKey="repair_revenue" name="Repairs" fill="#8b5cf6" stackId="a" />
+              <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
+              <XAxis dataKey="employee_name" tick={chartAxisTick} />
+              <YAxis tick={chartAxisTick} tickFormatter={(v) => `£${v}`} />
+              <Tooltip formatter={(v: unknown) => formatCurrency(v as number)} {...chartTooltipStyle} />
+              <Legend wrapperStyle={chartLegendStyle} />
+              <Bar dataKey="sales_revenue"  name="Sales"   fill="var(--primary)" stackId="a" />
+              <Bar dataKey="repair_revenue" name="Repairs" fill="var(--tertiary)" stackId="a" />
             </BarChart>
           </ResponsiveContainer>
         </div>

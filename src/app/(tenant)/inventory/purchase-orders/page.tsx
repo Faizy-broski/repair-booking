@@ -306,7 +306,7 @@ export default function PurchaseOrdersPage() {
             onClick={(e) => e.stopPropagation()}
             onChange={(e) => statusMutation.mutate({ id: row.original.id, status: e.target.value })}
             disabled={statusMutation.isPending}
-            className="rounded-md border border-gray-200 bg-white px-1.5 py-1 text-xs font-medium capitalize disabled:opacity-50"
+            className="rounded-md border border-outline-variant bg-surface px-1.5 py-1 text-xs font-medium capitalize disabled:opacity-50"
           >
             {(s === 'received' ? ['received', ...MANUAL_STATUSES] : MANUAL_STATUSES).map((o) => (
               <option key={o} value={o}>{o.replace('_', ' ')}</option>
@@ -322,7 +322,7 @@ export default function PurchaseOrdersPage() {
         if (row.original.status !== 'received') {
           return row.original.amount_paid > 0
             ? <Badge variant={PAYMENT_STATUS_VARIANT[row.original.payment_status] ?? 'default'}>{row.original.payment_status === 'paid' ? 'Deposit: paid in full' : 'Deposit: partial'}</Badge>
-            : <span className="text-xs text-gray-400">On credit</span>
+            : <span className="text-xs text-outline">On credit</span>
         }
         const s = row.original.payment_status
         return <Badge variant={PAYMENT_STATUS_VARIANT[s] ?? 'default'}>{s}</Badge>
@@ -348,26 +348,26 @@ export default function PurchaseOrdersPage() {
         <div className="flex justify-start" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
-              <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none">
+              <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-outline bg-surface text-on-surface shadow-sm hover:bg-surface-container-low focus:outline-none">
                 <MoreVertical className="h-4 w-4 stroke-[2.5]" />
               </button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
-              <DropdownMenu.Content align="end" sideOffset={4} className="z-50 min-w-[180px] overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+              <DropdownMenu.Content align="end" sideOffset={4} className="z-50 min-w-[180px] overflow-hidden rounded-lg border border-outline-variant bg-surface py-1 shadow-lg">
                 <DropdownMenu.Item asChild>
                   <Link
                     href={`/inventory/purchase-orders/${row.original.id}`}
-                    className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-50"
+                    className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-on-surface-variant outline-none hover:bg-surface-container-low"
                   >
-                    <Eye className="h-4 w-4 text-gray-400" /> View
+                    <Eye className="h-4 w-4 text-outline" /> View
                   </Link>
                 </DropdownMenu.Item>
                 {row.original.status === 'draft' && (
                   <DropdownMenu.Item
                     onSelect={() => openEditRow(row.original.id)}
-                    className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-50"
+                    className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-on-surface-variant outline-none hover:bg-surface-container-low"
                   >
-                    <Pencil className="h-4 w-4 text-gray-400" /> Edit
+                    <Pencil className="h-4 w-4 text-outline" /> Edit
                   </DropdownMenu.Item>
                 )}
                 <DropdownMenu.Item
@@ -376,9 +376,9 @@ export default function PurchaseOrdersPage() {
                     const res = await fetch(`/api/purchase-orders/${row.original.id}/clone?branch_id=${activeBranch.id}`, { method: 'POST' })
                     if (res.ok) queryClient.invalidateQueries({ queryKey: ['purchase-orders', activeBranch?.id] })
                   }}
-                  className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-gray-700 outline-none hover:bg-gray-50"
+                  className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-on-surface-variant outline-none hover:bg-surface-container-low"
                 >
-                  <Copy className="h-4 w-4 text-gray-400" /> Clone
+                  <Copy className="h-4 w-4 text-outline" /> Clone
                 </DropdownMenu.Item>
                 {row.original.status !== 'cancelled' && row.original.payment_status !== 'paid' && (
                   <DropdownMenu.Item
@@ -388,7 +388,7 @@ export default function PurchaseOrdersPage() {
                     <Banknote className="h-4 w-4" /> Record Payment
                   </DropdownMenu.Item>
                 )}
-                <DropdownMenu.Separator className="my-1 border-t border-gray-100" />
+                <DropdownMenu.Separator className="my-1 border-t border-outline-variant" />
                 <DropdownMenu.Item
                   onSelect={() => handleDelete(row.original)}
                   className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-red-600 outline-none hover:bg-red-50"
@@ -411,12 +411,12 @@ export default function PurchaseOrdersPage() {
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-gray-500 hover:text-gray-900">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-on-surface-variant hover:text-on-surface">
             <ArrowLeft className="h-5 w-5" strokeWidth={3} />
           </Button>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Purchase Orders</h1>
-            <p className="text-sm text-gray-500">{total} orders</p>
+            <h1 className="text-xl font-bold text-on-surface">Purchase Orders</h1>
+            <p className="text-sm text-on-surface-variant">{total} orders</p>
           </div>
         </div>
         <Button onClick={() => setSheetOpen(true)}>
@@ -433,7 +433,7 @@ export default function PurchaseOrdersPage() {
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
               statusFilter === s
                 ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
             }`}
           >
             {s ? s.replace('_', ' ') : 'All'}
@@ -462,11 +462,11 @@ export default function PurchaseOrdersPage() {
       >
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Supplier *</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Supplier *</label>
             <select
               value={supplierId}
               onChange={(e) => setSupplierId(e.target.value)}
-              className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm"
+              className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
             >
               <option value="">Select supplier…</option>
               {suppliers.map((s) => (
@@ -483,33 +483,33 @@ export default function PurchaseOrdersPage() {
           />
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Deposit Paid Now (optional)</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Deposit Paid Now (optional)</label>
             <div className="flex gap-2">
               <input
                 type="number" min="0" step="0.01" placeholder="0.00"
                 value={depositAmount}
                 onChange={(e) => setDepositAmount(e.target.value)}
-                className="h-9 w-32 rounded-lg border border-gray-300 px-3 text-sm focus:border-brand-teal focus:outline-none"
+                className="h-9 w-32 rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none"
               />
               <select
                 value={depositMethod}
                 onChange={(e) => setDepositMethod(e.target.value as typeof depositMethod)}
                 disabled={!depositAmount || parseFloat(depositAmount) <= 0}
-                className="h-9 flex-1 rounded-lg border border-gray-300 px-3 text-sm capitalize disabled:opacity-50"
+                className="h-9 flex-1 rounded-lg border border-outline px-3 text-sm capitalize disabled:opacity-50"
               >
                 {(['cash', 'card', 'bank_transfer', 'cheque', 'other'] as const).map(m => (
                   <option key={m} value={m}>{m.replace('_', ' ')}</option>
                 ))}
               </select>
             </div>
-            <p className="mt-1 text-[11px] text-gray-400">
+            <p className="mt-1 text-[11px] text-outline">
               Recorded immediately as an upfront payment to the supplier — leave at 0 to buy fully on credit. Any remaining balance is settled later via Record Payment.
             </p>
           </div>
 
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-700">Line Items</label>
+              <label className="text-sm font-medium text-on-surface-variant">Line Items</label>
               <div className="flex gap-3">
                 <button type="button" onClick={() => setPickerOpen(true)} className="text-xs font-medium text-brand-teal hover:underline">
                   + Add product
@@ -527,7 +527,7 @@ export default function PurchaseOrdersPage() {
               {lineItems.map((item, idx) => (
                 <div key={idx} className="flex gap-2 items-end">
                   <div className="flex-1">
-                    {idx === 0 && <label className="mb-1 block text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Item Name</label>}
+                    {idx === 0 && <label className="mb-1 block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wide">Item Name</label>}
                     {item.product_id ? (
                       <div className="flex h-8 items-center gap-1.5 rounded-md border border-brand-teal/30 bg-brand-teal-light/10 px-2 text-sm">
                         <span className="truncate">{item.name}</span>
@@ -540,36 +540,36 @@ export default function PurchaseOrdersPage() {
                         onChange={(e) => {
                           const u = [...lineItems]; u[idx] = { ...u[idx], name: e.target.value }; setLineItems(u)
                         }}
-                        className="h-8 w-full rounded-md border border-gray-300 px-2 text-sm focus:border-blue-400 focus:outline-none"
+                        className="h-8 w-full rounded-md border border-outline px-2 text-sm focus:border-blue-400 focus:outline-none"
                       />
                     )}
                   </div>
                   <div className="w-16">
-                    {idx === 0 && <label className="mb-1 block text-[11px] font-semibold text-gray-500 uppercase tracking-wide text-center">Qty</label>}
+                    {idx === 0 && <label className="mb-1 block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wide text-center">Qty</label>}
                     <input
                       type="number" min="1"
                       value={item.quantity_ordered}
                       onChange={(e) => {
                         const u = [...lineItems]; u[idx] = { ...u[idx], quantity_ordered: Number(e.target.value) }; setLineItems(u)
                       }}
-                      className="h-8 w-full rounded-md border border-gray-300 px-2 text-sm text-center focus:border-blue-400 focus:outline-none"
+                      className="h-8 w-full rounded-md border border-outline px-2 text-sm text-center focus:border-blue-400 focus:outline-none"
                     />
                   </div>
                   <div className="w-24">
-                    {idx === 0 && <label className="mb-1 block text-[11px] font-semibold text-gray-500 uppercase tracking-wide text-right">Unit Cost</label>}
+                    {idx === 0 && <label className="mb-1 block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wide text-right">Unit Cost</label>}
                     <input
                       type="number" min="0" step="0.01"
                       value={item.unit_cost}
                       onChange={(e) => {
                         const u = [...lineItems]; u[idx] = { ...u[idx], unit_cost: Number(e.target.value) }; setLineItems(u)
                       }}
-                      className="h-8 w-full rounded-md border border-gray-300 px-2 text-sm text-right focus:border-blue-400 focus:outline-none"
+                      className="h-8 w-full rounded-md border border-outline px-2 text-sm text-right focus:border-blue-400 focus:outline-none"
                     />
                   </div>
                   <div className="flex w-8 items-end justify-center pb-0.5">
                     <button
                       onClick={() => setLineItems((l) => l.filter((_, i) => i !== idx))}
-                      className="flex h-8 w-8 items-center justify-center rounded-md text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-outline-variant hover:bg-red-50 hover:text-red-500 transition-colors"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -577,7 +577,7 @@ export default function PurchaseOrdersPage() {
                 </div>
               ))}
               {lineItems.length === 0 && (
-                <p className="py-3 text-center text-xs text-gray-400">Add a product or a misc item to get started</p>
+                <p className="py-3 text-center text-xs text-outline">Add a product or a misc item to get started</p>
               )}
             </div>
           </div>
@@ -599,14 +599,14 @@ export default function PurchaseOrdersPage() {
             }}
           />
 
-          <div className="rounded-lg bg-gray-50 p-3 flex justify-between text-sm">
-            <span className="text-gray-500">Total</span>
-            <span className="font-semibold text-gray-900">{formatCurrency(poTotal)}</span>
+          <div className="rounded-lg bg-surface-container-low p-3 flex justify-between text-sm">
+            <span className="text-on-surface-variant">Total</span>
+            <span className="font-semibold text-on-surface">{formatCurrency(poTotal)}</span>
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
-            <textarea rows={2} value={poNotes} onChange={(e) => setPoNotes(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes</label>
+            <textarea rows={2} value={poNotes} onChange={(e) => setPoNotes(e.target.value)} className="w-full rounded-lg border border-outline px-3 py-2 text-sm" />
           </div>
 
           <Button className="w-full" onClick={createPO} loading={submitting} disabled={!supplierId || !lineItems.some((i) => i.name.trim())}>
@@ -624,16 +624,16 @@ export default function PurchaseOrdersPage() {
       >
         {editLoading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            <Loader2 className="h-6 w-6 animate-spin text-outline" />
           </div>
         ) : (
           <div className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Supplier</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Supplier</label>
               <select
                 value={editSupplier}
                 onChange={(e) => setEditSupplier(e.target.value)}
-                className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
               >
                 <option value="">Select supplier…</option>
                 {suppliers.map((s) => (
@@ -651,7 +651,7 @@ export default function PurchaseOrdersPage() {
 
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <label className="text-sm font-medium text-gray-700">Line Items</label>
+                <label className="text-sm font-medium text-on-surface-variant">Line Items</label>
                 <div className="flex gap-3">
                   <button type="button" onClick={() => setEditPickerOpen(true)} className="text-xs font-medium text-brand-teal hover:underline">
                     + Add product
@@ -669,7 +669,7 @@ export default function PurchaseOrdersPage() {
                 {editItems.map((item, idx) => (
                   <div key={idx} className="flex gap-2 items-end">
                     <div className="flex-1">
-                      {idx === 0 && <label className="mb-1 block text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Item Name</label>}
+                      {idx === 0 && <label className="mb-1 block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wide">Item Name</label>}
                       {item.product_id ? (
                         <div className="flex h-8 items-center gap-1.5 rounded-md border border-brand-teal/30 bg-brand-teal-light/10 px-2 text-sm">
                           <span className="truncate">{item.name}</span>
@@ -682,36 +682,36 @@ export default function PurchaseOrdersPage() {
                           onChange={(e) => {
                             const u = [...editItems]; u[idx] = { ...u[idx], name: e.target.value }; setEditItems(u)
                           }}
-                          className="h-8 w-full rounded-md border border-gray-300 px-2 text-sm focus:border-blue-400 focus:outline-none"
+                          className="h-8 w-full rounded-md border border-outline px-2 text-sm focus:border-blue-400 focus:outline-none"
                         />
                       )}
                     </div>
                     <div className="w-16">
-                      {idx === 0 && <label className="mb-1 block text-[11px] font-semibold text-gray-500 uppercase tracking-wide text-center">Qty</label>}
+                      {idx === 0 && <label className="mb-1 block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wide text-center">Qty</label>}
                       <input
                         type="number" min="1"
                         value={item.quantity_ordered}
                         onChange={(e) => {
                           const u = [...editItems]; u[idx] = { ...u[idx], quantity_ordered: Number(e.target.value) }; setEditItems(u)
                         }}
-                        className="h-8 w-full rounded-md border border-gray-300 px-2 text-sm text-center focus:border-blue-400 focus:outline-none"
+                        className="h-8 w-full rounded-md border border-outline px-2 text-sm text-center focus:border-blue-400 focus:outline-none"
                       />
                     </div>
                     <div className="w-24">
-                      {idx === 0 && <label className="mb-1 block text-[11px] font-semibold text-gray-500 uppercase tracking-wide text-right">Unit Cost</label>}
+                      {idx === 0 && <label className="mb-1 block text-[11px] font-semibold text-on-surface-variant uppercase tracking-wide text-right">Unit Cost</label>}
                       <input
                         type="number" min="0" step="0.01"
                         value={item.unit_cost}
                         onChange={(e) => {
                           const u = [...editItems]; u[idx] = { ...u[idx], unit_cost: Number(e.target.value) }; setEditItems(u)
                         }}
-                        className="h-8 w-full rounded-md border border-gray-300 px-2 text-sm text-right focus:border-blue-400 focus:outline-none"
+                        className="h-8 w-full rounded-md border border-outline px-2 text-sm text-right focus:border-blue-400 focus:outline-none"
                       />
                     </div>
                     <div className="flex w-8 items-end justify-center pb-0.5">
                       <button
                         onClick={() => setEditItems((l) => l.filter((_, i) => i !== idx))}
-                        className="flex h-8 w-8 items-center justify-center rounded-md text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+                        className="flex h-8 w-8 items-center justify-center rounded-md text-outline-variant hover:bg-red-50 hover:text-red-500 transition-colors"
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
@@ -719,7 +719,7 @@ export default function PurchaseOrdersPage() {
                   </div>
                 ))}
                 {editItems.length === 0 && (
-                  <p className="py-3 text-center text-xs text-gray-400">Add a product or a misc item to get started</p>
+                  <p className="py-3 text-center text-xs text-outline">Add a product or a misc item to get started</p>
                 )}
               </div>
 
@@ -741,16 +741,16 @@ export default function PurchaseOrdersPage() {
               />
             </div>
 
-            <div className="rounded-lg bg-gray-50 p-3 flex justify-between text-sm">
-              <span className="text-gray-500">Total</span>
-              <span className="font-semibold text-gray-900">
+            <div className="rounded-lg bg-surface-container-low p-3 flex justify-between text-sm">
+              <span className="text-on-surface-variant">Total</span>
+              <span className="font-semibold text-on-surface">
                 {formatCurrency(editItems.reduce((s, i) => s + i.quantity_ordered * i.unit_cost, 0))}
               </span>
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
-              <textarea rows={2} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes</label>
+              <textarea rows={2} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} className="w-full rounded-lg border border-outline px-3 py-2 text-sm" />
             </div>
 
             <Button className="w-full" onClick={saveEdit} loading={editSaving} disabled={!editItems.some((i) => i.name.trim())}>
@@ -790,8 +790,8 @@ export default function PurchaseOrdersPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">
-                  Amount to record <span className="font-normal text-gray-400">(max {formatCurrency(outstanding)})</span>
+                <label className="mb-1 block text-xs font-medium text-on-surface-variant">
+                  Amount to record <span className="font-normal text-outline">(max {formatCurrency(outstanding)})</span>
                 </label>
                 <input
                   type="number"
@@ -807,13 +807,13 @@ export default function PurchaseOrdersPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Paid via</label>
+                <label className="mb-1 block text-xs font-medium text-on-surface-variant">Paid via</label>
                 <div className="grid grid-cols-3 gap-2">
                   {(['cash', 'card', 'bank_transfer', 'cheque', 'other'] as const).map(m => (
                     <button
                       key={m}
                       onClick={() => setPaymentMethod(m)}
-                      className={`rounded-lg border py-2 text-xs font-medium capitalize transition-colors ${paymentMethod === m ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                      className={`rounded-lg border py-2 text-xs font-medium capitalize transition-colors ${paymentMethod === m ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-outline-variant text-on-surface-variant hover:bg-surface-container-low'}`}
                     >
                       {m.replace('_', ' ')}
                     </button>

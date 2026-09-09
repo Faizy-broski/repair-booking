@@ -206,28 +206,28 @@ export default function AppointmentsPage() {
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Appointments</h1>
-          <p className="mt-0.5 text-sm text-gray-400 font-medium">
+          <h1 className="text-2xl font-bold tracking-tight text-on-surface">Appointments</h1>
+          <p className="mt-0.5 text-sm text-outline font-medium">
             {format(weekStart, 'MMM d')} – {format(addDays(weekStart, 6), 'MMM d, yyyy')}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+          <div className="flex items-center rounded-lg border border-outline-variant bg-surface shadow-sm overflow-hidden">
             <button
               onClick={() => setWeekStart((d) => addDays(d, -7))}
-              className="px-3 py-2 hover:bg-gray-50 text-gray-500 hover:text-gray-700 border-r border-gray-200 transition-colors"
+              className="px-3 py-2 hover:bg-surface-container-low text-on-surface-variant hover:text-on-surface-variant border-r border-outline-variant transition-colors"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
             <button
               onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-              className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 border-r border-gray-200 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface border-r border-outline-variant transition-colors"
             >
               Today
             </button>
             <button
               onClick={() => setWeekStart((d) => addDays(d, 7))}
-              className="px-3 py-2 hover:bg-gray-50 text-gray-500 hover:text-gray-700 transition-colors"
+              className="px-3 py-2 hover:bg-surface-container-low text-on-surface-variant hover:text-on-surface-variant transition-colors"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -239,23 +239,23 @@ export default function AppointmentsPage() {
       </div>
 
       {/* Calendar */}
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface shadow-sm">
         {/* Day headers */}
-        <div className="grid bg-gray-50 border-b border-gray-200" style={{ gridTemplateColumns: '4.5rem repeat(7, 1fr)' }}>
-          <div className="border-r border-gray-200" />
+        <div className="grid bg-surface-container-low border-b border-outline-variant" style={{ gridTemplateColumns: '4.5rem repeat(7, 1fr)' }}>
+          <div className="border-r border-outline-variant" />
           {weekDays.map((day) => {
             const isToday = isSameDay(day, new Date())
             const weekend = isWeekend(day)
             return (
               <div
                 key={day.toISOString()}
-                className={`border-r border-gray-200 last:border-r-0 px-3 py-4 text-center ${weekend ? 'bg-gray-50/80' : ''}`}
+                className={`border-r border-outline-variant last:border-r-0 px-3 py-4 text-center ${weekend ? 'bg-surface-container-low/80' : ''}`}
               >
-                <p className={`text-[11px] font-semibold uppercase tracking-widest ${isToday ? 'text-teal-600' : 'text-gray-400'}`}>
+                <p className={`text-[11px] font-semibold uppercase tracking-widest ${isToday ? 'text-teal-600' : 'text-outline'}`}>
                   {format(day, 'EEE')}
                 </p>
                 <div className={`mx-auto mt-1 flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold transition-colors ${
-                  isToday ? 'bg-teal-600 text-white shadow-md shadow-teal-200' : 'text-gray-700'
+                  isToday ? 'bg-teal-600 text-white shadow-md shadow-teal-200' : 'text-on-surface-variant'
                 }`}>
                   {format(day, 'd')}
                 </div>
@@ -267,7 +267,7 @@ export default function AppointmentsPage() {
         {/* Hour rows */}
         <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 15rem)' }}>
           {loading ? (
-            <div className="flex h-64 items-center justify-center gap-2 text-sm text-gray-400">
+            <div className="flex h-64 items-center justify-center gap-2 text-sm text-outline">
               <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
@@ -278,12 +278,12 @@ export default function AppointmentsPage() {
             hours.map((hour, idx) => (
               <div
                 key={hour}
-                className={`grid border-b border-gray-100 last:border-b-0 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}
+                className={`grid border-b border-outline-variant last:border-b-0 ${idx % 2 === 0 ? 'bg-surface' : 'bg-surface-container-low/40'}`}
                 style={{ gridTemplateColumns: '4.5rem repeat(7, 1fr)', minHeight: '4.5rem' }}
               >
                 {/* Time label */}
-                <div className="border-r border-gray-200 flex items-start justify-end pr-3 pt-2">
-                  <span className="text-[11px] font-medium text-gray-400">
+                <div className="border-r border-outline-variant flex items-start justify-end pr-3 pt-2">
+                  <span className="text-[11px] font-medium text-outline">
                     {format(new Date().setHours(hour, 0, 0), 'h a')}
                   </span>
                 </div>
@@ -295,8 +295,8 @@ export default function AppointmentsPage() {
                   return (
                     <div
                       key={day.toISOString()}
-                      className={`border-r border-gray-100 last:border-r-0 p-1.5 ${
-                        isToday ? 'bg-teal-50/30' : weekend ? 'bg-gray-50/60' : ''
+                      className={`border-r border-outline-variant last:border-r-0 p-1.5 ${
+                        isToday ? 'bg-teal-50/30' : weekend ? 'bg-surface-container-low/60' : ''
                       }`}
                     >
                       {dayAppts.map((a) => (
@@ -304,7 +304,7 @@ export default function AppointmentsPage() {
                           key={a.id}
                           className="group relative mb-1.5 last:mb-0 rounded-lg border-l-[3px] border-teal-500 bg-teal-50 px-2 py-1.5 text-xs shadow-sm hover:shadow-md hover:bg-teal-100/80 transition-all cursor-default"
                         >
-                          <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5 bg-white rounded-md shadow-sm border border-gray-100 p-0.5">
+                          <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5 bg-surface rounded-md shadow-sm border border-outline-variant p-0.5">
                             <button
                               onClick={(e) => { e.stopPropagation(); openEdit(a) }}
                               className="rounded p-0.5 hover:bg-teal-50 text-teal-600"
@@ -351,7 +351,7 @@ export default function AppointmentsPage() {
                               </button>
                               <button
                                 onClick={() => setConfirmDeleteId(null)}
-                                className="rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600 hover:bg-gray-200"
+                                className="rounded-md bg-surface-container px-2 py-0.5 text-[10px] font-medium text-on-surface-variant hover:bg-surface-container-high"
                               >
                                 No
                               </button>
@@ -375,10 +375,10 @@ export default function AppointmentsPage() {
           )}
           <Input label="Title" placeholder="Repair Consultation" required error={editErrors.title?.message} {...registerEdit('title')} />
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Customer (optional)</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Customer (optional)</label>
             <select
               {...registerEdit('customer_id')}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
             >
               <option value="">No customer</option>
               {customers.map((c) => (
@@ -387,10 +387,10 @@ export default function AppointmentsPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Assigned To (optional)</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Assigned To (optional)</label>
             <select
               {...registerEdit('employee_id')}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
             >
               <option value="">Unassigned</option>
               {employees.map((e) => (
@@ -403,8 +403,8 @@ export default function AppointmentsPage() {
             <Input label="End Time" type="datetime-local" required error={editErrors.end_time?.message} {...registerEdit('end_time')} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
-            <textarea rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" {...registerEdit('notes')} />
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes</label>
+            <textarea rows={2} className="w-full rounded-lg border border-outline px-3 py-2 text-sm" {...registerEdit('notes')} />
           </div>
           <Button type="submit" className="w-full" loading={isEditSubmitting}>Save Changes</Button>
         </form>
@@ -417,10 +417,10 @@ export default function AppointmentsPage() {
           )}
           <Input label="Title" placeholder="Repair Consultation" required error={errors.title?.message} {...register('title')} />
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Customer (optional)</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Customer (optional)</label>
             <select
               {...register('customer_id')}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
             >
               <option value="">No customer</option>
               {customers.map((c) => (
@@ -429,10 +429,10 @@ export default function AppointmentsPage() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Assigned To (optional)</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Assigned To (optional)</label>
             <select
               {...register('employee_id')}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
             >
               <option value="">Unassigned</option>
               {employees.map((e) => (
@@ -445,8 +445,8 @@ export default function AppointmentsPage() {
             <Input label="End Time" type="datetime-local" required error={errors.end_time?.message} {...register('end_time')} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
-            <textarea rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" {...register('notes')} />
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes</label>
+            <textarea rows={2} className="w-full rounded-lg border border-outline px-3 py-2 text-sm" {...register('notes')} />
           </div>
           <Button type="submit" className="w-full" loading={isSubmitting}>Add Appointment</Button>
         </form>

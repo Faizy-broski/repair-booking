@@ -36,8 +36,8 @@ type BusinessFormData = z.infer<typeof businessSchema>
 function InfoRow({ label, value, capitalize }: { label: string; value: string; capitalize?: boolean }) {
   return (
     <div>
-      <p className="text-xs font-medium text-gray-500 mb-0.5">{label}</p>
-      <p className={cn('text-sm font-semibold text-gray-900', capitalize && 'capitalize')}>{value}</p>
+      <p className="text-xs font-medium text-on-surface-variant mb-0.5">{label}</p>
+      <p className={cn('text-sm font-semibold text-on-surface', capitalize && 'capitalize')}>{value}</p>
     </div>
   )
 }
@@ -141,15 +141,15 @@ export default function GeneralSettingsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-gray-200 bg-white p-6">
-        <h3 className="mb-4 font-semibold text-gray-900">Business Information</h3>
+      <div className="rounded-xl border border-outline-variant bg-surface p-6">
+        <h3 className="mb-4 font-semibold text-on-surface">Business Information</h3>
         <form onSubmit={businessForm.handleSubmit(onSaveBusiness)} className="space-y-4 max-w-lg">
           <Input label="Business Name" required disabled={!canEdit} {...businessForm.register('name')} />
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Subdomain</label>
-            <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Subdomain</label>
+            <div className="flex items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-sm text-on-surface-variant">
               <span>{subdomain || '—'}</span>
-              <span className="text-gray-400">.repairbooking.co.uk</span>
+              <span className="text-outline">.repairbooking.co.uk</span>
             </div>
           </div>
           {canEdit ? (
@@ -166,12 +166,12 @@ export default function GeneralSettingsPage() {
             />
           ) : (
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Business Logo</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Business Logo</label>
               {businessForm.watch('logo_url') ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={businessForm.watch('logo_url') ?? ''} alt="Business logo" className="h-16 w-16 rounded-lg object-cover border border-gray-200" />
+                <img src={businessForm.watch('logo_url') ?? ''} alt="Business logo" className="h-16 w-16 rounded-lg object-cover border border-outline-variant" />
               ) : (
-                <p className="text-sm text-gray-400">No logo set</p>
+                <p className="text-sm text-outline">No logo set</p>
               )}
             </div>
           )}
@@ -181,14 +181,14 @@ export default function GeneralSettingsPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="relative">
-              <label className="mb-1 block text-sm font-medium text-gray-700">Website</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Website</label>
               <div className="relative">
-                <Globe className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <Globe className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
                 <input
                   type="text"
                   placeholder="https://yourwebsite.com"
                   disabled={!canEdit}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 pl-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500"
+                  className="w-full rounded-lg border border-outline px-3 py-2 pl-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-on-surface-variant"
                   {...businessForm.register('website')}
                 />
               </div>
@@ -197,10 +197,10 @@ export default function GeneralSettingsPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Country</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Country</label>
               <select
                 disabled={!canEdit}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 bg-white disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500"
+                className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 bg-surface disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-on-surface-variant"
                 {...businessForm.register('country')}
               >
                 <option value="">Select country</option>
@@ -213,29 +213,29 @@ export default function GeneralSettingsPage() {
             <Input label="City" placeholder="London" disabled={!canEdit} {...businessForm.register('city')} />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Full Address</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Full Address</label>
             <div className="relative">
-              <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
               <input
                 type="text"
                 placeholder="123 High Street, London, E1 6RF"
                 disabled={!canEdit}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 pl-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500"
+                className="w-full rounded-lg border border-outline px-3 py-2 pl-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-on-surface-variant"
                 {...businessForm.register('address')}
               />
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Google Maps Link <span className="font-normal text-gray-400">(optional)</span>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">
+              Google Maps Link <span className="font-normal text-outline">(optional)</span>
             </label>
             <div className="relative">
-              <Link2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Link2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
               <input
                 type="text"
                 placeholder="https://maps.google.com/... or https://maps.app.goo.gl/..."
                 disabled={!canEdit}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 pl-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500"
+                className="w-full rounded-lg border border-outline px-3 py-2 pl-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-on-surface-variant"
                 {...businessForm.register('mapsUrl')}
               />
             </div>
@@ -244,10 +244,10 @@ export default function GeneralSettingsPage() {
                 <iframe
                   src={mapsEmbedSrc}
                   loading="lazy"
-                  className="mt-2 h-48 w-full rounded-lg border border-gray-200"
+                  className="mt-2 h-48 w-full rounded-lg border border-outline-variant"
                 />
               ) : (
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-on-surface-variant">
                   Can&apos;t preview shortened links — it&apos;ll still be saved and linked on your profile.{' '}
                   <a href={mapsUrlValue} target="_blank" rel="noopener noreferrer" className="text-primary underline">
                     Open link
@@ -302,10 +302,10 @@ export default function GeneralSettingsPage() {
       </div>
 
       {/* ── Business Owner Details (read-only, from your personal profile) ── */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6">
+      <div className="rounded-xl border border-outline-variant bg-surface p-6">
         <div className="flex items-center gap-2 mb-4">
-          <User className="h-4 w-4 text-gray-400" />
-          <h3 className="font-semibold text-gray-900">Business Owner Details</h3>
+          <User className="h-4 w-4 text-outline" />
+          <h3 className="font-semibold text-on-surface">Business Owner Details</h3>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
           <InfoRow label="Full name" value={profile?.full_name ?? '—'} />
@@ -320,12 +320,12 @@ export default function GeneralSettingsPage() {
 
       {/* ── Delete Protection PIN (retail template only) ── */}
       {isRetailTemplate && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 space-y-4">
+        <div className="rounded-xl border border-outline-variant bg-surface p-6 space-y-4">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-red-500" />
-            <h3 className="font-semibold text-gray-900">Delete Protection PIN</h3>
+            <h3 className="font-semibold text-on-surface">Delete Protection PIN</h3>
           </div>
-          <p className="text-sm text-gray-500 max-w-md">
+          <p className="text-sm text-on-surface-variant max-w-md">
             When set, this PIN must be entered by any manager before a sale can be deleted. Protects against accidental or unauthorized deletions.
           </p>
           {hasPinSet ? (
@@ -347,23 +347,23 @@ export default function GeneralSettingsPage() {
           {/* ── PIN set/change modal ── */}
           {pinModalMode && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-              <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl">
-                <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+              <div className="w-full max-w-sm rounded-2xl bg-surface shadow-2xl">
+                <div className="flex items-center justify-between border-b border-outline-variant px-5 py-4">
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="h-5 w-5 text-red-500" />
-                    <span className="font-semibold text-gray-900">
+                    <span className="font-semibold text-on-surface">
                       {pinModalMode === 'set' ? 'Set Delete PIN' : 'Change Delete PIN'}
                     </span>
                   </div>
-                  <button onClick={closePinModal} className="text-gray-400 hover:text-gray-600">✕</button>
+                  <button onClick={closePinModal} className="text-outline hover:text-on-surface-variant">✕</button>
                 </div>
                 <div className="p-5 space-y-4">
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-on-surface-variant">
                     Choose a 4–6 digit PIN. You will need this PIN each time a sale is deleted.
                   </p>
                   <div className="space-y-3">
                     <div className="relative">
-                      <label className="block text-xs font-medium text-gray-600 mb-1">New PIN</label>
+                      <label className="block text-xs font-medium text-on-surface-variant mb-1">New PIN</label>
                       <input
                         type={showNewPin ? 'text' : 'password'}
                         inputMode="numeric"
@@ -371,18 +371,18 @@ export default function GeneralSettingsPage() {
                         value={newPin}
                         onChange={e => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                         placeholder="4–6 digits"
-                        className="w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 text-sm tracking-widest focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100"
+                        className="w-full rounded-lg border border-outline-variant px-3 py-2 pr-10 text-sm tracking-widest focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100"
                       />
                       <button
                         type="button"
                         onClick={() => setShowNewPin(v => !v)}
-                        className="absolute right-3 top-7 text-gray-400 hover:text-gray-600"
+                        className="absolute right-3 top-7 text-outline hover:text-on-surface-variant"
                       >
                         {showNewPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
                     <div className="relative">
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Confirm PIN</label>
+                      <label className="block text-xs font-medium text-on-surface-variant mb-1">Confirm PIN</label>
                       <input
                         type={showConfirmPin ? 'text' : 'password'}
                         inputMode="numeric"
@@ -390,12 +390,12 @@ export default function GeneralSettingsPage() {
                         value={confirmPin}
                         onChange={e => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                         placeholder="Re-enter PIN"
-                        className="w-full rounded-lg border border-gray-200 px-3 py-2 pr-10 text-sm tracking-widest focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100"
+                        className="w-full rounded-lg border border-outline-variant px-3 py-2 pr-10 text-sm tracking-widest focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100"
                       />
                       <button
                         type="button"
                         onClick={() => setShowConfirmPin(v => !v)}
-                        className="absolute right-3 top-7 text-gray-400 hover:text-gray-600"
+                        className="absolute right-3 top-7 text-outline hover:text-on-surface-variant"
                       >
                         {showConfirmPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
@@ -421,22 +421,22 @@ export default function GeneralSettingsPage() {
       )}
 
       {/* Quick links */}
-      <div className="rounded-xl border border-gray-200 bg-white divide-y">
+      <div className="rounded-xl border border-outline-variant bg-surface divide-y">
         <div className="px-6 py-3">
-          <h3 className="font-semibold text-gray-900 text-sm">Configuration</h3>
+          <h3 className="font-semibold text-on-surface text-sm">Configuration</h3>
         </div>
         <Link
           href="/settings/loyalty"
-          className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors group"
+          className="flex items-center justify-between px-6 py-3 hover:bg-surface-container-low transition-colors group"
         >
           <div className="flex items-center gap-3">
             <Star className="h-4 w-4 text-yellow-500" />
             <div>
-              <p className="text-sm font-medium text-gray-800">Loyalty Programme</p>
-              <p className="text-xs text-gray-400">Configure points earn &amp; redeem rates</p>
+              <p className="text-sm font-medium text-on-surface">Loyalty Programme</p>
+              <p className="text-xs text-outline">Configure points earn &amp; redeem rates</p>
             </div>
           </div>
-          <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-gray-600" />
+          <ChevronRight className="h-4 w-4 text-outline group-hover:text-on-surface-variant" />
         </Link>
       </div>
     </div>

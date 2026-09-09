@@ -183,11 +183,11 @@ export default function SuppliersPage() {
     },
     {
       header: 'PO #',
-      cell: ({ row }) => <span className="font-mono text-xs text-gray-500">{row.original.po_number}</span>,
+      cell: ({ row }) => <span className="font-mono text-xs text-on-surface-variant">{row.original.po_number}</span>,
     },
     {
       header: 'Date',
-      cell: ({ row }) => <span className="text-sm text-gray-600">{formatDate(row.original.created_at)}</span>,
+      cell: ({ row }) => <span className="text-sm text-on-surface-variant">{formatDate(row.original.created_at)}</span>,
     },
     {
       header: 'Total',
@@ -196,7 +196,7 @@ export default function SuppliersPage() {
     {
       header: 'Paid',
       cell: ({ row }) => (
-        <span className={row.original.amount_paid > 0 ? 'font-medium text-green-700' : 'text-gray-400'}>
+        <span className={row.original.amount_paid > 0 ? 'font-medium text-green-700' : 'text-outline'}>
           {formatCurrency(Number(row.original.amount_paid))}
         </span>
       ),
@@ -217,7 +217,7 @@ export default function SuppliersPage() {
       cell: ({ row }) => {
         const s = row.original.payment_status
         return (
-          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[s] ?? 'bg-gray-100 text-gray-700'}`}>
+          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[s] ?? 'bg-surface-container text-on-surface-variant'}`}>
             {STATUS_LABELS[s] ?? s}
           </span>
         )
@@ -247,12 +247,12 @@ export default function SuppliersPage() {
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-gray-500 hover:text-gray-900">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-on-surface-variant hover:text-on-surface">
             <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
           </Button>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Suppliers</h1>
-            <p className="text-sm text-gray-500">
+            <h1 className="text-xl font-bold text-on-surface">Suppliers</h1>
+            <p className="text-sm text-on-surface-variant">
               {view === 'suppliers' ? `${suppliers.length} suppliers` : 'Received purchase orders and outstanding balances owed to suppliers'}
             </p>
           </div>
@@ -265,7 +265,7 @@ export default function SuppliersPage() {
           <button
             onClick={() => refetchCredit()}
             disabled={creditFetching}
-            className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 shadow-sm hover:bg-gray-50 disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-medium text-on-surface-variant shadow-sm hover:bg-surface-container-low disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${creditFetching ? 'animate-spin' : ''}`} />
             Refresh
@@ -300,22 +300,22 @@ export default function SuppliersPage() {
       {view === 'suppliers' && (
         <>
           <div className="relative max-w-xs">
-            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search suppliers..."
-              className="h-9 w-full rounded-lg border border-gray-300 pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
+              className="h-9 w-full rounded-lg border border-outline pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
             />
           </div>
 
           {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white py-16">
-              <Truck className="mb-3 h-10 w-10 text-gray-300" />
-              <p className="text-sm font-medium text-gray-500">No suppliers found.</p>
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant bg-surface py-16">
+              <Truck className="mb-3 h-10 w-10 text-outline-variant" />
+              <p className="text-sm font-medium text-on-surface-variant">No suppliers found.</p>
             </div>
           ) : (
-            <div className="w-full overflow-x-auto rounded-xl border border-outline-variant/50 bg-white shadow-sm">
+            <div className="w-full overflow-x-auto rounded-xl border border-outline-variant/50 bg-surface shadow-sm">
               <table className="w-full min-w-[980px] table-fixed text-sm">
                 <colgroup>
                   <col className="w-[16%]" />
@@ -346,45 +346,45 @@ export default function SuppliersPage() {
                     <tr
                       key={s.id}
                       onClick={() => router.push(`/inventory/suppliers/${s.id}?tab=payments`)}
-                      className={`group cursor-pointer border-t border-gray-100 transition-colors hover:bg-blue-50 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                      className={`group cursor-pointer border-t border-outline-variant transition-colors hover:bg-blue-50 ${i % 2 === 0 ? 'bg-surface' : 'bg-surface-container-low'}`}
                     >
                       <td className="px-4 py-3 align-middle">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                            <span className="truncate font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{s.name}</span>
+                            <span className="truncate font-bold text-on-surface group-hover:text-blue-600 transition-colors">{s.name}</span>
                             {!s.is_active && <Badge variant="default">Inactive</Badge>}
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-3 align-middle text-xs">
                         {s.contact_person
-                          ? <span className="truncate font-medium text-gray-700">{s.contact_person}</span>
-                          : <span className="italic text-gray-300">—</span>}
+                          ? <span className="truncate font-medium text-on-surface-variant">{s.contact_person}</span>
+                          : <span className="italic text-outline-variant">—</span>}
                       </td>
-                      <td className="px-4 py-3 align-middle text-xs text-gray-500">
+                      <td className="px-4 py-3 align-middle text-xs text-on-surface-variant">
                         {s.email
                           ? <span className="flex min-w-0 items-center gap-1"><Mail className="h-3 w-3 shrink-0" /> <span className="truncate">{s.email}</span></span>
-                          : <span className="italic text-gray-300">—</span>}
+                          : <span className="italic text-outline-variant">—</span>}
                       </td>
-                      <td className="px-4 py-3 align-middle text-xs text-gray-500">
+                      <td className="px-4 py-3 align-middle text-xs text-on-surface-variant">
                         {s.phone
                           ? <span className="flex items-center gap-1"><Phone className="h-3 w-3 shrink-0" /> {s.phone}</span>
-                          : <span className="italic text-gray-300">—</span>}
+                          : <span className="italic text-outline-variant">—</span>}
                       </td>
-                      <td className="px-4 py-3 align-middle text-xs text-gray-500">
+                      <td className="px-4 py-3 align-middle text-xs text-on-surface-variant">
                         {s.city
                           ? <span className="flex items-center gap-1 truncate"><MapPin className="h-3 w-3 shrink-0" /> {s.city}</span>
-                          : <span className="italic text-gray-300">—</span>}
+                          : <span className="italic text-outline-variant">—</span>}
                       </td>
-                      <td className="px-4 py-3 align-middle text-xs text-gray-500">
+                      <td className="px-4 py-3 align-middle text-xs text-on-surface-variant">
                         {s.country
                           ? <span className="truncate">{s.country}</span>
-                          : <span className="italic text-gray-300">—</span>}
+                          : <span className="italic text-outline-variant">—</span>}
                       </td>
                       <td className="px-4 py-3 align-middle">
-                        <span className="font-bold text-gray-700">Net {s.payment_terms_days}d</span>
+                        <span className="font-bold text-on-surface-variant">Net {s.payment_terms_days}d</span>
                       </td>
-                      <td className="px-4 py-3 align-middle text-xs text-gray-500">{s.currency}</td>
+                      <td className="px-4 py-3 align-middle text-xs text-on-surface-variant">{s.currency}</td>
                       <td className="px-4 py-3 align-middle text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-1">
                           <Button size="sm" variant="ghost" onClick={() => openModal(s)}>
@@ -408,35 +408,35 @@ export default function SuppliersPage() {
         <>
           {/* Summary cards */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-sm">
               <div className="flex items-center gap-3">
                 <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100">
                   <Truck className="h-5 w-5 text-purple-600" />
                 </span>
                 <div>
-                  <p className="text-xs font-medium text-gray-500">Suppliers on Credit</p>
-                  <p className="text-2xl font-bold text-gray-900">{uniqueSuppliersOnCredit}</p>
+                  <p className="text-xs font-medium text-on-surface-variant">Suppliers on Credit</p>
+                  <p className="text-2xl font-bold text-on-surface">{uniqueSuppliersOnCredit}</p>
                 </div>
               </div>
             </div>
-            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-sm">
               <div className="flex items-center gap-3">
                 <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
                   <AlertCircle className="h-5 w-5 text-red-600" />
                 </span>
                 <div>
-                  <p className="text-xs font-medium text-gray-500">Total Outstanding</p>
+                  <p className="text-xs font-medium text-on-surface-variant">Total Outstanding</p>
                   <p className="text-2xl font-bold text-red-600">{formatCurrency(totalOutstanding)}</p>
                 </div>
               </div>
             </div>
-            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-sm">
               <div className="flex items-center gap-3">
                 <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
                   <CheckCircle2 className="h-5 w-5 text-green-600" />
                 </span>
                 <div>
-                  <p className="text-xs font-medium text-gray-500">Fully Cleared</p>
+                  <p className="text-xs font-medium text-on-surface-variant">Fully Cleared</p>
                   <p className="text-2xl font-bold text-green-600">{formatCurrency(totalCleared)}</p>
                 </div>
               </div>
@@ -445,16 +445,16 @@ export default function SuppliersPage() {
 
           {/* Filter toggle */}
           <div className="flex items-center gap-3">
-            <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-sm">
+            <div className="flex rounded-lg border border-outline-variant bg-surface-container-low p-0.5 text-sm">
               <button
                 onClick={() => setShowAll(false)}
-                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${!showAll ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${!showAll ? 'bg-surface text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
               >
                 Outstanding
               </button>
               <button
                 onClick={() => setShowAll(true)}
-                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${showAll ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${showAll ? 'bg-surface text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
               >
                 All Received POs
               </button>
@@ -464,18 +464,18 @@ export default function SuppliersPage() {
           {/* Table */}
           {creditLoading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-outline" />
             </div>
           ) : purchaseOrders.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white py-16">
-              <CreditCard className="mb-3 h-10 w-10 text-gray-300" />
-              <p className="text-sm font-medium text-gray-500">
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant bg-surface py-16">
+              <CreditCard className="mb-3 h-10 w-10 text-outline-variant" />
+              <p className="text-sm font-medium text-on-surface-variant">
                 {showAll ? 'No received purchase orders found' : 'No outstanding supplier balances'}
               </p>
-              <p className="mt-1 text-xs text-gray-400">Purchase orders appear here once goods are received</p>
+              <p className="mt-1 text-xs text-outline">Purchase orders appear here once goods are received</p>
             </div>
           ) : (
-            <div className="rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+            <div className="rounded-xl border border-outline-variant bg-surface shadow-sm overflow-hidden">
               <DataTable columns={creditColumns} data={purchaseOrders} />
             </div>
           )}
@@ -509,11 +509,11 @@ export default function SuppliersPage() {
 
           <Input label="Payment Terms (days)" type="number" min="0" value={form.payment_terms_days} onChange={(e) => setForm((f) => ({ ...f, payment_terms_days: Number(e.target.value) }))} />
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Currency</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Currency</label>
             <select
               value={form.currency}
               onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
-              className="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
+              className="h-9 w-full rounded-lg border border-outline bg-surface px-3 text-sm focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
             >
               <option value="GBP">GBP</option>
               <option value="USD">USD</option>
@@ -523,18 +523,18 @@ export default function SuppliersPage() {
           </div>
 
           <div className="col-span-2">
-            <label className="mb-1 block text-sm font-medium text-gray-700">Notes</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes</label>
             <textarea
               rows={2}
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
+              className="w-full rounded-lg border border-outline bg-surface px-3 py-2 text-sm focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
             />
           </div>
 
           <div className="col-span-2">
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))} className="rounded border-gray-300 text-brand-teal focus:ring-brand-teal" />
+            <label className="flex items-center gap-2 text-sm text-on-surface-variant">
+              <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))} className="rounded border-outline text-brand-teal focus:ring-brand-teal" />
               Active Supplier
             </label>
           </div>
@@ -575,8 +575,8 @@ export default function SuppliersPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">
-                  Amount to record <span className="font-normal text-gray-400">(max {formatCurrency(outstanding)})</span>
+                <label className="mb-1 block text-xs font-medium text-on-surface-variant">
+                  Amount to record <span className="font-normal text-outline">(max {formatCurrency(outstanding)})</span>
                 </label>
                 <input
                   type="number"
@@ -592,13 +592,13 @@ export default function SuppliersPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Paid via</label>
+                <label className="mb-1 block text-xs font-medium text-on-surface-variant">Paid via</label>
                 <div className="grid grid-cols-3 gap-2">
                   {(['cash', 'card', 'bank_transfer', 'cheque', 'other'] as const).map(m => (
                     <button
                       key={m}
                       onClick={() => setPaymentMethod(m)}
-                      className={`rounded-lg border py-2 text-xs font-medium capitalize transition-colors ${paymentMethod === m ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                      className={`rounded-lg border py-2 text-xs font-medium capitalize transition-colors ${paymentMethod === m ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-outline-variant text-on-surface-variant hover:bg-surface-container-low'}`}
                     >
                       {m.replace('_', ' ')}
                     </button>
@@ -607,8 +607,8 @@ export default function SuppliersPage() {
               </div>
 
               {parseFloat(paymentAmount) > 0 && (
-                <div className="flex justify-between rounded-md bg-gray-50 px-3 py-2 text-sm">
-                  <span className="text-gray-600">Remaining after this payment</span>
+                <div className="flex justify-between rounded-md bg-surface-container-low px-3 py-2 text-sm">
+                  <span className="text-on-surface-variant">Remaining after this payment</span>
                   <span className={`font-semibold ${outstanding - parseFloat(paymentAmount) <= 0.01 ? 'text-green-600' : 'text-amber-700'}`}>
                     {formatCurrency(Math.max(0, outstanding - (parseFloat(paymentAmount) || 0)))}
                   </span>

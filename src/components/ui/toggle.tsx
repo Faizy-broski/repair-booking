@@ -19,7 +19,7 @@ const checkedColor = { teal: 'peer-checked:bg-brand-teal', blue: 'peer-checked:b
 export function Toggle({ checked, onChange, label, size = 'sm', color = 'teal', disabled, id, ...rest }: ToggleProps) {
   return (
     <label className={cn('relative inline-flex items-center gap-2', disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer')}>
-      {label && <span className="text-sm font-medium text-gray-600">{label}</span>}
+      {label && <span className="text-sm font-medium text-on-surface-variant">{label}</span>}
       <input
         id={id}
         type="checkbox"
@@ -31,7 +31,7 @@ export function Toggle({ checked, onChange, label, size = 'sm', color = 'teal', 
       />
       <div
         className={cn(
-          'relative peer rounded-full bg-gray-200 transition-colors',
+          'relative peer rounded-full bg-surface-container-high transition-colors',
           "after:absolute after:rounded-full after:bg-white after:shadow-sm after:transition-all after:content-['']",
           trackSize[size], thumbSize[size], thumbTranslate[size], checkedColor[color]
         )}

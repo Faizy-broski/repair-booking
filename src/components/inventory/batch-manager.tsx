@@ -130,53 +130,53 @@ export function BatchManager({ productId, variantId, branchId }: BatchManagerPro
   return (
     <div className="space-y-3">
       {isLoading ? (
-        <p className="text-sm text-gray-400">Loading batches…</p>
+        <p className="text-sm text-outline">Loading batches…</p>
       ) : layers.length === 0 && !adding ? (
-        <div className="rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center">
-          <Layers className="mx-auto h-6 w-6 text-gray-300 mb-2" />
-          <p className="text-sm text-gray-500">No stock batches yet.</p>
+        <div className="rounded-lg border border-dashed border-outline-variant px-4 py-6 text-center">
+          <Layers className="mx-auto h-6 w-6 text-outline-variant mb-2" />
+          <p className="text-sm text-on-surface-variant">No stock batches yet.</p>
         </div>
       ) : (
-        <div className="rounded-lg border border-gray-200 overflow-x-auto">
-          <table className="w-full divide-y divide-gray-100 text-sm">
-            <thead className="bg-gray-50">
+        <div className="rounded-lg border border-outline-variant overflow-x-auto">
+          <table className="w-full divide-y divide-outline-variant text-sm">
+            <thead className="bg-surface-container-low">
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Received</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Quantity</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Cost Price</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Selling Price</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-on-surface-variant">Received</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-on-surface-variant">Quantity</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-on-surface-variant">Cost Price</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-on-surface-variant">Selling Price</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 bg-white">
+            <tbody className="divide-y divide-outline-variant bg-surface">
               {layers.map((layer, i) => {
                 const editing = editingId === layer.id
                 return (
                   <tr key={layer.id} className={i === 0 ? 'bg-brand-teal-light/20' : ''}>
-                    <td className="px-3 py-2 text-gray-500 whitespace-nowrap">
+                    <td className="px-3 py-2 text-on-surface-variant whitespace-nowrap">
                       {formatDate(layer.received_at)}
                       {i === 0 && <span className="ml-1.5 rounded-full bg-brand-teal px-1.5 py-0.5 text-[10px] font-semibold text-white">Next to sell</span>}
                     </td>
                     {editing ? (
                       <>
-                        <td className="px-3 py-2"><input type="number" min="0" value={editQty} onChange={e => setEditQty(e.target.value)} className="w-20 rounded-md border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/30" /></td>
-                        <td className="px-3 py-2"><input type="number" min="0" step="0.01" value={editCost} onChange={e => setEditCost(e.target.value)} className="w-24 rounded-md border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/30" /></td>
-                        <td className="px-3 py-2"><input type="number" min="0" step="0.01" placeholder="Optional" value={editPrice} onChange={e => setEditPrice(e.target.value)} className="w-24 rounded-md border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/30" /></td>
+                        <td className="px-3 py-2"><input type="number" min="0" value={editQty} onChange={e => setEditQty(e.target.value)} className="w-20 rounded-md border border-outline px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/30" /></td>
+                        <td className="px-3 py-2"><input type="number" min="0" step="0.01" value={editCost} onChange={e => setEditCost(e.target.value)} className="w-24 rounded-md border border-outline px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/30" /></td>
+                        <td className="px-3 py-2"><input type="number" min="0" step="0.01" placeholder="Optional" value={editPrice} onChange={e => setEditPrice(e.target.value)} className="w-24 rounded-md border border-outline px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/30" /></td>
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-1">
                             <button type="button" onClick={() => saveEdit(layer.id)} disabled={saving} className="rounded-md p-1.5 bg-brand-teal text-white hover:bg-brand-teal-dark transition-colors disabled:opacity-50"><Check className="h-3.5 w-3.5" /></button>
-                            <button type="button" onClick={cancelEdit} className="rounded-md p-1.5 bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"><X className="h-3.5 w-3.5" /></button>
+                            <button type="button" onClick={cancelEdit} className="rounded-md p-1.5 bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors"><X className="h-3.5 w-3.5" /></button>
                           </div>
                         </td>
                       </>
                     ) : (
                       <>
-                        <td className="px-3 py-2 font-medium text-gray-800">{layer.quantity}</td>
-                        <td className="px-3 py-2 text-gray-700">{formatCurrency(layer.unit_cost)}</td>
-                        <td className="px-3 py-2 text-gray-700">{layer.selling_price != null ? formatCurrency(layer.selling_price) : <span className="text-gray-300">—</span>}</td>
+                        <td className="px-3 py-2 font-medium text-on-surface">{layer.quantity}</td>
+                        <td className="px-3 py-2 text-on-surface-variant">{formatCurrency(layer.unit_cost)}</td>
+                        <td className="px-3 py-2 text-on-surface-variant">{layer.selling_price != null ? formatCurrency(layer.selling_price) : <span className="text-outline-variant">—</span>}</td>
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-1">
-                            <button type="button" onClick={() => startEdit(layer)} className="rounded-md p-1.5 text-gray-400 hover:text-brand-teal hover:bg-brand-teal/10 transition-colors"><Pencil className="h-3.5 w-3.5" /></button>
+                            <button type="button" onClick={() => startEdit(layer)} className="rounded-md p-1.5 text-outline hover:text-brand-teal hover:bg-brand-teal/10 transition-colors"><Pencil className="h-3.5 w-3.5" /></button>
                             <button type="button" onClick={() => deleteBatch(layer)} className="rounded-md p-1.5 text-red-500 hover:bg-red-50 transition-colors"><Trash2 className="h-3.5 w-3.5" /></button>
                           </div>
                         </td>
@@ -191,21 +191,21 @@ export function BatchManager({ productId, variantId, branchId }: BatchManagerPro
       )}
 
       {adding ? (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 flex flex-wrap items-end gap-2">
+        <div className="rounded-lg border border-outline-variant bg-surface-container-low p-3 flex flex-wrap items-end gap-2">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Quantity</label>
-            <input type="number" min="1" value={newQty} onChange={e => setNewQty(e.target.value)} placeholder="0" className="w-24 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/30" />
+            <label className="block text-xs font-medium text-on-surface-variant mb-1">Quantity</label>
+            <input type="number" min="1" value={newQty} onChange={e => setNewQty(e.target.value)} placeholder="0" className="w-24 rounded-md border border-outline px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/30" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Cost Price</label>
-            <input type="number" min="0" step="0.01" value={newCost} onChange={e => setNewCost(e.target.value)} placeholder="0.00" className="w-24 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/30" />
+            <label className="block text-xs font-medium text-on-surface-variant mb-1">Cost Price</label>
+            <input type="number" min="0" step="0.01" value={newCost} onChange={e => setNewCost(e.target.value)} placeholder="0.00" className="w-24 rounded-md border border-outline px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/30" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Selling Price</label>
-            <input type="number" min="0" step="0.01" value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="0.00" className="w-24 rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/30" />
+            <label className="block text-xs font-medium text-on-surface-variant mb-1">Selling Price</label>
+            <input type="number" min="0" step="0.01" value={newPrice} onChange={e => setNewPrice(e.target.value)} placeholder="0.00" className="w-24 rounded-md border border-outline px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/30" />
           </div>
           <button type="button" onClick={addBatch} disabled={saving} className="rounded-md bg-brand-teal px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-teal-dark transition-colors disabled:opacity-50">Add</button>
-          <button type="button" onClick={() => setAdding(false)} className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-500 hover:bg-gray-100 transition-colors">Cancel</button>
+          <button type="button" onClick={() => setAdding(false)} className="rounded-md px-3 py-1.5 text-sm font-medium text-on-surface-variant hover:bg-surface-container transition-colors">Cancel</button>
         </div>
       ) : (
         <button type="button" onClick={() => setAdding(true)} className="flex items-center gap-1.5 text-sm font-medium text-brand-teal hover:text-brand-teal-dark">
@@ -218,31 +218,31 @@ export function BatchManager({ productId, variantId, branchId }: BatchManagerPro
           <button
             type="button"
             onClick={() => setShowDepleted(v => !v)}
-            className="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700"
+            className="flex items-center gap-1.5 text-sm font-medium text-on-surface-variant hover:text-on-surface-variant"
           >
             {showDepleted ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
             Depleted batches ({depletedLayers.length})
           </button>
           {showDepleted && (
-            <div className="mt-2 rounded-lg border border-gray-200 overflow-x-auto opacity-70">
-              <table className="w-full divide-y divide-gray-100 text-sm">
-                <thead className="bg-gray-50">
+            <div className="mt-2 rounded-lg border border-outline-variant overflow-x-auto opacity-70">
+              <table className="w-full divide-y divide-outline-variant text-sm">
+                <thead className="bg-surface-container-low">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Received</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Depleted</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Received Qty</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Cost Price</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Selling Price</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-on-surface-variant">Received</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-on-surface-variant">Depleted</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-on-surface-variant">Received Qty</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-on-surface-variant">Cost Price</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-on-surface-variant">Selling Price</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
+                <tbody className="divide-y divide-outline-variant bg-surface">
                   {depletedLayers.map(layer => (
                     <tr key={layer.id}>
-                      <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{formatDate(layer.received_at)}</td>
-                      <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{layer.depleted_at ? formatDate(layer.depleted_at) : '—'}</td>
-                      <td className="px-3 py-2 text-gray-600">{layer.quantity_received ?? layer.quantity}</td>
-                      <td className="px-3 py-2 text-gray-600">{formatCurrency(layer.unit_cost)}</td>
-                      <td className="px-3 py-2 text-gray-600">{layer.selling_price != null ? formatCurrency(layer.selling_price) : <span className="text-gray-300">—</span>}</td>
+                      <td className="px-3 py-2 text-on-surface-variant whitespace-nowrap">{formatDate(layer.received_at)}</td>
+                      <td className="px-3 py-2 text-on-surface-variant whitespace-nowrap">{layer.depleted_at ? formatDate(layer.depleted_at) : '—'}</td>
+                      <td className="px-3 py-2 text-on-surface-variant">{layer.quantity_received ?? layer.quantity}</td>
+                      <td className="px-3 py-2 text-on-surface-variant">{formatCurrency(layer.unit_cost)}</td>
+                      <td className="px-3 py-2 text-on-surface-variant">{layer.selling_price != null ? formatCurrency(layer.selling_price) : <span className="text-outline-variant">—</span>}</td>
                     </tr>
                   ))}
                 </tbody>

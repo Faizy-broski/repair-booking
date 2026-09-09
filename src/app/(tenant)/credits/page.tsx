@@ -57,7 +57,7 @@ const TXN_TYPE_COLORS: Record<string, string> = {
   credit: 'bg-green-100 text-green-800',
   debit: 'bg-red-100 text-red-700',
   refund: 'bg-blue-100 text-blue-700',
-  adjustment: 'bg-gray-100 text-gray-700',
+  adjustment: 'bg-surface-container text-on-surface-variant',
 }
 
 const TXN_TYPE_LABELS: Record<string, string> = {
@@ -192,19 +192,19 @@ export default function CreditsPage() {
             {customerName(row.original.customers)}
           </Link>
         ) : (
-          <span className="font-medium text-gray-900">{customerName(row.original.customers)}</span>
+          <span className="font-medium text-on-surface">{customerName(row.original.customers)}</span>
         )
       ),
     },
     {
       header: 'Sale #',
       cell: ({ row }) => (
-        <span className="font-mono text-xs text-gray-500">#{row.original.sale_number ?? row.original.id.slice(-8).toUpperCase()}</span>
+        <span className="font-mono text-xs text-on-surface-variant">#{row.original.sale_number ?? row.original.id.slice(-8).toUpperCase()}</span>
       ),
     },
     {
       header: 'Date',
-      cell: ({ row }) => <span className="text-sm text-gray-600">{formatDate(row.original.created_at)}</span>,
+      cell: ({ row }) => <span className="text-sm text-on-surface-variant">{formatDate(row.original.created_at)}</span>,
     },
     {
       header: 'Total',
@@ -213,7 +213,7 @@ export default function CreditsPage() {
     {
       header: 'Paid',
       cell: ({ row }) => (
-        <span className={row.original.amount_paid > 0 ? 'font-medium text-green-700' : 'text-gray-400'}>
+        <span className={row.original.amount_paid > 0 ? 'font-medium text-green-700' : 'text-outline'}>
           {formatCurrency(Number(row.original.amount_paid))}
         </span>
       ),
@@ -234,7 +234,7 @@ export default function CreditsPage() {
       cell: ({ row }) => {
         const s = row.original.payment_status
         return (
-          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[s] ?? 'bg-gray-100 text-gray-700'}`}>
+          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[s] ?? 'bg-surface-container text-on-surface-variant'}`}>
             {STATUS_LABELS[s] ?? s}
           </span>
         )
@@ -259,7 +259,7 @@ export default function CreditsPage() {
               onClick={() => downloadReceipt(sale.id)}
               disabled={isDownloading}
               title="Download updated receipt"
-              className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              className="flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface px-3 py-1.5 text-xs font-semibold text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50 transition-colors"
             >
               {isDownloading
                 ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -276,7 +276,7 @@ export default function CreditsPage() {
     {
       header: 'Customer',
       cell: ({ row }) => (
-        <span className="font-medium text-gray-900">{customerName(row.original.customers)}</span>
+        <span className="font-medium text-on-surface">{customerName(row.original.customers)}</span>
       ),
     },
     {
@@ -284,7 +284,7 @@ export default function CreditsPage() {
       cell: ({ row }) => {
         const t = row.original.type
         return (
-          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TXN_TYPE_COLORS[t] ?? 'bg-gray-100 text-gray-700'}`}>
+          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TXN_TYPE_COLORS[t] ?? 'bg-surface-container text-on-surface-variant'}`}>
             {TXN_TYPE_LABELS[t] ?? t}
           </span>
         )
@@ -304,12 +304,12 @@ export default function CreditsPage() {
     {
       header: 'Note',
       cell: ({ row }) => (
-        <span className="text-sm text-gray-600">{row.original.note ?? '—'}</span>
+        <span className="text-sm text-on-surface-variant">{row.original.note ?? '—'}</span>
       ),
     },
     {
       header: 'Date',
-      cell: ({ row }) => <span className="text-sm text-gray-600">{formatDate(row.original.created_at)}</span>,
+      cell: ({ row }) => <span className="text-sm text-on-surface-variant">{formatDate(row.original.created_at)}</span>,
     },
   ]
 
@@ -321,12 +321,12 @@ export default function CreditsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Customer Credit</h1>
-          <p className="text-sm text-gray-500">On-account sales and outstanding balances</p>
+          <p className="text-sm text-on-surface-variant">On-account sales and outstanding balances</p>
         </div>
         <button
           onClick={() => (view === 'sales' ? refetch() : refetchStoreCredit())}
           disabled={view === 'sales' ? isFetching : isFetchingStoreCredit}
-          className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 shadow-sm hover:bg-gray-50 disabled:opacity-50"
+          className="flex items-center gap-2 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-medium text-on-surface-variant shadow-sm hover:bg-surface-container-low disabled:opacity-50"
         >
           <RefreshCw className={`h-4 w-4 ${(view === 'sales' ? isFetching : isFetchingStoreCredit) ? 'animate-spin' : ''}`} />
           Refresh
@@ -335,16 +335,16 @@ export default function CreditsPage() {
 
       {/* View toggle — two unrelated data sources: on-account sales vs. the prepaid store-credit wallet ledger */}
       <div className="flex items-center gap-3">
-        <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-sm">
+        <div className="flex rounded-lg border border-outline-variant bg-surface-container-low p-0.5 text-sm">
           <button
             onClick={() => setView('sales')}
-            className={`rounded-md px-3 py-1.5 font-medium transition-colors ${view === 'sales' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`rounded-md px-3 py-1.5 font-medium transition-colors ${view === 'sales' ? 'bg-surface text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
           >
             On-Account Sales
           </button>
           <button
             onClick={() => setView('store_credit')}
-            className={`rounded-md px-3 py-1.5 font-medium transition-colors ${view === 'store_credit' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`rounded-md px-3 py-1.5 font-medium transition-colors ${view === 'store_credit' ? 'bg-surface text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
           >
             Store Credit Activity
           </button>
@@ -355,35 +355,35 @@ export default function CreditsPage() {
         <>
           {/* Summary cards */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-sm">
               <div className="flex items-center gap-3">
                 <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100">
                   <Users className="h-5 w-5 text-purple-600" />
                 </span>
                 <div>
-                  <p className="text-xs font-medium text-gray-500">Customers on Credit</p>
-                  <p className="text-2xl font-bold text-gray-900">{uniqueCustomers}</p>
+                  <p className="text-xs font-medium text-on-surface-variant">Customers on Credit</p>
+                  <p className="text-2xl font-bold text-on-surface">{uniqueCustomers}</p>
                 </div>
               </div>
             </div>
-            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-sm">
               <div className="flex items-center gap-3">
                 <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
                   <AlertCircle className="h-5 w-5 text-red-600" />
                 </span>
                 <div>
-                  <p className="text-xs font-medium text-gray-500">Total Outstanding</p>
+                  <p className="text-xs font-medium text-on-surface-variant">Total Outstanding</p>
                   <p className="text-2xl font-bold text-red-600">{formatCurrency(totalOutstanding)}</p>
                 </div>
               </div>
             </div>
-            <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-sm">
               <div className="flex items-center gap-3">
                 <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
                   <CheckCircle2 className="h-5 w-5 text-green-600" />
                 </span>
                 <div>
-                  <p className="text-xs font-medium text-gray-500">Fully Cleared</p>
+                  <p className="text-xs font-medium text-on-surface-variant">Fully Cleared</p>
                   <p className="text-2xl font-bold text-green-600">{formatCurrency(totalCollected)}</p>
                 </div>
               </div>
@@ -392,16 +392,16 @@ export default function CreditsPage() {
 
           {/* Filter toggle */}
           <div className="flex items-center gap-3">
-            <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-sm">
+            <div className="flex rounded-lg border border-outline-variant bg-surface-container-low p-0.5 text-sm">
               <button
                 onClick={() => setShowAll(false)}
-                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${!showAll ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${!showAll ? 'bg-surface text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
               >
                 Outstanding
               </button>
               <button
                 onClick={() => setShowAll(true)}
-                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${showAll ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${showAll ? 'bg-surface text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
               >
                 All Credit Sales
               </button>
@@ -411,18 +411,18 @@ export default function CreditsPage() {
           {/* Table */}
           {isLoading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-outline" />
             </div>
           ) : sales.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white py-16">
-              <CreditCard className="mb-3 h-10 w-10 text-gray-300" />
-              <p className="text-sm font-medium text-gray-500">
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant bg-surface py-16">
+              <CreditCard className="mb-3 h-10 w-10 text-outline-variant" />
+              <p className="text-sm font-medium text-on-surface-variant">
                 {showAll ? 'No credit sales found' : 'No outstanding credit balances'}
               </p>
-              <p className="mt-1 text-xs text-gray-400">Credit sales will appear here after checkout</p>
+              <p className="mt-1 text-xs text-outline">Credit sales will appear here after checkout</p>
             </div>
           ) : (
-            <div className="rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+            <div className="rounded-xl border border-outline-variant bg-surface shadow-sm overflow-hidden">
               <DataTable columns={columns} data={sales} />
             </div>
           )}
@@ -433,18 +433,18 @@ export default function CreditsPage() {
         <>
           {isLoadingStoreCredit ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+              <Loader2 className="h-6 w-6 animate-spin text-outline" />
             </div>
           ) : storeCreditTxns.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white py-16">
-              <CreditCard className="mb-3 h-10 w-10 text-gray-300" />
-              <p className="text-sm font-medium text-gray-500">No store credit activity found</p>
-              <p className="mt-1 text-xs text-gray-400">
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant bg-surface py-16">
+              <CreditCard className="mb-3 h-10 w-10 text-outline-variant" />
+              <p className="text-sm font-medium text-on-surface-variant">No store credit activity found</p>
+              <p className="mt-1 text-xs text-outline">
                 Wallet top-ups, spends, refunds and adjustments will appear here.
               </p>
             </div>
           ) : (
-            <div className="rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+            <div className="rounded-xl border border-outline-variant bg-surface shadow-sm overflow-hidden">
               <DataTable columns={storeCreditColumns} data={storeCreditTxns} />
             </div>
           )}
@@ -483,8 +483,8 @@ export default function CreditsPage() {
 
               {/* Amount input */}
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">
-                  Amount to record <span className="font-normal text-gray-400">(max {formatCurrency(outstanding)})</span>
+                <label className="mb-1 block text-xs font-medium text-on-surface-variant">
+                  Amount to record <span className="font-normal text-outline">(max {formatCurrency(outstanding)})</span>
                 </label>
                 <input
                   type="number"
@@ -501,13 +501,13 @@ export default function CreditsPage() {
 
               {/* Payment method */}
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Received via</label>
+                <label className="mb-1 block text-xs font-medium text-on-surface-variant">Received via</label>
                 <div className="flex gap-2">
                   {(['cash', 'card'] as const).map(m => (
                     <button
                       key={m}
                       onClick={() => setPaymentMethod(m)}
-                      className={`flex-1 rounded-lg border py-2 text-sm font-medium capitalize transition-colors ${paymentMethod === m ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                      className={`flex-1 rounded-lg border py-2 text-sm font-medium capitalize transition-colors ${paymentMethod === m ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-outline-variant text-on-surface-variant hover:bg-surface-container-low'}`}
                     >
                       {m}
                     </button>
@@ -517,8 +517,8 @@ export default function CreditsPage() {
 
               {/* New outstanding after this payment */}
               {parseFloat(paymentAmount) > 0 && (
-                <div className="flex justify-between rounded-md bg-gray-50 px-3 py-2 text-sm">
-                  <span className="text-gray-600">Remaining after this payment</span>
+                <div className="flex justify-between rounded-md bg-surface-container-low px-3 py-2 text-sm">
+                  <span className="text-on-surface-variant">Remaining after this payment</span>
                   <span className={`font-semibold ${outstanding - parseFloat(paymentAmount) <= 0.01 ? 'text-green-600' : 'text-amber-700'}`}>
                     {formatCurrency(Math.max(0, outstanding - (parseFloat(paymentAmount) || 0)))}
                   </span>

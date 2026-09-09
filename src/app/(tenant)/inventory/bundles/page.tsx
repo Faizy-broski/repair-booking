@@ -113,21 +113,21 @@ export default function BundlesPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Product Bundles</h1>
-          <p className="text-sm text-gray-500">{bundles.length} bundles</p>
+          <h1 className="text-xl font-bold text-on-surface">Product Bundles</h1>
+          <p className="text-sm text-on-surface-variant">{bundles.length} bundles</p>
         </div>
         <Button onClick={() => openModal()}>
           <Plus className="h-4 w-4" /> New Bundle
         </Button>
       </div>
 
-      <div className="divide-y rounded-xl border border-gray-200 bg-white">
+      <div className="divide-y rounded-xl border border-outline-variant bg-surface">
         {loading ? (
-          [1,2,3].map((i) => <div key={i} className="h-16 animate-pulse bg-gray-50 m-2 rounded-lg" />)
+          [1,2,3].map((i) => <div key={i} className="h-16 animate-pulse bg-surface-container-low m-2 rounded-lg" />)
         ) : bundles.length === 0 ? (
           <div className="py-16 text-center">
-            <Package2 className="mx-auto h-8 w-8 text-gray-300" />
-            <p className="mt-2 text-sm text-gray-400">No bundles yet.</p>
+            <Package2 className="mx-auto h-8 w-8 text-outline-variant" />
+            <p className="mt-2 text-sm text-outline">No bundles yet.</p>
           </div>
         ) : (
           bundles.map((b) => (
@@ -135,21 +135,21 @@ export default function BundlesPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-gray-800">{b.name}</p>
+                    <p className="font-medium text-on-surface">{b.name}</p>
                     {!b.is_active && <Badge variant="default">Inactive</Badge>}
-                    {b.sku && <span className="text-xs text-gray-400">SKU: {b.sku}</span>}
+                    {b.sku && <span className="text-xs text-outline">SKU: {b.sku}</span>}
                   </div>
-                  {b.description && <p className="text-xs text-gray-400 mt-0.5">{b.description}</p>}
+                  {b.description && <p className="text-xs text-outline mt-0.5">{b.description}</p>}
                   <div className="mt-1 flex flex-wrap gap-1">
                     {b.product_bundle_items.map((item) => (
-                      <span key={item.id} className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                      <span key={item.id} className="rounded bg-surface-container px-2 py-0.5 text-xs text-on-surface-variant">
                         {item.products?.name} ×{item.quantity}
                       </span>
                     ))}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="font-semibold text-gray-900">{formatCurrency(b.bundle_price)}</span>
+                  <span className="font-semibold text-on-surface">{formatCurrency(b.bundle_price)}</span>
                   <div className="flex gap-1">
                     <Button size="sm" variant="ghost" onClick={() => openModal(b)}>
                       <Pencil className="h-3.5 w-3.5" />
@@ -173,36 +173,36 @@ export default function BundlesPage() {
       >
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Bundle Name *</label>
+            <label className="mb-1 block text-sm font-medium text-on-surface-variant">Bundle Name *</label>
             <input
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm"
+              className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Bundle Price *</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Bundle Price *</label>
               <input
                 type="number" min="0" step="0.01"
                 value={form.bundle_price}
                 onChange={(e) => setForm((f) => ({ ...f, bundle_price: Number(e.target.value) }))}
-                className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">SKU</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">SKU</label>
               <input
                 value={form.sku}
                 onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
-                className="h-9 w-full rounded-lg border border-gray-300 px-3 text-sm"
+                className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
               />
             </div>
           </div>
 
           <div>
             <div className="mb-1.5 flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-700">Items</label>
+              <label className="text-sm font-medium text-on-surface-variant">Items</label>
               <button
                 type="button"
                 onClick={() => setForm((f) => ({ ...f, items: [...f.items, { product_id: '', quantity: 1 }] }))}
@@ -218,7 +218,7 @@ export default function BundlesPage() {
                       const u = [...form.items]; u[idx] = { ...u[idx], product_id: e.target.value }
                       setForm((f) => ({ ...f, items: u }))
                     }}
-                    className="h-8 flex-1 rounded-md border border-gray-300 px-2 text-sm"
+                    className="h-8 flex-1 rounded-md border border-outline px-2 text-sm"
                   >
                     <option value="">Select product…</option>
                     {products.map((p) => (
@@ -232,10 +232,10 @@ export default function BundlesPage() {
                       const u = [...form.items]; u[idx] = { ...u[idx], quantity: Number(e.target.value) }
                       setForm((f) => ({ ...f, items: u }))
                     }}
-                    className="h-8 w-16 rounded-md border border-gray-300 px-2 text-sm"
+                    className="h-8 w-16 rounded-md border border-outline px-2 text-sm"
                   />
                   {form.items.length > 1 && (
-                    <button onClick={() => setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) }))} className="text-gray-400 hover:text-red-500">×</button>
+                    <button onClick={() => setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) }))} className="text-outline hover:text-red-500">×</button>
                   )}
                 </div>
               ))}
@@ -243,9 +243,9 @@ export default function BundlesPage() {
           </div>
 
           {estimatedCost > 0 && (
-            <div className="rounded-lg bg-gray-50 p-2 flex justify-between text-xs">
-              <span className="text-gray-500">Individual total</span>
-              <span className="text-gray-700">{formatCurrency(estimatedCost)}</span>
+            <div className="rounded-lg bg-surface-container-low p-2 flex justify-between text-xs">
+              <span className="text-on-surface-variant">Individual total</span>
+              <span className="text-on-surface-variant">{formatCurrency(estimatedCost)}</span>
             </div>
           )}
 

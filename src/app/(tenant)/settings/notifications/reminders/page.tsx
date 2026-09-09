@@ -64,23 +64,23 @@ export default function InvoiceRemindersPage() {
           <Clock className="h-5 w-5 text-amber-600" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Invoice Reminders</h1>
-          <p className="text-sm text-gray-500">Automatically notify customers about upcoming and overdue invoices</p>
+          <h1 className="text-2xl font-bold text-on-surface">Invoice Reminders</h1>
+          <p className="text-sm text-on-surface-variant">Automatically notify customers about upcoming and overdue invoices</p>
         </div>
       </div>
 
       <div className="max-w-lg space-y-6">
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <h3 className="mb-4 text-lg font-semibold text-gray-900">Automated Invoice Reminders</h3>
+        <div className="rounded-lg border border-outline-variant bg-surface p-6 shadow-sm">
+          <h3 className="mb-4 text-lg font-semibold text-on-surface">Automated Invoice Reminders</h3>
           <div className="space-y-4">
             <label className="flex items-center gap-3">
               <input
                 type="checkbox"
                 checked={reminderSettings.enabled}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded border-outline text-blue-600 focus:ring-blue-500"
                 onChange={(e) => setReminderSettings((s) => ({ ...s, enabled: e.target.checked }))}
               />
-              <span className="text-sm font-medium text-gray-700">Enable automated invoice payment reminders</span>
+              <span className="text-sm font-medium text-on-surface-variant">Enable automated invoice payment reminders</span>
             </label>
 
             {reminderSettings.enabled && (
@@ -96,8 +96,8 @@ export default function InvoiceRemindersPage() {
                 />
 
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Days After Overdue</label>
-                  <p className="mb-2 text-xs text-gray-500">Send reminders this many days after the due date. Comma-separated.</p>
+                  <label className="mb-1 block text-sm font-medium text-on-surface-variant">Days After Overdue</label>
+                  <p className="mb-2 text-xs text-on-surface-variant">Send reminders this many days after the due date. Comma-separated.</p>
                   <Input
                     value={reminderSettings.days_after_overdue.join(', ')}
                     onChange={(e) => {
