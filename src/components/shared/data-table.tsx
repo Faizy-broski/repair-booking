@@ -112,7 +112,7 @@ export function DataTable<T>({
                 <tr
                   key={row.id}
                   onClick={onRowClick ? () => onRowClick(row.original) : undefined}
-                  className={`border-t border-outline-variant transition-colors hover:bg-teal-50 ${onRowClick ? 'cursor-pointer' : ''} ${
+                  className={`border-t border-outline-variant transition-colors hover:bg-surface-container-high ${onRowClick ? 'cursor-pointer' : ''} ${
                     i % 2 === 0 ? 'bg-surface' : 'bg-surface-container-low'
                   }`}
                 >
