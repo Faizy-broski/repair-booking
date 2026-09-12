@@ -38,7 +38,7 @@ export const companyPages: CompanyPage[] = [
     related: [
       { label: "Customers", href: "/company/customers" },
       { label: "Careers", href: "/company/careers" },
-      { label: "Contact Us", href: "/company/contact-us" },
+      { label: "Contact Us", href: "/contact" },
     ],
   },
   {
@@ -114,7 +114,7 @@ export const companyPages: CompanyPage[] = [
     ],
     related: [
       { label: "About", href: "/company/about" },
-      { label: "Contact Us", href: "/company/contact-us" },
+      { label: "Contact Us", href: "/contact" },
       { label: "Press", href: "/company/press" },
     ],
   },
@@ -145,7 +145,7 @@ export const companyPages: CompanyPage[] = [
     ],
     related: [
       { label: "About", href: "/company/about" },
-      { label: "Contact Us", href: "/company/contact-us" },
+      { label: "Contact Us", href: "/contact" },
       { label: "Blog", href: "/resources/blog" },
     ],
   },

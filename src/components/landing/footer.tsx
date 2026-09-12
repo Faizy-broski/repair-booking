@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { FadeIn } from "@/components/landing/motion";
 import { footerLinkGroups } from "@/lib/footer-pages";
+import { LeadForm } from "@/components/marketing/lead-form";
 
 export default function Footer() {
   return (
@@ -25,6 +26,18 @@ export default function Footer() {
               The operating system for repair businesses that take their craft
               seriously. Designed in Lisbon. Built worldwide.
             </p>
+
+            <div className="mt-7 max-w-[360px] sm:mt-9">
+              <h3 className="mb-2.5 text-xs font-light uppercase text-slate-500">
+                Stay updated
+              </h3>
+              <LeadForm
+                source="newsletter"
+                submitLabel="Subscribe"
+                successMessage="You're subscribed — thanks!"
+                className="[&_label]:hidden"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 sm:gap-12">
