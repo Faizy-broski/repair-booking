@@ -96,6 +96,12 @@ export default function PosPage() {
     // deliberately a combined cash+card number (migration 190) and can't be
     // reconciled against a physical cash count on its own.
     card_refunds?: number; repair_cash_refunds?: number
+    // Card-tendered portion of cash_in/cash_out (migration 202) — a cash
+    // movement can be logged as paid via card/bank instead of physically
+    // moving till cash, so this must be subtracted out for the same reason
+    // card_refunds is above. Already returned by the RPC (report.service.ts
+    // previewExpectedCash spreads it through); just wasn't declared here.
+    cash_in_card?: number; cash_out_card?: number
   } | null>(null)
 
   const fetchSessionStats = useCallback(async (sessionId: string) => {
@@ -387,7 +393,7 @@ export default function PosPage() {
     setSessionProcessing(false)
   }
 
-  async function handleCashMovement(categoryId: string | null, addToLedger: boolean, buyback?: BuybackPayload | null) {
+  async function handleCashMovement(categoryId: string | null, addToLedger: boolean, buyback?: BuybackPayload | null, supplierId?: string | null) {
     if (!pos.session || !cashMovementAmount) return
     setCashMovementSaving(true)
     const amount = parseFloat(cashMovementAmount)
@@ -395,6 +401,7 @@ export default function PosPage() {
     const purpose = cashMovementType !== 'cash_out' ? 'plain'
       : addToLedger ? 'expense'
       : buyback ? 'buyback'
+      : supplierId ? 'supplier'
       : 'plain'
 
     // Everything (cash movement + its offsetting expense/buyback entry) is
@@ -417,12 +424,14 @@ export default function PosPage() {
         buyback_name: purpose === 'buyback' ? buyback?.name : undefined,
         buyback_selling_price: purpose === 'buyback' ? buyback?.selling_price : undefined,
         buyback_barcode: purpose === 'buyback' ? buyback?.barcode : undefined,
+        supplier_id: purpose === 'supplier' ? supplierId : undefined,
       }),
     })
 
     if (res.ok) {
       if (purpose === 'expense') toast.success(`Cash out of ${formatCurrency(amount)} recorded as expense`)
       else if (purpose === 'buyback') toast.success(`Cash out of ${formatCurrency(amount)} recorded as buyback — 1 unit added to stock`)
+      else if (purpose === 'supplier') toast.success(`Cash out of ${formatCurrency(amount)} recorded as a supplier payment`)
       else if (cashMovementType === 'cash_out') toast.success(`Cash out of ${formatCurrency(amount)} recorded`)
       else toast.success(`Cash in of ${formatCurrency(amount)} recorded`)
       setCashMovementOpen(false)
@@ -549,9 +558,19 @@ export default function PosPage() {
         // number to compare against a physical till count: same formula,
         // card entirely excluded, and refunds cut down to just their cash
         // leg (total_refunds/repair_refunds minus their card portion).
+        //
+        // cash_in/cash_out below must be reduced by their card-tendered
+        // portion (migration 202) — a card-paid cash movement (e.g. a
+        // "Cash Out" logged as payment_type='card' for a card refund/
+        // write-off) never touched the till, so including it here made this
+        // tile wildly understate cash on hand whenever one occurred (was
+        // silently missed when migration 202 added the cash/card split;
+        // close-register-modal.tsx already did this correctly — see its
+        // `(sessionStats.cash_in ?? 0) - (sessionStats.cash_in_card ?? 0)`
+        // pattern, mirrored here).
         const cashDrawerExpected = sessionStats.opening_float
           + sessionStats.cash_sales + sessionStats.repair_cash_deposits + sessionStats.credit_repayments_cash
-          + sessionStats.cash_in - sessionStats.cash_out
+          + (sessionStats.cash_in - (sessionStats.cash_in_card ?? 0)) - (sessionStats.cash_out - (sessionStats.cash_out_card ?? 0))
           - (sessionStats.total_refunds - (sessionStats.card_refunds ?? 0))
           - (sessionStats.repair_cash_refunds ?? 0)
         return (

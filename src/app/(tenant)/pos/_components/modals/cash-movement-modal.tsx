@@ -15,6 +15,8 @@ export interface BuybackPayload {
   barcode?: string
 }
 
+interface Supplier { id: string; name: string }
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -27,7 +29,7 @@ interface Props {
   cashMovementPaymentType: 'cash' | 'card'
   setCashMovementPaymentType: (v: 'cash' | 'card') => void
   cashMovementSaving: boolean
-  handleCashMovement: (categoryId: string | null, addToLedger: boolean, buyback?: BuybackPayload | null) => void
+  handleCashMovement: (categoryId: string | null, addToLedger: boolean, buyback?: BuybackPayload | null, supplierId?: string | null) => void
   businessId: string | null | undefined
 }
 
@@ -41,17 +43,23 @@ export function CashMovementModal({
 }: Props) {
   const isCashOut = cashMovementType === 'cash_out'
 
-  // Cash Out has three mutually-exclusive purposes: a plain drawer removal,
-  // logging it as a real expense (feeds the standalone Expenses module), or
-  // a quick buyback (quick-create the product just bought from the customer,
+  // Cash Out has four mutually-exclusive purposes: a plain drawer removal,
+  // logging it as a real expense (feeds the standalone Expenses module), a
+  // quick buyback (quick-create the product just bought from the customer,
   // the amount paid becomes its cost, one unit is added to stock — no
-  // separate ledger, no condition grade/serial).
+  // separate ledger, no condition grade/serial), or paying a supplier for
+  // stock (requires picking a real supplier, so the withdrawal is traceable
+  // to a named supplier even without a formal purchase order).
   // Cash In has no opt-in — it always counts directly as Sales revenue.
-  const [purpose, setPurpose] = useState<'none' | 'expense' | 'buyback'>('none')
+  const [purpose, setPurpose] = useState<'none' | 'expense' | 'buyback' | 'supplier'>('none')
 
   const [categories, setCategories] = useState<LedgerCategory[]>([])
   const [categoryId, setCategoryId] = useState('')
   const [catsLoading, setCatsLoading] = useState(false)
+
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [supplierId, setSupplierId] = useState('')
+  const [suppliersLoading, setSuppliersLoading] = useState(false)
 
   const [buybackName, setBuybackName] = useState('')
   const [buybackSellingPrice, setBuybackSellingPrice] = useState('')
@@ -69,6 +77,17 @@ export function CashMovementModal({
       .finally(() => setCatsLoading(false))
   }, [purpose, businessId]) // eslint-disable-line
 
+  // Fetch suppliers only when user opts in
+  useEffect(() => {
+    if (purpose !== 'supplier' || suppliers.length > 0) return
+    setSuppliersLoading(true)
+    fetch('/api/suppliers')
+      .then(r => r.json())
+      .then(j => setSuppliers(j.data ?? []))
+      .catch(() => {})
+      .finally(() => setSuppliersLoading(false))
+  }, [purpose]) // eslint-disable-line
+
   // Reset purpose-specific fields when switching away from Cash Out
   useEffect(() => {
     if (!isCashOut) resetPurposeFields()
@@ -81,6 +100,7 @@ export function CashMovementModal({
     setBuybackSellingPrice('')
     setBuybackBarcode('')
     setBarcodeConflict(false)
+    setSupplierId('')
   }
 
   // Debounced duplicate-barcode check, same pattern as the product creation page
@@ -106,6 +126,18 @@ export function CashMovementModal({
     setCategories(p => [...p, created])
     setCategoryId(created.id)
     toast.success(`Category "${created.name}" created`)
+  }
+
+  async function createSupplier(name: string) {
+    const res = await fetch('/api/suppliers', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    if (!res.ok) { toast.error('Failed to create supplier (requires branch manager)'); return }
+    const created: Supplier = (await res.json()).data
+    setSuppliers(p => [...p, created])
+    setSupplierId(created.id)
+    toast.success(`Supplier "${created.name}" created`)
   }
 
   function handleClose() {
@@ -212,6 +244,7 @@ export function CashMovementModal({
                 ['none', 'Plain'],
                 ['expense', 'Expense'],
                 ['buyback', 'Buyback'],
+                ['supplier', 'Supplier'],
               ] as const).map(([value, label]) => (
                 <button
                   key={value}
@@ -294,6 +327,28 @@ export function CashMovementModal({
                 <p className="text-xs text-outline">The amount above becomes this product's cost, and one unit is added to stock.</p>
               </div>
             )}
+
+            {purpose === 'supplier' && (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-on-surface-variant">
+                  Supplier <span className="text-red-500">*</span>
+                </label>
+                {suppliersLoading ? (
+                  <div className="h-9 animate-pulse rounded-lg bg-surface-container" />
+                ) : (
+                  <CreatableCombobox
+                    options={suppliers.map(s => ({ value: s.id, label: s.name }))}
+                    value={supplierId}
+                    onChange={v => setSupplierId(v)}
+                    onCreate={createSupplier}
+                    placeholder="Select or type to create..."
+                    createLabel="Add supplier"
+                    inline
+                  />
+                )}
+                <p className="mt-2 text-xs text-outline">Paying a supplier for stock without a full Purchase Order — this ties the cash-out to a real supplier so it's traceable later, instead of a free-text note only.</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -310,6 +365,7 @@ export function CashMovementModal({
               !cashMovementAmount || parseFloat(cashMovementAmount) <= 0 ||
               (isCashOut && purpose === 'buyback' && (!buybackName.trim() || !buybackSellingPrice || parseFloat(buybackSellingPrice) < 0 || barcodeConflict)) ||
               (isCashOut && purpose === 'expense' && !categoryId.trim() && !cashMovementNotes.trim()) ||
+              (isCashOut && purpose === 'supplier' && !supplierId.trim()) ||
               (isCashOut && purpose === 'none' && !cashMovementNotes.trim())
             }
             onClick={() => handleCashMovement(
@@ -317,7 +373,8 @@ export function CashMovementModal({
               isCashOut && purpose === 'expense',
               isCashOut && purpose === 'buyback'
                 ? { name: buybackName.trim(), selling_price: parseFloat(buybackSellingPrice), barcode: buybackBarcode.trim() || undefined }
-                : null
+                : null,
+              isCashOut && purpose === 'supplier' ? supplierId : null
             )}
           >
             {isCashOut ? 'Record Cash Out' : 'Add Cash'}

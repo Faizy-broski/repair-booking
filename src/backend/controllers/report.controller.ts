@@ -32,13 +32,14 @@ const cashMovementSchema = z.object({
   amount: z.number().positive(),
   payment_type: z.enum(['cash', 'card']).optional(),
   notes: z.string().optional(),
-  purpose: z.enum(['plain', 'expense', 'buyback']).optional(),
+  purpose: z.enum(['plain', 'expense', 'buyback', 'supplier']).optional(),
   expense_category_id: z.string().uuid().nullable().optional(),
   expense_title: z.string().optional(),
   buyback_product_id: z.string().uuid().optional(),
   buyback_name: z.string().optional(),
   buyback_selling_price: z.number().min(0).optional(),
   buyback_barcode: z.string().optional(),
+  supplier_id: z.string().uuid().nullable().optional(),
 })
 
 const savedReportSchema = z.object({
@@ -252,6 +253,7 @@ export const ReportController = {
         buybackName: parsed.data.buyback_name,
         buybackSellingPrice: parsed.data.buyback_selling_price,
         buybackBarcode: parsed.data.buyback_barcode,
+        supplierId: parsed.data.supplier_id,
       })
       return ok(data)
     } catch (err: any) {

@@ -704,10 +704,11 @@ export const ReportService = {
     sessionId: string; branchId: string; businessId: string
     cashierId: string; type: 'cash_in' | 'cash_out'
     amount: number; paymentType?: string; notes?: string
-    purpose?: 'plain' | 'expense' | 'buyback'
+    purpose?: 'plain' | 'expense' | 'buyback' | 'supplier'
     expenseCategoryId?: string | null; expenseTitle?: string | null
     buybackProductId?: string | null; buybackName?: string | null
     buybackSellingPrice?: number | null; buybackBarcode?: string | null
+    supplierId?: string | null
   }) {
     const { data, error } = await (adminSupabase as any).rpc('record_cash_movement', {
       p_session_id: payload.sessionId,
@@ -725,6 +726,7 @@ export const ReportService = {
       p_buyback_name: payload.buybackName ?? null,
       p_buyback_selling_price: payload.buybackSellingPrice ?? null,
       p_buyback_barcode: payload.buybackBarcode ?? null,
+      p_supplier_id: payload.supplierId ?? null,
     })
     if (error) throw error
     return data
