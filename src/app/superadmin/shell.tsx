@@ -8,7 +8,7 @@ import { SuperAdminNav } from './nav'
 
 function Sidebar({ onClose }: { onClose?: () => void }) {
   return (
-    <aside className="flex h-screen w-56 shrink-0 flex-col bg-sidebar-bg text-white">
+    <aside className="flex h-full w-56 shrink-0 flex-col bg-sidebar-bg text-white">
       {/* Brand */}
       <div className="flex h-16 shrink-0 items-center gap-3 border-b border-white/10 px-5">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-teal shadow-lg shadow-brand-teal/30">

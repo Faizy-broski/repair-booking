@@ -3237,7 +3237,7 @@ export default function RepairsPage() {
                     ) : 'No fault found / Price TBD'}
                   </span>
                 </label>}
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                   {/* Job Fee (labour) */}
                   <div>
                     <label className={lbl}>Job Fee (Labour)</label>
@@ -3343,61 +3343,6 @@ export default function RepairsPage() {
                     }`}>
                       {pricePending ? 'TBD' : `£${remaining.toFixed(2)}`}
                     </div>
-                  </div>
-                  <div>
-                    <div className="mb-0.5 flex items-center justify-between">
-                      <label className={`${lbl} !mb-0`}>{isTyreShop ? 'Fitter' : 'Assigned To'} <span className="font-normal normal-case text-outline-variant">(opt)</span></label>
-                      {isTyreShop && (
-                        <button
-                          type="button"
-                          onClick={() => setShowNewFitter((v) => !v)}
-                          title="Add a new fitter"
-                          className="flex items-center gap-0.5 rounded-full bg-brand-teal px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm hover:bg-brand-teal/90 transition-colors"
-                        >
-                          <Plus className="h-2.5 w-2.5" /> New
-                        </button>
-                      )}
-                    </div>
-                    {activeBranch && (
-                      <AsyncEmployeeSelect
-                        branchId={activeBranch.id}
-                        value={jobData.assigned_to ?? ''}
-                        onChange={(id) => setJobData((p) => ({ ...p, assigned_to: id }))}
-                        label=""
-                        placeholder="Search employee..."
-                        onCreateNew={isTyreShop ? createInstantFitter : undefined}
-                        createLabel="Add fitter"
-                        externalSelection={newFitterSelection}
-                      />
-                    )}
-                    {showNewFitter && (
-                      <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-low p-2">
-                        <input
-                          autoFocus
-                          type="text"
-                          value={newFitterName}
-                          onChange={(e) => setNewFitterName(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && submitNewFitter()}
-                          placeholder="Fitter name…"
-                          className="h-8 flex-1 rounded-md border border-outline bg-surface px-2 text-sm focus:border-brand-teal focus:outline-none"
-                        />
-                        <button
-                          type="button"
-                          onClick={submitNewFitter}
-                          disabled={!newFitterName.trim() || newFitterCreating}
-                          className="h-8 shrink-0 rounded-md bg-gray-900 px-3 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
-                        >
-                          {newFitterCreating ? 'Adding…' : 'Add'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setShowNewFitter(false); setNewFitterName('') }}
-                          className="h-8 w-8 shrink-0 rounded-md text-outline hover:bg-surface-container hover:text-on-surface-variant flex items-center justify-center"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    )}
                   </div>
                   {isTyreShop && (
                     <>
@@ -3563,6 +3508,64 @@ export default function RepairsPage() {
                     )
                   })()}
                   {paymentSplitError && <p className="mt-1 text-xs text-red-500">{paymentSplitError}</p>}
+                </div>
+
+                {/* Assigned To — moved out of the narrow 6-col grid above so the
+                    selected employee's full name/role isn't clipped. */}
+                <div className="mt-3 max-w-xs">
+                  <div className="mb-0.5 flex items-center justify-between">
+                    <label className={`${lbl} !mb-0`}>{isTyreShop ? 'Fitter' : 'Assigned To'} <span className="font-normal normal-case text-outline-variant">(opt)</span></label>
+                    {isTyreShop && (
+                      <button
+                        type="button"
+                        onClick={() => setShowNewFitter((v) => !v)}
+                        title="Add a new fitter"
+                        className="flex items-center gap-0.5 rounded-full bg-brand-teal px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm hover:bg-brand-teal/90 transition-colors"
+                      >
+                        <Plus className="h-2.5 w-2.5" /> New
+                      </button>
+                    )}
+                  </div>
+                  {activeBranch && (
+                    <AsyncEmployeeSelect
+                      branchId={activeBranch.id}
+                      value={jobData.assigned_to ?? ''}
+                      onChange={(id) => setJobData((p) => ({ ...p, assigned_to: id }))}
+                      label=""
+                      placeholder="Search employee..."
+                      onCreateNew={isTyreShop ? createInstantFitter : undefined}
+                      createLabel="Add fitter"
+                      externalSelection={newFitterSelection}
+                    />
+                  )}
+                  {showNewFitter && (
+                    <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-low p-2">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={newFitterName}
+                        onChange={(e) => setNewFitterName(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && submitNewFitter()}
+                        placeholder="Fitter name…"
+                        className="h-8 flex-1 rounded-md border border-outline bg-surface px-2 text-sm focus:border-brand-teal focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={submitNewFitter}
+                        disabled={!newFitterName.trim() || newFitterCreating}
+                        className="h-8 shrink-0 rounded-md bg-gray-900 px-3 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
+                      >
+                        {newFitterCreating ? 'Adding…' : 'Add'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowNewFitter(false); setNewFitterName('') }}
+                        className="h-8 w-8 shrink-0 rounded-md text-outline hover:bg-surface-container hover:text-on-surface-variant flex items-center justify-center"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 

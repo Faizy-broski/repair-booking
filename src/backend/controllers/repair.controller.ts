@@ -162,7 +162,10 @@ async function getRepairInvoiceData(repairId: string, branchId: string | null, b
     total:           invoiceTotal,
     amountPaid:      Number(r.deposit_paid ?? 0),
     paymentMethods:  aggregatePaymentMethods(r.repair_payments),
-    notes:           r.notes ?? null,
+    // Customer/staff notes live in custom_fields (repairs has no notes column) —
+    // see repairs/page.tsx's jobData.customer_note/staff_note submit payload.
+    notes:           (cf.customer_note as string | null) ?? null,
+    customerNote:    (cf.customer_note as string | null) ?? null,
     currency:        businessRow?.currency ?? 'GBP',
     jobNumber:       r.job_number as string,
   }
@@ -260,13 +263,16 @@ async function getRepairSlipData(repairId: string, branchId: string | null, busi
     branchPhone:    branchRow?.phone ?? null,
     customerName,
     deviceLabel,
+    deviceImei:     r.serial_number || null,
     faults,
-    dueDate:        r.due_date ?? null,
+    // due_date lives in custom_fields — the repairs table has no due_date column.
+    dueDate:        (cf.due_date as string) ?? null,
     createdAt:      r.created_at as string,
     totalRepairCharges,
     deposit,
     remaining,
     paymentMethods: aggregatePaymentMethods(r.repair_payments),
+    customerNote:   (cf.customer_note as string | null) ?? null,
   }
 }
 

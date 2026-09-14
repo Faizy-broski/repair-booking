@@ -63,6 +63,7 @@ interface Props {
   deviceName?: string
   deviceImei?: string
   faults?: string
+  customerNote?: string | null
   items: Array<{ description: string; quantity: number; unit_price: number; discount?: number }>
   subtotal: number
   discount?: number
@@ -98,7 +99,7 @@ function visibleItems<T extends { description: string }>(items: T[], settings: I
 
 export function RepairReceiptHtml({
   settings, invoiceNumber, status, issuedAt, dueAt,
-  businessName, branchName, branchAddress, branchPhone, customerName, deviceName, deviceImei, faults,
+  businessName, branchName, branchAddress, branchPhone, customerName, deviceName, deviceImei, faults, customerNote,
   items, subtotal, discount = 0, tax = 0, total, amountPaid = 0, paymentMethods, currency = 'GBP',
 }: Props) {
   const pc      = settings.primary_color ?? '#0f766e'
@@ -207,8 +208,11 @@ export function RepairReceiptHtml({
           {deviceName && (
             <div style={{ marginBottom: '4px', fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase' }}>{deviceName}</div>
           )}
-          <div style={{ marginBottom: '4px' }}><span style={s.lbl}>Serial No.: </span><span style={{fontWeight: 'bold', wordBreak: 'break-all'}}>{deviceImei || 'N/A'}</span></div>
-          <div style={{ marginBottom: '6px' }}><span style={s.lbl}>Faults: </span><span style={{fontWeight: 'bold'}}>{faults || 'N/A'}</span></div>
+          <div style={{ marginBottom: '4px' }}><span style={s.lbl}>IMEI Number: </span><span style={{fontWeight: 'bold', wordBreak: 'break-all'}}>{deviceImei || 'N/A'}</span></div>
+          <div style={{ marginBottom: customerNote ? '4px' : '6px' }}><span style={s.lbl}>Faults: </span><span style={{fontWeight: 'bold'}}>{faults || 'N/A'}</span></div>
+          {customerNote && (
+            <div style={{ marginBottom: '6px' }}><span style={s.lbl}>Customer Note: </span><span style={{fontWeight: 'bold', wordBreak: 'break-word'}}>{customerNote}</span></div>
+          )}
 
           <div style={{ borderBottom: '1px dashed #000', margin: '6px 0' }} />
 

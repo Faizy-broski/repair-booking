@@ -21,12 +21,14 @@ interface SlipData {
   branchPhone: string | null
   customerName: string
   deviceLabel: string
+  deviceImei: string | null
   faults: string[]
   dueDate: string | null
   createdAt: string
   totalRepairCharges: number
   deposit: number
   remaining: number
+  customerNote: string | null
 }
 
 // Paper sizes that print through the HTML popup path (thermal roll printers)
@@ -127,7 +129,9 @@ export function RepairSlipModal({ repair, onClose }: Props) {
               <div><strong>Ticket ID:</strong> T-{data.jobNumber}</div>
               <div><strong>Customer:</strong> {data.customerName}</div>
               <div><strong>Device:</strong> {data.deviceLabel}</div>
+              <div><strong>IMEI Number:</strong> {data.deviceImei || 'N/A'}</div>
               {data.faults.length > 0 && <div><strong>Faults:</strong> {data.faults.join(', ')}</div>}
+              {data.customerNote && <div><strong>Customer Note:</strong> {data.customerNote}</div>}
               <hr style={{ borderTop: '1px solid #000', margin: '4px 0' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><strong>Repair Charges:</strong></span><span>£{data.totalRepairCharges.toFixed(2)}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span><strong>Deposit:</strong></span><span>£{data.deposit.toFixed(2)}</span></div>

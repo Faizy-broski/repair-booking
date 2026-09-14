@@ -292,7 +292,7 @@ ${isRepairReceipt ? `
   </div>
   <div style="padding:6px;">
     ${deviceName ? `<div style="margin-bottom:4px; font-weight:bold; font-size:11px; text-transform:uppercase;">${esc(deviceName)}</div>` : ''}
-    <div style="margin-bottom:4px;"><span class="lbl">Serial No.: </span><span style="font-weight:bold; word-break:break-all;">${esc(deviceImei || 'N/A')}</span></div>
+    <div style="margin-bottom:4px;"><span class="lbl">IMEI Number: </span><span style="font-weight:bold; word-break:break-all;">${esc(deviceImei || 'N/A')}</span></div>
     <div style="margin-bottom:6px;"><span class="lbl">Faults: </span><span style="font-weight:bold;">${esc(faults || 'N/A')}</span></div>
 
     <div style="border-bottom:1px dashed #000; margin:6px 0;"></div>
@@ -626,6 +626,7 @@ export interface SlipPrintData {
   branchPhone?: string | null
   customerName?: string
   deviceLabel?: string
+  deviceImei?: string | null
   faults?: string[]
   dueDate?: string | null
   createdAt?: string
@@ -633,6 +634,7 @@ export interface SlipPrintData {
   deposit?: number
   remaining?: number
   paymentMethods?: Array<{ method: string; amount: number }>
+  customerNote?: string | null
 }
 
 function buildSlipHtml(d: SlipPrintData): string {
@@ -708,7 +710,9 @@ function buildSlipHtml(d: SlipPrintData): string {
   <div><strong>Ticket ID:</strong> T-${esc(d.jobNumber)}</div>
   <div><strong>Customer:</strong> ${esc(d.customerName)}</div>
   <div><strong>Make and Model:</strong> ${esc(d.deviceLabel)}</div>
+  <div><strong>IMEI Number:</strong> <span style="font-weight:bold;">${esc(d.deviceImei) || 'N/A'}</span></div>
   <div><strong>Faults:</strong> <span style="font-weight:bold;">${faultsText}</span></div>
+  ${d.customerNote ? `<div><strong>Customer Note:</strong> <span style="font-weight:bold;">${esc(d.customerNote)}</span></div>` : ''}
 </div>
 <div class="summary">
   <div class="sumrow"><span>Repair Charges:</span><span>£${(d.totalRepairCharges ?? 0).toFixed(2)}</span></div>

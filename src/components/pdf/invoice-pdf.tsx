@@ -74,6 +74,10 @@ function calcReceiptPageHeight(opts: {
   policyText: string | null | undefined
   pageWidth: number
   showFinalAmountOnly?: boolean
+  deviceName?: string
+  deviceImei?: string
+  faults?: string
+  customerNote?: string | null
 }): number {
   let h = 20 // page padding top (10) + bottom (10)
 
@@ -89,6 +93,13 @@ function calcReceiptPageHeight(opts: {
   h += 13 // date row
   h += 13 // customer row
   h += 13 // status row
+
+  // Device details (name / IMEI / faults) + customer note block, repair invoices only
+  const footerCharsPerLineForDevice = opts.pageWidth < 200 ? 22 : 30
+  if (opts.deviceName)  h += 13
+  if (opts.deviceImei)  h += 13
+  if (opts.faults)      h += Math.max(1, Math.ceil((opts.faults.length) / footerCharsPerLineForDevice)) * 11 + 2
+  if (opts.customerNote) h += Math.max(1, Math.ceil(opts.customerNote.length / footerCharsPerLineForDevice)) * 11 + 4
 
   h += 14 // second divider
   let itemsHeight = 0
@@ -170,6 +181,10 @@ export interface InvoicePdfProps {
   customerEmail?: string | null
   customerPhone?: string | null
   customerAddress?: string | null
+  // Repair-only device details — undefined/omitted for regular sales invoices.
+  deviceName?: string
+  deviceImei?: string
+  faults?: string
   items: InvoiceLineItem[]
   subtotal: number
   discount?: number
@@ -178,6 +193,7 @@ export interface InvoicePdfProps {
   amountPaid?: number
   paymentMethods?: Array<{ method: string; amount: number }>
   notes?: string | null
+  customerNote?: string | null
   currency?: string
 }
 
@@ -188,8 +204,9 @@ export function InvoicePdf(props: InvoicePdfProps) {
     settings, invoiceNumber, status, issuedAt, dueAt,
     businessName, branchName, branchAddress, branchPhone, branchEmail,
     customerName, customerEmail, customerPhone, customerAddress,
+    deviceName, deviceImei, faults,
     items, subtotal, discount = 0, tax, total, amountPaid = 0, paymentMethods,
-    notes, currency = 'GBP',
+    notes, customerNote, currency = 'GBP',
   } = props
 
   const isReceipt = settings.paper_size === 'Receipt80' || settings.paper_size === 'Receipt58'
@@ -323,6 +340,12 @@ export function InvoicePdf(props: InvoicePdfProps) {
     paidBadge: { width: 220, backgroundColor: '#10b981', borderRadius: 6, paddingHorizontal: 14, paddingVertical: 9, marginTop: 5 },
     paidBadgeText: { fontSize: 11, fontFamily: bold, color: '#ffffff', textAlign: 'center' },
 
+    // ── Device details (repair invoices only) ──
+    deviceSection: { flexDirection: 'row', backgroundColor: sc, marginHorizontal: 40, marginTop: 14, borderRadius: 6, paddingHorizontal: 16, paddingVertical: 10 },
+    deviceBlock: { flex: 1, marginRight: 16 },
+    deviceLabel: { fontSize: 7.5, fontFamily: bold, color: pc, marginBottom: 3 },
+    deviceValue: { fontSize: 9, color: tc },
+
     // ── Notes ──
     notesSection: { marginHorizontal: 40, marginTop: 18 },
     notesLabel: { fontSize: 8, fontFamily: bold, color: pc, marginBottom: 4 },
@@ -439,6 +462,24 @@ export function InvoicePdf(props: InvoicePdfProps) {
           </View>
         </View>
 
+        {/* ── Device details (repair invoices only) ── */}
+        {(deviceName || deviceImei || faults) && (
+          <View style={s.deviceSection}>
+            <View style={s.deviceBlock}>
+              <Text style={s.deviceLabel}>DEVICE</Text>
+              <Text style={s.deviceValue}>{deviceName || '—'}</Text>
+            </View>
+            <View style={s.deviceBlock}>
+              <Text style={s.deviceLabel}>IMEI NUMBER</Text>
+              <Text style={s.deviceValue}>{deviceImei || 'N/A'}</Text>
+            </View>
+            <View style={[s.deviceBlock, { marginRight: 0 }]}>
+              <Text style={s.deviceLabel}>FAULTS</Text>
+              <Text style={s.deviceValue}>{faults || 'N/A'}</Text>
+            </View>
+          </View>
+        )}
+
         {/* ── Line items table ── */}
         <View style={s.table}>
           <View style={s.tableHeader}>
@@ -523,10 +564,10 @@ export function InvoicePdf(props: InvoicePdfProps) {
         </View>
 
         {/* ── Notes ── */}
-        {notes && (
+        {(customerNote || notes) && (
           <View style={s.notesSection}>
             <Text style={s.notesLabel}>NOTES</Text>
-            <Text style={s.notesText}>{notes}</Text>
+            <Text style={s.notesText}>{customerNote || notes}</Text>
           </View>
         )}
 
@@ -564,7 +605,7 @@ export function InvoicePdf(props: InvoicePdfProps) {
 function ReceiptPdf({
   settings, invoiceNumber, status, issuedAt,
   businessName, branchName, branchAddress, branchPhone,
-  customerName,
+  customerName, deviceName, deviceImei, faults, customerNote,
   items, subtotal, discount = 0, tax, total, amountPaid = 0, paymentMethods,
   family, bold, fmt, socialEntries,
 }: InvoicePdfProps & {
@@ -609,6 +650,10 @@ function ReceiptPdf({
     policyText:       settings.policy_text_repair,
     pageWidth,
     showFinalAmountOnly: settings.show_final_amount_only,
+    deviceName,
+    deviceImei,
+    faults,
+    customerNote,
   })
 
   const s = StyleSheet.create({
@@ -639,6 +684,12 @@ function ReceiptPdf({
     thankYou: { fontSize: 8, fontFamily: bold, color: '#000000', textAlign: 'center', marginTop: 6 },
     footerText: { fontSize: 8, color: '#000000', textAlign: 'center', marginTop: 1.5 },
     policy: { fontSize: 7, color: '#000000', textAlign: 'center', marginTop: 5, borderTop: '0.5 solid #e5e7eb', paddingTop: 4 },
+    deviceRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
+    deviceLabel: { fontSize: 7.5, color: '#6b7280', flex: 1 },
+    deviceValue: { fontSize: 7.5, color: '#000000', fontFamily: bold, textAlign: 'right', flexShrink: 0, maxWidth: '65%' },
+    noteBlock: { marginBottom: 2 },
+    noteLabel: { fontSize: 7.5, color: '#6b7280' },
+    noteValue: { fontSize: 7.5, color: '#000000', fontFamily: bold },
   })
 
   return (
@@ -666,6 +717,36 @@ function ReceiptPdf({
           <Text style={s.dateLabel}>Status</Text>
           <Text style={[s.dateValue, { color: '#000000', fontFamily: bold }]}>{status}</Text>
         </View>
+
+        {(deviceName || deviceImei || faults) && (
+          <>
+            <View style={s.divider} />
+            {deviceName && (
+              <View style={s.deviceRow}>
+                <Text style={s.deviceLabel}>Device</Text>
+                <Text style={s.deviceValue}>{deviceName}</Text>
+              </View>
+            )}
+            {deviceImei && (
+              <View style={s.deviceRow}>
+                <Text style={s.deviceLabel}>IMEI Number</Text>
+                <Text style={s.deviceValue}>{deviceImei}</Text>
+              </View>
+            )}
+            {faults && (
+              <View style={s.deviceRow}>
+                <Text style={s.deviceLabel}>Faults</Text>
+                <Text style={s.deviceValue}>{faults}</Text>
+              </View>
+            )}
+          </>
+        )}
+        {customerNote && (
+          <View style={s.noteBlock}>
+            <Text style={s.noteLabel}>Customer Note</Text>
+            <Text style={s.noteValue}>{customerNote}</Text>
+          </View>
+        )}
 
         <View style={s.divider} />
         {visibleItems(items, settings).map((item, i) => {

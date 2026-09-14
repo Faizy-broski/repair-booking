@@ -151,12 +151,12 @@ export function AsyncEmployeeSelect({
       )}
 
       {selected ? (
-        <div className="flex h-9 items-center justify-between rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface">
-          <span>
+        <div className="flex h-9 items-center justify-between overflow-hidden rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface">
+          <span className="min-w-0 truncate whitespace-nowrap">
             {selected.first_name} {selected.last_name ?? ''}
             {selected.role ? <span className="ml-1.5 text-xs text-on-surface-variant">· {selected.role}</span> : null}
           </span>
-          <button type="button" onClick={clear} className="ml-2 text-on-surface-variant hover:text-on-surface transition-colors">
+          <button type="button" onClick={clear} className="ml-2 shrink-0 text-on-surface-variant hover:text-on-surface transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -197,12 +197,12 @@ export function AsyncEmployeeSelect({
                 type="button"
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => selectEmployee(emp)}
-                className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-surface-container-low transition-colors"
+                className="flex w-full items-center gap-1.5 overflow-hidden px-3 py-2.5 text-left text-sm hover:bg-surface-container-low transition-colors"
               >
-                <span className="font-medium text-on-surface">
+                <span className="min-w-0 truncate whitespace-nowrap font-medium text-on-surface">
                   {emp.first_name} {emp.last_name ?? ''}
                 </span>
-                {emp.role && <span className="text-xs text-on-surface-variant capitalize">· {emp.role.replace(/_/g, ' ')}</span>}
+                {emp.role && <span className="shrink-0 text-xs text-on-surface-variant capitalize">· {emp.role.replace(/_/g, ' ')}</span>}
               </button>
             ))
           )}
