@@ -32,6 +32,7 @@ const EMPTY_DETAILS: RepairDetailsForm = {
   lock_type: '', passcode: '',
   payment_methods: [], payment_amounts: { cash: '', card: '' }, credit_apply_input: '', loyalty_apply_input: '',
   is_rush: false, physical_location: '', task_type: 'In-Store', device_network: '',
+  customer_note: '', staff_note: '',
 }
 
 const inp = 'h-10 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm focus:border-brand-teal focus:outline-none'
@@ -445,6 +446,8 @@ export function RepairsTab() {
           physical_location: repairDetails.physical_location || null,
           task_type: repairDetails.task_type || null,
           device_network: repairDetails.device_network || null,
+          customer_note: repairDetails.customer_note || null,
+          staff_note: repairDetails.staff_note || null,
           price_pending: repairDetails.price_pending || undefined,
           payment_method: repairDetails.payment_methods.length === 1
             ? repairDetails.payment_methods[0]
@@ -1088,6 +1091,28 @@ export function RepairsTab() {
                 className="h-4 w-4 rounded border-outline text-brand-teal"
               />
               <label htmlFor="rush_job" className="text-sm font-medium text-on-surface-variant">Mark as Rush Job</label>
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className={lbl}>Customer Note <span className="font-normal normal-case text-outline-variant">(shown on invoice)</span></label>
+                <textarea
+                  rows={2}
+                  value={repairDetails.customer_note}
+                  onChange={(e) => setRepairDetails(d => ({ ...d, customer_note: e.target.value }))}
+                  placeholder="Visible to customer…"
+                  className="w-full resize-none rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface placeholder:text-outline transition focus:border-brand-teal focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className={lbl}>Staff Note <span className="font-normal normal-case text-outline-variant">(internal only)</span></label>
+                <textarea
+                  rows={2}
+                  value={repairDetails.staff_note}
+                  onChange={(e) => setRepairDetails(d => ({ ...d, staff_note: e.target.value }))}
+                  placeholder="Internal only…"
+                  className="w-full resize-none rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface placeholder:text-outline transition focus:border-brand-teal focus:outline-none"
+                />
+              </div>
             </div>
           </div>
 

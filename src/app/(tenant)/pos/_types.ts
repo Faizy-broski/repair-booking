@@ -127,6 +127,8 @@ export interface RepairDetailsForm {
   physical_location: string
   task_type: string
   device_network: string
+  customer_note: string
+  staff_note: string
 }
 
 // ── Shared constants ───────────────────────────────────────────────────────────

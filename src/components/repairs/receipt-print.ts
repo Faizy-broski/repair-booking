@@ -64,6 +64,7 @@ export interface ReceiptPrintData {
   deviceName?: string
   deviceImei?: string
   faults?: string
+  customerNote?: string | null
   items: Array<{ description: string; quantity: number; unit_price: number; discount?: number; original_unit_price?: number | null }>
   subtotal: number
   discount?: number
@@ -82,7 +83,7 @@ export interface ReceiptPrintData {
 function buildHtml(d: ReceiptPrintData, debugMode = false): string {
   const {
     settings, invoiceNumber, status, issuedAt, dueAt,
-    businessName, branchName, branchAddress, branchPhone, customerName, deviceName, deviceImei, faults,
+    businessName, branchName, branchAddress, branchPhone, customerName, deviceName, deviceImei, faults, customerNote,
     items, subtotal, discount = 0, tax = 0, total, amountPaid = 0, paymentMethods, currency = 'GBP',
   } = d
 
@@ -293,7 +294,8 @@ ${isRepairReceipt ? `
   <div style="padding:6px;">
     ${deviceName ? `<div style="margin-bottom:4px; font-weight:bold; font-size:11px; text-transform:uppercase;">${esc(deviceName)}</div>` : ''}
     <div style="margin-bottom:4px;"><span class="lbl">IMEI Number: </span><span style="font-weight:bold; word-break:break-all;">${esc(deviceImei || 'N/A')}</span></div>
-    <div style="margin-bottom:6px;"><span class="lbl">Faults: </span><span style="font-weight:bold;">${esc(faults || 'N/A')}</span></div>
+    <div style="margin-bottom:${customerNote ? '4px' : '6px'};"><span class="lbl">Faults: </span><span style="font-weight:bold;">${esc(faults || 'N/A')}</span></div>
+    ${customerNote ? `<div style="margin-bottom:6px;"><span class="lbl">Customer Note: </span><span style="font-weight:bold; word-break:break-word;">${esc(customerNote)}</span></div>` : ''}
 
     <div style="border-bottom:1px dashed #000; margin:6px 0;"></div>
 
