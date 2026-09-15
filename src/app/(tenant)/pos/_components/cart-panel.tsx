@@ -126,6 +126,10 @@ export function CartPanel({ mobileView }: Props) {
   const [commissionAmount, setCommissionAmount] = useState('')
   const [commissionType, setCommissionType] = useState<'flat' | 'percentage'>('flat')
 
+  // ── Customer note (shown on receipt) ───────────────────────────────────────
+  const [customerNote, setCustomerNote] = useState('')
+  const [noteExpanded, setNoteExpanded] = useState(false)
+
   const { data: invoiceSettings = null } = useQuery({
     queryKey: ['invoice-settings', activeBranch?.id],
     queryFn: async () => {
@@ -286,6 +290,7 @@ export function CartPanel({ mobileView }: Props) {
     paymentStatus?: string,
     amountPaid?: number,
     invoiceNumber?: string | null,
+    notes?: string | null,
   ) {
     const displayInvoiceNumber = invoiceNumber ?? `#${saleId.slice(-8).toUpperCase()}`
     const customerName = pos.customer
@@ -327,6 +332,7 @@ export function CartPanel({ mobileView }: Props) {
           ? paymentSplits.map(s => ({ method: s.method, amount: s.amount }))
           : [{ method: paymentMethod, amount: amountPaid ?? total }],
         currency,
+        customerNote: notes ?? null,
       }
       printThermalReceipt(data, preWin)
       return
@@ -364,6 +370,7 @@ export function CartPanel({ mobileView }: Props) {
           currency={currency}
           taxRate={pos.taxRate > 0 ? pos.taxRate : undefined}
           settings={invoiceSettings ?? undefined}
+          notes={notes}
         />
       ).toBlob()
       const url = URL.createObjectURL(blob)
@@ -407,6 +414,7 @@ export function CartPanel({ mobileView }: Props) {
       served_by_employee_id: servedByEmployeeId || null,
       commission_amount: servedByEmployeeId && commissionAmount ? parseFloat(commissionAmount) : null,
       commission_type: servedByEmployeeId && commissionAmount ? commissionType : null,
+      notes: customerNote.trim() || null,
       items: pos.cart.map(item => ({
         product_id: (item.product as any).repair_id ? null : item.product.id,
         repair_id: (item.product as any).repair_id ?? null,
@@ -433,6 +441,7 @@ export function CartPanel({ mobileView }: Props) {
     if (res.ok) {
       const saleJson = await res.json()
       setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
+      setCustomerNote(''); setNoteExpanded(false)
       queryClient.invalidateQueries({ queryKey: ['sales'] })
       queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
       // Refresh the product grid so stock/discount status (e.g. a discount
@@ -440,7 +449,7 @@ export function CartPanel({ mobileView }: Props) {
       // page refresh.
       queryClient.invalidateQueries({ queryKey: ['pos-products'] })
       queryClient.invalidateQueries({ queryKey: ['pos-variants'] })
-      await printReceipt(saleJson.data?.sale_id ?? 'unknown', paymentMethod, receiptItems, preWin, paymentSplits, undefined, undefined, saleJson.data?.invoice_number)
+      await printReceipt(saleJson.data?.sale_id ?? 'unknown', paymentMethod, receiptItems, preWin, paymentSplits, undefined, undefined, saleJson.data?.invoice_number, customerNote.trim() || null)
       setTimeout(() => { setSuccess(false); setPaymentOpen(false) }, 2500)
     } else {
       // Rollback: restore cart and hide success screen
@@ -451,6 +460,7 @@ export function CartPanel({ mobileView }: Props) {
       const msg = errJson?.error?.message ?? errJson?.message ?? 'Payment failed. Please try again.'
       toast.error(msg)
       setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
+      setCustomerNote(''); setNoteExpanded(false)
     }
     setProcessing(false)
   }
@@ -498,6 +508,7 @@ export function CartPanel({ mobileView }: Props) {
         served_by_employee_id: servedByEmployeeId || null,
         commission_amount: servedByEmployeeId && commissionAmount ? parseFloat(commissionAmount) : null,
         commission_type: servedByEmployeeId && commissionAmount ? commissionType : null,
+        notes: customerNote.trim() || null,
         items: itemsPayload,
       }),
     })
@@ -505,6 +516,7 @@ export function CartPanel({ mobileView }: Props) {
     if (res.ok) {
       const saleJson = await res.json()
       setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
+      setCustomerNote(''); setNoteExpanded(false)
       queryClient.invalidateQueries({ queryKey: ['sales'] })
       queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
       // Refresh the product grid so stock/discount status (e.g. a discount
@@ -512,7 +524,7 @@ export function CartPanel({ mobileView }: Props) {
       // page refresh.
       queryClient.invalidateQueries({ queryKey: ['pos-products'] })
       queryClient.invalidateQueries({ queryKey: ['pos-variants'] })
-      await printReceipt(saleJson.data?.sale_id ?? 'unknown', method, receiptItemsCash, preWinCash, undefined, undefined, undefined, saleJson.data?.invoice_number)
+      await printReceipt(saleJson.data?.sale_id ?? 'unknown', method, receiptItemsCash, preWinCash, undefined, undefined, undefined, saleJson.data?.invoice_number, customerNote.trim() || null)
       setTimeout(() => setSuccess(false), 2500)
     } else {
       // Rollback: restore cart and hide success screen
@@ -523,6 +535,7 @@ export function CartPanel({ mobileView }: Props) {
       const msg = errJson?.error?.message ?? errJson?.message ?? 'Payment failed. Please try again.'
       toast.error(msg)
       setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
+      setCustomerNote(''); setNoteExpanded(false)
     }
     setProcessing(false)
   }
@@ -599,6 +612,7 @@ export function CartPanel({ mobileView }: Props) {
         served_by_employee_id: servedByEmployeeId || null,
         commission_amount: servedByEmployeeId && commissionAmount ? parseFloat(commissionAmount) : null,
         commission_type: servedByEmployeeId && commissionAmount ? commissionType : null,
+        notes: customerNote.trim() || null,
         items: itemsPayload,
       }),
     })
@@ -606,6 +620,7 @@ export function CartPanel({ mobileView }: Props) {
     if (res.ok) {
       const saleJson = await res.json()
       setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
+      setCustomerNote(''); setNoteExpanded(false)
       queryClient.invalidateQueries({ queryKey: ['sales'] })
       queryClient.invalidateQueries({ queryKey: ['sales-stats'] })
       // Refresh the product grid so stock/discount status (e.g. a discount
@@ -616,7 +631,7 @@ export function CartPanel({ mobileView }: Props) {
       queryClient.invalidateQueries({ queryKey: ['credits'] })
       const creditStatus  = deposit <= 0 ? 'on_account' : deposit >= total ? 'paid' : 'partial'
       const depositSplits = deposit > 0 ? [{ method: creditDepositMethod as PaymentSplit['method'], amount: deposit }] : undefined
-      await printReceipt(saleJson.data?.sale_id ?? 'unknown', 'on_account', receiptItemsCredit, preWinCredit, depositSplits, creditStatus, deposit, saleJson.data?.invoice_number)
+      await printReceipt(saleJson.data?.sale_id ?? 'unknown', 'on_account', receiptItemsCredit, preWinCredit, depositSplits, creditStatus, deposit, saleJson.data?.invoice_number, customerNote.trim() || null)
       setTimeout(() => { setSuccess(false) }, 2500)
     } else {
       preWinCredit?.close()
@@ -626,6 +641,7 @@ export function CartPanel({ mobileView }: Props) {
       const errJson = await res.json().catch(() => ({}))
       toast.error(errJson?.error?.message ?? 'Payment failed. Please try again.')
       setServedByEmployeeId(''); setCommissionAmount(''); setCommissionType('flat')
+      setCustomerNote(''); setNoteExpanded(false)
     }
     setProcessing(false)
   }
@@ -1001,6 +1017,40 @@ export function CartPanel({ mobileView }: Props) {
             )}
           </div>
         )}
+
+        {/* Customer note (shown on receipt, collapsed by default) */}
+        <div className="border-t border-outline-variant bg-surface px-4 py-2 space-y-2">
+          {noteExpanded || customerNote ? (
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="block text-sm font-medium text-on-surface-variant">
+                  Customer Note <span className="font-normal text-xs text-outline-variant">(shown on receipt)</span>
+                </label>
+                {!customerNote && (
+                  <button type="button" onClick={() => setNoteExpanded(false)} className="text-xs text-outline-variant hover:text-on-surface-variant">
+                    Cancel
+                  </button>
+                )}
+              </div>
+              <textarea
+                autoFocus={noteExpanded && !customerNote}
+                rows={2}
+                value={customerNote}
+                onChange={e => setCustomerNote(e.target.value)}
+                placeholder="Visible to customer…"
+                className="w-full resize-none rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface placeholder:text-outline transition focus:border-brand-teal focus:outline-none"
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setNoteExpanded(true)}
+              className="flex items-center gap-1 text-sm font-medium text-brand-teal hover:text-brand-teal-dark transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add customer note
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Payment buttons — this business gets its own row at the top instead (see above) */}

@@ -62,7 +62,7 @@ export interface ReceiptPrintData {
   branchPhone?: string | null
   customerName: string
   deviceName?: string
-  deviceImei?: string
+  deviceImei?: string | null
   faults?: string
   customerNote?: string | null
   items: Array<{ description: string; quantity: number; unit_price: number; discount?: number; original_unit_price?: number | null }>
@@ -343,6 +343,7 @@ ${L(settings.show_tax_breakdown && tax > 0, `<div class="tr"><span class="tl">Ta
 <div class="tr"><span class="tl">Amount Paid</span><span class="tv">${money(amountPaid, currency)}</span></div>
 ${L(!!paymentMethods?.length, `<div class="tr"><span class="tl">Payment Method</span><span class="tv">${esc(paymentMethodText(paymentMethods, currency))}</span></div>`)}
 ${L(bal > 0, `<div class="bar"><span class="bl">Balance Due</span><span class="bv">${money(bal, currency)}</span></div>`)}
+${L(customerNote, `<hr><div style="margin-bottom:5px;"><span class="lbl">Customer Note: </span><span style="font-weight:bold; word-break:break-word;">${esc(customerNote)}</span></div>`)}
 `}
 <div class="ft">
   <hr>
