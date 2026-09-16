@@ -45,10 +45,11 @@ export default function DamageReturnDetailPage({ params }: { params: Promise<{ i
   const [shipping, setShipping] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [resolveOpen, setResolveOpen] = useState(false)
-  const [resolutionType, setResolutionType] = useState<'replacement' | 'credit' | 'refund'>('replacement')
+  const [resolutionType, setResolutionType] = useState<'replacement' | 'credit' | 'refund'>('credit')
   const [resolutionAmount, setResolutionAmount] = useState('')
   const [resolutionNote, setResolutionNote] = useState('')
   const [resolving, setResolving] = useState(false)
+  const [showOtherTypes, setShowOtherTypes] = useState(false)
 
   async function fetchReturn() {
     setLoading(true)
@@ -103,9 +104,10 @@ export default function DamageReturnDetailPage({ params }: { params: Promise<{ i
   }
 
   function openResolve() {
-    setResolutionType('replacement')
-    setResolutionAmount('')
+    setResolutionType('credit')
+    setResolutionAmount(ret ? String(ret.total_value) : '')
     setResolutionNote('')
+    setShowOtherTypes(false)
     setResolveOpen(true)
   }
 
@@ -271,24 +273,41 @@ export default function DamageReturnDetailPage({ params }: { params: Promise<{ i
       <Modal open={resolveOpen} onClose={() => setResolveOpen(false)} title="Resolve Return" size="sm">
         <div className="space-y-4">
           <p className="text-sm text-on-surface-variant">How did the supplier make this right?</p>
-          <div className="space-y-2">
-            {(['replacement', 'credit', 'refund'] as const).map((type) => (
-              <label
-                key={type}
-                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer transition-colors ${
-                  resolutionType === type ? 'border-brand-teal bg-brand-teal-light/10' : 'border-outline-variant'
-                }`}
+
+          {!showOtherTypes ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 rounded-lg border border-brand-teal bg-brand-teal-light/10 px-3 py-2 text-sm">
+                <input type="radio" checked readOnly />
+                <span className="font-medium text-on-surface">Credit</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowOtherTypes(true)}
+                className="text-xs text-brand-teal hover:underline"
               >
-                <input
-                  type="radio"
-                  name="resolution_type"
-                  checked={resolutionType === type}
-                  onChange={() => setResolutionType(type)}
-                />
-                <span className="capitalize font-medium text-on-surface">{type}</span>
-              </label>
-            ))}
-          </div>
+                Supplier replaced or refunded instead?
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {(['replacement', 'credit', 'refund'] as const).map((type) => (
+                <label
+                  key={type}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer transition-colors ${
+                    resolutionType === type ? 'border-brand-teal bg-brand-teal-light/10' : 'border-outline-variant'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="resolution_type"
+                    checked={resolutionType === type}
+                    onChange={() => setResolutionType(type)}
+                  />
+                  <span className="capitalize font-medium text-on-surface">{type}</span>
+                </label>
+              ))}
+            </div>
+          )}
 
           {resolutionType !== 'replacement' && (
             <div>
