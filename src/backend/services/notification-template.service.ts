@@ -132,14 +132,11 @@ export const NotificationTemplateService = {
   },
 
   async seedForBusiness(businessId: string) {
-    const { error } = await db('notification_templates').rpc('seed_notification_templates', {
+    const { error } = await (adminSupabase as any).rpc('seed_notification_templates', {
       p_business_id: businessId,
     })
-    // Fallback: if rpc doesn't work, the function can be called via raw SQL
-    if (error) {
-      const supabase = adminSupabase
-      await (supabase as any).rpc('seed_notification_templates', { p_business_id: businessId })
-    }
+    // Non-fatal: registration must not fail (and orphan a tenant) over template seeding
+    if (error) console.error('[notification-template] seedForBusiness failed:', error)
   },
 
   // ── Notification Log ──────────────────────────────────────────────────────
