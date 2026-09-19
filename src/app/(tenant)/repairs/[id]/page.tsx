@@ -114,6 +114,10 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({})
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false)
   const [slipOpen, setSlipOpen] = useState(false)
+  const [editingNotes, setEditingNotes] = useState(false)
+  const [customerNoteDraft, setCustomerNoteDraft] = useState('')
+  const [staffNoteDraft, setStaffNoteDraft] = useState('')
+  const [savingNotes, setSavingNotes] = useState(false)
 
   // ── Main repair data ──────────────────────────────────────────────────────────
   const { data: repair, isLoading: loading } = useQuery<RepairDetail | null>({
@@ -132,6 +136,8 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
       setNewStatus(repair.status)
       setLabelIds(repair.label_ids ?? [])
       setCustomFieldValues((repair.custom_fields as Record<string, unknown>) ?? {})
+      setCustomerNoteDraft((repair.custom_fields?.customer_note as string | null) ?? '')
+      setStaffNoteDraft((repair.custom_fields?.staff_note as string | null) ?? '')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repair?.id])
@@ -210,6 +216,34 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
       body: JSON.stringify({ custom_fields: values }),
     })
     if (!res.ok) setCustomFieldValues(prev)  // rollback on failure
+  }
+
+  // Customer/staff notes live in custom_fields.customer_note / .staff_note (this is what
+  // the repair receipt/invoice templates read) — merge onto the existing blob so we don't
+  // clobber due_date/payment_method/other custom fields stored alongside them.
+  async function saveNotes() {
+    if (!repair) return
+    setSavingNotes(true)
+    try {
+      const res = await fetch(`/api/repairs/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          custom_fields: {
+            ...(repair.custom_fields ?? {}),
+            customer_note: customerNoteDraft || null,
+            staff_note: staffNoteDraft || null,
+          },
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to save notes')
+      await queryClient.invalidateQueries({ queryKey: ['repair-detail', id] })
+      setEditingNotes(false)
+    } catch {
+      toast.error('Failed to save notes.')
+    } finally {
+      setSavingNotes(false)
+    }
   }
 
   async function assignTechnician(employeeId: string | null) {
@@ -509,25 +543,71 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
         </Card>
 
         {/* Notes */}
-        {(repair.custom_fields?.customer_note || repair.custom_fields?.staff_note) && (
-          <Card>
-            <CardHeader><CardTitle className="text-sm">Notes</CardTitle></CardHeader>
-            <CardContent className="space-y-4 text-sm">
-              {repair.custom_fields?.customer_note && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-sm">Notes</CardTitle>
+            {!editingNotes && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomerNoteDraft((repair.custom_fields?.customer_note as string | null) ?? '')
+                  setStaffNoteDraft((repair.custom_fields?.staff_note as string | null) ?? '')
+                  setEditingNotes(true)
+                }}
+                className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+              >
+                <Edit className="h-3 w-3" /> Edit
+              </button>
+            )}
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            {editingNotes ? (
+              <>
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-wider text-outline">Customer Note (Public)</label>
-                  <p className="mt-1 rounded-lg border border-blue-100 bg-blue-50/50 p-2 text-on-surface">{repair.custom_fields.customer_note}</p>
+                  <textarea
+                    rows={2}
+                    value={customerNoteDraft}
+                    onChange={(e) => setCustomerNoteDraft(e.target.value)}
+                    placeholder="Visible to customer…"
+                    className="mt-1 w-full resize-none rounded-md border border-blue-200 bg-surface px-2.5 py-1.5 text-sm text-on-surface placeholder:text-outline transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400/20"
+                  />
                 </div>
-              )}
-              {repair.custom_fields?.staff_note && (
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-wider text-outline">Staff Note (Internal)</label>
-                  <p className="mt-1 rounded-lg border border-amber-100 bg-amber-50/50 p-2 text-on-surface">{repair.custom_fields.staff_note}</p>
+                  <textarea
+                    rows={2}
+                    value={staffNoteDraft}
+                    onChange={(e) => setStaffNoteDraft(e.target.value)}
+                    placeholder="Internal only…"
+                    className="mt-1 w-full resize-none rounded-md border border-amber-200 bg-surface px-2.5 py-1.5 text-sm text-on-surface placeholder:text-outline transition focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20"
+                  />
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setEditingNotes(false)} disabled={savingNotes}>Cancel</Button>
+                  <Button size="sm" onClick={saveNotes} disabled={savingNotes}>{savingNotes ? 'Saving…' : 'Save'}</Button>
+                </div>
+              </>
+            ) : (repair.custom_fields?.customer_note || repair.custom_fields?.staff_note) ? (
+              <>
+                {repair.custom_fields?.customer_note && (
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-outline">Customer Note (Public)</label>
+                    <p className="mt-1 rounded-lg border border-blue-100 bg-blue-50/50 p-2 text-on-surface">{repair.custom_fields.customer_note}</p>
+                  </div>
+                )}
+                {repair.custom_fields?.staff_note && (
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-outline">Staff Note (Internal)</label>
+                    <p className="mt-1 rounded-lg border border-amber-100 bg-amber-50/50 p-2 text-on-surface">{repair.custom_fields.staff_note}</p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-outline">No notes yet.</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Custom Fields */}
