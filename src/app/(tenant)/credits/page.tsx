@@ -111,16 +111,29 @@ export default function CreditsPage() {
     queryKey: ['credits', activeBranch?.id, showAll],
     queryFn: async () => {
       if (!activeBranch?.id) return []
-      const params = new URLSearchParams({
-        branch_id: activeBranch.id,
-        payment_method: 'on_account',
-        limit: '200',
-      })
-      if (!showAll) params.set('outstanding_only', 'true')
-      const res = await fetch(`/api/pos/sales?${params}`)
-      if (!res.ok) return []
-      const json = await res.json()
-      return json.data ?? []
+      // The API caps `limit` at 100, so walk every page rather than trusting a
+      // single request — otherwise older balances silently fall off the list.
+      const PAGE_SIZE = 100
+      const all: CreditSale[] = []
+      for (let page = 1; page <= 100; page++) {
+        const params = new URLSearchParams({
+          branch_id: activeBranch.id,
+          payment_method: 'on_account',
+          page: String(page),
+          limit: String(PAGE_SIZE),
+        })
+        if (!showAll) params.set('outstanding_only', 'true')
+        const res = await fetch(`/api/pos/sales?${params}`)
+        if (!res.ok) {
+          if (page === 1) return []
+          throw new Error('Failed to load all credit sales')
+        }
+        const json = await res.json()
+        const rows: CreditSale[] = json.data ?? []
+        all.push(...rows)
+        if (rows.length < PAGE_SIZE) break
+      }
+      return all
     },
     enabled: !!activeBranch?.id,
     staleTime: 30_000,
