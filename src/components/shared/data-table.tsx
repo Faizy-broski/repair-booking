@@ -24,11 +24,18 @@ interface DataTableProps<T> {
   onRowClick?: (row: T) => void
 }
 
+/**
+ * Two paging modes:
+ *  - Server-side: pass `onPageChange` (+ `totalCount`, `pageIndex`, `pageSize`); `data` is the current page.
+ *  - Client-side: omit `onPageChange`; `data` is the full list and the table pages it
+ *    itself (default 20 rows, with a pager and rows-per-page selector).
+ */
 export function DataTable<T>({
   data, columns, isLoading, totalCount, pageIndex = 0, pageSize = 20, onPageChange, onPageSizeChange, emptyMessage = 'No records found.',
   onRowClick,
 }: DataTableProps<T>) {
   const [sorting, setSorting] = useState<SortingState>([])
+  const controlled = !!onPageChange
 
   const table = useReactTable({
     data,
@@ -38,11 +45,23 @@ export function DataTable<T>({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    manualPagination: !!onPageChange,
-    pageCount: totalCount ? Math.ceil(totalCount / pageSize) : undefined,
+    initialState: { pagination: { pageIndex: 0, pageSize } },
+    manualPagination: controlled,
+    pageCount: controlled && totalCount ? Math.ceil(totalCount / pageSize) : undefined,
   })
 
-  const totalPages = totalCount ? Math.ceil(totalCount / pageSize) : 1
+  // Unify controlled (server) and uncontrolled (client) paging for the footer.
+  const clientPagination = table.getState().pagination
+  const curPageIndex = controlled ? pageIndex : clientPagination.pageIndex
+  const curPageSize = controlled ? pageSize : clientPagination.pageSize
+  const curTotal = controlled ? (totalCount ?? 0) : data.length
+  const goToPage = (p: number) => (controlled ? onPageChange!(p) : table.setPageIndex(p))
+  const changePageSize = controlled
+    ? onPageSizeChange
+    : (s: number) => table.setPagination({ pageIndex: 0, pageSize: s })
+  const totalPages = Math.max(1, Math.ceil(curTotal / curPageSize))
+  // Client mode: skip the footer for short lists where paging is pointless.
+  const showFooter = controlled || data.length > PAGE_SIZE_OPTIONS[0]
   const rows = table.getRowModel().rows
   // True only on the very first load when there is no cached data yet
   const initialLoading = isLoading && rows.length === 0
@@ -129,20 +148,20 @@ export function DataTable<T>({
       </div>
 
       {/* Pagination */}
-      {!!onPageChange && (
+      {showFooter && (
         <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 px-1">
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-outline">
-              Showing <span className="text-on-surface">{pageIndex * pageSize + 1}</span>–
-              <span className="text-on-surface">{Math.min((pageIndex + 1) * pageSize, totalCount ?? 0)}</span> of
-              <span className="text-on-surface"> {totalCount ?? 0}</span>
+              Showing <span className="text-on-surface">{curTotal === 0 ? 0 : curPageIndex * curPageSize + 1}</span>–
+              <span className="text-on-surface">{Math.min((curPageIndex + 1) * curPageSize, curTotal)}</span> of
+              <span className="text-on-surface"> {curTotal}</span>
             </span>
-            {onPageSizeChange && (
+            {changePageSize && (
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-outline">Rows:</span>
                 <select
-                  value={pageSize}
-                  onChange={(e) => { onPageChange(0); onPageSizeChange(Number(e.target.value)) }}
+                  value={curPageSize}
+                  onChange={(e) => { if (controlled) onPageChange!(0); changePageSize(Number(e.target.value)) }}
                   className="h-7 rounded-md border border-outline bg-surface px-2 text-xs text-on-surface-variant focus:border-primary focus:outline-none"
                 >
                   {PAGE_SIZE_OPTIONS.map((n) => (
@@ -153,13 +172,13 @@ export function DataTable<T>({
             )}
           </div>
 
-          {(totalCount ?? 0) > pageSize && (
+          {curTotal > curPageSize && (
             <div className="flex items-center gap-2">
               <Button
                 variant="default"
                 size="sm"
-                onClick={() => onPageChange(pageIndex - 1)}
-                disabled={pageIndex === 0}
+                onClick={() => goToPage(curPageIndex - 1)}
+                disabled={curPageIndex === 0}
                 className="h-9 px-4 flex items-center gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm transition-all disabled:bg-surface-container-high disabled:text-outline disabled:opacity-100"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -167,14 +186,14 @@ export function DataTable<T>({
               </Button>
 
               <div className="flex items-center justify-center min-w-[2.5rem] h-9 rounded-lg border border-outline-variant bg-surface-container-lowest text-sm font-bold text-primary shadow-sm">
-                {pageIndex + 1}
+                {curPageIndex + 1}
               </div>
 
               <Button
                 variant="default"
                 size="sm"
-                onClick={() => onPageChange(pageIndex + 1)}
-                disabled={pageIndex + 1 >= totalPages}
+                onClick={() => goToPage(curPageIndex + 1)}
+                disabled={curPageIndex + 1 >= totalPages}
                 className="h-9 px-4 flex items-center gap-2 bg-primary hover:bg-primary/90 text-white shadow-sm transition-all disabled:bg-surface-container-high disabled:text-outline disabled:opacity-100"
               >
                 <span className="font-medium">Next</span>
