@@ -21,6 +21,12 @@ export const metadata: Metadata = {
     description: "All-in-one cloud POS and repair booking platform for modern repair shops.",
     type: "website",
   },
+  verification: {
+    google: [
+      "cMJOrBZBBwCbdkH_9cOmGnPZJEirWt8SeX7eM2yH05A",
+      "bB-Gt4W1L8a3lvBrT8Nt-2t9YmP0MTxZUvQoUFaf7YE",
+    ],
+  },
 };
 
 export default function RootLayout({
