@@ -61,11 +61,11 @@ function RefundPageInner() {
 
   // Refund method + reason
   const [refundMethod, setRefundMethod] = useState<'cash' | 'card' | 'gift_card'>('cash')
-  // Split refund tender — only used when the original sale was itself a
+  // Split refund tender ï¿½ only used when the original sale was itself a
   // split-tender ('split') sale, so the cashier can mirror the original
   // cash/card breakdown instead of forcing the whole refund onto one method
   // (previously the only option, which silently dropped whichever leg wasn't
-  // picked from every cash figure — see migration 201).
+  // picked from every cash figure ï¿½ see migration 201).
   const [refundSplits, setRefundSplits] = useState<Record<string, string>>({})
   const [refundReason, setRefundReason] = useState('')
 
@@ -109,7 +109,7 @@ function RefundPageInner() {
         setRefundQtys(qtys)
         setRefundPrices(prices)
         // Prefill the split refund tender from the original sale's own
-        // split, since every item starts selected (full refund) — the
+        // split, since every item starts selected (full refund) ï¿½ the
         // cashier can still adjust before confirming.
         if (s.payment_method === 'split' && s.payment_splits?.length) {
           const splits: Record<string, string> = {}
@@ -164,7 +164,7 @@ function RefundPageInner() {
 
   const refundTotal = -(refundSubtotal - refundDiscount + refundTax - restockFee)
 
-  // Split refund tender — only relevant when the original sale itself was
+  // Split refund tender ï¿½ only relevant when the original sale itself was
   // split-tender. Channels come from whatever methods the original sale's
   // payment_splits used (falls back to cash/card if that's somehow empty).
   const isSplitOriginal = sale?.payment_method === 'split'
@@ -211,7 +211,7 @@ function RefundPageInner() {
         total: -((refundPrices[item.id] ?? item.unit_price) * (refundQtys[item.id] ?? item.quantity)),
         is_service: item.is_service ?? false,
         // Always a real quantity-based return on this page (no Amount mode
-        // exists here) — explicit false so the server's quantity-remaining
+        // exists here) ï¿½ explicit false so the server's quantity-remaining
         // guard always applies, regardless of whether the underlying catalog
         // item happens to be a service (migration 193; previously the guard
         // was skipped for service items due to that unrelated flag).
@@ -312,7 +312,7 @@ function RefundPageInner() {
                 {sale.customers
                   ? `${sale.customers.first_name} ${sale.customers.last_name ?? ''}`.trim()
                   : 'Walk-in Customer'}
-                {' · '}{new Date(sale.created_at).toLocaleDateString()} · {sale.payment_method}
+                {' ï¿½ '}{new Date(sale.created_at).toLocaleDateString()} ï¿½ {sale.payment_method}
               </p>
             </div>
             <p className="text-base font-bold text-on-surface">{formatCurrency(sale.total)}</p>
@@ -456,7 +456,7 @@ function RefundPageInner() {
               {isSplitOriginal ? (
                 <div>
                   <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
-                    Refund Method — this sale was split-tender, split the refund the same way
+                    Refund Method ï¿½ this sale was split-tender, split the refund the same way
                   </p>
                   <div className="space-y-2">
                     {splitChannels.map((m) => (

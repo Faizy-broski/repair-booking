@@ -20,7 +20,7 @@ interface Props {
   values: Record<string, unknown>
   /** Field definitions to render */
   definitions: CustomFieldDef[]
-  /** Called when user saves — receives updated JSONB blob */
+  /** Called when user saves ï¿½ receives updated JSONB blob */
   onSave: (values: Record<string, unknown>) => Promise<void>
   /** Read-only mode */
   readOnly?: boolean
@@ -102,7 +102,7 @@ export function CustomFieldRenderer({
                     onChange={e => set(field.field_key, e.target.value)}
                     className="h-9 w-full rounded-lg border border-outline bg-surface px-3 text-sm text-on-surface focus:border-brand-teal focus:outline-none disabled:bg-surface-container-low disabled:text-on-surface-variant"
                   >
-                    <option value="">— Select —</option>
+                    <option value="">ï¿½ Select ï¿½</option>
                     {choices.map(c => (
                       <option key={c} value={c}>{c}</option>
                     ))}

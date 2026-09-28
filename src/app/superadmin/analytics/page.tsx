@@ -226,7 +226,7 @@ export default async function AnalyticsPage() {
         ))}
       </div>
 
-      {/* Charts — client component */}
+      {/* Charts ï¿½ client component */}
       <AnalyticsCharts
         mrrByMonth={data.mrrByMonth}
         signupsByMonth={data.months}

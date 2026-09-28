@@ -7,12 +7,12 @@ const db = (table: string): any => (adminSupabase as any).from(table)
 const rpc = (fn: string, args?: Record<string, unknown>): any => (adminSupabase as any).rpc(fn, args)
 
 // The Expense figure on the POS register summary is a one-off customization for
-// a single client business — not a general feature — so it's gated behind an
+// a single client business ï¿½ not a general feature ï¿½ so it's gated behind an
 // explicit business ID rather than a module setting.
 const EXPENSE_STAT_BUSINESS_IDS = new Set(['b822b350-8590-49c8-a421-1018dd92c468'])
 
 // Expenses aren't tracked by the register RPCs (register_session_expected /
-// close_register_session) — they're recorded separately via the Expenses page,
+// close_register_session) ï¿½ they're recorded separately via the Expenses page,
 // same source the dashboard's "Total Expenses" card uses. Sums them here so the
 // POS session stats and Z-report can show an Expense figure alongside sales.
 async function sumExpensesSince(branchId: string, sinceIso: string): Promise<number> {
@@ -109,7 +109,7 @@ export const ReportService = {
     return data
   },
 
-  // Cash In/Out for the same window — Cash In adds to Sales revenue, Cash
+  // Cash In/Out for the same window ï¿½ Cash In adds to Sales revenue, Cash
   // Out subtracts. Returned separately (not merged into `sales` rows) so
   // the frontend can bucket them into the same daily groups.
   async getCashMovementsReport(branchId: string, from: string, to: string) {
@@ -132,7 +132,7 @@ export const ReportService = {
         .lte('created_at', to)
         .order('created_at'),
 
-      // Amounts actually charged through POS for repair-linked line items —
+      // Amounts actually charged through POS for repair-linked line items ï¿½
       // takes priority over deposit_paid/actual_cost below, same rule used by
       // the Repairs dashboard/Dashboard/Sales page (see repair-financials.service.ts).
       db('sale_items')
@@ -159,7 +159,7 @@ export const ReportService = {
     })
 
     // Top sellers / loss detail are additive to whichever base P&L path runs
-    // below — degrade to empty rather than failing the whole report if either
+    // below ï¿½ degrade to empty rather than failing the whole report if either
     // query hits a schema mismatch.
     const [sellers, lossBreakdown] = await Promise.all([
       getTopSellers(branchId, from, to).catch(() => ({ topProducts: [] as TopSellerRow[], topCategories: [] as TopSellerRow[] })),
@@ -182,16 +182,16 @@ export const ReportService = {
         db('cash_movements').select('type, amount, purpose').eq('branch_id', branchId).gte('created_at', from).lte('created_at', to),
       ])
       // Refund rows store a POSITIVE total with is_refund=true as the flag
-      // (migration 188) — sign by is_refund to net them out of revenue.
+      // (migration 188) ï¿½ sign by is_refund to net them out of revenue.
       const revenue = ((salesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + (r.is_refund ? -r.total : r.total), 0)
       const expenses = ((expensesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.amount, 0)
       const salaries = ((salariesRes.data ?? []) as any[]).reduce((s: number, r: any) => s + r.amount, 0)
-      // Cash In adds to Sales revenue, Cash Out subtracts — except cash-outs
+      // Cash In adds to Sales revenue, Cash Out subtracts ï¿½ except cash-outs
       // tagged 'expense' (already counted via the expenses table above),
       // 'plain' (UI explicitly promises these have no report effect), or
-      // 'buyback'/'trade_in' (both recognized as COGS at resale instead —
+      // 'buyback'/'trade_in' (both recognized as COGS at resale instead ï¿½
       // see migrations 195/196), and cash-ins tagged 'gift_card_sale'
-      // (deferred revenue, not revenue — see migration 187).
+      // (deferred revenue, not revenue ï¿½ see migration 187).
       const cashNet = ((cashMovementsRes.data ?? []) as any[]).reduce(
         (s: number, r: any) => s + (r.type === 'cash_in' ? (r.purpose === 'gift_card_sale' ? 0 : r.amount) : (r.purpose === 'expense' || r.purpose === 'plain' || r.purpose === 'buyback' || r.purpose === 'trade_in' ? 0 : -r.amount)), 0
       )
@@ -221,7 +221,7 @@ export const ReportService = {
       .lte('created_at', to)
 
     // Refund rows store a POSITIVE total with is_refund=true as the flag
-    // (migration 188) — sign by is_refund to net them out of revenue.
+    // (migration 188) ï¿½ sign by is_refund to net them out of revenue.
     const totalsByBranch = ((salesRows ?? []) as any[]).reduce(
       (acc: Record<string, number>, r: any) => {
         acc[r.branch_id] = (acc[r.branch_id] ?? 0) + (r.is_refund ? -r.total : r.total)
@@ -248,7 +248,7 @@ export const ReportService = {
 
     const totalItems = ((totalStock ?? []) as any[]).reduce((s: number, r: any) => s + (r.quantity ?? 0), 0)
     const totalValue = ((totalStock ?? []) as any[]).reduce((s: number, r: any) => {
-      // Batch valuation is keyed per (product_id, variant_id) — each variant's
+      // Batch valuation is keyed per (product_id, variant_id) ï¿½ each variant's
       // own batches are looked up independently, not blended with its siblings
       // or the base product row.
       const batch = batchValuation.get(`${r.product_id}::${r.variant_id ?? 'null'}`)
@@ -304,7 +304,7 @@ export const ReportService = {
       .lte('created_at', to)
     if (error) throw error
 
-    // A split-tender sale's payment_method is the literal string 'split' —
+    // A split-tender sale's payment_method is the literal string 'split' ï¿½
     // grouping by that raw column lumps its whole total into one "split"
     // slice instead of breaking it into the cash/card (etc.) legs it's
     // actually made of. Expand it via payment_splits instead, same fix
@@ -380,7 +380,7 @@ export const ReportService = {
     }
 
     // Fetch names. `repairs.assigned_to`/`employee_commissions.employee_id` FK to
-    // employees(id) (migration 028), while `sales.created_by` FKs profiles(id) —
+    // employees(id) (migration 028), while `sales.created_by` FKs profiles(id) ï¿½
     // these are two different id spaces, so look each id up against both tables
     // rather than assuming one covers all keys in byEmployee.
     const ids = Object.keys(byEmployee)
@@ -406,7 +406,7 @@ export const ReportService = {
         .select('quantity, products(id, name, sku, cost_price, selling_price, categories(name))')
         // Fix: previously unfiltered, so a variant's inventory row leaked into
         // this report and got priced with the PARENT product's cost/selling
-        // price regardless of which variant it actually was. Base rows only —
+        // price regardless of which variant it actually was. Base rows only ï¿½
         // matches how this report has always been described (per-product, not
         // per-variant); also required for the batch-valuation lookup below,
         // which is keyed per product and would double-count across variant rows.
@@ -451,7 +451,7 @@ export const ReportService = {
     }
 
     const productIds = Object.keys(byProduct)
-    // brand_id/brands(name) are additive fields — existing consumers (inventory
+    // brand_id/brands(name) are additive fields ï¿½ existing consumers (inventory
     // report page) render this as a flat table and simply ignore the extras.
     const { data: products } = await db('products')
       .select('id, name, sku, brand_id, brands(name)')
@@ -469,7 +469,7 @@ export const ReportService = {
     }))
   },
 
-  // Same data as getPartConsumptionReport, rolled up by brand — powers "sales/
+  // Same data as getPartConsumptionReport, rolled up by brand ï¿½ powers "sales/
   // usage by tyre brand" for the mobile tyre-fitting vertical (tyres are just
   // inventory products with a brand_id, so no new schema is needed for this).
   async getPartConsumptionByBrandReport(branchId: string, from: string, to: string) {
@@ -485,7 +485,7 @@ export const ReportService = {
   },
 
   // Repairs still open (not in a terminal status) after `staleDays`, whose
-  // parts already left inventory (deducted at booking time — deduct_repair_parts,
+  // parts already left inventory (deducted at booking time ï¿½ deduct_repair_parts,
   // migration 098) but whose cost hasn't hit COGS yet (get_profit_loss only
   // counts repair_items cost for terminal-status repairs, migration 131). This
   // surfaces stock that's "in limbo": already gone from stock counts, but not
@@ -559,7 +559,7 @@ export const ReportService = {
       .map((r: any) => {
         // "Value at risk" for a low-stock line is best represented by the
         // batch that's about to run out (the next-to-sell cost), not a
-        // blended total — this report is about "what will it cost to
+        // blended total ï¿½ this report is about "what will it cost to
         // restock/what's the cost of the unit sitting at the front."
         // Keyed per (product_id, variant_id) so a variant's own next-batch
         // cost is used, not its product's blended figure.
@@ -594,7 +594,7 @@ export const ReportService = {
       .eq('status', 'open')
       .maybeSingle()
 
-    // If a session is already open, return it instead of erroring —
+    // If a session is already open, return it instead of erroring ï¿½
     // the UI will detect this and show "Join Shift" instead.
     if (existing) {
       const { data: full } = await db('register_sessions')
@@ -674,7 +674,7 @@ export const ReportService = {
   async getCurrentSession(branchId: string | null) {
     if (!branchId) return null
 
-    // Base query — always works even if migration 034 isn't applied yet
+    // Base query ï¿½ always works even if migration 034 isn't applied yet
     const { data: session, error } = await db('register_sessions')
       .select('*, profiles!cashier_id(full_name)')
       .eq('branch_id', branchId)
@@ -683,7 +683,7 @@ export const ReportService = {
 
     if (error || !session) return null
 
-    // Optionally enrich with members — safe to fail if table doesn't exist yet
+    // Optionally enrich with members ï¿½ safe to fail if table doesn't exist yet
     try {
       const { data: members } = await (adminSupabase as any)
         .from('register_session_members')
@@ -696,7 +696,7 @@ export const ReportService = {
   },
 
   // Records the cash movement and, when purpose is 'expense' or 'buyback', its
-  // offsetting expense/product-inventory entries — all inside a single Postgres
+  // offsetting expense/product-inventory entries ï¿½ all inside a single Postgres
   // transaction (record_cash_movement RPC), so a failure in the offsetting side
   // (e.g. a duplicate barcode) rolls back the cash movement too, instead of
   // leaving cash recorded as removed from the drawer with nothing to show for it.
