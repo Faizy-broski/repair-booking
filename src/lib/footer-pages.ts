@@ -80,7 +80,7 @@ export const footerLinkGroups: FooterLinkGroup[] = [
       { label: "Customers", href: "/company/customers" },
       { label: "Careers", href: "/company/careers" },
       { label: "Press", href: "/company/press" },
-      { label: "Contact Us", href: "/company/contact-us" },
+      { label: "Contact Us", href: "/contact" },
       { label: "Privacy Policy", href: "/company/privacy-policy" },
       { label: "Cookie Policy", href: "/company/cookie-policy" },
       { label: "Website T&C's", href: "/company/website-terms-and-conditions" },

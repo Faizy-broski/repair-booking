@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/backend/config/supabase'
 import { effectiveMonthlyPrice } from '@/backend/services/custom-plan-pricing'
 import { formatCurrencyCompact } from '@/lib/utils'
-import { Building2, Users, CreditCard, TrendingUp, LifeBuoy } from 'lucide-react'
+import { Building2, Users, CreditCard, TrendingUp, LifeBuoy, Target } from 'lucide-react'
 import { StatsCard } from '@/components/dashboard/stats-card'
 import Link from 'next/link'
 
@@ -27,17 +27,19 @@ async function getDashboardStats() {
     { count: totalUsers },
     { data: subscriptions },
     { count: openTickets },
+    { count: newLeads },
   ] = await Promise.all([
     supabase.from('businesses').select('*', { count: 'exact', head: true }),
     supabase.from('businesses').select('*', { count: 'exact', head: true }).eq('is_active', true),
     supabase.from('profiles').select('*', { count: 'exact', head: true }),
     supabase.from('subscriptions').select('plan_id, billing_cycle, is_custom, custom_price_monthly, plans(price_monthly, price_yearly)').eq('status', 'active').eq('livemode', true),
     supabase.from('helpdesk_tickets').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'new'),
   ])
 
   const mrr = (subscriptions ?? []).reduce((sum: number, sub: any) => sum + effectiveMonthlyPrice(sub), 0)
 
-  return { totalBusinesses, activeBusinesses, totalUsers, mrr, openTickets }
+  return { totalBusinesses, activeBusinesses, totalUsers, mrr, openTickets, newLeads }
 }
 
 async function getRecentBusinesses() {
@@ -71,6 +73,7 @@ export default async function SuperAdminDashboard() {
     { label: 'Total Users',       value: stats.totalUsers ?? 0,        icon: <Users className="h-5 w-5" />,     color: 'purple' as const, subtitle: 'across all tenants' },
     { label: 'MRR',               value: formatCurrencyCompact(stats.mrr, 'GBP'), icon: <CreditCard className="h-5 w-5" />, color: 'yellow' as const, subtitle: 'monthly recurring' },
     { label: 'Open Tickets',      value: stats.openTickets ?? 0,       icon: <LifeBuoy className="h-5 w-5" />, color: 'red'    as const, subtitle: 'awaiting response' },
+    { label: 'New Leads',         value: stats.newLeads ?? 0,          icon: <Target className="h-5 w-5" />,   color: 'blue'   as const, subtitle: 'from the website' },
   ]
 
   return (
@@ -80,7 +83,7 @@ export default async function SuperAdminDashboard() {
         <p className="text-sm text-on-surface-variant">Platform-wide overview</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
         {statCards.map((card) => (
           <StatsCard
             key={card.label}

@@ -56,7 +56,7 @@ export const legalPages: LegalPage[] = [
     related: [
       { label: "Cookie Policy", href: "/company/cookie-policy" },
       { label: "Data Processing Agreement", href: "/company/data-processing-agreement" },
-      { label: "Contact Us", href: "/company/contact-us" },
+      { label: "Contact Us", href: "/contact" },
     ],
   },
   {
@@ -97,7 +97,7 @@ export const legalPages: LegalPage[] = [
     related: [
       { label: "Privacy Policy", href: "/company/privacy-policy" },
       { label: "Website T&C's", href: "/company/website-terms-and-conditions" },
-      { label: "Contact Us", href: "/company/contact-us" },
+      { label: "Contact Us", href: "/contact" },
     ],
   },
   {

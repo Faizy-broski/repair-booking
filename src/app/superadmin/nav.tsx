@@ -1,11 +1,12 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Building2, CreditCard, BarChart3, Layers, Store, Megaphone, Receipt, LifeBuoy } from 'lucide-react'
+import { LayoutDashboard, Building2, CreditCard, BarChart3, Layers, Store, Megaphone, Receipt, LifeBuoy, Target } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV = [
   { href: '/superadmin/dashboard',           label: 'Dashboard',     icon: LayoutDashboard },
+  { href: '/superadmin/leads',               label: 'Leads',         icon: Target },
   { href: '/superadmin/businesses',          label: 'Businesses',    icon: Building2 },
   { href: '/superadmin/plans',               label: 'Plans',         icon: CreditCard },
   { href: '/superadmin/subscriptions',       label: 'Subscriptions', icon: Receipt },

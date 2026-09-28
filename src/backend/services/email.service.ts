@@ -576,6 +576,24 @@ export const EmailService = {
     })
   },
 
+  async sendLeadNotification(payload: {
+    source: string
+    name: string
+    email: string
+    phone?: string | null
+    company?: string | null
+    message?: string | null
+  }) {
+    const transport = await getGlobalTransporter()
+    const sourceLabel = payload.source.replace(/_/g, ' ')
+    await transport.sendMail({
+      from: globalFromAddress('RepairBooking'),
+      to: process.env.SALES_EMAIL ?? 'connect@repairbooking.co.uk',
+      subject: `New lead (${sourceLabel}) — ${payload.name}`,
+      html: `<p>New lead from the website:</p><ul><li><b>Source:</b> ${sourceLabel}</li><li><b>Name:</b> ${payload.name}</li><li><b>Email:</b> ${payload.email}</li><li><b>Phone:</b> ${payload.phone ?? '—'}</li><li><b>Company:</b> ${payload.company ?? '—'}</li><li><b>Message:</b> ${payload.message ?? '—'}</li></ul>`,
+    })
+  },
+
   async verifyConnection(): Promise<boolean> {
     try {
       const transport = await getGlobalTransporter()

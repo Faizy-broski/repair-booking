@@ -48,7 +48,7 @@ export default function CtaSection({
               </Link>
 
               <Link
-                href="#demo"
+                href="/demo"
                 className="inline-flex w-full items-center justify-center rounded-full border border-white/25 bg-white/5 px-7 py-4 text-sm font-medium text-white backdrop-blur transition-colors hover:bg-white/10 sm:w-auto sm:py-5 sm:text-md"
               >
                 Book a 20-min demo

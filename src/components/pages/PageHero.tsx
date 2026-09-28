@@ -10,7 +10,7 @@ export default function PageHero({
   primaryCtaLabel = "Start Free Trial",
   primaryCtaHref = "/register",
   secondaryCtaLabel = "Book a Demo",
-  secondaryCtaHref = "#demo",
+  secondaryCtaHref = "/demo",
 }: {
   icon?: LucideIcon;
   kicker: string;
