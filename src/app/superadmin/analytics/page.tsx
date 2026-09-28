@@ -1,4 +1,4 @@
-﻿import { createAdminClient } from '@/backend/config/supabase'
+import { createAdminClient } from '@/backend/config/supabase'
 import { effectiveMonthlyPrice } from '@/backend/services/custom-plan-pricing'
 import { formatCurrency } from '@/lib/utils'
 import {
@@ -7,13 +7,13 @@ import {
 } from 'lucide-react'
 import { AnalyticsCharts } from './charts'
 
-// ─── Types ────────────────────────────────────────────────────────────────
+// --- Types ----------------------------------------------------------------
 interface MonthBucket { month: string; count: number }
 interface PlanStat { name: string; subscribers: number; mrr: number; pct: number }
 interface StatusStat { status: string; count: number; pct: number }
 interface MrrBucket { month: string; mrr: number }
 
-// ─── Data fetching ────────────────────────────────────────────────────────
+// --- Data fetching --------------------------------------------------------
 async function fetchAnalyticsData() {
   const supabase = createAdminClient()
 
@@ -44,12 +44,12 @@ async function fetchAnalyticsData() {
   const allSubs = subscriptions ?? []
   const allPlans = plans ?? []
 
-  // ── MRR / ARR ──────────────────────────────────────────────────────────
+  // -- MRR / ARR ----------------------------------------------------------
   const activeSubs = allSubs.filter((s) => s.status === 'active' || s.status === 'trialing')
   const mrr = activeSubs.reduce((sum, sub) => sum + effectiveMonthlyPrice(sub as any), 0)
   const arr = mrr * 12
 
-  // ── Monthly signups (last 12 months) ──────────────────────────────────
+  // -- Monthly signups (last 12 months) ----------------------------------
   const now = new Date()
   const months: MonthBucket[] = []
   for (let i = 11; i >= 0; i--) {
@@ -62,7 +62,7 @@ async function fetchAnalyticsData() {
     months.push({ month: label, count })
   }
 
-  // ── MRR by month (last 12 months, approximated by subs created) ────────
+  // -- MRR by month (last 12 months, approximated by subs created) --------
   const mrrByMonth: MrrBucket[] = months.map(({ month }, idx) => {
     const d = new Date(now.getFullYear(), now.getMonth() - (11 - idx), 1)
     const nextD = new Date(d.getFullYear(), d.getMonth() + 1, 1)
@@ -76,7 +76,7 @@ async function fetchAnalyticsData() {
     return { month, mrr: Math.round(mrrVal) }
   })
 
-  // ── Subscription status breakdown ─────────────────────────────────────
+  // -- Subscription status breakdown -------------------------------------
   const statusCounts: Record<string, number> = {}
   allSubs.forEach((s) => {
     statusCounts[s.status] = (statusCounts[s.status] ?? 0) + 1
@@ -88,7 +88,7 @@ async function fetchAnalyticsData() {
     pct: Math.round((count / totalSubs) * 100),
   })).sort((a, b) => b.count - a.count)
 
-  // ── Plan distribution ─────────────────────────────────────────────────
+  // -- Plan distribution -------------------------------------------------
   const planMap: Record<string, { name: string; subscribers: number; mrr: number }> = {}
   activeSubs.forEach((sub) => {
     const plan = sub.plans as any
@@ -109,7 +109,7 @@ async function fetchAnalyticsData() {
     }
   })
 
-  // ── KPIs ──────────────────────────────────────────────────────────────
+  // -- KPIs --------------------------------------------------------------
   const totalBusinesses = allBusinesses.length
   const activeBusinesses = allBusinesses.filter((b) => b.is_active).length
   const churnedSubs = allSubs.filter((s) => s.status === 'canceled').length
@@ -128,7 +128,7 @@ async function fetchAnalyticsData() {
   }
 }
 
-// ─── Status colour map ────────────────────────────────────────────────────
+// --- Status colour map ----------------------------------------------------
 const STATUS_COLOR: Record<string, string> = {
   active:    'bg-emerald-100 text-emerald-700',
   trialing:  'bg-blue-100 text-blue-700',
@@ -137,7 +137,7 @@ const STATUS_COLOR: Record<string, string> = {
   suspended: 'bg-gray-100 text-gray-700',
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────
+// --- Page -----------------------------------------------------------------
 export default async function AnalyticsPage() {
   const data = await fetchAnalyticsData()
 
@@ -226,7 +226,7 @@ export default async function AnalyticsPage() {
         ))}
       </div>
 
-      {/* Charts — client component */}
+      {/* Charts � client component */}
       <AnalyticsCharts
         mrrByMonth={data.mrrByMonth}
         signupsByMonth={data.months}

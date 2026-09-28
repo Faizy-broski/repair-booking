@@ -47,13 +47,7 @@ export default function CtaSection({
                 <ArrowRight className="ml-4 h-5 w-5 sm:h-7 sm:w-7" />
               </Link>
 
-              <Link
-                href="#demo"
-                className="inline-flex w-full items-center justify-center rounded-full border border-white/25 bg-white/5 px-7 py-4 text-sm font-medium text-white backdrop-blur transition-colors hover:bg-white/10 sm:w-auto sm:py-5 sm:text-md"
-              >
-                Book a 20-min demo
-                <ArrowRight className="ml-4 h-5 w-5 sm:h-6 sm:w-6" />
-              </Link>
+
 
               <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-white/55 sm:mt-6 sm:gap-4">
                 <span className="flex items-center gap-2">

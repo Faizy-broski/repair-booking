@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import CompanyPageTemplate from "@/components/pages/CompanyPageTemplate";
 import LegalPageTemplate from "@/components/pages/LegalPageTemplate";
 import { companyPages, legalPages, getCompanyPage, getLegalPage } from "@/lib/footer-pages";
@@ -48,6 +48,10 @@ export async function generateMetadata({
 
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+
+  if (slug === "contact-us") {
+    redirect("/contact");
+  }
 
   const company = getCompanyPage(slug);
   if (company) return <CompanyPageTemplate page={company} />;

@@ -9,8 +9,8 @@ export default function PageHero({
   description,
   primaryCtaLabel = "Start Free Trial",
   primaryCtaHref = "/register",
-  secondaryCtaLabel = "Book a Demo",
-  secondaryCtaHref = "#demo",
+  secondaryCtaLabel,
+  secondaryCtaHref,
 }: {
   icon?: LucideIcon;
   kicker: string;
@@ -53,12 +53,14 @@ export default function PageHero({
             <ArrowRight className="h-4 w-4" />
           </Link>
 
-          <Link
-            href={secondaryCtaHref}
-            className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-9 py-4 text-base font-bold text-slate-950 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
-          >
-            {secondaryCtaLabel}
-          </Link>
+          {secondaryCtaLabel && secondaryCtaHref && (
+            <Link
+              href={secondaryCtaHref}
+              className="inline-flex w-full items-center justify-center rounded-full border border-slate-200 bg-white px-9 py-4 text-base font-bold text-slate-950 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
+            >
+              {secondaryCtaLabel}
+            </Link>
+          )}
         </FadeIn>
       </div>
     </section>

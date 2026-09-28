@@ -97,6 +97,9 @@ export default function Nav() {
             <Link href="/#testimonials" className="hover:text-primary transition-colors">
               Reviews
             </Link>
+            <Link href="/contact" className="hover:text-primary transition-colors">
+              Contact Us
+            </Link>
           </div>
 
           <div className="flex items-center gap-2 my-2 sm:gap-5">
@@ -218,6 +221,13 @@ export default function Nav() {
                 onClick={() => setMobileNavOpen(false)}
               >
                 Reviews
+              </Link>
+              <Link
+                href="/contact"
+                className="rounded-lg px-4 py-3 text-base font-medium text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                onClick={() => setMobileNavOpen(false)}
+              >
+                Contact Us
               </Link>
             </nav>
 

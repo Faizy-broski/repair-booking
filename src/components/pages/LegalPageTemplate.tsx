@@ -16,7 +16,7 @@ export default function LegalPageTemplate({ page }: { page: LegalPage }) {
         title={page.name}
         description={page.summary}
         primaryCtaLabel="Contact Us"
-        primaryCtaHref="/company/contact-us"
+        primaryCtaHref="/contact"
         secondaryCtaLabel="Back to Legal"
         secondaryCtaHref="/company/privacy-policy"
       />

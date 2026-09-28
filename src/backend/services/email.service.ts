@@ -576,6 +576,38 @@ export const EmailService = {
     })
   },
 
+  async sendLeadNotification(payload: { source: string; name: string; email: string; phone?: string; company?: string; message?: string }) {
+    const transport = await getGlobalTransporter()
+    const salesEmail = process.env.SALES_EMAIL ?? 'connect@repairbooking.co.uk'
+    
+    let sourceLabel = payload.source
+    if (payload.source === 'contact_us') sourceLabel = 'Contact Us'
+    if (payload.source === 'demo_request') sourceLabel = 'Demo Request'
+    if (payload.source === 'newsletter') sourceLabel = 'Newsletter Subscription'
+    if (payload.source === 'enterprise_contact') sourceLabel = 'Enterprise Enquiry'
+
+    const htmlParts = [
+      `<div style="font-family:Arial,sans-serif;max-width:600px;color:#374151;">`,
+      `<h2 style="color:#008080;border-bottom:1px solid #e5e7eb;padding-bottom:10px;">New Lead: ${sourceLabel}</h2>`,
+      `<ul style="list-style-type:none;padding:0;">`,
+      `<li style="padding:8px 0;"><b>Name:</b> ${payload.name}</li>`,
+      `<li style="padding:8px 0;border-top:1px solid #f3f4f6;"><b>Email:</b> <a href="mailto:${payload.email}">${payload.email}</a></li>`,
+    ]
+    if (payload.phone) htmlParts.push(`<li style="padding:8px 0;border-top:1px solid #f3f4f6;"><b>Phone:</b> ${payload.phone}</li>`)
+    if (payload.company) htmlParts.push(`<li style="padding:8px 0;border-top:1px solid #f3f4f6;"><b>Company:</b> ${payload.company}</li>`)
+    if (payload.message) htmlParts.push(`<li style="padding:8px 0;border-top:1px solid #f3f4f6;"><b>Message:</b><br/><div style="margin-top:8px;padding:12px;background:#f9fafb;border-radius:6px;white-space:pre-wrap;">${payload.message}</div></li>`)
+    htmlParts.push(`</ul>`)
+    htmlParts.push(`<div style="margin-top:24px;"><a href="https://admin.repairbooking.co.uk/superadmin/leads" style="display:inline-block;background:#008080;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;font-weight:bold;">View in SuperAdmin</a></div>`)
+    htmlParts.push(`</div>`)
+
+    await transport.sendMail({
+      from: globalFromAddress('RepairBooking Leads'),
+      to: salesEmail,
+      subject: `New Lead: ${sourceLabel} — ${payload.name}`,
+      html: htmlParts.join(''),
+    })
+  },
+
   async verifyConnection(): Promise<boolean> {
     try {
       const transport = await getGlobalTransporter()

@@ -38,11 +38,15 @@ export default function ContactPage() {
         description="Whether you're evaluating iRepairly for your shop, need help with an existing account, or want to talk press or partnerships, here's how to reach us."
       />
 
-      <section className="bg-white px-4 pb-20 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-4xl gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-start">
-          <FadeIn className="space-y-10">
+      <section className="relative overflow-hidden bg-gradient-to-b from-white to-slate-50/50 px-4 pb-24 sm:px-6 lg:px-8">
+        {/* Decorative background blurs */}
+        <div className="absolute -right-40 top-20 h-[400px] w-[400px] rounded-full bg-teal-100/40 blur-[100px] pointer-events-none" />
+        <div className="absolute left-0 bottom-0 h-[300px] w-[300px] rounded-full bg-cyan-100/40 blur-[100px] pointer-events-none" />
+
+        <div className="mx-auto grid max-w-5xl gap-12 lg:grid-cols-[1fr_1.1fr] lg:items-start relative z-10">
+          <FadeIn className="space-y-10 lg:pt-8">
             {SECTIONS.map((section) => (
-              <div key={section.heading}>
+              <div key={section.heading} className="relative pl-6 before:absolute before:left-0 before:top-2.5 before:h-2 before:w-2 before:rounded-full before:bg-teal-500">
                 <h2 className="text-xl font-bold tracking-[-0.02em] text-slate-950 sm:text-2xl">
                   {section.heading}
                 </h2>
@@ -51,9 +55,22 @@ export default function ContactPage() {
             ))}
           </FadeIn>
 
-          <FadeIn delay={0.05} className="rounded-3xl border border-slate-100 bg-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.08)] sm:p-8">
-            <h3 className="mb-5 text-lg font-bold text-slate-950">Send us a message</h3>
-            <LeadForm source="contact_us" submitLabel="Send Message" />
+          <FadeIn delay={0.1} className="relative">
+            {/* A slight glowing border effect behind the card */}
+            <div className="absolute -inset-0.5 rounded-[32px] bg-gradient-to-br from-teal-200 to-cyan-200 opacity-50 blur-lg pointer-events-none" />
+            
+            <div className="relative rounded-[28px] border border-white bg-white/80 backdrop-blur-xl p-8 shadow-2xl sm:p-10">
+              <div className="mb-8 flex items-center gap-4 border-b border-slate-100 pb-6">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-50 text-teal-600">
+                  <Mail className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-950">Send us a message</h3>
+                  <p className="text-sm text-slate-500">We aim to reply within 24 hours.</p>
+                </div>
+              </div>
+              <LeadForm source="contact_us" submitLabel="Send Message" className="mt-2" />
+            </div>
           </FadeIn>
         </div>
       </section>

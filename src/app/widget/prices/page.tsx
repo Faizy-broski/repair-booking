@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 import { useState, useEffect } from 'react'
 import { Tag, ChevronRight, ArrowLeft, Loader2, Search } from 'lucide-react'
 import { getBrandStyle } from '@/lib/brand-theme'
@@ -89,7 +89,7 @@ export default function PriceWidget() {
           <Tag className="h-5 w-5" />
           <h1 className="text-lg font-bold">{business?.name ?? 'Repair Prices'}</h1>
         </div>
-        <p className="text-green-100 text-sm">Transparent pricing — no hidden fees</p>
+        <p className="text-green-100 text-sm">Transparent pricing � no hidden fees</p>
       </div>
 
       <div className="p-4 max-w-lg mx-auto">

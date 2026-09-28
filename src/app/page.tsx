@@ -12,6 +12,7 @@ import CustomerStoriesCarousel from "@/components/landing/customerStoriesSection
 import PricingSection from "@/components/landing/pricingSection";
 import FAQs from "@/components/landing/faqs";
 import StartTrialSection from "@/components/landing/startTrialSection";
+import HomeContactSection from "@/components/landing/homeContactSection";
 import Footer from "@/components/landing/footer";
 
 // ─── Page ─────────────────────────────────────────────────────────────────
@@ -40,6 +41,7 @@ export default function HomePage() {
       <PricingSection />
       <FAQs />
       <StartTrialSection />
+      <HomeContactSection />
       <Footer />
     </>
   );
