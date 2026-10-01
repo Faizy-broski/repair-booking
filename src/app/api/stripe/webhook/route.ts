@@ -404,7 +404,7 @@ export async function POST(request: NextRequest) {
     const supabase = getAdminSupabase() as any
     const { data: existing } = await supabase
       .from('subscriptions')
-      .select('plan_id, is_custom, custom_max_branches, custom_max_users, custom_max_products, custom_max_services, custom_price_monthly')
+      .select('plan_id, is_custom, custom_max_branches, custom_max_users, custom_max_products, custom_max_services, custom_price_monthly, custom_price_locked')
       .eq('business_id', businessId).maybeSingle()
 
     const resolvedPlanId = planId ?? existing?.plan_id
@@ -438,6 +438,7 @@ export async function POST(request: NextRequest) {
           maxProducts:  existing.custom_max_products,
           maxServices:  existing.custom_max_services,
           priceMonthly: existing.custom_price_monthly,
+          priceLocked:  existing.custom_price_locked ?? false,
         }
       : undefined
 

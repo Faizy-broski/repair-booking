@@ -107,19 +107,25 @@ export function computeCustomPlanPricePence(dims: CustomPlanDimensions, baseline
 }
 
 /**
- * Recomputes the total charge in pence for the given billing cycle. For
- * 'yearly' this is the full annual charge (12 months at a 10% discount),
- * not a monthly-equivalent — matches how regular plans bill price_yearly
- * as a single annual amount via Stripe's `interval: 'year'`.
+ * Applies the Custom Plan's billing-cycle charge for a given monthly price.
+ * For 'yearly' this is the full annual charge (12 months at a 10% discount),
+ * not a monthly-equivalent — matches how regular plans bill price_yearly as
+ * a single annual amount via Stripe's `interval: 'year'`. Shared by both the
+ * formula-computed price and a superadmin-pinned override (custom_price_locked)
+ * so the two paths never duplicate this math.
  */
+export function applyCustomPlanBillingCycle(monthlyPence: number, billingCycle: CustomPlanBillingCycle = 'monthly'): number {
+  if (billingCycle !== 'yearly') return monthlyPence
+  return Math.round(monthlyPence * 12 * (1 - CUSTOM_PLAN_YEARLY_DISCOUNT))
+}
+
+/** Recomputes the total charge in pence for the given billing cycle — see `applyCustomPlanBillingCycle`. */
 export function computeCustomPlanTotalPence(
   dims: CustomPlanDimensions,
   baseline: CustomPlanBaseline,
   billingCycle: CustomPlanBillingCycle = 'monthly'
 ): number {
-  const monthlyPence = computeCustomPlanPricePence(dims, baseline)
-  if (billingCycle !== 'yearly') return monthlyPence
-  return Math.round(monthlyPence * 12 * (1 - CUSTOM_PLAN_YEARLY_DISCOUNT))
+  return applyCustomPlanBillingCycle(computeCustomPlanPricePence(dims, baseline), billingCycle)
 }
 
 /**

@@ -54,6 +54,14 @@ export function EditSubscriptionModal({
   const [saving, setSaving]             = useState(false)
   const [error, setError]               = useState<string | null>(null)
 
+  // ── Custom Plan price lock ───────────────────────────────────────────────
+  // When locked, this exact £/month is pushed to Stripe on every save instead
+  // of being recomputed from the dimensions below — without this, ANY save
+  // (even one only touching status/dates) silently overwrote a negotiated
+  // price back to the formula total. Confirmed live on RiseTeck/Delta Wraps.
+  const [priceLocked, setPriceLocked]   = useState(row.custom_price_locked ?? false)
+  const [lockedPrice, setLockedPrice]   = useState(String(row.custom_price_monthly ?? ''))
+
   // ── Custom Plan dimensions ──────────────────────────────────────────────
   // Base price/floors always derive from the current cheapest paid plan
   // (never hardcoded) — same source of truth as the tenant-facing upgrade flow.
@@ -88,6 +96,10 @@ export function EditSubscriptionModal({
 
   async function handleSave() {
     if (!planId) { setError('Please select a plan'); return }
+    if (isCustomPlan && priceLocked) {
+      const n = parseFloat(lockedPrice)
+      if (!Number.isFinite(n) || n <= 0) { setError('Enter a valid locked price'); return }
+    }
     setSaving(true)
     setError(null)
     try {
@@ -101,6 +113,8 @@ export function EditSubscriptionModal({
           currentPeriodEnd: periodEnd || null,
           trialEndsAt: status === 'trialing' ? (trialEndsAt || null) : null,
           customDimensions: isCustomPlan ? toCustomPlanPayload(customState) : undefined,
+          customPriceLocked: isCustomPlan ? priceLocked : undefined,
+          customPriceMonthly: isCustomPlan && priceLocked ? parseFloat(lockedPrice) : undefined,
         }),
       })
       const json = await res.json()
@@ -177,7 +191,8 @@ export function EditSubscriptionModal({
           </div>
 
           {/* Custom Plan dimensions — branches/staff/inventory/repairs, priced
-              by the same formula as the tenant-facing upgrade flow. */}
+              by the same formula as the tenant-facing upgrade flow (unless
+              locked below). */}
           {isCustomPlan && (
             <CustomPlanCard
               variant="light"
@@ -187,6 +202,41 @@ export function EditSubscriptionModal({
               baseline={customBaseline}
               billingCycle={billingCycle}
             />
+          )}
+
+          {/* Price lock — pins an exact £/month that survives every future
+              save instead of being recomputed from the dimensions above. */}
+          {isCustomPlan && (
+            <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={priceLocked}
+                  onChange={(e) => setPriceLocked(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                />
+                Lock price (negotiated deal)
+              </label>
+              {priceLocked ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-500">£</span>
+                  <input
+                    type="number"
+                    min={0.01}
+                    step={0.01}
+                    value={lockedPrice}
+                    onChange={(e) => setLockedPrice(e.target.value)}
+                    placeholder="0.00"
+                    className="h-9 w-32 rounded-lg border border-gray-300 bg-white px-2 text-sm text-gray-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                  />
+                  <span className="text-xs text-gray-400">/month — this exact price is pushed to Stripe on save, every save, until unlocked.</span>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400">
+                  Off: price is recomputed from the dimensions above on every save.
+                </p>
+              )}
+            </div>
           )}
 
           {/* Status */}
@@ -284,7 +334,9 @@ export function EditSubscriptionModal({
               and period dates are applied to your platform only — Stripe billing for
               those is <em>not</em> modified.
               {isCustomPlan
-                ? ' Custom Plan pricing IS pushed to Stripe on save (with an immediate prorated adjustment) if this business has an active Stripe subscription.'
+                ? (priceLocked
+                    ? ` The locked price (£${lockedPrice || '0.00'}/mo) IS pushed to Stripe on save (with an immediate prorated adjustment) if this business has an active Stripe subscription.`
+                    : ' Custom Plan pricing IS pushed to Stripe on save (with an immediate prorated adjustment, recomputed from the dimensions above) if this business has an active Stripe subscription.')
                 : ' If this business has an active Stripe subscription, its price is not changed here — manage that separately in the Stripe dashboard.'}
             </p>
           </div>

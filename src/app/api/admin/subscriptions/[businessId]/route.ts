@@ -9,6 +9,7 @@ import {
   customPlanDimensionsSchema,
   computeCustomPlanPricePence,
   computeCustomPlanTotalPence,
+  applyCustomPlanBillingCycle,
   getOrCreateCustomPlanStripeProductId,
 } from '@/backend/services/custom-plan-pricing'
 
@@ -40,7 +41,7 @@ async function handler(
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { planId, status, billingCycle, currentPeriodEnd, trialEndsAt, customDimensions } = body ?? {}
+  const { planId, status, billingCycle, currentPeriodEnd, trialEndsAt, customDimensions, customPriceLocked, customPriceMonthly } = body ?? {}
 
   // ── Validation ─────────────────────────────────────────────────────────────
   if (!planId || typeof planId !== 'string') {
@@ -90,7 +91,7 @@ async function handler(
   // ── Read existing subscription to preserve Stripe IDs ──────────────────────
   const { data: existingSub } = await (supabase as any)
     .from('subscriptions')
-    .select('stripe_sub_id, stripe_customer_id, livemode, canceled_at')
+    .select('stripe_sub_id, stripe_customer_id, livemode, canceled_at, custom_price_locked, custom_price_monthly')
     .eq('business_id', businessId)
     .maybeSingle()
 
@@ -106,6 +107,7 @@ async function handler(
     custom_max_products:  null,
     custom_max_services:  null,
     custom_price_monthly: null,
+    custom_price_locked:  false,
   }
 
   let stripeSynced: boolean | null = null
@@ -124,7 +126,25 @@ async function handler(
       )
     }
     const dims = parsed.data
-    const pricePence = computeCustomPlanPricePence(dims, baseline)
+
+    // ── Price: locked (superadmin-pinned) overrides the dimension formula ────
+    // Without this, every save — even one that only touches status or dates —
+    // silently recomputed the price from dims+today's baseline and pushed it
+    // to Stripe, overwriting any manually negotiated discount. Confirmed live
+    // on RiseTeck/Delta Wraps (1 Oct 2026): a negotiated £29/month kept
+    // reverting to the £39 formula price on every resave.
+    const priceLocked = customPriceLocked === true
+    let pricePence: number
+    if (priceLocked) {
+      const overrideMonthly = Number(customPriceMonthly)
+      if (!Number.isFinite(overrideMonthly) || overrideMonthly <= 0) {
+        return NextResponse.json({ error: 'customPriceMonthly must be a positive number when the price is locked' }, { status: 400 })
+      }
+      pricePence = Math.round(overrideMonthly * 100)
+    } else {
+      pricePence = computeCustomPlanPricePence(dims, baseline)
+    }
+
     customFields = {
       is_custom:            true,
       custom_max_branches:  dims.branches,
@@ -132,6 +152,7 @@ async function handler(
       custom_max_products:  dims.inventoryLimit,
       custom_max_services:  dims.repairLimit,
       custom_price_monthly: pricePence / 100,
+      custom_price_locked:  priceLocked,
     }
 
     // ── Push the negotiated price to the real Stripe subscription ────────────
@@ -144,7 +165,7 @@ async function handler(
         const itemId = stripeSub.items.data[0]?.id
         if (!itemId) throw new Error('Stripe subscription has no line items')
 
-        const totalPence = computeCustomPlanTotalPence(dims, baseline, billingCycle as Cycle)
+        const totalPence = applyCustomPlanBillingCycle(pricePence, billingCycle as Cycle)
         const productId = await getOrCreateCustomPlanStripeProductId(stripe)
 
         await stripe.subscriptions.update(existingSub.stripe_sub_id, {

@@ -251,6 +251,7 @@ export default function BusinessInvoicesPage({
       custom_max_products: sub?.custom_max_products ?? null,
       custom_max_services: sub?.custom_max_services ?? null,
       custom_price_monthly: sub?.custom_price_monthly ?? null,
+      custom_price_locked:  sub?.custom_price_locked ?? false,
       current_period_end: sub?.current_period_end ?? null,
       trial_ends_at:       sub?.trial_ends_at ?? null,
       canceled_at:         sub?.canceled_at ?? null,

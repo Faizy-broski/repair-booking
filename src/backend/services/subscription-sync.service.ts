@@ -15,6 +15,8 @@ interface CustomPlanOverrides {
   maxProducts: number | null
   maxServices: number | null
   priceMonthly: number
+  /** Superadmin-pinned price override — must survive webhook resyncs too, not just admin-UI resaves. */
+  priceLocked?: boolean
 }
 
 interface SubscriptionPayload {
@@ -62,6 +64,7 @@ export const SubscriptionSyncService = {
           custom_max_products:   payload.customOverrides?.maxProducts ?? null,
           custom_max_services:   payload.customOverrides?.maxServices ?? null,
           custom_price_monthly:  payload.customOverrides?.priceMonthly ?? null,
+          custom_price_locked:   payload.customOverrides?.priceLocked ?? false,
         },
         { onConflict: 'business_id' }
       )

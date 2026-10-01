@@ -22,6 +22,7 @@ export interface SubscriptionRow {
   custom_max_products: number | null
   custom_max_services: number | null
   custom_price_monthly: number | null
+  custom_price_locked: boolean
   current_period_end: string | null
   trial_ends_at: string | null
   canceled_at: string | null
@@ -78,6 +79,7 @@ function normaliseSubRow(sub: any): SubscriptionRow {
     custom_max_products:  sub.custom_max_products ?? null,
     custom_max_services:  sub.custom_max_services ?? null,
     custom_price_monthly: sub.custom_price_monthly ?? null,
+    custom_price_locked:  sub.custom_price_locked ?? false,
     current_period_end: sub.current_period_end ?? null,
     trial_ends_at:      sub.trial_ends_at ?? null,
     canceled_at:        sub.canceled_at ?? null,
@@ -150,6 +152,7 @@ async function handler(request: NextRequest, _ctx: RequestContext) {
       custom_max_products,
       custom_max_services,
       custom_price_monthly,
+      custom_price_locked,
       businesses (
         id, name, subdomain, stripe_customer_id, is_active
       ),
