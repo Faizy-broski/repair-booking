@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Mail } from 'lucide-react'
+import { WhatsAppIcon, sendWhatsAppFromUrl, sendEmailFromUrl, SendDocumentActions } from '@/components/shared/send-document-actions'
 import { Eye, X, Download, Printer, Loader2, Trash2, RotateCcw, RefreshCw, Pencil, MoreVertical, Package, DollarSign, ArrowLeftRight, Search, Plus, Minus, ChevronRight, ChevronLeft } from 'lucide-react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Button } from '@/components/ui/button'
@@ -782,6 +784,14 @@ export default function SalesPage() {
     }
   }
 
+  async function sendReceiptWhatsApp(id: string) {
+    await sendWhatsAppFromUrl(`/api/pos/sales/${id}/whatsapp-link`)
+  }
+
+  async function sendReceiptEmail(id: string) {
+    await sendEmailFromUrl(`/api/pos/sales/${id}/send-email`)
+  }
+
   function downloadReceipt(sale: SaleDetail, fromDetail = false) {
     triggerReceiptDownload(sale.id, fromDetail ? setDownloadingDetail : () => {})
   }
@@ -977,6 +987,31 @@ export default function SalesPage() {
                         : <Download className="h-3.5 w-3.5 text-on-surface-variant" />}
                     </span>
                     <span className="font-medium">{isDownloading ? 'Generating…' : 'Download Receipt'}</span>
+                  </DropdownMenu.Item>
+                )}
+
+                {/* Send receipt */}
+                {!isCash && (
+                  <DropdownMenu.Item
+                    onSelect={() => sendReceiptWhatsApp(sale.id)}
+                    className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-on-surface-variant outline-none transition-colors hover:bg-surface-container-low"
+                  >
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-surface-container transition-colors group-hover:bg-surface-container-high">
+                      <WhatsAppIcon className="h-3.5 w-3.5 text-green-600" />
+                    </span>
+                    <span className="font-medium">Send via WhatsApp</span>
+                  </DropdownMenu.Item>
+                )}
+
+                {!isCash && (
+                  <DropdownMenu.Item
+                    onSelect={() => sendReceiptEmail(sale.id)}
+                    className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-on-surface-variant outline-none transition-colors hover:bg-surface-container-low"
+                  >
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-surface-container transition-colors group-hover:bg-surface-container-high">
+                      <Mail className="h-3.5 w-3.5 text-blue-600" />
+                    </span>
+                    <span className="font-medium">Send via Email</span>
                   </DropdownMenu.Item>
                 )}
 
@@ -1314,6 +1349,14 @@ export default function SalesPage() {
                 : <Printer className="mr-2 h-4 w-4" />}
               {downloadingDetail ? 'Generating PDF…' : 'Download Receipt'}
             </Button>
+            <div className="flex flex-wrap gap-2">
+              <SendDocumentActions
+                whatsappUrl={`/api/pos/sales/${detail.id}/whatsapp-link`}
+                emailUrl={`/api/pos/sales/${detail.id}/send-email`}
+                phone={(detail as any).customers?.phone}
+                email={(detail as any).customers?.email}
+              />
+            </div>
           </div>
         ) : (
           <p className="py-8 text-center text-outline">Sale not found</p>

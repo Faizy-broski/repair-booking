@@ -1,4 +1,5 @@
 import { adminSupabase } from '@/backend/config/supabase'
+import { ExpenseService } from '@/backend/services/expense.service'
 import { InventoryService } from './inventory.service'
 import { ProductService } from './product.service'
 import { buildPosOverrideMap } from './repair-financials.service'
@@ -16,10 +17,7 @@ const EXPENSE_STAT_BUSINESS_IDS = new Set(['b822b350-8590-49c8-a421-1018dd92c468
 // same source the dashboard's "Total Expenses" card uses. Sums them here so the
 // POS session stats and Z-report can show an Expense figure alongside sales.
 async function sumExpensesSince(branchId: string, sinceIso: string): Promise<number> {
-  const { data } = await db('expenses')
-    .select('amount')
-    .eq('branch_id', branchId)
-    .gte('expense_date', sinceIso)
+  const { data } = await ExpenseService.listIncludedAmounts(branchId, sinceIso)
   return (data ?? []).reduce((sum: number, row: any) => sum + Number(row.amount ?? 0), 0)
 }
 
@@ -84,6 +82,49 @@ async function getLossBreakdown(branchId: string, from: string, to: string) {
     repair_refunds: repairRefunds,
     repair_refund_count: repairRefundRows.length,
     total_loss: salesRefunds + repairRefunds,
+  }
+}
+
+// Daily sales revenue vs included expenses for the P&L trend chart. Sales only
+// (net of refunds) — repair revenue is recognised on job completion with its
+// own POS-override rules, which the headline totals already cover — so this is
+// a trend indicator, not a second source for the totals.
+async function getDailyTrend(branchId: string, from: string, to: string) {
+  const fromDate = from.split('T')[0]
+  const toDate = to.split('T')[0]
+  const [salesRes, expRes] = await Promise.all([
+    db('sales').select('total, is_refund, created_at').eq('branch_id', branchId).gte('created_at', from).lte('created_at', to),
+    db('expenses').select('amount, expense_date, include_in_pnl, expense_categories(include_in_pnl)').eq('branch_id', branchId).gte('expense_date', fromDate).lte('expense_date', toDate),
+  ])
+  if (salesRes.error) throw salesRes.error
+  let expenseRows = (expRes.data ?? []) as any[]
+  if (expRes.error) {
+    // Migration 207 not applied yet — count every expense, as before.
+    const plain = await db('expenses').select('amount, expense_date').eq('branch_id', branchId).gte('expense_date', fromDate).lte('expense_date', toDate)
+    expenseRows = (plain.data ?? []) as any[]
+  }
+  const byDay = new Map<string, { date: string; revenue: number; expenses: number }>()
+  const day = (d: string) => {
+    let r = byDay.get(d)
+    if (!r) { r = { date: d, revenue: 0, expenses: 0 }; byDay.set(d, r) }
+    return r
+  }
+  for (const r of (salesRes.data ?? []) as any[]) {
+    day(String(r.created_at).split('T')[0]).revenue += r.is_refund ? -Number(r.total ?? 0) : Number(r.total ?? 0)
+  }
+  for (const r of expenseRows) {
+    if ((r.include_in_pnl ?? r.expense_categories?.include_in_pnl ?? true) === false) continue
+    day(String(r.expense_date).split('T')[0]).expenses += Number(r.amount ?? 0)
+  }
+  return [...byDay.values()]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(r => ({ ...r, net: r.revenue - r.expenses }))
+}
+
+function emptyLedgerSummary() {
+  return {
+    cash: { in: 0, out: 0, net: 0 },
+    card: { in: 0, out: 0, net: 0 },
   }
 }
 
@@ -161,16 +202,18 @@ export const ReportService = {
     // Top sellers / loss detail are additive to whichever base P&L path runs
     // below � degrade to empty rather than failing the whole report if either
     // query hits a schema mismatch.
-    const [sellers, lossBreakdown] = await Promise.all([
+    const [sellers, lossBreakdown, daily] = await Promise.all([
       getTopSellers(branchId, from, to).catch(() => ({ topProducts: [] as TopSellerRow[], topCategories: [] as TopSellerRow[] })),
       getLossBreakdown(branchId, from, to).catch(() => ({
         sales_refunds: 0, sales_refund_count: 0, repair_refunds: 0, repair_refund_count: 0, total_loss: 0,
       })),
+      getDailyTrend(branchId, from, to).catch(() => [] as { date: string; revenue: number; expenses: number; net: number }[]),
     ])
     const extras = {
       top_products: sellers.topProducts,
       top_categories: sellers.topCategories,
       loss_breakdown: lossBreakdown,
+      daily,
     }
 
     if (error) {
@@ -202,7 +245,54 @@ export const ReportService = {
         ...extras,
       }
     }
-    return { ...data, ...extras }
+    // Defaults keep the page working if migration 207 (expense include flag) isn't applied yet.
+    return { expenses_excluded: 0, expense_breakdown: [], expense_excluded_breakdown: [], ...data, ...extras }
+  },
+
+  // Cash / Card ledger — every money movement that touched cash or card, with
+  // totals. Rows come from get_cash_card_ledger() (migration 208); the summary,
+  // per-source split and daily series are aggregated here.
+  async getCashCardLedger(branchId: string, from: string, to: string) {
+    const { data, error } = await rpc('get_cash_card_ledger', { p_branch_id: branchId, p_start: from, p_end: to })
+    if (error) {
+      return { available: false, rows: [], summary: emptyLedgerSummary(), by_source: [], daily: [] }
+    }
+    const rows = ((data ?? []) as any[])
+      .map(r => ({
+        occurred_at: r.occurred_at as string,
+        source: r.source as string,
+        direction: r.direction as 'in' | 'out',
+        method: r.method as 'cash' | 'card',
+        amount: Number(r.amount ?? 0),
+        reference_id: (r.reference_id ?? null) as string | null,
+        reference_label: (r.reference_label ?? null) as string | null,
+        customer_name: (r.customer_name ?? null) as string | null,
+        notes: (r.notes ?? null) as string | null,
+      }))
+      .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at))
+
+    const summary = emptyLedgerSummary()
+    const bySource = new Map<string, { source: string; in: number; out: number }>()
+    const byDay = new Map<string, { date: string; cash_in: number; cash_out: number; card_in: number; card_out: number }>()
+    for (const r of rows) {
+      summary[r.method][r.direction] += r.amount
+      const s = bySource.get(r.source) ?? { source: r.source, in: 0, out: 0 }
+      s[r.direction] += r.amount
+      bySource.set(r.source, s)
+      const date = r.occurred_at.split('T')[0]
+      const d = byDay.get(date) ?? { date, cash_in: 0, cash_out: 0, card_in: 0, card_out: 0 }
+      d[`${r.method}_${r.direction}` as 'cash_in'] += r.amount
+      byDay.set(date, d)
+    }
+    summary.cash.net = summary.cash.in - summary.cash.out
+    summary.card.net = summary.card.in - summary.card.out
+    return {
+      available: true,
+      rows,
+      summary,
+      by_source: [...bySource.values()],
+      daily: [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date)),
+    }
   },
 
   async getRevenuByBranch(businessId: string, from: string, to: string) {

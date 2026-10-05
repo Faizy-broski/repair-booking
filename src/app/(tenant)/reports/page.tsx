@@ -37,6 +37,7 @@ const REPORT_LINKS = [
   { href: '/reports/repairs',     label: 'Repairs',     desc: 'Repair job status & revenue',              icon: Wrench,     color: 'bg-purple-50 text-purple-600' },
   { href: '/reports/tax',         label: 'Tax',         desc: 'Tax collected by class & period',          icon: FileText,   color: 'bg-orange-50 text-orange-600' },
   { href: '/reports/payments',    label: 'Payments',    desc: 'Revenue split by payment method',          icon: CreditCard, color: 'bg-pink-50 text-pink-600' },
+  { href: '/reports/cash-card-ledger', label: 'Cash & Card Ledger', desc: 'Money in & out by cash and card, with detail', icon: Banknote, color: 'bg-emerald-50 text-emerald-600' },
   { href: '/reports/employees',   label: 'Employees',   desc: 'Staff productivity & commission',          icon: Users,      color: 'bg-teal-50 text-teal-600' },
   { href: '/reports/inventory',   label: 'Inventory',   desc: 'Stock value, low stock & adjustments',     icon: Package,    color: 'bg-amber-50 text-amber-600' },
   { href: '/reports/z-report',    label: 'Z-Report',    desc: 'Daily register sessions & cash variance',  icon: BarChart2,  color: 'bg-surface-container-low text-on-surface-variant' },

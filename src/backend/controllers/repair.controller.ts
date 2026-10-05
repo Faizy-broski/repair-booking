@@ -5,34 +5,15 @@ import { StoreCreditService } from '@/backend/services/store-credit.service'
 import { LoyaltyService } from '@/backend/services/loyalty.service'
 import { CommissionService } from '@/backend/services/payroll.service'
 import { NotificationEngine } from '@/backend/services/notification-engine.service'
-import { NotificationTemplateService } from '@/backend/services/notification-template.service'
 import { adminSupabase } from '@/backend/config/supabase'
 import { ok, created, notFound, serverError, badRequest } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
 import { PdfCacheService } from '@/backend/services/pdf-cache.service'
-import { ShortLinkService } from '@/backend/services/short-link.service'
+import { shortenUrl, sendInvoiceCreatedEmail, WHATSAPP_PDF_TTL_SECONDS } from '@/backend/services/document-share.service'
 import { buildWhatsAppInvoiceLink } from '@/lib/whatsapp-link'
 import { z } from 'zod'
 
-// wa.me links are opened by the customer at an unknown later time, so the PDF's
-// signed URL needs to outlive the normal 10-minute in-app preview TTL.
-const WHATSAPP_PDF_TTL_SECONDS = 60 * 60 * 24 * 7 // 7 days
-
-// Wraps a long signed URL (Supabase Storage signed URLs carry a big JWT token)
-// behind a short /s/{code} redirect — much friendlier in a WhatsApp message or
-// email body. Expires alongside the URL it points to. Falls back to the raw
-// URL if short-link creation fails for any reason (never block a send over this).
-async function shortenUrl(targetUrl: string, businessId: string, ttlSeconds: number): Promise<string> {
-  try {
-    const code = await ShortLinkService.create(targetUrl, businessId, new Date(Date.now() + ttlSeconds * 1000))
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://repairbooking.co.uk'
-    return `${appUrl}/s/${code}`
-  } catch (err) {
-    console.error('[shortenUrl] Failed to create short link, falling back to raw URL:', err)
-    return targetUrl
-  }
-}
 
 // ── Shared repair PDF generators ────────────────────────────────────────────
 // Server-rendered with a fixed page size so the print output is deterministic —
@@ -905,56 +886,24 @@ export const RepairController = {
       if (!pdfUrl) pdfUrl = await PdfCacheService.store(cachePath, result.buffer, filename, WHATSAPP_PDF_TTL_SECONDS)
       if (!pdfUrl) return serverError('Failed to prepare invoice PDF for sending')
 
-      // Ensure this business has an active "invoice_created" template — most
-      // businesses never visit Settings to create one, so NotificationEngine.fire
-      // would otherwise silently no-op. Seed a sensible default the first time
-      // this is used, same shape/tone as the ticket_created default template.
-      let template = await NotificationTemplateService.getByTrigger(ctx.businessId, 'invoice_created')
-      if (!template) {
-        template = await NotificationTemplateService.upsert(ctx.businessId, {
-          trigger_event: 'invoice_created',
-          channel: 'email',
-          subject: 'Your Invoice {{invoice_number}} from {{store_name}}',
-          email_body:
-            '<p style="margin:0 0 16px;font-size:15px;color:#374151;">Hi <strong>{{customer_name}}</strong>,</p>' +
-            '<p style="margin:0 0 20px;font-size:14px;color:#6b7280;line-height:1.6;">Here is your invoice from {{store_name}}.</p>' +
-            '<table style="width:100%;border-collapse:collapse;margin:0 0 24px;font-size:14px;">' +
-            '<tr style="background:#f8fafc;"><td style="padding:10px 14px;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Invoice #</td>' +
-            '<td style="padding:10px 14px;font-weight:700;color:#111827;border-bottom:1px solid #e5e7eb;"><strong>{{invoice_number}}</strong></td></tr>' +
-            '<tr><td style="padding:10px 14px;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e5e7eb;white-space:nowrap;">Total</td>' +
-            '<td style="padding:10px 14px;color:#374151;border-bottom:1px solid #e5e7eb;">{{total}}</td></tr>' +
-            '<tr style="background:#f8fafc;"><td style="padding:10px 14px;color:#6b7280;font-size:12px;text-transform:uppercase;letter-spacing:0.05em;">Balance Due</td>' +
-            '<td style="padding:10px 14px;font-weight:700;color:#111827;">{{balance_due}}</td></tr>' +
-            '</table>' +
-            '<p style="margin:0 0 20px;"><a href="{{invoice_link}}" style="display:inline-block;padding:10px 20px;background:#0f766e;color:#ffffff;border-radius:6px;font-size:14px;font-weight:600;text-decoration:none;">View / Download Invoice</a></p>' +
-            '<p style="margin:0;font-size:14px;color:#6b7280;">Thank you for your business.</p>',
-          is_active: true,
-        })
-      }
-      if (!template?.is_active) return badRequest('Invoice email is disabled in Settings → Notifications for this business.')
-
-      const fmt = (n: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: data.currency }).format(n)
-      const balanceDue = Math.max(0, data.total - data.amountPaid)
       const shortUrl = await shortenUrl(pdfUrl, ctx.businessId, WHATSAPP_PDF_TTL_SECONDS)
-
-      await NotificationEngine.fire('invoice_created', {
+      const emailError = await sendInvoiceCreatedEmail({
         businessId: ctx.businessId,
         branchId: ctx.auth.branchId ?? null,
         relatedId: id,
         relatedType: 'repair',
-        variables: {
-          customer_name: data.customerName,
-          invoice_number: data.jobNumber,
-          total: fmt(data.total),
-          balance_due: fmt(balanceDue),
-          due_date: data.dueAt ? new Date(data.dueAt).toLocaleDateString('en-GB') : '',
-          currency: data.currency,
-          store_name: data.businessName,
-          invoice_link: shortUrl,
-        },
-        recipient: { email: data.customerEmail, phone: null },
-        attachments: [{ filename, content: result.buffer, contentType: 'application/pdf' }],
+        customerName: data.customerName,
+        customerEmail: data.customerEmail,
+        invoiceNumber: data.jobNumber,
+        total: data.total,
+        amountPaid: data.amountPaid,
+        currency: data.currency,
+        storeName: data.businessName,
+        dueAt: data.dueAt,
+        invoiceLink: shortUrl,
+        attachment: { filename, content: result.buffer },
       })
+      if (emailError) return badRequest(emailError)
 
       return ok({ sent: true })
     } catch (err) {

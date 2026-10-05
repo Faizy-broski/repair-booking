@@ -25,13 +25,14 @@ interface ExpenseRow {
   notes?: string | null
   category_id?: string | null
   payment_method?: 'cash' | 'card'
+  include_in_pnl?: boolean | null
   expense_categories?: { name: string } | null
 }
 interface SalaryRow {
   id: string; amount: number; pay_date: string; pay_period: string | null
   employees?: { first_name: string; last_name: string | null } | null
 }
-interface CategoryOption { id: string; name: string }
+interface CategoryOption { id: string; name: string; include_in_pnl?: boolean }
 
 const expenseSchema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -40,6 +41,8 @@ const expenseSchema = z.object({
   category_id: z.string().uuid().optional().or(z.literal('')),
   payment_method: z.enum(['cash', 'card']).default('cash'),
   notes: z.string().optional(),
+  // 'inherit' = use the category's default; otherwise overrides it for this expense
+  pnl_mode: z.enum(['inherit', 'include', 'exclude']).default('inherit'),
 })
 type ExpenseFormData = z.infer<typeof expenseSchema>
 
@@ -53,6 +56,7 @@ export default function ExpensesPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [creatingCategory, setCreatingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
+  const [newCategoryInPnl, setNewCategoryInPnl] = useState(true)
   const [savingCategory, setSavingCategory] = useState(false)
 
   // Edit modal
@@ -70,7 +74,7 @@ export default function ExpensesPage() {
 
   const addForm = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema),
-    defaultValues: { expense_date: new Date().toISOString().split('T')[0], payment_method: 'cash' },
+    defaultValues: { expense_date: new Date().toISOString().split('T')[0], payment_method: 'cash', pnl_mode: 'inherit' },
   })
   const editForm = useForm<ExpenseFormData>({ resolver: zodResolver(expenseSchema) })
 
@@ -117,15 +121,21 @@ export default function ExpensesPage() {
   }
 
   // ── Add expense ──────────────────────────────────────────────────────────────
+  // Maps the form's pnl_mode to the API's nullable include_in_pnl (null = inherit category default).
+  function withPnl(data: ExpenseFormData) {
+    const { pnl_mode, ...rest } = data
+    return { ...rest, include_in_pnl: pnl_mode === 'inherit' ? null : pnl_mode === 'include' }
+  }
+
   async function onAddExpense(data: ExpenseFormData) {
     if (!activeBranch) return
     const res = await fetch('/api/expenses', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, branch_id: activeBranch.id, category_id: data.category_id || null }),
+      body: JSON.stringify({ ...withPnl(data), branch_id: activeBranch.id, category_id: data.category_id || null }),
     })
     if (!res.ok) { toast.error('Failed to add expense'); return }
     toast.success('Expense added')
-    addForm.reset({ expense_date: new Date().toISOString().split('T')[0], payment_method: 'cash' })
+    addForm.reset({ expense_date: new Date().toISOString().split('T')[0], payment_method: 'cash', pnl_mode: 'inherit' })
     setSheetOpen(false)
     setCreatingCategory(false)
     setNewCategoryName('')
@@ -137,7 +147,7 @@ export default function ExpensesPage() {
     setSavingCategory(true)
     const res = await fetch('/api/expenses/categories', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ business_id: activeBranch.business_id, name: newCategoryName.trim() }),
+      body: JSON.stringify({ business_id: activeBranch.business_id, name: newCategoryName.trim(), include_in_pnl: newCategoryInPnl }),
     })
     if (res.ok) {
       const json = await res.json()
@@ -161,6 +171,7 @@ export default function ExpensesPage() {
       category_id: row.category_id ?? '',
       payment_method: row.payment_method ?? 'cash',
       notes: row.notes ?? '',
+      pnl_mode: row.include_in_pnl == null ? 'inherit' : row.include_in_pnl ? 'include' : 'exclude',
     })
   }
 
@@ -169,7 +180,7 @@ export default function ExpensesPage() {
     setEditSaving(true)
     const res = await fetch(`/api/expenses/${editRow.id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, category_id: data.category_id || null }),
+      body: JSON.stringify({ ...withPnl(data), category_id: data.category_id || null }),
     })
     if (!res.ok) { toast.error('Failed to update expense'); setEditSaving(false); return }
     toast.success('Expense updated')
@@ -183,7 +194,7 @@ export default function ExpensesPage() {
     setEditSavingCat(true)
     const res = await fetch('/api/expenses/categories', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ business_id: activeBranch.business_id, name: editNewCatName.trim() }),
+      body: JSON.stringify({ business_id: activeBranch.business_id, name: editNewCatName.trim(), include_in_pnl: newCategoryInPnl }),
     })
     if (res.ok) {
       const json = await res.json()
@@ -193,6 +204,22 @@ export default function ExpensesPage() {
       setEditNewCatName('')
     }
     setEditSavingCat(false)
+  }
+
+  async function toggleCategoryPnl(c: CategoryOption) {
+    const next = !(c.include_in_pnl ?? true)
+    const res = await fetch(`/api/expenses/categories/${c.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ include_in_pnl: next }),
+    })
+    if (!res.ok) { toast.error('Failed to update category'); return }
+    toast.success(next ? `${c.name} now counts in P&L` : `${c.name} is now excluded from P&L`)
+    await refetchCategories()
+  }
+
+  // Effective P&L flag: expense override, else category default, else included.
+  function isInPnl(row: ExpenseRow) {
+    return row.include_in_pnl ?? categories.find(c => c.id === row.category_id)?.include_in_pnl ?? true
   }
 
   // ── Delete expense ───────────────────────────────────────────────────────────
@@ -215,6 +242,9 @@ export default function ExpensesPage() {
       cell: ({ row }) => (
         <div>
           <span className="font-medium text-on-surface">{row.original.title}</span>
+          {!isInPnl(row.original) && (
+            <span className="ml-2 rounded-full bg-surface-container px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-on-surface-variant">Not in P&amp;L</span>
+          )}
         </div>
       ),
     },
@@ -344,6 +374,22 @@ export default function ExpensesPage() {
     )
   }
 
+  function PnlSelect({ form }: { form: ReturnType<typeof useForm<ExpenseFormData>> }) {
+    const catId = form.watch('category_id')
+    const catDefault = categories.find(c => c.id === catId)?.include_in_pnl ?? true
+    return (
+      <div>
+        <label className="mb-1 block text-sm font-medium text-on-surface-variant">Profit &amp; Loss</label>
+        <select {...form.register('pnl_mode')} className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none">
+          <option value="inherit">Use category default ({catDefault ? 'counted' : 'not counted'})</option>
+          <option value="include">Count in P&amp;L</option>
+          <option value="exclude">Exclude from P&amp;L</option>
+        </select>
+        <p className="mt-1 text-xs text-outline">Excluded expenses stay listed here but don&apos;t reduce profit in reports.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -380,6 +426,9 @@ export default function ExpensesPage() {
           <Tabs.Trigger value="salaries" className="rounded-md px-4 py-1.5 text-sm font-medium data-[state=active]:bg-surface data-[state=active]:shadow-sm">
             Salaries
           </Tabs.Trigger>
+          <Tabs.Trigger value="categories" className="rounded-md px-4 py-1.5 text-sm font-medium data-[state=active]:bg-surface data-[state=active]:shadow-sm">
+            Categories
+          </Tabs.Trigger>
         </Tabs.List>
 
         <Tabs.Content value="expenses" className="mt-4">
@@ -393,6 +442,41 @@ export default function ExpensesPage() {
             onPageChange={setPage}
             onPageSizeChange={s => { setPageSize(s); setPage(0) }}
           />
+        </Tabs.Content>
+
+        <Tabs.Content value="categories" className="mt-4">
+          <div className="rounded-xl border border-outline-variant bg-surface">
+            <p className="border-b border-outline-variant px-4 py-3 text-sm text-on-surface-variant">
+              Choose which categories count towards Profit &amp; Loss. Individual expenses can still override this.
+            </p>
+            {categories.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-on-surface-variant">No categories yet.</p>
+            ) : (
+              <ul className="divide-y divide-outline-variant/50">
+                {categories.map(c => {
+                  const on = c.include_in_pnl ?? true
+                  return (
+                    <li key={c.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                      <span className="text-sm font-medium text-on-surface">{c.name}</span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={on}
+                        aria-label={`Count ${c.name} in P&L`}
+                        onClick={() => toggleCategoryPnl(c)}
+                        className="flex items-center gap-2 text-xs text-on-surface-variant"
+                      >
+                        <span>{on ? 'Counted in P&L' : 'Excluded from P&L'}</span>
+                        <span className={`relative h-5 w-9 rounded-full transition-colors ${on ? 'bg-brand-teal' : 'bg-outline-variant'}`}>
+                          <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${on ? 'left-[18px]' : 'left-0.5'}`} />
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
         </Tabs.Content>
 
         <Tabs.Content value="salaries" className="mt-4">
@@ -417,6 +501,7 @@ export default function ExpensesPage() {
                   onChange={e => setNewCategoryName(e.target.value)}
                   className="flex-1 rounded-lg border border-outline px-3 py-2 text-sm focus:outline-none"
                 />
+                <label className="flex shrink-0 items-center gap-1.5 text-xs text-on-surface-variant"><input type="checkbox" checked={newCategoryInPnl} onChange={e => setNewCategoryInPnl(e.target.checked)} /> Count in P&amp;L</label>
                 <Button type="button" size="sm" disabled={!newCategoryName.trim()} loading={savingCategory} onClick={handleAddCategory}>Add</Button>
                 <Button type="button" size="sm" variant="outline" onClick={() => { setCreatingCategory(false); setNewCategoryName('') }}>Cancel</Button>
               </div>
@@ -425,6 +510,7 @@ export default function ExpensesPage() {
           <Input label="Amount" type="number" step="0.01" required error={addForm.formState.errors.amount?.message} {...addForm.register('amount')} />
           <Input label="Date" type="date" required {...addForm.register('expense_date')} />
           <PaymentMethodSelect form={addForm} />
+          <PnlSelect form={addForm} />
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes <span className="text-xs font-normal text-outline">(optional)</span></label>
             <textarea rows={2} className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none" {...addForm.register('notes')} />
@@ -451,6 +537,7 @@ export default function ExpensesPage() {
                     onChange={e => setEditNewCatName(e.target.value)}
                     className="flex-1 rounded-lg border border-outline px-3 py-2 text-sm focus:outline-none"
                   />
+                  <label className="flex shrink-0 items-center gap-1.5 text-xs text-on-surface-variant"><input type="checkbox" checked={newCategoryInPnl} onChange={e => setNewCategoryInPnl(e.target.checked)} /> Count in P&amp;L</label>
                   <Button type="button" size="sm" disabled={!editNewCatName.trim()} loading={editSavingCat} onClick={handleEditCategory}>Add</Button>
                   <Button type="button" size="sm" variant="outline" onClick={() => { setEditCreatingCat(false); setEditNewCatName('') }}>Cancel</Button>
                 </div>
@@ -459,6 +546,7 @@ export default function ExpensesPage() {
             <Input label="Amount" type="number" step="0.01" required error={editForm.formState.errors.amount?.message} {...editForm.register('amount')} />
             <Input label="Date" type="date" required {...editForm.register('expense_date')} />
             <PaymentMethodSelect form={editForm} />
+            <PnlSelect form={editForm} />
             <div>
               <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes <span className="text-xs font-normal text-outline">(optional)</span></label>
               <textarea rows={2} className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none" {...editForm.register('notes')} />

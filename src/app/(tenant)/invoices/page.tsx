@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { Plus, Download, CreditCard, RotateCcw, Loader2, UserPlus, MoreVertical, Pencil, Trash2, MessageCircle } from 'lucide-react'
+import { Plus, Download, CreditCard, RotateCcw, Loader2, UserPlus, MoreVertical, Pencil, Trash2, MessageCircle, Mail } from 'lucide-react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -84,6 +84,7 @@ export default function InvoicesPage() {
   const [recordingPayment, setRecordingPayment] = useState(false)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [sendingWhatsAppId, setSendingWhatsAppId] = useState<string | null>(null)
+  const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [newCustOpen, setNewCustOpen] = useState(false)
@@ -305,6 +306,21 @@ export default function InvoicesPage() {
     }
   }
 
+  async function sendEmail(invoiceId: string) {
+    setSendingEmailId(invoiceId)
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}/send-email`, { method: 'POST' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok || !json.data?.sent) {
+        toast.error(json.error?.message ?? 'Failed to send invoice email.')
+        return
+      }
+      toast.success('Invoice emailed to customer.')
+    } finally {
+      setSendingEmailId(null)
+    }
+  }
+
   async function downloadPdf(invoiceId: string) {
     setDownloadingId(invoiceId)
     // Only show the toast if it takes longer than 400ms (i.e. cache miss / first generation).
@@ -441,6 +457,15 @@ export default function InvoicesPage() {
                       ? <Loader2 className="h-4 w-4 animate-spin text-outline" />
                       : <MessageCircle className="h-4 w-4 text-outline" />}
                     Send via WhatsApp
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    onSelect={() => sendEmail(inv.id)}
+                    className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-on-surface-variant outline-none hover:bg-surface-container-low"
+                  >
+                    {sendingEmailId === inv.id
+                      ? <Loader2 className="h-4 w-4 animate-spin text-outline" />
+                      : <Mail className="h-4 w-4 text-outline" />}
+                    Send via Email
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     onSelect={() => openEdit(inv)}

@@ -10,9 +10,7 @@ import { PdfCacheService } from '@/backend/services/pdf-cache.service'
 import { buildWhatsAppInvoiceLink } from '@/lib/whatsapp-link'
 import { adminSupabase } from '@/backend/config/supabase'
 
-// wa.me links are opened by the customer at an unknown later time, so the PDF's
-// signed URL needs to outlive the normal 10-minute in-app preview TTL.
-const WHATSAPP_PDF_TTL_SECONDS = 60 * 60 * 24 * 7 // 7 days
+import { shortenUrl, sendInvoiceCreatedEmail, WHATSAPP_PDF_TTL_SECONDS } from '@/backend/services/document-share.service'
 
 const lineItemSchema = z.object({
   description: z.string().min(1),
@@ -207,12 +205,50 @@ export const InvoiceController = {
         invoiceNumber: (invoice as any).invoice_number,
         total: (invoice as any).total ?? 0,
         currency: (business as any)?.currency ?? 'GBP',
-        pdfUrl,
+        pdfUrl: await shortenUrl(pdfUrl, ctx.businessId, WHATSAPP_PDF_TTL_SECONDS),
         businessName: (business as any)?.name ?? null,
       })
       return ok({ url: link })
     } catch (err) {
       return serverError('Failed to build WhatsApp link', err)
+    }
+  },
+
+  async sendEmail(_request: NextRequest, ctx: RequestContext, id: string) {
+    try {
+      const invoice = await InvoiceService.getById(id, ctx.auth.branchId ?? null) as any
+      if (!invoice) return notFound('Invoice not found')
+      const customer = invoice.customers
+      if (!customer?.email) return badRequest('This customer has no email address on file.')
+
+      const buffer = await InvoiceService.generatePdf(id, ctx.businessId ?? undefined)
+      const filename = `invoice-${invoice.invoice_number}.pdf`
+      const cachePath = PdfCacheService.cachePath('invoices', id)
+      let pdfUrl = await PdfCacheService.getSignedUrl(cachePath, filename, WHATSAPP_PDF_TTL_SECONDS)
+      if (!pdfUrl) pdfUrl = await PdfCacheService.store(cachePath, buffer, filename, WHATSAPP_PDF_TTL_SECONDS)
+      if (!pdfUrl) return serverError('Failed to prepare invoice PDF for sending')
+
+      const { data: business } = await adminSupabase.from('businesses').select('name, currency').eq('id', ctx.businessId).single()
+      const emailError = await sendInvoiceCreatedEmail({
+        businessId: ctx.businessId,
+        branchId: ctx.auth.branchId ?? null,
+        relatedId: id,
+        relatedType: 'invoice',
+        customerName: [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'Customer',
+        customerEmail: customer.email,
+        invoiceNumber: invoice.invoice_number,
+        total: Number(invoice.total ?? 0),
+        amountPaid: Number(invoice.amount_paid ?? 0),
+        currency: (business as any)?.currency ?? 'GBP',
+        storeName: (business as any)?.name ?? '',
+        dueAt: invoice.due_date ?? null,
+        invoiceLink: await shortenUrl(pdfUrl, ctx.businessId, WHATSAPP_PDF_TTL_SECONDS),
+        attachment: { filename, content: buffer },
+      })
+      if (emailError) return badRequest(emailError)
+      return ok({ sent: true })
+    } catch (err) {
+      return serverError('Failed to send invoice email', err)
     }
   },
 }

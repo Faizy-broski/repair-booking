@@ -10,7 +10,7 @@ import {
   CreditCard, AlertCircle, Smartphone, BookOpen, TrendingUp, PieChart,
   ChevronDown, Bell, Server, Clock, Activity, Mail, Users2,
   Store, GitBranch, Sliders, Layers, Settings2, PackagePlus, Cpu, Tag,
-  CalendarDays, LogIn, Palette, LifeBuoy, Truck, ClipboardList, Trash2, Undo2,
+  CalendarDays, LogIn, Palette, LifeBuoy, Truck, ClipboardList, Trash2, Undo2, Banknote,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
@@ -81,6 +81,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Repairs',        href: '/reports/repairs',              icon: Wrench,     requiredRole: 'branch_manager', module: 'reports', subItem: true },
   { label: 'Tax',            href: '/reports/tax',                  icon: FileText,   requiredRole: 'branch_manager', module: 'reports', subItem: true },
   { label: 'Payments',       href: '/reports/payments',             icon: CreditCard, requiredRole: 'branch_manager', module: 'reports', subItem: true },
+  { label: 'Cash & Card',    href: '/reports/cash-card-ledger',     icon: Banknote,   requiredRole: 'branch_manager', module: 'reports', subItem: true },
   { label: 'Employees',      href: '/reports/employees',            icon: UserCheck,  requiredRole: 'branch_manager', module: 'reports', subItem: true },
   { label: 'Inventory',      href: '/reports/inventory',            icon: Package,    requiredRole: 'branch_manager', module: 'reports', subItem: true },
   { label: 'Z-Report',       href: '/reports/z-report',             icon: PieChart,   requiredRole: 'branch_manager', module: 'reports', subItem: true },

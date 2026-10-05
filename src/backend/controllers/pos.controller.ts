@@ -7,6 +7,9 @@ import { validateBody } from '@/backend/utils/validate'
 import { getPagination } from '@/backend/utils/pagination'
 import { z } from 'zod'
 import { adminSupabase } from '@/backend/config/supabase'
+import { PdfCacheService } from '@/backend/services/pdf-cache.service'
+import { buildWhatsAppInvoiceLink } from '@/lib/whatsapp-link'
+import { shortenUrl, sendInvoiceCreatedEmail, WHATSAPP_PDF_TTL_SECONDS } from '@/backend/services/document-share.service'
 
 // ── Shared receipt PDF generator (used by both on-demand and background warm) ──
 async function buildReceiptBuffer(saleId: string, branchId: string | null, businessId: string | null, paymentId?: string) {
@@ -142,6 +145,37 @@ async function buildReceiptBuffer(saleId: string, branchId: string | null, busin
   })
 
   return { buffer: await renderToBuffer(doc as any), createdAt: s.created_at }
+}
+
+// Renders the receipt PDF, stores it with a 7-day signed + shortened URL, and
+// resolves the sale/customer/business data both share-by-WhatsApp and
+// share-by-email need. The link is per-render (unique cache path per payment)
+// because receipt content depends on invoice design settings.
+async function prepareSaleShare(saleId: string, ctx: RequestContext, paymentId?: string) {
+  const branchId = ctx.auth.branchId ?? null
+  const sale = (await PosService.getSaleById(saleId, branchId)) as any
+  if (!sale) return { error: notFound('Sale not found') }
+
+  const result = await buildReceiptBuffer(saleId, branchId, ctx.businessId, paymentId)
+  if (!result) return { error: notFound('Sale not found') }
+
+  const number: string = sale.invoice_number ?? `#${saleId.slice(-8).toUpperCase()}`
+  const filename = `receipt-${saleId.slice(-8)}${paymentId ? `-payment-${paymentId.slice(-6)}` : ''}.pdf`
+  const cachePath = PdfCacheService.cachePath('sales', paymentId ? `${saleId}-${paymentId}` : saleId)
+  const storedUrl = await PdfCacheService.store(cachePath, result.buffer, filename, WHATSAPP_PDF_TTL_SECONDS)
+  if (!storedUrl) return { error: serverError('Failed to prepare receipt PDF for sending') }
+  const pdfUrl = await shortenUrl(storedUrl, ctx.businessId!, WHATSAPP_PDF_TTL_SECONDS)
+
+  const { data: business } = await adminSupabase.from('businesses').select('name, currency').eq('id', ctx.businessId).single()
+  return {
+    sale,
+    number,
+    pdfUrl,
+    buffer: result.buffer as Buffer,
+    filename,
+    currency: (business as any)?.currency ?? 'GBP',
+    businessName: ((business as any)?.name ?? null) as string | null,
+  }
 }
 
 const saleItemSchema = z.object({
@@ -325,6 +359,56 @@ export const PosController = {
       })
     } catch (err) {
       return serverError('Failed to generate receipt PDF', err)
+    }
+  },
+
+  async getReceiptWhatsAppLink(_request: NextRequest, ctx: RequestContext, id: string, paymentId?: string) {
+    try {
+      const prepared = await prepareSaleShare(id, ctx, paymentId)
+      if ('error' in prepared) return prepared.error as NextResponse
+      const { sale, number, pdfUrl, currency, businessName } = prepared
+      if (!sale.customers?.phone) return badRequest('This customer has no phone number on file.')
+
+      const link = buildWhatsAppInvoiceLink({
+        phone: sale.customers.phone,
+        invoiceNumber: number,
+        total: Number(sale.total ?? 0),
+        currency,
+        pdfUrl,
+        businessName,
+      })
+      return ok({ url: link })
+    } catch (err) {
+      return serverError('Failed to build WhatsApp link', err)
+    }
+  },
+
+  async sendReceiptEmail(_request: NextRequest, ctx: RequestContext, id: string, paymentId?: string) {
+    try {
+      const prepared = await prepareSaleShare(id, ctx, paymentId)
+      if ('error' in prepared) return prepared.error as NextResponse
+      const { sale, number, pdfUrl, buffer, filename, currency, businessName } = prepared
+      if (!sale.customers?.email) return badRequest('This customer has no email address on file.')
+
+      const emailError = await sendInvoiceCreatedEmail({
+        businessId: ctx.businessId!,
+        branchId: ctx.auth.branchId ?? null,
+        relatedId: id,
+        relatedType: 'sale',
+        customerName: [sale.customers.first_name, sale.customers.last_name].filter(Boolean).join(' ') || 'Customer',
+        customerEmail: sale.customers.email,
+        invoiceNumber: number,
+        total: Number(sale.total ?? 0),
+        amountPaid: Number(sale.amount_paid ?? 0),
+        currency,
+        storeName: businessName ?? '',
+        invoiceLink: pdfUrl,
+        attachment: { filename, content: buffer },
+      })
+      if (emailError) return badRequest(emailError)
+      return ok({ sent: true })
+    } catch (err) {
+      return serverError('Failed to send receipt email', err)
     }
   },
 

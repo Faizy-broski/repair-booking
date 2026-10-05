@@ -31,13 +31,14 @@ export const ExpenseService = {
     return { data, count }
   },
 
-  async create(payload: InsertTables<'expenses'>) {
-    const { data, error } = await adminSupabase.from('expenses').insert(payload).select().single()
+  async create(payload: InsertTables<'expenses'> & { include_in_pnl?: boolean | null }) {
+    // include_in_pnl isn't in the generated Supabase types until migration 207 is applied and types regenerated.
+    const { data, error } = await adminSupabase.from('expenses').insert(payload as any).select().single()
     if (error) throw error
     return data
   },
 
-  async update(id: string, businessId: string, payload: { title?: string; amount?: number; expense_date?: string; category_id?: string | null; payment_method?: 'cash' | 'card'; notes?: string | null }) {
+  async update(id: string, businessId: string, payload: { title?: string; amount?: number; expense_date?: string; category_id?: string | null; payment_method?: 'cash' | 'card'; notes?: string | null; include_in_pnl?: boolean | null }) {
     // Verify the expense belongs to this business before updating
     const { data: existing, error: fetchErr } = await adminSupabase
       .from('expenses')
@@ -50,7 +51,7 @@ export const ExpenseService = {
 
     const { data, error } = await adminSupabase
       .from('expenses')
-      .update(payload)
+      .update(payload as any)
       .eq('id', id)
       .select('*, expense_categories(name)')
       .single()
@@ -95,20 +96,52 @@ export const ExpenseService = {
   async getCategories(businessId: string) {
     const { data, error } = await adminSupabase
       .from('expense_categories')
-      .select('id, name')
+      .select('*')
       .eq('business_id', businessId)
       .order('name')
     if (error) throw error
     return data
   },
 
-  async createCategory(businessId: string, name: string) {
+  async createCategory(businessId: string, name: string, includeInPnl = true) {
     const { data, error } = await adminSupabase
       .from('expense_categories')
-      .insert({ business_id: businessId, name })
+      .insert({ business_id: businessId, name, ...(includeInPnl ? {} : { include_in_pnl: false }) } as any)
       .select()
       .single()
     if (error) throw error
     return data
+  },
+
+  async updateCategory(id: string, businessId: string, payload: { name?: string; include_in_pnl?: boolean }) {
+    const { data, error } = await adminSupabase
+      .from('expense_categories')
+      .update(payload as any)
+      .eq('id', id)
+      .eq('business_id', businessId)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  /**
+   * Expense amounts that count towards P&L (effective flag = expense override,
+   * else category default, else included). Falls back to every expense when
+   * migration 207's columns don't exist yet, so reports keep working before it
+   * is applied.
+   */
+  async listIncludedAmounts(branchId: string, fromDate: string): Promise<{ data: { amount: number }[] }> {
+    const { data, error } = await adminSupabase
+      .from('expenses')
+      .select('amount, include_in_pnl, expense_categories(include_in_pnl)' as any)
+      .eq('branch_id', branchId)
+      .gte('expense_date', fromDate)
+    if (error) {
+      const fallback = await adminSupabase.from('expenses').select('amount').eq('branch_id', branchId).gte('expense_date', fromDate)
+      return { data: (fallback.data ?? []) as { amount: number }[] }
+    }
+    const rows = ((data ?? []) as any[]).filter(r => (r.include_in_pnl ?? r.expense_categories?.include_in_pnl ?? true) !== false)
+    return { data: rows.map(r => ({ amount: r.amount })) }
   },
 }

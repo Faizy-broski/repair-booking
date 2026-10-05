@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency } from '@/lib/utils'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { SendDocumentActions } from '@/components/shared/send-document-actions'
 
 interface SaleItem {
   id: string
@@ -35,7 +36,7 @@ interface Sale {
   created_at: string
   is_refund: boolean
   sale_items: SaleItem[]
-  customers: { first_name: string; last_name: string | null } | null
+  customers: { first_name: string; last_name: string | null; phone?: string | null; email?: string | null } | null
   payment_splits?: PaymentSplitLeg[] | null
 }
 
@@ -70,7 +71,7 @@ function RefundPageInner() {
   const [refundReason, setRefundReason] = useState('')
 
   const [processing, setProcessing] = useState(false)
-  const [success, setSuccess] = useState<{ total: number; method: string } | null>(null)
+  const [success, setSuccess] = useState<{ total: number; method: string; refundId: string | null; phone: string | null; email: string | null } | null>(null)
 
   // Auto-search if sale_id provided in URL
   useEffect(() => {
@@ -226,7 +227,14 @@ function RefundPageInner() {
     })
 
     if (res.ok) {
-      setSuccess({ total: Math.abs(refundTotal), method: isSplitOriginal ? 'split' : refundMethod })
+      const refundJson = await res.json().catch(() => null)
+      setSuccess({
+        total: Math.abs(refundTotal),
+        method: isSplitOriginal ? 'split' : refundMethod,
+        refundId: refundJson?.data?.refund_id ?? null,
+        phone: sale?.customers?.phone ?? null,
+        email: sale?.customers?.email ?? null,
+      })
     } else {
       const err = await res.json()
       setSearchError(err.message ?? 'Refund failed. Please try again.')
@@ -246,6 +254,16 @@ function RefundPageInner() {
         <p className="text-sm text-on-surface-variant">
           {formatCurrency(success.total)} refunded via {success.method.replace('_', ' ')}
         </p>
+        {success.refundId && (success.phone || success.email) && (
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <SendDocumentActions
+              whatsappUrl={`/api/pos/sales/${success.refundId}/whatsapp-link`}
+              emailUrl={`/api/pos/sales/${success.refundId}/send-email`}
+              phone={success.phone}
+              email={success.email}
+            />
+          </div>
+        )}
         <div className="flex gap-3">
           <Button variant="outline" onClick={() => { setSuccess(null); setSale(null); setInvoiceSearch('') }}>
             <RotateCcw className="h-4 w-4 mr-1.5" /> Process Another

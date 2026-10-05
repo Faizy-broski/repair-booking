@@ -13,6 +13,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { usePosStore } from '@/store/pos.store'
 import { useModuleConfigStore } from '@/store/module-config.store'
 import { AsyncEmployeeSelect } from '@/components/shared/async-employee-select'
+import { SendDocumentActions } from '@/components/shared/send-document-actions'
 import type { PaymentSplit } from '@/store/pos.store'
 import { formatCurrency, formatDateTime, getCurrencySymbol } from '@/lib/utils'
 import { pdf } from '@react-pdf/renderer'
@@ -108,6 +109,9 @@ export function CartPanel({ mobileView }: Props) {
   const [paymentOpen, setPaymentOpen]       = useState(false)
   const [processing, setProcessing]         = useState(false)
   const [success, setSuccess]               = useState(false)
+  // Set after a sale is saved when the customer has a phone/email — keeps the
+  // success overlay open so staff can WhatsApp/email the receipt.
+  const [saleShare, setSaleShare]           = useState<{ saleId: string; name: string; phone: string | null; email: string | null } | null>(null)
   const [splits, setSplits]                 = useState<Record<string, string>>({ cash: '', card: '' })
   const [cashTendered, setCashTendered]     = useState('')
   const [discountType, setDiscountType]     = useState<'fixed' | 'percent'>('fixed')
@@ -380,6 +384,57 @@ export function CartPanel({ mobileView }: Props) {
     } catch { /* receipt print is best-effort */ }
   }
 
+  // Closes the success overlay (and the split-payment modal behind it).
+  function dismissSale() {
+    setSuccess(false)
+    setSaleShare(null)
+    setPaymentOpen(false)
+  }
+
+  // After a saved sale: if the customer has a phone/email, keep the success
+  // overlay up so the receipt can be WhatsApped/emailed; otherwise auto-dismiss.
+  function finishSale(saleId: string | undefined, customer: Customer | null, afterDismiss?: () => void) {
+    const phone = customer?.phone ?? null
+    const email = customer?.email ?? null
+    if (saleId && (phone || email)) {
+      setSaleShare({
+        saleId,
+        name: [customer?.first_name, customer?.last_name].filter(Boolean).join(' '),
+        phone,
+        email,
+      })
+      return
+    }
+    setTimeout(() => { setSuccess(false); afterDismiss?.() }, 2500)
+  }
+
+  // Shared body of the three "Payment Successful!" overlays.
+  function renderSuccessCard(subtitle: string) {
+    return (
+      <div className="rounded-2xl bg-surface px-16 py-14 text-center shadow-2xl">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+          <CheckCircle2 className="h-9 w-9 text-green-600" />
+        </div>
+        <p className="text-xl font-bold text-green-700">Payment Successful!</p>
+        <p className="mt-1 text-sm text-on-surface-variant">{subtitle}</p>
+        {saleShare && (
+          <div className="mt-6 border-t border-outline-variant pt-5">
+            <p className="mb-3 text-xs text-on-surface-variant">Send receipt to {saleShare.name || 'customer'}</p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <SendDocumentActions
+                whatsappUrl={`/api/pos/sales/${saleShare.saleId}/whatsapp-link`}
+                emailUrl={`/api/pos/sales/${saleShare.saleId}/send-email`}
+                phone={saleShare.phone}
+                email={saleShare.email}
+              />
+              <Button variant="outline" className="whitespace-nowrap shrink-0" onClick={dismissSale}>Done</Button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // ── Process payment (full / split / gift card) ─────────────────────────────
   async function processPayment() {
     if (!activeBranch || !profile) return
@@ -429,6 +484,7 @@ export function CartPanel({ mobileView }: Props) {
     }
 
     // Optimistic update: clear cart and show success before server responds
+    const saleCustomer = pos.customer
     setSuccess(true)
     pos.clearCart()
     setCashTendered('')
@@ -450,7 +506,7 @@ export function CartPanel({ mobileView }: Props) {
       queryClient.invalidateQueries({ queryKey: ['pos-products'] })
       queryClient.invalidateQueries({ queryKey: ['pos-variants'] })
       await printReceipt(saleJson.data?.sale_id ?? 'unknown', paymentMethod, receiptItems, preWin, paymentSplits, undefined, undefined, saleJson.data?.invoice_number, customerNote.trim() || null)
-      setTimeout(() => { setSuccess(false); setPaymentOpen(false) }, 2500)
+      finishSale(saleJson.data?.sale_id, saleCustomer, () => setPaymentOpen(false))
     } else {
       // Rollback: restore cart and hide success screen
       preWin?.close()
@@ -494,6 +550,7 @@ export function CartPanel({ mobileView }: Props) {
     }))
 
     // Optimistic update: clear cart and show success before server responds
+    const saleCustomer = pos.customer
     setSuccess(true)
     pos.clearCart()
     setCashTendered('')
@@ -525,7 +582,7 @@ export function CartPanel({ mobileView }: Props) {
       queryClient.invalidateQueries({ queryKey: ['pos-products'] })
       queryClient.invalidateQueries({ queryKey: ['pos-variants'] })
       await printReceipt(saleJson.data?.sale_id ?? 'unknown', method, receiptItemsCash, preWinCash, undefined, undefined, undefined, saleJson.data?.invoice_number, customerNote.trim() || null)
-      setTimeout(() => setSuccess(false), 2500)
+      finishSale(saleJson.data?.sale_id, saleCustomer)
     } else {
       // Rollback: restore cart and hide success screen
       preWinCash?.close()
@@ -595,6 +652,7 @@ export function CartPanel({ mobileView }: Props) {
     }))
 
     setCreditOpen(false)
+    const saleCustomer = pos.customer
     setSuccess(true)
     pos.clearCart()
     setCreditDepositAmount('')
@@ -632,7 +690,7 @@ export function CartPanel({ mobileView }: Props) {
       const creditStatus  = deposit <= 0 ? 'on_account' : deposit >= total ? 'paid' : 'partial'
       const depositSplits = deposit > 0 ? [{ method: creditDepositMethod as PaymentSplit['method'], amount: deposit }] : undefined
       await printReceipt(saleJson.data?.sale_id ?? 'unknown', 'on_account', receiptItemsCredit, preWinCredit, depositSplits, creditStatus, deposit, saleJson.data?.invoice_number, customerNote.trim() || null)
-      setTimeout(() => { setSuccess(false) }, 2500)
+      finishSale(saleJson.data?.sale_id, saleCustomer)
     } else {
       preWinCredit?.close()
       pos.restoreCart(cartSnapshot)
@@ -1319,13 +1377,7 @@ export function CartPanel({ mobileView }: Props) {
       {paymentOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           {success ? (
-            <div className="rounded-2xl bg-surface px-16 py-14 text-center shadow-2xl">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-                <CheckCircle2 className="h-9 w-9 text-green-600" />
-              </div>
-              <p className="text-xl font-bold text-green-700">Payment Successful!</p>
-              <p className="mt-1 text-sm text-on-surface-variant">Receipt has been processed.</p>
-            </div>
+            renderSuccessCard('Receipt has been processed.')
           ) : (
             <div className="flex w-[600px] max-h-[90vh] overflow-hidden rounded-2xl bg-surface shadow-2xl">
               <div className="flex flex-1 flex-col p-5">
@@ -1381,13 +1433,7 @@ export function CartPanel({ mobileView }: Props) {
       {/* Cash Payment Success Overlay */}
       {success && !paymentOpen && !gcModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="rounded-2xl bg-surface px-16 py-14 text-center shadow-2xl">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-              <CheckCircle2 className="h-9 w-9 text-green-600" />
-            </div>
-            <p className="text-xl font-bold text-green-700">Payment Successful!</p>
-            <p className="mt-1 text-sm text-on-surface-variant">Receipt has been sent to print.</p>
-          </div>
+          {renderSuccessCard('Receipt has been sent to print.')}
         </div>
       )}
 
@@ -1413,13 +1459,7 @@ export function CartPanel({ mobileView }: Props) {
       {gcModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           {success ? (
-            <div className="rounded-2xl bg-surface px-16 py-14 text-center shadow-2xl">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-                <CheckCircle2 className="h-9 w-9 text-green-600" />
-              </div>
-              <p className="text-xl font-bold text-green-700">Payment Successful!</p>
-              <p className="mt-1 text-sm text-on-surface-variant">Receipt has been processed.</p>
-            </div>
+            renderSuccessCard('Receipt has been processed.')
           ) : (
             <div className="w-[420px] rounded-2xl bg-surface shadow-2xl overflow-hidden">
               <div className="flex items-center justify-between border-b border-outline-variant px-5 py-4">

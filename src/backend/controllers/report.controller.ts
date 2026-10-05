@@ -81,6 +81,10 @@ export const ReportController = {
         const data = await ReportService.getPaymentMethodsReport(branchId, from, to)
         return ok(data)
       }
+      if (type === 'cash_card_ledger') {
+        const data = await ReportService.getCashCardLedger(branchId, from, to)
+        return ok(data)
+      }
       if (type === 'tax') {
         const data = await ReportService.getTaxReport(branchId, from, to)
         return ok(data)

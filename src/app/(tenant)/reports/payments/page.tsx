@@ -63,9 +63,14 @@ export default function PaymentsReportPage() {
             <p className="text-sm text-on-surface-variant mt-0.5">Revenue breakdown by payment method</p>
           </div>
         </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+        <Link href="/reports/cash-card-ledger">
+          <Button size="sm" variant="outline" className="w-full sm:w-auto">View cash &amp; card ledger</Button>
+        </Link>
         <Button size="sm" className="w-full sm:w-auto" onClick={() => exportExcel(data as unknown as Record<string, unknown>[], `payments-${dateFrom}-${dateTo}.xlsx`)}>
           <Download className="h-4 w-4" /> Export Excel
         </Button>
+        </div>
       </div>
 
       <DateRangeBar dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} onApply={refetch} />

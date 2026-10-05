@@ -12,6 +12,7 @@ import { MultiComboInput } from '@/components/shared/multi-combo-input'
 import { CustomFieldRenderer, useCustomFieldDefs } from '@/components/shared/custom-field-renderer'
 import { AsyncEmployeeSelect } from '@/components/shared/async-employee-select'
 import { toast } from 'sonner'
+import { SendDocumentActions } from '@/components/shared/send-document-actions'
 import { printRepairInvoiceById } from '@/components/repairs/receipt-print'
 import { buildPaymentSplits, paymentSplitTotal } from '@/lib/payment-splits'
 import { TASK_TYPE_OPTIONS, type RepairDetailsForm, type RepairLineItem } from '../_types'
@@ -48,6 +49,8 @@ export function RepairsTab() {
   const [repairParts, setRepairParts]     = useState<RepairLineItem[]>([])
   const [confirmingRepair, setConfirmingRepair] = useState(false)
   const [success, setSuccess] = useState(false)
+  // Keeps the success overlay open (instead of auto-dismissing) when the customer has a phone/email, so the invoice can be sent.
+  const [repairShare, setRepairShare] = useState<{ repairId: string; name: string; phone: string | null; email: string | null } | null>(null)
   const [deviceError, setDeviceError]     = useState('')
   const [faultError, setFaultError]       = useState('')
   const [chargesError, setChargesError]   = useState('')
@@ -468,7 +471,17 @@ export function RepairsTab() {
         printRepairInvoiceById(repair.id, printWin)
         if (j.data?.credit_apply_warning) toast.error(j.data.credit_apply_warning)
         setSuccess(true)
-        setTimeout(() => setSuccess(false), 2500)
+        const shareCustomer = pos.customer
+        if (repair?.id && (shareCustomer?.phone || shareCustomer?.email)) {
+          setRepairShare({
+            repairId: repair.id,
+            name: [shareCustomer.first_name, shareCustomer.last_name].filter(Boolean).join(' '),
+            phone: shareCustomer.phone ?? null,
+            email: shareCustomer.email ?? null,
+          })
+        } else {
+          setTimeout(() => setSuccess(false), 2500)
+        }
         resetForm()
       } else {
         printWin?.close()
@@ -1140,6 +1153,20 @@ export function RepairsTab() {
             </div>
             <p className="text-xl font-bold text-green-700">Repair Job Created!</p>
             <p className="mt-1 text-sm text-on-surface-variant">Invoice has been sent to print.</p>
+            {repairShare && (
+              <div className="mt-6 border-t border-outline-variant pt-5">
+                <p className="mb-3 text-xs text-on-surface-variant">Send invoice to {repairShare.name || 'customer'}</p>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <SendDocumentActions
+                    whatsappUrl={`/api/repairs/${repairShare.repairId}/whatsapp-link`}
+                    emailUrl={`/api/repairs/${repairShare.repairId}/send-invoice-email`}
+                    phone={repairShare.phone}
+                    email={repairShare.email}
+                  />
+                  <Button variant="outline" className="whitespace-nowrap shrink-0" onClick={() => { setSuccess(false); setRepairShare(null) }}>Done</Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

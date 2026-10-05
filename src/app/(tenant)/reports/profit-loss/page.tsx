@@ -8,6 +8,7 @@ import { formatCurrency } from '@/lib/utils'
 import { exportExcel } from '@/lib/export-excel'
 import { DateRangeBar } from '../_components/date-range-bar'
 import Link from 'next/link'
+import { ProfitLossCharts, type DailyPoint, type CategoryAmount } from './_components/pl-charts'
 
 interface TopSellerRow { name: string; quantity: number; revenue: number }
 interface LossBreakdown {
@@ -39,12 +40,21 @@ interface ProfitLossData {
   top_products?: TopSellerRow[]
   top_categories?: TopSellerRow[]
   loss_breakdown?: LossBreakdown
+  // Expenses flagged "exclude from P&L" (category default or per-expense override) —
+  // reported here for visibility but NOT part of `expenses`/`total_costs`/`net_profit`.
+  expenses_excluded?: number
+  expense_breakdown?: CategoryAmount[]
+  expense_excluded_breakdown?: CategoryAmount[]
+  daily?: DailyPoint[]
 }
 
 function firstOfMonth() { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] }
 function today() { return new Date().toISOString().split('T')[0] }
 function exportPL(data: ProfitLossData, filename: string) {
-  const rows = Object.entries(data).map(([metric, value]) => ({ metric, value }))
+  const { top_products, top_categories, loss_breakdown, daily, expense_breakdown, expense_excluded_breakdown, ...totals } = data
+  const rows: { metric: string; value: number | string }[] = Object.entries(totals).map(([metric, value]) => ({ metric, value: value as number }))
+  for (const e of expense_breakdown ?? []) rows.push({ metric: `Expense (included) – ${e.category}`, value: e.amount })
+  for (const e of expense_excluded_breakdown ?? []) rows.push({ metric: `Expense (excluded from P&L) – ${e.category}`, value: e.amount })
   exportExcel(rows, filename)
 }
 
@@ -112,6 +122,17 @@ export default function ProfitLossReportPage() {
             ))}
           </div>
 
+          <ProfitLossCharts
+            daily={data.daily ?? []}
+            totalRevenue={data.total_revenue}
+            cogs={data.cogs}
+            expenses={data.expenses}
+            salaries={data.salaries}
+            grossProfit={data.gross_profit}
+            netProfit={data.net_profit}
+            expenseBreakdown={data.expense_breakdown ?? []}
+          />
+
           {/* Breakdown */}
           <div className="rounded-xl border border-outline-variant bg-surface p-5">
             <h3 className="mb-4 text-base font-semibold text-on-surface">Breakdown</h3>
@@ -128,10 +149,11 @@ export default function ProfitLossReportPage() {
                 ...(data.repair_lab_fees !== undefined ? [{ label: 'Repair Lab / 3rd-Party Fees', value: -data.repair_lab_fees, indent: 2, bold: false }] : []),
                 { label: 'Gross Profit',          value: data.gross_profit,    indent: 0, bold: true  },
                 { label: 'Operating Expenses',    value: -data.expenses,       indent: 1,  bold: false },
+                ...(data.expense_breakdown ?? []).map(e => ({ label: e.category, value: -e.amount, indent: 2 as const, bold: false })),
                 { label: 'Salaries',              value: -data.salaries,       indent: 1,  bold: false },
                 { label: 'Net Profit',            value: data.net_profit,      indent: 0, bold: true  },
               ] as { label: string; value: number; indent: 0 | 1 | 2; bold: boolean }[]).map(({ label, value, indent, bold }) => (
-                <div key={label} className={`flex justify-between py-2.5 ${bold ? 'font-semibold' : ''}`}>
+                <div key={`${indent}-${label}`} className={`flex justify-between py-2.5 ${bold ? 'font-semibold' : ''}`}>
                   <span className={indent === 2 ? 'pl-8 text-on-surface-variant text-sm' : indent === 1 ? 'pl-4 text-on-surface-variant' : 'text-on-surface'}>
                     {indent > 0 ? `— ${label}` : label}
                   </span>
@@ -141,6 +163,26 @@ export default function ProfitLossReportPage() {
                 </div>
               ))}
             </div>
+            {!!data.expenses_excluded && (
+              <div className="mt-4 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-3 text-xs text-on-surface-variant">
+                <div className="flex items-start gap-2">
+                  <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    <strong className="text-on-surface">{formatCurrency(data.expenses_excluded)}</strong> of expenses are marked <em>Exclude from P&amp;L</em> and are not counted in the totals above.
+                  </span>
+                </div>
+                {!!data.expense_excluded_breakdown?.length && (
+                  <ul className="mt-2 space-y-1 pl-6">
+                    {data.expense_excluded_breakdown.map(e => (
+                      <li key={e.category} className="flex justify-between">
+                        <span>{e.category}</span>
+                        <span className="tabular-nums">{formatCurrency(e.amount)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
             {!!data.repair_lab_fees && (
               <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />

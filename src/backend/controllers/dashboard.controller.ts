@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { ExpenseService } from '@/backend/services/expense.service'
 import { type RequestContext } from '@/backend/middleware'
 import { adminSupabase } from '@/backend/config/supabase'
 import { ok, serverError } from '@/backend/utils/api-response'
@@ -44,7 +45,7 @@ export const DashboardController = {
         cashMovementsRes,
       ] = await Promise.all([
         adminSupabase.from('sales').select('id, total, created_at, is_refund').eq('branch_id', branchId).gte('created_at', periodStart),
-        adminSupabase.from('expenses').select('amount').eq('branch_id', branchId).gte('expense_date', periodStart),
+        ExpenseService.listIncludedAmounts(branchId, periodStart),
         (adminSupabase as any).from('repairs').select('*', { count: 'exact', head: true }).eq('branch_id', branchId) as Promise<{ count: number | null; error: unknown }>,
         // Open/Urgent Jobs — always all-time current state, never filtered by
         // period. Filtered client-side (isTerminalRepairStatus) rather than a
@@ -232,11 +233,7 @@ export const DashboardController = {
           .gte('created_at', periodStart),
 
         // Expenses in selected period
-        adminSupabase
-          .from('expenses')
-          .select('amount')
-          .eq('branch_id', branchId)
-          .gte('expense_date', periodStart),
+        ExpenseService.listIncludedAmounts(branchId, periodStart),
 
         // COUNT: total repairs (HEAD — no row data transferred)
         (adminSupabase as any)

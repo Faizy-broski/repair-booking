@@ -15,6 +15,8 @@ const createExpenseSchema = z.object({
   payment_method: z.enum(['cash', 'card']).default('cash'),
   receipt_url: z.string().url().optional().nullable(),
   notes: z.string().optional().nullable(),
+  // null/omitted = inherit the category's "Include in P&L" default
+  include_in_pnl: z.boolean().optional().nullable(),
 })
 
 const createSalarySchema = z.object({
@@ -63,6 +65,7 @@ export const ExpenseController = {
       category_id: z.string().uuid().optional().nullable(),
       payment_method: z.enum(['cash', 'card']).optional(),
       notes: z.string().optional().nullable(),
+      include_in_pnl: z.boolean().optional().nullable(),
     })
     const { data, error } = await validateBody(request, updateSchema)
     if (error) return error
@@ -118,14 +121,26 @@ export const ExpenseController = {
   },
 
   async createCategory(request: NextRequest, ctx: RequestContext) {
-    const categorySchema = z.object({ name: z.string().min(1), business_id: z.string().uuid() })
+    const categorySchema = z.object({ name: z.string().min(1), business_id: z.string().uuid(), include_in_pnl: z.boolean().optional() })
     const { data, error } = await validateBody(request, categorySchema)
     if (error) return error
     try {
-      const category = await ExpenseService.createCategory(data.business_id, data.name)
+      const category = await ExpenseService.createCategory(data.business_id, data.name, data.include_in_pnl ?? true)
       return created(category)
     } catch (err) {
       return serverError('Failed to create expense category', err)
+    }
+  },
+
+  async updateCategory(request: NextRequest, ctx: RequestContext, id: string) {
+    const schema = z.object({ name: z.string().min(1).optional(), include_in_pnl: z.boolean().optional() })
+    const { data, error } = await validateBody(request, schema)
+    if (error) return error
+    try {
+      const category = await ExpenseService.updateCategory(id, ctx.businessId, data)
+      return ok(category)
+    } catch (err) {
+      return serverError('Failed to update expense category', err)
     }
   },
 }
