@@ -33,7 +33,6 @@ export default function robots(): MetadataRoute.Robots {
           '/google-reviews',
           '/account',
           '/superadmin',
-          '/login',
           '/register',
           '/forgot-password',
           '/reset-password',

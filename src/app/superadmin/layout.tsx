@@ -1,7 +1,12 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient as createServerClient } from '@/lib/supabase/server'
 import { AccessDenied } from './access-denied'
 import { SuperAdminShell } from './shell'
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+}
 
 export default async function SuperAdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createServerClient()

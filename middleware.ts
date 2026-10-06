@@ -64,7 +64,7 @@ function noStore(res: NextResponse): NextResponse {
   return res
 }
 
-export async function middleware(request: NextRequest) {
+async function handleRequest(request: NextRequest) {
   const { pathname } = request.nextUrl
   // Respect the original host passed by reverse proxies in production
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || ''
@@ -514,6 +514,37 @@ export async function middleware(request: NextRequest) {
   }
 
   return supabaseResponse
+}
+
+// Public customer-facing tenant pages that a shop may want Google to index.
+const INDEXABLE_SUBDOMAIN_PATHS = ['/book/', '/s/']
+
+/**
+ * Keeps tenant/admin subdomains out of search results. Login, dashboard and
+ * redirect URLs on these hosts are not content and, when indexed, look like
+ * duplicate pages that hurt the root domain.
+ *
+ * robots.txt on a subdomain must stay crawlable (empty Disallow): Google can
+ * only drop already-indexed URLs if it can fetch them and see the noindex header.
+ */
+export async function middleware(request: NextRequest) {
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || ''
+  const subdomain = getSubdomain(host)
+  const { pathname } = request.nextUrl
+
+  if (subdomain && pathname === '/robots.txt') {
+    return new NextResponse('User-agent: *\nDisallow:\n', {
+      status: 200,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' },
+    })
+  }
+
+  const response = await handleRequest(request)
+
+  if (subdomain && !INDEXABLE_SUBDOMAIN_PATHS.some((p) => pathname.startsWith(p))) {
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive')
+  }
+  return response
 }
 
 export const config = {
