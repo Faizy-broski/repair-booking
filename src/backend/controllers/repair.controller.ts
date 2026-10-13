@@ -684,10 +684,14 @@ export const RepairController = {
 
       // When marked as refunded, record the deposit_paid as the refund_amount
       // and restore any store credit / loyalty points that were used to pay for it.
-      if (data.status === 'refunded') {
+      // Custom status names keep the business's own casing (e.g. "REFUNDED"),
+      // so match case-insensitively like repair-financials.service does.
+      if (data.status.toLowerCase().trim() === 'refunded') {
         const branchId = ctx.auth.branchId ?? null
         const repair = await RepairService.getById(id, branchId)
-        if (repair) {
+        // Skip if already refunded — re-saving the status must not reverse
+        // store credit / loyalty a second time.
+        if (repair && !((repair as any).refund_amount > 0)) {
           const depositPaid = (repair as any).deposit_paid ?? 0
           await adminSupabase
             .from('repairs')
