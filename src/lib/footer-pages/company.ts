@@ -164,7 +164,7 @@ export const companyPages: CompanyPage[] = [
       {
         heading: "Sales enquiries",
         body: [
-          "Interested in iRepairly for your shop? Start a free trial from the homepage, or book a 20-minute demo and a member of our team will walk you through the platform.",
+          "Interested in iRepairly for your shop? Get started from the homepage, or book a 20-minute demo and a member of our team will walk you through the platform.",
         ],
       },
       {

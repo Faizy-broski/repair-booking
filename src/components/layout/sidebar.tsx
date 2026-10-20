@@ -403,6 +403,22 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
                 </div>
               )}
             </Link>
+          ) : subscriptionStatus.status === 'incomplete' ? (
+            <Link
+              href="/account/plans"
+              className={cn(
+                'flex items-center gap-2 rounded-xl bg-amber-500/15 border border-amber-500/30 px-3 py-2.5 text-amber-400 hover:bg-amber-500/20 transition-colors',
+                collapsed ? 'justify-center' : ''
+              )}
+            >
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {!collapsed && (
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">Choose a plan</p>
+                  <p className="text-[11px] text-amber-400/70 truncate">Complete payment to unlock →</p>
+                </div>
+              )}
+            </Link>
           ) : (
             <Link
               href="/account"

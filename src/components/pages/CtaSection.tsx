@@ -43,7 +43,7 @@ export default function CtaSection({
                 href="/register"
                 className="inline-flex w-full items-center justify-center rounded-full bg-white px-7 py-4 text-sm font-medium text-slate-950 shadow-none transition-colors hover:bg-white/90 sm:w-auto sm:py-5 sm:text-md"
               >
-                Start free trial
+                Get started
                 <ArrowRight className="ml-4 h-5 w-5 sm:h-7 sm:w-7" />
               </Link>
 

@@ -25,6 +25,9 @@ const schema = z.object({
   planId:               z.string().optional(),
   billingCycle:         z.enum(['monthly', 'yearly']).optional().default('monthly'),
   verticalTemplateSlug: z.string().optional(),
+  // Optional free trial granted by the superadmin. 0/absent = no trial: the
+  // business is created with an 'incomplete' subscription and must pay on first login.
+  trialDays:            z.number().int().min(0).max(365).optional().default(0),
 })
 
 async function handler(request: NextRequest, _ctx: RequestContext) {
@@ -46,14 +49,16 @@ async function handler(request: NextRequest, _ctx: RequestContext) {
     planName  = (plan as any)?.name ?? null
   }
 
-  const trialEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+  const trialEndsAt = data.trialDays > 0
+    ? new Date(Date.now() + data.trialDays * 24 * 60 * 60 * 1000).toISOString()
+    : null
 
   // Phase 1: Create the tenant (auth user + business + branch + profile + seed data)
   // No OTP guard — super admin bypasses email verification.
   // AuthService.register() internally rolls back the auth user if business/branch creation fails.
   let result: Awaited<ReturnType<typeof AuthService.register>>
   try {
-    result = await AuthService.register({ ...data, activateNow: true, trialEndsAt })
+    result = await AuthService.register({ ...data, activateNow: true, trialEndsAt: trialEndsAt ?? undefined })
   } catch (err) {
     const message = (err as Error).message
     if (message.includes('already taken') || message.includes('already exists')) return conflict(message)
@@ -68,18 +73,15 @@ async function handler(request: NextRequest, _ctx: RequestContext) {
       const { error: subErr } = await (supabase as any).from('subscriptions').insert({
         business_id:          result.business.id,
         plan_id:              data.planId,
-        status:               'trialing',
+        // With a trial: full access until trialEndsAt. Without: locked to
+        // /account until the owner pays (middleware paidSubInactive gate).
+        status:               trialEndsAt ? 'trialing' : 'incomplete',
         billing_cycle:        data.billingCycle,
         trial_ends_at:        trialEndsAt,
-        current_period_start: new Date().toISOString(),
+        current_period_start: trialEndsAt ? new Date().toISOString() : null,
         current_period_end:   trialEndsAt,
       })
       if (subErr) throw new Error(`Subscription insert failed: ${subErr.message}`)
-
-      await (supabase as any)
-        .from('businesses')
-        .update({ trial_ends_at: trialEndsAt })
-        .eq('id', result.business.id)
     }
   } catch (postErr) {
     // Rollback: delete the auth user (Supabase cascades profile via trigger) and business

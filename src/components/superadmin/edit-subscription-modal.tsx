@@ -26,6 +26,7 @@ const STATUSES = [
   { value: 'past_due',  label: 'Past Due' },
   { value: 'canceled',  label: 'Canceled' },
   { value: 'suspended', label: 'Suspended' },
+  { value: 'incomplete', label: 'Awaiting payment' },
 ] as const
 
 type EditStatus = typeof STATUSES[number]['value']

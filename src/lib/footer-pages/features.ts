@@ -66,7 +66,7 @@ export const featurePages: CapabilityPage[] = [
     faqs: [
       { question: "Is iRepairly only for phone repair shops?", answer: "No, it's used across many repair trades — see Business Types for the full list of supported industries." },
       { question: "How long does setup take?", answer: "Most shops are taking their first ticket within a day, with guided onboarding and data import support." },
-      { question: "Can I try it before committing?", answer: "Yes, a free trial is available with no card required." },
+      { question: "Can I try it before committing?", answer: "Yes — book a free 20-minute demo and we'll walk you through the platform before you choose a plan." },
     ],
     related: [
       { label: "All Features", href: "/features" },

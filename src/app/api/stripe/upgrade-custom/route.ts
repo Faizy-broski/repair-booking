@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Stripe from 'stripe'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/backend/config/supabase'
-import { customPlanDimensionsSchema, computeCustomPlanTotalPence, getCustomPlanBaseline, type CustomPlanBillingCycle } from '@/backend/services/custom-plan-pricing'
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', { apiVersion: '2026-02-25.clover' })
+import { customPlanDimensionsSchema, computeCustomPlanPricePence, computeCustomPlanTotalPence, getCustomPlanBaseline, type CustomPlanBillingCycle } from '@/backend/services/custom-plan-pricing'
+import { createPlanCheckoutSession, PlanCheckoutError } from '@/backend/services/plan-checkout.service'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://repairbooking.co.uk'
 
@@ -63,80 +61,31 @@ export async function POST(request: NextRequest) {
 
     const { data: bizRow } = await (supabase as any)
       .from('businesses')
-      .select('stripe_customer_id, subdomain, vat_exempt')
+      .select('subdomain')
       .eq('id', businessId)
       .single()
+    const subdomain = (bizRow as { subdomain?: string } | null)?.subdomain ?? ''
 
-    const business = bizRow as { stripe_customer_id?: string | null; subdomain?: string; vat_exempt?: boolean | null } | null
-
-    // Validate the stored customer ID against the current Stripe mode (test vs live) —
-    // same pattern as /api/stripe/upgrade/route.ts.
-    let customerParam: Stripe.Checkout.SessionCreateParams
-    if (business?.stripe_customer_id) {
-      try {
-        const existing = await stripe.customers.retrieve(business.stripe_customer_id)
-        if ((existing as Stripe.DeletedCustomer).deleted) throw new Error('deleted')
-        customerParam = { customer: business.stripe_customer_id }
-      } catch {
-        await (supabase as any)
-          .from('businesses')
-          .update({ stripe_customer_id: null })
-          .eq('id', businessId)
-        customerParam = { customer_email: user.email }
-      }
-    } else {
-      customerParam = { customer_email: user.email }
-    }
-
-    const subdomain = business?.subdomain ?? ''
     const appUrlObj = new URL(APP_URL)
     const successUrl = subdomain
       ? `${appUrlObj.protocol}//${subdomain}.${appUrlObj.host}/dashboard?upgraded=1&session_id={CHECKOUT_SESSION_ID}`
       : `${APP_URL}/dashboard?upgraded=1&session_id={CHECKOUT_SESSION_ID}`
 
-    // Never attach VAT for a business flagged vat_exempt (see migration
-    // 200_business_vat_exempt.sql), otherwise a Custom Plan change would
-    // silently re-add VAT for them.
-    const vatTaxRateId = business?.vat_exempt ? null : process.env.STRIPE_VAT_TAX_RATE_ID
-
-    // Dimension values are passed through as metadata (strings) so the
-    // checkout.session.completed webhook / verify-upgrade can write
-    // is_custom + custom_* onto the subscriptions row on confirmation —
-    // there's no shared plan row to look these up from.
-    const customMetadata = {
-      isCustom:       'true',
-      customBranches: String(dims.branches),
-      customStaff:    String(dims.staff),
-      customInventory: dims.inventoryLimit === null ? 'unlimited' : String(dims.inventoryLimit),
-      customRepair:    dims.repairLimit === null ? 'unlimited' : String(dims.repairLimit),
-      customPricePence: String(totalPence),
+    const { url } = await createPlanCheckoutSession({
+      businessId,
+      email:      user.email ?? '',
+      target:     { kind: 'custom', dims, totalPence, monthlyPence: computeCustomPlanPricePence(dims, baseline) },
       billingCycle,
-    }
+      successUrl,
+      cancelUrl:  `${APP_URL}/upgrade`,
+      source:     'upgrade',
+    })
 
-    const session = await stripe.checkout.sessions.create({
-      ...customerParam,
-      mode: 'subscription',
-      line_items: [{
-        price_data: {
-          currency: 'gbp',
-          product_data: { name: 'Custom Plan' },
-          unit_amount: totalPence,
-          recurring: { interval: billingCycle === 'yearly' ? 'year' : 'month' },
-        },
-        quantity: 1,
-        ...(vatTaxRateId ? { tax_rates: [vatTaxRateId] } : {}),
-      }],
-      subscription_data: {
-        metadata: { businessId, ...customMetadata },
-        ...(vatTaxRateId ? { default_tax_rates: [vatTaxRateId] } : {}),
-      },
-      metadata: { businessId, ...customMetadata },
-      success_url: successUrl,
-      cancel_url:  `${APP_URL}/upgrade`,
-    } as Stripe.Checkout.SessionCreateParams)
-
-    return NextResponse.json({ data: { url: session.url } })
+    return NextResponse.json({ data: { url } })
   } catch (err) {
+    if (err instanceof PlanCheckoutError) {
+      return NextResponse.json({ error: { message: err.message } }, { status: err.status })
+    }
     const message = err instanceof Error ? err.message : 'Stripe error'
     return NextResponse.json({ error: { message } }, { status: 500 })
   }

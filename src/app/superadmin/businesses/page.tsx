@@ -2,10 +2,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye, Trash2, MoreVertical, Users, Wrench, Package, X, Download, ChevronDown, CreditCard, Plus, Loader2, Landmark, Percent } from 'lucide-react'
+import { Search, ShieldAlert, ShieldCheck, Settings2, CheckCircle2, XCircle, Minus, Eye, Trash2, MoreVertical, Users, Wrench, Package, X, Download, ChevronDown, CreditCard, Plus, Loader2, Landmark, Percent, Gift } from 'lucide-react'
 import { EditSubscriptionModal } from '@/components/superadmin/edit-subscription-modal'
 import type { PlanOption } from '@/components/superadmin/edit-subscription-modal'
 import { RecordManualPaymentModal } from '@/components/superadmin/record-manual-payment-modal'
+import { GrantTrialModal } from '@/components/superadmin/grant-trial-modal'
 import type { SubscriptionRow } from '@/app/api/admin/subscriptions/route'
 import { Badge, SUBSCRIPTION_STATUS_VARIANTS } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/data-table'
@@ -97,6 +98,7 @@ function ActionMenu({
   onModules,
   onEditSubscription,
   onRecordPayment,
+  onGrantTrial,
   onToggleSuspend,
   onToggleVatExempt,
   onDelete,
@@ -106,6 +108,7 @@ function ActionMenu({
   onModules: () => void
   onEditSubscription: () => void
   onRecordPayment: () => void
+  onGrantTrial: () => void
   onToggleSuspend: () => void
   onToggleVatExempt: () => void
   onDelete: () => void
@@ -163,6 +166,7 @@ function ActionMenu({
           {item('Modules', <Settings2 className="h-3.5 w-3.5" />, onModules)}
           {item('Edit Subscription', <CreditCard className="h-3.5 w-3.5" />, onEditSubscription)}
           {item('Record Payment', <Landmark className="h-3.5 w-3.5" />, onRecordPayment)}
+          {item('Grant Free Trial', <Gift className="h-3.5 w-3.5" />, onGrantTrial)}
           {item(
             biz.vat_exempt ? 'Remove VAT Exemption' : 'Mark VAT Exempt',
             <Percent className="h-3.5 w-3.5" />,
@@ -491,6 +495,7 @@ export default function BusinessesPage() {
   const [deleting, setDeleting] = useState(false)
   const [editSubRow, setEditSubRow] = useState<SubscriptionRow | null>(null)
   const [recordPaymentBusiness, setRecordPaymentBusiness] = useState<BusinessRow | null>(null)
+  const [grantTrialBusiness, setGrantTrialBusiness] = useState<BusinessRow | null>(null)
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -800,6 +805,7 @@ export default function BusinessesPage() {
             onModules={() => setModulesBusiness(biz)}
             onEditSubscription={() => openEditSubscription(biz)}
             onRecordPayment={() => setRecordPaymentBusiness(biz)}
+            onGrantTrial={() => setGrantTrialBusiness(biz)}
             onToggleSuspend={() => toggleSuspend(biz)}
             onToggleVatExempt={() => toggleVatExempt(biz)}
             onDelete={() => setConfirmDeleteId(biz.id)}
@@ -872,6 +878,19 @@ export default function BusinessesPage() {
           onClose={() => setEditSubRow(null)}
           onSaved={() => {
             setEditSubRow(null)
+            queryClient.invalidateQueries({ queryKey: ['superadmin-businesses'] })
+          }}
+        />
+      )}
+
+      {grantTrialBusiness && (
+        <GrantTrialModal
+          business={grantTrialBusiness}
+          plans={plans}
+          defaultPlanId={grantTrialBusiness.subscriptions?.[0]?.plan_id ?? null}
+          onClose={() => setGrantTrialBusiness(null)}
+          onSaved={() => {
+            setGrantTrialBusiness(null)
             queryClient.invalidateQueries({ queryKey: ['superadmin-businesses'] })
           }}
         />

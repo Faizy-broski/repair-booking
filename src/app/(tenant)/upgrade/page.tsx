@@ -122,7 +122,8 @@ export default function UpgradePage() {
   }
 
   const trialDays = subscription?.trial_ends_at ? daysLeft(subscription.trial_ends_at) : 0
-  const isExpired = subscription?.status === 'trialing' && trialDays <= 0
+  const isTrialing = subscription?.status === 'trialing'
+  const isExpired = isTrialing && trialDays <= 0
 
   return (
     <div className="min-h-screen bg-surface-container-low flex flex-col items-center justify-start py-16 px-4">
@@ -137,9 +138,13 @@ export default function UpgradePage() {
         ) : (
           <>
             <p className="text-lg font-bold text-amber-800">
-              {trialDays > 0 ? `${trialDays} day${trialDays === 1 ? '' : 's'} left in your free trial` : 'Your trial is ending soon'}
+              {isTrialing
+                ? trialDays > 0 ? `${trialDays} day${trialDays === 1 ? '' : 's'} left in your free trial` : 'Your trial is ending soon'
+                : 'Choose your plan'}
             </p>
-            <p className="text-sm text-amber-700 mt-1">Upgrade now to keep uninterrupted access.</p>
+            <p className="text-sm text-amber-700 mt-1">
+              {isTrialing ? 'Upgrade now to keep uninterrupted access.' : 'Pick a plan and complete payment to use your account.'}
+            </p>
           </>
         )}
       </div>

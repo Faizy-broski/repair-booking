@@ -41,7 +41,7 @@ export default function Hero() {
             href="/register"
             className="inline-flex w-full items-center justify-center gap-3 rounded-full bg-[linear-gradient(90deg,_#008080_0%,_#008080_37%,_#18E3CD_100%)] px-8 py-4 text-base font-bold text-white shadow-sm transition-transform hover:scale-[1.02] sm:w-auto"
           >
-            Start Free Trial
+            Get Started
             <ArrowRight className="h-4 w-4" />
           </Link>
 
@@ -53,8 +53,8 @@ export default function Hero() {
           className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-xs font-medium text-slate-700 sm:mt-14 sm:gap-x-12 sm:gap-y-4 sm:text-sm"
         >
           {[
-            "No credit card required",
-            "30-day free trial",
+            "Simple monthly or annual plans",
+            "Cancel anytime",
             "Trusted by repair shops",
           ].map((item) => (
             <div key={item} className="flex items-center gap-2">

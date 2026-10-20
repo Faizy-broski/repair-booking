@@ -5,6 +5,7 @@ import { AuthService } from '@/backend/services/auth.service'
 import { EmailService } from '@/backend/services/email.service'
 import { SubscriptionSyncService } from '@/backend/services/subscription-sync.service'
 import { invalidateBusinessCache } from '@/backend/services/module-config.service'
+import { customMonthlyPriceFromMetadata } from '@/backend/services/custom-plan-pricing'
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'repairbooking.co.uk'
 
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
           maxUsers:     Number(session.metadata?.customStaff ?? 5),
           maxProducts:  inventoryStr === 'unlimited' ? null : Number(inventoryStr),
           maxServices:  repairStr === 'unlimited' ? null : Number(repairStr),
-          priceMonthly: Number(session.metadata?.customPricePence ?? 0) / 100,
+          priceMonthly: customMonthlyPriceFromMetadata(session.metadata),
         },
       })
 

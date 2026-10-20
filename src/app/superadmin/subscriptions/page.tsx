@@ -152,6 +152,7 @@ const STATUS_PILLS = [
   { value: 'past_due',  label: 'Past Due' },
   { value: 'canceled',  label: 'Canceled' },
   { value: 'suspended', label: 'Suspended' },
+  { value: 'incomplete', label: 'Awaiting payment' },
 ]
 
 // ── Stripe tab ─────────────────────────────────────────────────────────────────

@@ -15,7 +15,7 @@ import {
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', { apiVersion: '2026-02-25.clover' as any })
 
-const VALID_STATUSES  = ['active', 'trialing', 'past_due', 'canceled', 'suspended'] as const
+const VALID_STATUSES  = ['active', 'trialing', 'past_due', 'canceled', 'suspended', 'incomplete'] as const
 const VALID_CYCLES    = ['monthly', 'yearly'] as const
 
 type Status  = typeof VALID_STATUSES[number]
@@ -23,7 +23,9 @@ type Cycle   = typeof VALID_CYCLES[number]
 
 // Whether a business should be marked is_active for a given subscription status
 function resolveIsActive(status: Status) {
-  return status === 'active' || status === 'trialing' || status === 'past_due'
+  // 'incomplete' (unpaid signup) stays active so the owner can log in and pay —
+  // middleware still locks everything except /account until they do.
+  return status === 'active' || status === 'trialing' || status === 'past_due' || status === 'incomplete'
 }
 
 async function handler(
@@ -224,7 +226,11 @@ async function handler(
   // ── Sync business active state ─────────────────────────────────────────────
   const { error: bizUpdateErr } = await (supabase as any)
     .from('businesses')
-    .update({ is_active: resolveIsActive(status as Status) })
+    .update({
+      is_active: resolveIsActive(status as Status),
+      // Keep the businesses copy in sync with the subscription's trial date
+      trial_ends_at: trialEndsAt ? new Date(trialEndsAt).toISOString() : null,
+    })
     .eq('id', businessId)
 
   if (bizUpdateErr) {

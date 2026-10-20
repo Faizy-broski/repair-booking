@@ -119,6 +119,23 @@ export function applyCustomPlanBillingCycle(monthlyPence: number, billingCycle: 
   return Math.round(monthlyPence * 12 * (1 - CUSTOM_PLAN_YEARLY_DISCOUNT))
 }
 
+/**
+ * Reads the Custom Plan's MONTHLY price (£) from Checkout session metadata, for
+ * subscriptions.custom_price_monthly. `customPricePence` is the amount actually
+ * charged per billing cycle — for yearly that's the annual total, so it must
+ * never be stored as-is. Prefers the explicit `customMonthlyPricePence`; falls
+ * back to reversing the yearly discount for sessions created before it existed.
+ */
+export function customMonthlyPriceFromMetadata(metadata: Record<string, string> | null | undefined): number {
+  const explicit = Number(metadata?.customMonthlyPricePence)
+  if (Number.isFinite(explicit) && explicit > 0) return explicit / 100
+  const charged = Number(metadata?.customPricePence ?? 0)
+  if (metadata?.billingCycle === 'yearly') {
+    return Math.round(charged / (12 * (1 - CUSTOM_PLAN_YEARLY_DISCOUNT))) / 100
+  }
+  return charged / 100
+}
+
 /** Recomputes the total charge in pence for the given billing cycle — see `applyCustomPlanBillingCycle`. */
 export function computeCustomPlanTotalPence(
   dims: CustomPlanDimensions,

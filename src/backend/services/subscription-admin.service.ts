@@ -1,12 +1,14 @@
 import { invalidateBusinessCache } from '@/backend/services/module-config.service'
 
-export const SUBSCRIPTION_STATUSES = ['active', 'trialing', 'past_due', 'canceled', 'suspended'] as const
+export const SUBSCRIPTION_STATUSES = ['active', 'trialing', 'past_due', 'canceled', 'suspended', 'incomplete'] as const
 export type SubscriptionStatus = typeof SUBSCRIPTION_STATUSES[number]
 
 // Whether a business should be marked is_active for a given subscription status.
 // Mirrors resolveIsActive() in PATCH /api/admin/subscriptions/[businessId].
 export function resolveIsActive(status: SubscriptionStatus) {
-  return status === 'active' || status === 'trialing' || status === 'past_due'
+  // 'incomplete' (unpaid signup) stays active so the owner can log in and pay —
+  // middleware still locks everything except /account until they do.
+  return status === 'active' || status === 'trialing' || status === 'past_due' || status === 'incomplete'
 }
 
 /**

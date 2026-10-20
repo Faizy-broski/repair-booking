@@ -10,6 +10,7 @@ function RegisterSuccessContent() {
 
   const [status, setStatus] = useState<'polling' | 'ready' | 'timeout'>(directSubdomain ? 'ready' : 'polling')
   const [subdomain, setSubdomain] = useState<string | null>(directSubdomain)
+  const [email, setEmail] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [countdown, setCountdown] = useState(5)
   const [redirecting, setRedirecting] = useState(false)
@@ -28,6 +29,7 @@ function RegisterSuccessContent() {
 
       if (json.data?.status === 'ready' && json.data.subdomain) {
         setSubdomain(json.data.subdomain)
+        setEmail(json.data.email ?? null)
         setStatus('ready')
         return
       }
@@ -62,8 +64,10 @@ function RegisterSuccessContent() {
       }
     }
 
-    setLoginUrl(`${protocol}://${subdomain}.${root}/login`)
-  }, [subdomain])
+    // After signing in, land straight on the dashboard
+    const params = new URLSearchParams({ redirectTo: '/dashboard', ...(email ? { email } : {}) })
+    setLoginUrl(`${protocol}://${subdomain}.${root}/login?${params}`)
+  }, [subdomain, email])
 
   // ── Auto-redirect ──
   useEffect(() => {
@@ -102,7 +106,7 @@ function RegisterSuccessContent() {
             Setting up your workspace&hellip;
           </h2>
           <p className="text-on-surface-variant text-sm leading-relaxed">
-            We&rsquo;re creating your account and configuring your modules.
+            We&rsquo;re confirming your payment and activating your plan.
             <br />
             This usually takes just a few seconds.
           </p>
@@ -130,7 +134,7 @@ function RegisterSuccessContent() {
             You&rsquo;re all set!
           </h2>
           <p className="text-on-surface-variant text-sm mb-6 leading-relaxed">
-            Your dedicated workspace is ready. Use your login URL below to access your dashboard.
+            Payment received and your plan is active. Sign in below to open your dashboard.
           </p>
 
           {/* Login URL box */}
@@ -201,10 +205,10 @@ function RegisterSuccessContent() {
             Taking longer than expected
           </h2>
           <p className="text-on-surface-variant text-sm mb-6 leading-relaxed">
-            Your payment was successful but account setup is still processing.
-            You&rsquo;ll receive a <strong>welcome email</strong> shortly with
-            your login link. If it doesn&rsquo;t arrive within a few minutes,
-            please contact support.
+            We&rsquo;re still waiting for Stripe to confirm your payment. Your
+            account has been created &mdash; check your <strong>welcome email</strong>
+            for your login link. Once payment is confirmed your plan activates
+            automatically. If it doesn&rsquo;t within a few minutes, please contact support.
           </p>
         </>
       )}

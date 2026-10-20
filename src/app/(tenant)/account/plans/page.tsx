@@ -103,7 +103,7 @@ export default function PlansPage() {
     fetch('/api/plans')
       .then((r) => r.json())
       .then(({ data }) => {
-        const subscribable = (data ?? []).filter((p: Plan) => p.plan_type !== 'enterprise')
+        const subscribable = (data ?? []).filter((p: Plan) => p.plan_type !== 'enterprise' && p.plan_type !== 'free')
         setPlans(subscribable)
       })
       .finally(() => setLoading(false))
@@ -392,7 +392,7 @@ export default function PlansPage() {
         )}
 
         <p className="mt-8 text-center text-xs text-on-surface-variant">
-          All plans include a 30-day free trial. Cancel anytime. Prices shown exclude VAT.
+          Secure payment via Stripe. Cancel anytime. Prices shown exclude VAT.
         </p>
       </div>
     </div>

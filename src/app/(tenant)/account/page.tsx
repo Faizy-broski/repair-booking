@@ -96,7 +96,8 @@ function StatusBadge({ status }: { status: string }) {
     past_due:  { label: 'Past due',  className: 'bg-red-500/15    text-red-400    border-red-500/30'    },
     canceled:  { label: 'Canceled',  className: 'bg-zinc-500/15   text-outline   border-zinc-500/30'   },
     suspended: { label: 'Suspended', className: 'bg-red-500/15    text-red-400    border-red-500/30'    },
-    paid:      { label: 'Completed', className: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
+    incomplete: { label: 'Awaiting payment', className: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
+    paid:     { label: 'Completed', className: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
   }
   const cfg = map[status] ?? { label: status, className: 'bg-zinc-500/15 text-outline border-zinc-500/30' }
   return (
@@ -211,9 +212,9 @@ function AccountPageInner() {
       fetch('/api/plans')
         .then((r) => r.json())
         .then(({ data }) => {
-          // All plans are eligible (starter/growth/professional all have 30-day trials)
-          // Filter out enterprise plans which require manual setup
-          const subscribable = (data ?? []).filter((p: Plan & { plan_type?: string }) => p.plan_type !== 'enterprise')
+          // Paid plans only — enterprise requires manual setup, and free/trial
+          // plans can't be bought (trials are granted by a superadmin only)
+          const subscribable = (data ?? []).filter((p: Plan & { plan_type?: string }) => p.plan_type !== 'enterprise' && p.plan_type !== 'free')
           setPlans(subscribable)
         })
     }
@@ -264,6 +265,8 @@ function AccountPageInner() {
   const isPastDue = sub?.status === 'past_due'
   // Truly ended — no point updating payment method, need full resubscribe
   const isCanceled = ['canceled', 'suspended'].includes(sub?.status ?? '')
+  // New signup that hasn't completed Stripe Checkout yet
+  const isIncomplete = sub?.status === 'incomplete'
 
   // Plans eligible for the upgrade/resubscribe section:
   // - past_due: don't show plans — owner needs to fix payment, not create a new sub
@@ -318,8 +321,29 @@ function AccountPageInner() {
         </div>
       )}
 
+      {/* New signup awaiting first payment */}
+      {isIncomplete && (
+        <div className="flex items-start justify-between gap-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+            <div>
+              <p className="text-sm font-semibold text-amber-300">Complete your subscription</p>
+              <p className="text-xs text-amber-400/80 mt-0.5">
+                Your account is ready — choose a plan and complete payment to unlock all features.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/account/plans"
+            className="shrink-0 rounded-md bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600"
+          >
+            Choose a plan
+          </Link>
+        </div>
+      )}
+
       {/* Fully expired / canceled banner */}
-      {isExpired && !isPastDue && (
+      {isExpired && !isPastDue && !isIncomplete && (
         <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
           <div>
@@ -489,7 +513,7 @@ function AccountPageInner() {
                       already carry their own correct, specific status — leave those alone. */}
                   {sub && (
                     <StatusBadge
-                      status={isExpired && !['past_due', 'canceled', 'suspended'].includes(sub.status) ? 'canceled' : sub.status}
+                      status={isExpired && !['past_due', 'canceled', 'suspended', 'incomplete'].includes(sub.status) ? 'canceled' : sub.status}
                     />
                   )}
                 </div>

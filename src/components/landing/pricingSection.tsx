@@ -94,8 +94,7 @@ function planDesc(p: PricingPlan) {
 }
 function planCta(p: PricingPlan): string {
   if (p.plan_type === "enterprise") return "Contact sales";
-  if (p.plan_type === "free") return "Start 30 Days free trial";
-  return "Start 30 Days free trial";
+  return "Get started";
 }
 function planCtaHref(p: PricingPlan): string {
   return p.plan_type === "enterprise"
@@ -130,7 +129,8 @@ export default function PricingSection() {
   useEffect(() => {
     fetch("/api/plans")
       .then((r) => r.json())
-      .then((j) => setPlans(j.data ?? []))
+      // Free/trial plans aren't sold — trials are superadmin-granted only
+      .then((j) => setPlans(((j.data ?? []) as PricingPlan[]).filter((p) => p.plan_type !== "free")))
       .catch(() => {})
       .finally(() => setPlansLoading(false));
   }, []);
@@ -361,7 +361,7 @@ export default function PricingSection() {
                 onChange={setCustomPlan}
                 baseline={customPlanBaseline}
                 billingCycle={billing}
-                ctaLabel="Start 30 Days free trial"
+                ctaLabel="Get started"
                 onCtaClick={handleCustomPlanCta}
               />
             </StaggerItem>

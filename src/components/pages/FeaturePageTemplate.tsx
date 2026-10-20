@@ -26,7 +26,7 @@ export default function FeaturePageTemplate({ page }: { page: CapabilityPage }) 
       <CtaSection
         heading="Try it in your shop."
         scriptWord="shop."
-        description="Every feature is included in every plan during your trial — no upsells, no surprises."
+        description="Every feature is included in every plan — no upsells, no surprises."
       />
 
       <RelatedLinks heading="Related features" links={page.related} />

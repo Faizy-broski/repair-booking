@@ -376,3 +376,196 @@ export function CustomPlanCard({
     </div>
   );
 }
+
+// ── Wide "Build your own" layout ──────────────────────────────────────────────
+// Full-width horizontal variant for pages that show fixed plans in a grid
+// (e.g. /register). The interactive controls get a row of their own instead
+// of being squeezed into a narrow plan column.
+
+function DimensionControl({
+  label,
+  hint,
+  value,
+  onDecrement,
+  onIncrement,
+  canDecrement,
+  unlimited,
+  onToggleUnlimited,
+}: {
+  label: string;
+  hint: string;
+  value: string;
+  onDecrement: () => void;
+  onIncrement: () => void;
+  canDecrement: boolean;
+  unlimited?: boolean;
+  onToggleUnlimited?: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex flex-col rounded-2xl border border-outline-variant/50 bg-surface-container-lowest p-4">
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-sm font-semibold text-on-surface">{label}</p>
+        <p className="whitespace-nowrap text-[11px] text-on-surface-variant">{hint}</p>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between rounded-xl bg-surface-container px-1.5 py-1.5">
+        <button
+          type="button"
+          onClick={onDecrement}
+          disabled={unlimited || !canDecrement}
+          aria-label={`Decrease ${label}`}
+          className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-container-lowest text-on-surface shadow-sm transition-colors hover:bg-primary hover:text-on-primary disabled:pointer-events-none disabled:opacity-30"
+        >
+          <Minus className="h-3.5 w-3.5" />
+        </button>
+        <span className="min-w-[64px] text-center text-base font-bold tabular-nums text-on-surface">
+          {unlimited ? "Unlimited" : value}
+        </span>
+        <button
+          type="button"
+          onClick={onIncrement}
+          disabled={unlimited}
+          aria-label={`Increase ${label}`}
+          className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-container-lowest text-on-surface shadow-sm transition-colors hover:bg-primary hover:text-on-primary disabled:pointer-events-none disabled:opacity-30"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {onToggleUnlimited ? (
+        <div className="mt-2 grid grid-cols-2 gap-1 rounded-lg bg-surface-container p-0.5 text-[11px] font-semibold">
+          <button
+            type="button"
+            onClick={() => onToggleUnlimited(false)}
+            aria-pressed={!unlimited}
+            className={cn(
+              "rounded-md py-1 transition-colors",
+              !unlimited ? "bg-surface-container-lowest text-on-surface shadow-sm" : "text-on-surface-variant hover:text-on-surface"
+            )}
+          >
+            Limited
+          </button>
+          <button
+            type="button"
+            onClick={() => onToggleUnlimited(true)}
+            aria-pressed={!!unlimited}
+            className={cn(
+              "rounded-md py-1 transition-colors",
+              unlimited ? "bg-primary text-on-primary shadow-sm" : "text-on-surface-variant hover:text-on-surface"
+            )}
+          >
+            Unlimited +£10
+          </button>
+        </div>
+      ) : (
+        // keeps all four tiles the same height
+        <div className="mt-2 h-[26px]" aria-hidden />
+      )}
+    </div>
+  );
+}
+
+export function CustomPlanBanner({
+  state,
+  onChange,
+  baseline,
+  selected,
+  onSelect,
+  billingCycle = "monthly",
+}: {
+  state: CustomPlanState;
+  onChange: (next: CustomPlanState) => void;
+  baseline: CustomPlanBaseline;
+  selected: boolean;
+  onSelect: () => void;
+  billingCycle?: "monthly" | "yearly";
+}) {
+  const monthlyPrice = computeCustomPlanPrice(state, baseline);
+  const annualPrice = computeCustomPlanAnnualPrice(state, baseline);
+  const yearly = billingCycle === "yearly";
+  const fmt = (n: number) => (n % 1 === 0 ? String(Math.round(n)) : n.toFixed(2));
+
+  return (
+    <div
+      className={cn(
+        "rounded-3xl border-2 bg-surface-container-lowest p-6 transition-colors sm:p-8",
+        selected ? "border-primary ring-4 ring-primary/10" : "border-outline-variant/50"
+      )}
+    >
+      {/* Header: title + live price + select */}
+      <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+        <div className="max-w-md">
+          <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-primary">Custom plan</p>
+          <h3 className="mt-1 text-xl font-bold text-on-surface">Need something different? Build your own.</h3>
+          <p className="mt-1 text-sm text-on-surface-variant">
+            Starts from the Starter plan. Add only the branches, staff and limits you need. Every module is included.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-5 md:flex-col md:items-end md:gap-3 lg:flex-row lg:items-center lg:gap-6">
+          <div className="text-left md:text-right">
+            <p className="flex items-baseline gap-1 md:justify-end">
+              <span className="text-4xl font-black leading-none tabular-nums text-on-surface">
+                £{fmt(yearly ? annualPrice : monthlyPrice)}
+              </span>
+              <span className="text-sm text-on-surface-variant">/{yearly ? "yr" : "mo"}</span>
+            </p>
+            <p className="mt-1 text-xs text-on-surface-variant">
+              {yearly ? `Save £${fmt(monthlyPrice * 12 - annualPrice)} vs monthly` : "Billed monthly · cancel anytime"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onSelect}
+            className={cn(
+              "inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-2xl px-6 text-sm font-semibold transition-colors",
+              selected ? "bg-primary text-on-primary" : "bg-surface-container text-on-surface hover:bg-surface-container-high"
+            )}
+          >
+            {selected ? <><Check className="h-4 w-4" /> Selected</> : "Select custom plan"}
+          </button>
+        </div>
+      </div>
+
+      {/* Controls — editing any of them selects the custom plan */}
+      <div className="mt-6 grid grid-cols-1 gap-3 border-t border-outline-variant/40 pt-6 sm:grid-cols-2 lg:grid-cols-4">
+        <DimensionControl
+          label="Branches"
+          hint="+£15 each"
+          value={String(state.branches)}
+          canDecrement={state.branches > baseline.baseBranches}
+          onDecrement={() => onChange({ ...state, branches: Math.max(baseline.baseBranches, state.branches - 1) })}
+          onIncrement={() => onChange({ ...state, branches: state.branches + 1 })}
+        />
+        <DimensionControl
+          label="Staff"
+          hint="+£5 per 5"
+          value={String(state.staff)}
+          canDecrement={state.staff > baseline.baseStaff}
+          onDecrement={() => onChange({ ...state, staff: Math.max(baseline.baseStaff, state.staff - 5) })}
+          onIncrement={() => onChange({ ...state, staff: state.staff + 5 })}
+        />
+        <DimensionControl
+          label="Inventory items"
+          hint="+£5 per 1,000"
+          value={state.inventoryLimit.toLocaleString("en-GB")}
+          canDecrement={state.inventoryLimit > baseline.baseInventory}
+          onDecrement={() => onChange({ ...state, inventoryLimit: Math.max(baseline.baseInventory, state.inventoryLimit - 1000) })}
+          onIncrement={() => onChange({ ...state, inventoryLimit: state.inventoryLimit + 1000 })}
+          unlimited={state.inventoryUnlimited}
+          onToggleUnlimited={(v) => onChange({ ...state, inventoryUnlimited: v })}
+        />
+        <DimensionControl
+          label="Repair services"
+          hint="+£5 per 1,000"
+          value={state.repairLimit.toLocaleString("en-GB")}
+          canDecrement={state.repairLimit > baseline.baseRepair}
+          onDecrement={() => onChange({ ...state, repairLimit: Math.max(baseline.baseRepair, state.repairLimit - 1000) })}
+          onIncrement={() => onChange({ ...state, repairLimit: state.repairLimit + 1000 })}
+          unlimited={state.repairUnlimited}
+          onToggleUnlimited={(v) => onChange({ ...state, repairUnlimited: v })}
+        />
+      </div>
+    </div>
+  );
+}

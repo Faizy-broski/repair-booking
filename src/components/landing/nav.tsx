@@ -115,8 +115,8 @@ export default function Nav() {
               className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,_#008080_0%,_#008080_37%,_#18E3CD_100%)] px-4 py-3 text-xs font-bold text-white shadow-sm transition-transform hover:scale-[1.02] sm:px-7 sm:py-4 sm:text-sm"
             >
               <Sparkles className="h-4 w-4" />
-              <span className="hidden sm:inline">Start Free Trial</span>
-              <span className="sm:hidden">Trial</span>
+              <span className="hidden sm:inline">Get Started</span>
+              <span className="sm:hidden">Start</span>
             </Link>
 
             <button

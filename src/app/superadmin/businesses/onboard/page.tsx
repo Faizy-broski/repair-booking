@@ -104,6 +104,9 @@ export default function OnboardBusinessPage() {
   const [step2Data, setStep2Data] = useState<Step2Data | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<DbPlan | null>(null)
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly')
+  // Optional superadmin-granted free trial (off by default — business pays on first login)
+  const [giveTrial, setGiveTrial] = useState(false)
+  const [trialDays, setTrialDays] = useState('14')
   const [plans, setPlans] = useState<DbPlan[]>([])
   const [plansLoading, setPlansLoading] = useState(false)
 
@@ -228,6 +231,7 @@ export default function OnboardBusinessPage() {
           ...step2Data,
           planId: selectedPlan?.id,
           billingCycle: billing,
+          trialDays: selectedPlan && giveTrial ? Math.max(0, Math.min(365, parseInt(trialDays, 10) || 0)) : 0,
         }),
       })
       const j = await res.json()
@@ -688,12 +692,11 @@ export default function OnboardBusinessPage() {
                     {isEnterprise ? (
                       <p className="mt-1 text-sm text-gray-500">Admin-managed pricing</p>
                     ) : price === 0 ? (
-                      <p className="mt-1 text-sm text-gray-500">Free — 30-day trial</p>
+                      <p className="mt-1 text-sm text-gray-500">Free</p>
                     ) : (
                       <p className="mt-1 text-sm text-gray-700">
                         <span className="text-lg font-bold">£{price % 1 === 0 ? price : price.toFixed(2)}</span>
                         <span className="text-gray-400">/{billing === 'yearly' ? 'yr' : 'mo'}</span>
-                        <span className="ml-1.5 text-xs text-gray-400">· 30-day trial</span>
                       </p>
                     )}
                     {plan.features && plan.features.length > 0 && (
@@ -712,6 +715,52 @@ export default function OnboardBusinessPage() {
                   </button>
                 )
               })}
+            </div>
+          )}
+
+          {selectedPlan && selectedPlan.plan_type !== 'enterprise' && (
+            <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+              <label className="flex items-center justify-between gap-3 cursor-pointer">
+                <span>
+                  <span className="block text-sm font-semibold text-gray-900">Start with a free trial</span>
+                  <span className="block text-xs text-gray-500">
+                    {giveTrial
+                      ? 'Full access until the trial ends, then the business must pay.'
+                      : 'Off — the business must choose a plan and pay when they first log in.'}
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={giveTrial}
+                  onChange={(e) => setGiveTrial(e.target.checked)}
+                  className="h-5 w-5 accent-teal-600"
+                />
+              </label>
+              {giveTrial && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={trialDays}
+                    onChange={(e) => setTrialDays(e.target.value)}
+                    className="h-9 w-24 rounded-lg border border-gray-300 px-3 text-sm text-gray-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                  />
+                  <span className="text-sm text-gray-500">days</span>
+                  <div className="ml-auto flex gap-1">
+                    {[7, 14, 30].map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setTrialDays(String(d))}
+                        className={`rounded-md border px-2 py-1 text-xs font-medium ${trialDays === String(d) ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                      >
+                        {d}d
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -801,6 +850,13 @@ export default function OnboardBusinessPage() {
                   </div>
                 ) : (
                   <p className="text-sm text-gray-400 italic">No plan selected — business will have no active subscription</p>
+                )}
+                {selectedPlan && selectedPlan.plan_type !== 'enterprise' && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    {giveTrial && (parseInt(trialDays, 10) || 0) > 0
+                      ? `Free trial: ${parseInt(trialDays, 10)} days, then payment required`
+                      : 'No trial — owner must pay on first login'}
+                  </p>
                 )}
               </div>
             </CardContent>

@@ -7,7 +7,7 @@ export default function PageHero({
   kicker,
   title,
   description,
-  primaryCtaLabel = "Start Free Trial",
+  primaryCtaLabel = "Get Started",
   primaryCtaHref = "/register",
   secondaryCtaLabel,
   secondaryCtaHref,

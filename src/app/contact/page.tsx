@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 const SECTIONS = [
   {
     heading: "Sales enquiries",
-    body: "Interested in iRepairly for your shop? Start a free trial from the homepage, book a 20-minute demo, or send us a message and a member of our team will get back to you.",
+    body: "Interested in iRepairly for your shop? Get started from the homepage, book a 20-minute demo, or send us a message and a member of our team will get back to you.",
   },
   {
     heading: "Existing customers",

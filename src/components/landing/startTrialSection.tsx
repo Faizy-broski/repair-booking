@@ -26,7 +26,7 @@ export default function StartTrialSection() {
               </h2>
 
               <p className="mt-6 max-w-md text-sm leading-6 text-white/65 sm:mt-10 sm:text-md">
-                Fourteen days. Every module. No card. We&apos;ll port your data
+                Every module. One simple plan. We&apos;ll port your data
                 in, and you can keep it whether you stay or not.
               </p>
             </div>
@@ -34,7 +34,7 @@ export default function StartTrialSection() {
             {/* Right */}
             <div className="flex flex-col items-stretch gap-4 sm:items-start sm:gap-7 lg:items-end lg:justify-end">
               <Button className="w-full rounded-full bg-white px-7 py-6 text-sm font-medium text-slate-950 shadow-none hover:bg-white/90 sm:w-auto sm:py-7 sm:text-md">
-                Start free trial
+                Get started
                 <ArrowRight className="ml-4 h-5 w-5 sm:h-7 sm:w-7" />
               </Button>
 

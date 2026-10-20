@@ -6,7 +6,10 @@ import { createAdminClient } from '@/backend/config/supabase'
 import { VerticalTemplateService } from '@/backend/services/vertical-template.service'
 import { created, conflict, serverError, badRequest } from '@/backend/utils/api-response'
 import { validateBody } from '@/backend/utils/validate'
-import { customPlanDimensionsSchema, computeCustomPlanPricePence, getCustomPlanBaseline } from '@/backend/services/custom-plan-pricing'
+import { customPlanDimensionsSchema, computeCustomPlanPricePence, computeCustomPlanTotalPence, getCustomPlanBaseline } from '@/backend/services/custom-plan-pricing'
+import { createPlanCheckoutSession, type CheckoutTarget } from '@/backend/services/plan-checkout.service'
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://repairbooking.co.uk'
 
 async function isEmailVerified(email: string): Promise<boolean> {
   try {
@@ -75,6 +78,7 @@ export async function POST(request: NextRequest) {
 
     let validatedCustomPlan: ReturnType<ReturnType<typeof customPlanDimensionsSchema>['parse']> | null = null
     let customPricePence: number | null = null
+    let customCheckoutTotalPence: number | null = null
 
     if (data.customPlan) {
       const { data: customPlanRow, error: customPlanErr } = await supabase
@@ -98,37 +102,58 @@ export async function POST(request: NextRequest) {
       }
       validatedCustomPlan = parsed.data
       customPricePence = computeCustomPlanPricePence(parsed.data, baseline)
+      customCheckoutTotalPence = computeCustomPlanTotalPence(parsed.data, baseline, data.billingCycle)
+    } else if (data.planId === 'enterprise') {
+      // Enterprise enquiry — the UI sends the literal 'enterprise', not a plan UUID.
+      // Attach the enterprise plan row (if any) so the account is locked until a
+      // superadmin assigns a plan or grants a trial.
+      planType = 'enterprise'
+      planName = 'Enterprise'
+      const { data: entPlan } = await supabase
+        .from('plans')
+        .select('id')
+        .eq('plan_type', 'enterprise')
+        .limit(1)
+        .maybeSingle()
+      resolvedPlanId = (entPlan as { id: string } | null)?.id ?? null
     } else if (data.planId) {
       const { data: plan } = await supabase
         .from('plans')
-        .select('plan_type, name')
+        .select('plan_type, name, is_active')
         .eq('id', data.planId)
         .single()
-      planType = (plan as { plan_type?: string; name?: string } | null)?.plan_type ?? null
-      planName  = (plan as { plan_type?: string; name?: string } | null)?.name ?? null
+      const p = plan as { plan_type?: string; name?: string; is_active?: boolean } | null
+      if (!p || p.is_active === false) {
+        return badRequest('Selected plan is not available.', 'INVALID_PLAN')
+      }
+      planType = p.plan_type ?? null
+      planName = p.name ?? null
     }
 
-    const trialEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    // No self-serve free trial — every non-enterprise signup must pay for a plan.
+    if (planType !== 'enterprise') {
+      if (!resolvedPlanId) return badRequest('Please choose a plan to continue.', 'PLAN_REQUIRED')
+      if (planType === 'free') return badRequest('Please choose a paid plan to continue.', 'PAID_PLAN_REQUIRED')
+    }
 
-    // Create account immediately, fully active for 30 days
+    // Create the account now; it stays locked (subscription 'incomplete') until
+    // Stripe Checkout completes — see /api/auth/check-registration + webhook.
     const result = await AuthService.register({
       ...data,
       activateNow: true,
-      trialEndsAt,
     })
 
-    // Create subscription row for ALL plans with a 30-day trial
-    if (resolvedPlanId && planType !== 'enterprise') {
-      await (supabase as any)
+    if (resolvedPlanId) {
+      const { error: subErr } = await (supabase as any)
         .from('subscriptions')
         .insert({
           business_id:          result.business.id,
           plan_id:              resolvedPlanId,
-          status:               'trialing',
+          status:               'incomplete',
           billing_cycle:        data.billingCycle,
-          trial_ends_at:        trialEndsAt,
-          current_period_start: new Date().toISOString(),
-          current_period_end:   trialEndsAt,
+          trial_ends_at:        null,
+          current_period_start: null,
+          current_period_end:   null,
           ...(validatedCustomPlan
             ? {
                 is_custom:            true,
@@ -141,11 +166,38 @@ export async function POST(request: NextRequest) {
             : {}),
         })
 
-      // Set trial_ends_at on business too for quick middleware check
-      await (supabase as any)
-        .from('businesses')
-        .update({ trial_ends_at: trialEndsAt })
-        .eq('id', result.business.id)
+      // Without this row the business would have no subscription at all, which
+      // the access gates treat as unrestricted — never leave it half-created.
+      if (subErr) {
+        await supabase.auth.admin.deleteUser(result.userId).catch(() => {})
+        await (supabase as any).from('businesses').delete().eq('id', result.business.id)
+        return serverError(`Could not set up your subscription: ${subErr.message}`, subErr)
+      }
+    }
+
+    // Create the Stripe Checkout session. If this fails the account still exists
+    // (locked) — the client sends the user to the payment-cancelled page, from
+    // where they can log in and pay via /account/plans.
+    let checkoutUrl: string | null = null
+    if (planType !== 'enterprise') {
+      const subdomain = data.subdomain.toLowerCase()
+      try {
+        const target: CheckoutTarget = validatedCustomPlan
+          ? { kind: 'custom', dims: validatedCustomPlan, totalPence: customCheckoutTotalPence!, monthlyPence: customPricePence! }
+          : { kind: 'plan', planId: resolvedPlanId! }
+        const session = await createPlanCheckoutSession({
+          businessId:   result.business.id,
+          email:        data.email,
+          target,
+          billingCycle: data.billingCycle,
+          successUrl:   `${APP_URL}/register/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl:    `${APP_URL}/register/payment-cancelled?subdomain=${encodeURIComponent(subdomain)}&email=${encodeURIComponent(data.email)}`,
+          source:       'signup',
+        })
+        checkoutUrl = session.url
+      } catch (err) {
+        console.error('[register] Checkout session creation failed:', err)
+      }
     }
 
     // Send welcome email for all non-enterprise plans
@@ -199,7 +251,7 @@ export async function POST(request: NextRequest) {
         .catch(() => {}) // non-fatal — business is created regardless
     }
 
-    return created({ businessId: result.business.id })
+    return created({ businessId: result.business.id, checkoutUrl })
   } catch (err) {
     const message = (err as Error).message
     if (message.includes('already taken') || message.includes('already exists')) return conflict(message)

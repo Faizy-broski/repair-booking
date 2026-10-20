@@ -372,7 +372,7 @@ function LoginForm() {
           <p className="mt-4 text-center text-sm text-on-surface-variant">
             Don&apos;t have an account?{' '}
             <a href={registerHref} className="font-medium text-primary hover:underline">
-              Start free trial
+              Get started
             </a>
           </p>
         )}

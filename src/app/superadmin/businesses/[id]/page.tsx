@@ -5,13 +5,15 @@ import {
   ArrowLeft, Building2, User, CreditCard, GitBranch, Package,
   Wrench, Users, DollarSign, ShieldAlert, ShieldCheck, KeyRound,
   Eye, EyeOff, Check, Globe, Phone, Mail, MapPin, Calendar, ExternalLink,
-  CheckCircle2, XCircle, Loader2, AlertTriangle,
+  CheckCircle2, XCircle, Loader2, AlertTriangle, Gift,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/ui/modal'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { MODULES } from '@/backend/config/constants'
+import { GrantTrialModal } from '@/components/superadmin/grant-trial-modal'
+import type { PlanOption } from '@/components/superadmin/edit-subscription-modal'
 
 const MODULE_LABELS: Record<string, string> = {
   pos: 'POS', inventory: 'Inventory', repairs: 'Repairs',
@@ -109,6 +111,19 @@ export default function BusinessDetailPage({ params }: { params: Promise<{ id: s
   // Suspend/activate
   const [toggling, setToggling] = useState(false)
 
+  // Grant free trial
+  const [grantTrialOpen, setGrantTrialOpen] = useState(false)
+  const [planOptions, setPlanOptions] = useState<PlanOption[]>([])
+  const [reloadKey, setReloadKey] = useState(0)
+
+  async function openGrantTrial() {
+    if (planOptions.length === 0) {
+      const json = await fetch('/api/plans?all=true').then((r) => r.json()).catch(() => null)
+      setPlanOptions(json?.data ?? [])
+    }
+    setGrantTrialOpen(true)
+  }
+
   useEffect(() => {
     setLoading(true)
     Promise.all([
@@ -118,7 +133,7 @@ export default function BusinessDetailPage({ params }: { params: Promise<{ id: s
       setDetails(detailsJson.data ?? null)
       setModules(modulesJson.data ?? [])
     }).finally(() => setLoading(false))
-  }, [id])
+  }, [id, reloadKey])
 
   async function openResetModal() {
     setResetModal(true)
@@ -266,6 +281,13 @@ export default function BusinessDetailPage({ params }: { params: Promise<{ id: s
             className="bg-amber-500 hover:bg-amber-600 text-white"
           >
             <KeyRound className="h-3.5 w-3.5 mr-1" /> Reset Password
+          </Button>
+          <Button
+            size="sm"
+            onClick={openGrantTrial}
+            className="bg-teal-600 hover:bg-teal-700 text-white"
+          >
+            <Gift className="h-3.5 w-3.5 mr-1" /> Grant Trial
           </Button>
           <Button
             size="sm"
@@ -634,6 +656,19 @@ export default function BusinessDetailPage({ params }: { params: Promise<{ id: s
           )}
         </div>
       </Modal>
+
+      {grantTrialOpen && (
+        <GrantTrialModal
+          business={{ id: business.id, name: business.name }}
+          plans={planOptions}
+          defaultPlanId={plan?.id ?? null}
+          onClose={() => setGrantTrialOpen(false)}
+          onSaved={() => {
+            setGrantTrialOpen(false)
+            setReloadKey((k) => k + 1)
+          }}
+        />
+      )}
     </div>
   )
 }

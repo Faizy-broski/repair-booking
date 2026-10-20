@@ -13,16 +13,17 @@ import { COUNTRIES } from '@/lib/countries'
 import {
   CheckCircle, Building2, User, CreditCard, Check, Zap, Mail,
   ChevronRight, ArrowLeft, Sparkles, Store, Wrench, ShoppingBag,
-  Scissors, Coffee, Monitor, Package, ShieldCheck, RotateCcw, Gift, Globe, MapPin, Link2, Truck,
+  Scissors, Coffee, Monitor, Package, ShieldCheck, RotateCcw, Globe, MapPin, Link2, Truck,
 } from 'lucide-react'
 
 import validations from '@/components/layout/number-validations.json'
 import { parseGoogleMapsLink } from '@/lib/maps-link'
 import {
-  CustomPlanCard,
+  CustomPlanBanner,
   deriveCustomPlanBaseline,
   makeDefaultCustomPlanState,
   computeCustomPlanPrice,
+  computeCustomPlanAnnualPrice,
   toCustomPlanPayload,
   type CustomPlanState,
 } from '@/components/landing/custom-plan-card'
@@ -160,7 +161,6 @@ export default function RegisterPage() {
   const [templates, setTemplates] = useState<VerticalTemplate[]>([])
   const [templatesLoading, setTemplatesLoading] = useState(true)
   const [selectedTemplate, setSelectedTemplate] = useState<VerticalTemplate | null>(null)
-  const [previewTemplate, setPreviewTemplate] = useState<VerticalTemplate | null>(null)
 
   // Existing form state
   const [step1Data, setStep1Data] = useState<Step1Data | null>(null)
@@ -210,7 +210,8 @@ export default function RegisterPage() {
       setPlansLoading(true)
       fetch('/api/plans')
         .then(r => r.json())
-        .then(j => { if (j.data) setPlans(j.data) })
+        // No free/trial plans at self-signup — every business pays for a plan.
+        .then(j => { if (j.data) setPlans((j.data as DbPlan[]).filter(p => p.plan_type !== 'free')) })
         .catch(() => { })
         .finally(() => setPlansLoading(false))
     }
@@ -231,7 +232,6 @@ export default function RegisterPage() {
     sessionStorage.removeItem('pendingCustomPlan')
   }, [step])
 
-  const isFreePlan = selectedPlan?.price_monthly === 0
   const isEnterprisePlan = selectedPlan?.plan_type === 'enterprise'
 
   // ── Validation helpers ────────────────────────────────────────────────────
@@ -444,6 +444,7 @@ export default function RegisterPage() {
           ...(isCustomSelected
             ? { customPlan: toCustomPlanPayload(effectiveCustomPlan) }
             : { planId: selectedPlan!.id }),
+          billingCycle: billing,
           ...(selectedTemplate ? { verticalTemplateSlug: selectedTemplate.slug } : {}),
         }),
       })
@@ -453,7 +454,14 @@ export default function RegisterPage() {
         setProceeding(false)
         return
       }
-      window.location.href = `/register/success?subdomain=${encodeURIComponent(step1Data.subdomain.toLowerCase())}`
+      if (json.data?.checkoutUrl) {
+        // Pay in Stripe Checkout — on success Stripe returns to /register/success
+        window.location.href = json.data.checkoutUrl
+        return
+      }
+      // Account was created but checkout couldn't start — let them log in and pay from /account/plans
+      const params = new URLSearchParams({ subdomain: step1Data.subdomain.toLowerCase(), email: step1Data.email, error: '1' })
+      window.location.href = `/register/payment-cancelled?${params}`
     } catch {
       setServerError('Something went wrong. Please try again.')
       setProceeding(false)
@@ -508,18 +516,18 @@ export default function RegisterPage() {
           <div className="text-center">
             <h2 className="text-2xl font-bold text-on-surface">What type of business are you?</h2>
             <p className="text-on-surface-variant mt-1 text-sm">
-              We'll pre-configure the right modules for you. You can always change this later.
+              We&apos;ll pre-configure the right modules for you. You can always change this later.
             </p>
           </div>
 
           {templatesLoading ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {[1, 2, 3, 4, 5, 6].map(i => (
-                <div key={i} className="h-36 animate-pulse rounded-2xl bg-surface-container" />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-[168px] rounded-2xl border-2 border-outline-variant/40 bg-surface-container-lowest" />
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3" role="radiogroup" aria-label="Business type">
               {templates.map((t) => {
                 const IconComp = ICON_MAP[t.icon] ?? Store
                 const colors = ICON_COLORS[t.icon] ?? { bg: 'bg-gray-100', text: 'text-gray-600' }
@@ -528,30 +536,33 @@ export default function RegisterPage() {
                   <button
                     key={t.slug}
                     type="button"
+                    role="radio"
+                    aria-checked={isSelected}
                     onClick={() => setSelectedTemplate(isSelected ? null : t)}
-                    onMouseEnter={() => setPreviewTemplate(t)}
-                    onMouseLeave={() => setPreviewTemplate(null)}
                     className={[
-                      'relative flex flex-col items-start gap-3 rounded-2xl border-2 p-4 text-left transition-all duration-150',
+                      'relative flex h-[168px] flex-col items-start gap-3 rounded-2xl border-2 bg-surface-container-lowest p-5 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
                       isSelected
-                        ? 'border-primary bg-primary-container/20 shadow-md shadow-primary/10'
-                        : 'border-outline-variant bg-surface-container-lowest hover:border-primary/40 hover:shadow-sm',
+                        ? 'border-primary ring-4 ring-primary/10'
+                        : 'border-outline-variant/60 hover:border-primary/50',
                     ].join(' ')}
                   >
-                    {isSelected && (
-                      <span className="absolute top-3 right-3">
-                        <CheckCircle className="h-4 w-4 text-primary" />
-                      </span>
-                    )}
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${colors.bg}`}>
+                    <span
+                      className={[
+                        'absolute top-4 right-4 flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors',
+                        isSelected ? 'border-primary bg-primary' : 'border-outline-variant',
+                      ].join(' ')}
+                    >
+                      {isSelected && <Check className="h-3 w-3 text-on-primary" />}
+                    </span>
+                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${colors.bg}`}>
                       <IconComp className={`h-5 w-5 ${colors.text}`} />
                     </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-on-surface text-sm leading-tight">{t.name}</p>
+                    <div className="min-w-0 flex-1 flex flex-col">
+                      <p className="font-semibold text-on-surface leading-tight pr-6">{t.name}</p>
                       {t.description && (
-                        <p className="text-xs text-on-surface-variant mt-0.5 line-clamp-2 leading-relaxed">{t.description}</p>
+                        <p className="text-xs text-on-surface-variant mt-1 line-clamp-2 leading-relaxed">{t.description}</p>
                       )}
-                      <p className="text-[10px] text-outline mt-1.5">{t.modules_enabled.length} modules included</p>
+                      <p className="mt-auto text-[11px] font-medium text-outline">{t.modules_enabled.length} modules included</p>
                     </div>
                   </button>
                 )
@@ -559,25 +570,32 @@ export default function RegisterPage() {
             </div>
           )}
 
-          {/* Module preview panel — shown on hover */}
-          {(previewTemplate ?? selectedTemplate) && (
-            <div className="rounded-2xl border border-outline-variant bg-surface-container-low px-5 py-4">
-              <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-2">
-                {(previewTemplate ?? selectedTemplate)!.name} — Included modules
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {(previewTemplate ?? selectedTemplate)!.modules_enabled.map((mod) => (
-                  <span
-                    key={mod}
-                    className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
-                  >
-                    <Check className="h-3 w-3" />
-                    {MODULE_LABELS[mod] ?? mod}
-                  </span>
-                ))}
+          {/* Included modules for the selected type — always rendered with a fixed
+              height so selecting/deselecting never shifts the page */}
+          <div className="rounded-2xl border border-outline-variant/60 bg-surface-container-low px-5 py-4 min-h-[112px]">
+            {selectedTemplate ? (
+              <>
+                <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-2.5">
+                  {selectedTemplate.name} — included modules
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedTemplate.modules_enabled.map((mod) => (
+                    <span
+                      key={mod}
+                      className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
+                    >
+                      <Check className="h-3 w-3" />
+                      {MODULE_LABELS[mod] ?? mod}
+                    </span>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="flex h-full min-h-[80px] items-center justify-center text-sm text-on-surface-variant">
+                Select a business type to see the modules we&apos;ll set up for you.
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           <div className="flex flex-col-reverse sm:flex-row items-center justify-center gap-4 sm:gap-8 pt-2">
             <button
@@ -585,7 +603,7 @@ export default function RegisterPage() {
               onClick={() => { setSelectedTemplate(null); setStep(1) }}
               className="text-sm text-on-surface-variant hover:text-on-surface underline underline-offset-2"
             >
-              Skip — I'll choose modules manually
+              Skip — I&apos;ll choose modules manually
             </button>
             <Button
               onClick={() => setStep(1)}
@@ -993,7 +1011,7 @@ export default function RegisterPage() {
         <div className="space-y-8">
           <div className="text-center">
             <h2 className="text-2xl font-bold text-on-surface">Choose your plan</h2>
-            <p className="text-on-surface-variant mt-1">30-day free trial on all plans. No credit card required.</p>
+            <p className="text-on-surface-variant mt-1">Pick a plan and pay securely with Stripe. Cancel anytime.</p>
 
             {/* Billing toggle */}
             <div className="mt-5 inline-flex items-center gap-3 rounded-2xl border border-outline-variant bg-surface-container p-1.5">
@@ -1020,9 +1038,10 @@ export default function RegisterPage() {
           {plansLoading ? (
             <div className="flex items-center justify-center py-20 text-on-surface-variant">Loading plans...</div>
           ) : (
-            <div className={`grid gap-8 items-stretch ${plans.length + 1 === 4 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4' :
-              plans.length + 1 === 3 ? 'grid-cols-1 md:grid-cols-3' :
-                'grid-cols-1 md:grid-cols-2 max-w-3xl mx-auto'
+            <>
+            <div className={`grid gap-8 items-stretch ${plans.length >= 3 ? 'grid-cols-1 md:grid-cols-3' :
+              plans.length === 2 ? 'grid-cols-1 md:grid-cols-2 max-w-3xl mx-auto' :
+                'grid-cols-1 max-w-sm mx-auto'
               }`}>
               {plans.map((plan, index) => {
                 const highlighted = isPlanHighlighted(plans, index)
@@ -1060,13 +1079,6 @@ export default function RegisterPage() {
                       {plan.name}
                     </p>
 
-                    {/* 30-day trial badge */}
-                    {!isEnterprise && (
-                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold mb-3 w-fit ${highlighted ? 'bg-on-primary/20 text-on-primary' : 'bg-primary/10 text-primary'}`}>
-                        <Gift className="h-3 w-3" /> 30 days free trial
-                      </span>
-                    )}
-
                     <div className="flex items-end gap-1 mb-1">
                       {isEnterprise ? (
                         <span className={`text-5xl font-black leading-none ${highlighted ? 'text-on-primary' : 'text-on-surface'}`}>Custom</span>
@@ -1088,11 +1100,9 @@ export default function RegisterPage() {
                     {/* Post-trial / billing note */}
                     {!isEnterprise && (
                       <p className={`text-xs mb-5 ${highlighted ? 'text-on-primary/50' : 'text-on-surface-variant'}`}>
-                        {isTrulyFree
-                          ? 'Free forever — no credit card required'
-                          : isYearly
-                            ? `Save £${Math.round(plan.price_monthly * 12) - yearlyTotal} vs monthly — after 30-day trial`
-                            : `Then £${fmtPrice(plan.price_monthly)}/mo after 30-day trial`}
+                        {isYearly
+                          ? `Save £${Math.round(plan.price_monthly * 12) - yearlyTotal} vs monthly · billed yearly`
+                          : 'Billed monthly · cancel anytime'}
                       </p>
                     )}
                     {isEnterprise && (
@@ -1134,15 +1144,17 @@ export default function RegisterPage() {
                   </button>
                 )
               })}
-              <CustomPlanCard
-                state={effectiveCustomPlan}
-                onChange={(next) => { setCustomPlan(next); setIsCustomSelected(true); setSelectedPlan(null) }}
-                baseline={customPlanBaseline}
-                highlight={isCustomSelected}
-                ctaLabel={isCustomSelected ? 'Selected' : 'Select Custom Plan'}
-                onCtaClick={() => { setIsCustomSelected(true); setSelectedPlan(null) }}
-              />
             </div>
+
+            <CustomPlanBanner
+              state={effectiveCustomPlan}
+              onChange={(next) => { setCustomPlan(next); setIsCustomSelected(true); setSelectedPlan(null) }}
+              baseline={customPlanBaseline}
+              billingCycle={billing}
+              selected={isCustomSelected}
+              onSelect={() => { setIsCustomSelected(true); setSelectedPlan(null) }}
+            />
+            </>
           )}
 
           {serverError && (
@@ -1161,25 +1173,25 @@ export default function RegisterPage() {
               <Button className="flex-1" loading={proceeding} disabled={!selectedPlan && !isCustomSelected} onClick={handleProceedToPayment}>
                 <Zap className="h-4 w-4" />
                 {isCustomSelected
-                  ? `Start free trial — £${computeCustomPlanPrice(effectiveCustomPlan, customPlanBaseline)}/mo`
+                  ? billing === 'yearly'
+                    ? `Continue to payment — £${computeCustomPlanAnnualPrice(effectiveCustomPlan, customPlanBaseline)}/year`
+                    : `Continue to payment — £${computeCustomPlanPrice(effectiveCustomPlan, customPlanBaseline)}/mo`
                   : selectedPlan
-                    ? isFreePlan
-                      ? 'Start 30-day free trial'
-                      : (() => {
-                          const isYearly = billing === 'yearly'
-                          const price = isYearly
-                            ? Math.round(selectedPlan.price_monthly * 12 * (1 - ANNUAL_DISCOUNT))
-                            : selectedPlan.price_monthly
-                          const fmt = (n: number) => n % 1 === 0 ? String(Math.round(n)) : n.toFixed(2)
-                          return `Start free trial — £${fmt(price)}${isYearly ? '/year' : '/mo'}`
-                        })()
+                    ? (() => {
+                        const isYearly = billing === 'yearly'
+                        const price = isYearly
+                          ? Math.round(selectedPlan.price_monthly * 12 * (1 - ANNUAL_DISCOUNT))
+                          : selectedPlan.price_monthly
+                        const fmt = (n: number) => n % 1 === 0 ? String(Math.round(n)) : n.toFixed(2)
+                        return `Continue to payment — £${fmt(price)}${isYearly ? '/year' : '/mo'}`
+                      })()
                     : 'Select a plan to continue'}
               </Button>
             )}
           </div>
 
           <p className="text-center text-xs text-on-surface-variant">
-            No credit card charged until trial ends · Cancel anytime
+            You&apos;ll be charged today via secure Stripe checkout · Cancel anytime
           </p>
         </div>
       )}
