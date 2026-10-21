@@ -5,6 +5,8 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from '@/lib/query-client'
 import { SignOutButton } from '@/components/layout/sign-out-button'
 import { SuperAdminNav } from './nav'
+import { Toaster } from 'sonner'
+import { PaymentChecksBell } from '@/components/superadmin/payment-checks-bell'
 
 function Sidebar({ onClose }: { onClose?: () => void }) {
   return (
@@ -51,7 +53,7 @@ export function SuperAdminShell({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-    <div className="flex h-screen overflow-hidden bg-surface-container-low">
+    <div className="flex h-screen overflow-hidden bg-background">
       {/* Desktop sidebar — always visible */}
       <div className="hidden lg:flex">
         <Sidebar />
@@ -87,6 +89,14 @@ export function SuperAdminShell({ children }: { children: React.ReactNode }) {
             </div>
             <span className="text-sm font-bold text-white">SuperAdmin</span>
           </div>
+          <div className="ml-auto rounded-lg bg-white">
+            <PaymentChecksBell />
+          </div>
+        </header>
+
+        {/* Desktop header — notifications */}
+        <header className="hidden h-12 shrink-0 items-center justify-end border-b border-outline-variant bg-surface-container-lowest px-4 lg:flex">
+          <PaymentChecksBell />
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">
@@ -94,6 +104,7 @@ export function SuperAdminShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
     </div>
+    <Toaster richColors position="top-center" />
     </QueryClientProvider>
   )
 }

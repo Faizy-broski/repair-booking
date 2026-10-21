@@ -15,6 +15,7 @@ import { formatCurrency } from '@/lib/utils'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
+import { useAuthStore } from '@/store/auth.store'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -45,6 +46,24 @@ const typeSchema = z.object({
   show_on_pos: z.boolean().default(true),
 })
 type TypeForm = z.infer<typeof typeSchema>
+
+// ── Copy per business type ─────────────────────────────────────────────────
+// Mobile tyre-fitting businesses use the same hierarchy, worded for vehicles.
+
+const GENERIC_LABELS = {
+  subtitle:  'Define device types, brands, devices and repair services.',
+  type:      'Device Type',   types:   'Device Types',  typePh:   'e.g. Phone, Laptop…', slugPh: 'e.g. phone, laptop',
+  brand:     'Brand',         brands:  'Brands',        brandPh:  'e.g. Apple, Samsung…',
+  device:    'Device',        devices: 'Devices',       devicePh: 'e.g. iPhone 15, Galaxy S24…',
+  services:  'Services',      servicePh: 'Service name…',
+}
+const TYRE_LABELS: typeof GENERIC_LABELS = {
+  subtitle:  'Set up vehicle types, makes and models, and the tyre services you offer.',
+  type:      'Vehicle Type',  types:   'Vehicle Types', typePh:   'e.g. Car, Van, 4x4…', slugPh: 'e.g. car, van',
+  brand:     'Make',          brands:  'Makes',         brandPh:  'e.g. Ford, Vauxhall…',
+  device:    'Model',         devices: 'Models',        devicePh: 'e.g. Focus, Transit…',
+  services:  'Tyre Services', servicePh: 'e.g. Puncture repair…',
+}
 
 // ── Reusable column header ──────────────────────────────────────────────────
 
@@ -147,6 +166,8 @@ function EmptyPrompt({ icon: Icon, text }: { icon: React.ElementType; text: stri
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function ServiceCataloguePage() {
+  const { verticalTemplateSlug } = useAuthStore()
+  const L = verticalTemplateSlug === 'mobile-tyre-fitting' ? TYRE_LABELS : GENERIC_LABELS
   const [brands,      setBrands]      = useState<Brand[]>([])
   const [devices,     setDevices]     = useState<Device[]>([])
   const [deviceTypes, setDeviceTypes] = useState<DeviceType[]>([])
@@ -255,7 +276,8 @@ export default function ServiceCataloguePage() {
     finally { setLoadingDevices(false) }
   }, [])
 
-  const loadServices = useCallback(async (devId: string, page = 1, append = false) => {
+  // scope: a specific device, or a whole type ("all models" services, device_id IS NULL)
+  const loadServices = useCallback(async (scope: { deviceId: string } | { categoryId: string }, page = 1, append = false) => {
     servicesAbortRef.current?.abort()
     const ctrl = new AbortController()
     servicesAbortRef.current = ctrl
@@ -263,7 +285,9 @@ export default function ServiceCataloguePage() {
     if (!append) setServices([])
     try {
       const res = await fetch(
-        `/api/services/problems?device_id=${devId}&page=${page}&limit=${PAGE_SIZE}`,
+        'deviceId' in scope
+          ? `/api/services/problems?device_id=${scope.deviceId}&page=${page}&limit=${PAGE_SIZE}`
+          : `/api/services/problems?category_id=${scope.categoryId}&all_models=1&page=${page}&limit=${PAGE_SIZE}`,
         { signal: ctrl.signal },
       )
       const j = await res.json()
@@ -296,11 +320,14 @@ export default function ServiceCataloguePage() {
   useEffect(() => {
     if (selectedDevId) {
       setServicesPage(1); setServicesTotal(0)
-      loadServices(selectedDevId, 1, false)
+      loadServices({ deviceId: selectedDevId }, 1, false)
+    } else if (selectedTypeId) {
+      setServicesPage(1); setServicesTotal(0)
+      loadServices({ categoryId: selectedTypeId }, 1, false)
     } else {
       setServices([]); setServicesTotal(0)
     }
-  }, [selectedDevId, loadServices])
+  }, [selectedDevId, selectedTypeId, loadServices])
 
   // ── Device Types ────────────────────────────────────────────────────────
 
@@ -332,7 +359,7 @@ export default function ServiceCataloguePage() {
   }
 
   async function deleteType(id: string) {
-    if (!await confirmToast('Delete this device type?', 'Delete')) return
+    if (!await confirmToast(`Delete this ${L.type.toLowerCase()}?`, 'Delete')) return
     setDeviceTypes(p => p.filter(t => t.id !== id))
     if (selectedTypeId === id) { setSelectedTypeId(null); setSelectedBrandId(null); setSelectedDevId(null) }
     fetch(`/api/services/categories/${id}`, { method: 'DELETE' })
@@ -390,7 +417,7 @@ export default function ServiceCataloguePage() {
   }
 
   async function deleteBrand(id: string) {
-    if (!await confirmToast('Delete this brand? All its devices will also be removed.', 'Delete')) return
+    if (!await confirmToast(`Delete this ${L.brand.toLowerCase()}? All its ${L.devices.toLowerCase()} will also be removed.`, 'Delete')) return
     setBrands(p => p.filter(b => b.id !== id))
     if (selectedBrandId === id) { setSelectedBrandId(null); setSelectedDevId(null) }
     fetch(`/api/services/manufacturers/${id}`, { method: 'DELETE' })
@@ -424,7 +451,7 @@ export default function ServiceCataloguePage() {
   }
 
   async function deleteDevice(id: string) {
-    if (!await confirmToast('Delete this device? Its services will be unlinked.', 'Delete')) return
+    if (!await confirmToast(`Delete this ${L.device.toLowerCase()}? Its services will be unlinked.`, 'Delete')) return
     setDevices(p => p.filter(d => d.id !== id))
     if (selectedDevId === id) setSelectedDevId(null)
     fetch(`/api/services/devices/${id}`, { method: 'DELETE' })
@@ -433,14 +460,18 @@ export default function ServiceCataloguePage() {
   // ── Services ─────────────────────────────────────────────────────────────
 
   async function addServiceInline() {
-    if (!newSvcName.trim() || !selectedDevId) return
+    if (!newSvcName.trim() || (!selectedDevId && !selectedTypeId)) return
     const price = parseFloat(newSvcPrice) || 0
-    const tmp: Service = { id: `tmp-${Date.now()}`, name: newSvcName.trim(), price, cost: 0, warranty_days: 0, show_on_pos: true, device_id: selectedDevId, category_id: null }
+    // No device selected -> the service applies to every model of the selected type
+    const typeWide = !selectedDevId
+    const tmp: Service = { id: `tmp-${Date.now()}`, name: newSvcName.trim(), price, cost: 0, warranty_days: 0, show_on_pos: true, device_id: selectedDevId, category_id: typeWide ? selectedTypeId : null }
     setServices(p => [...p, tmp])
     setNewSvcName(''); setNewSvcPrice('')
     const res = await fetch('/api/services/problems', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: tmp.name, price, cost: 0, warranty_days: 0, show_on_pos: true, device_id: selectedDevId }),
+      body: JSON.stringify(typeWide
+        ? { name: tmp.name, price, cost: 0, warranty_days: 0, show_on_pos: true, category_id: selectedTypeId, use_for_all_models: true }
+        : { name: tmp.name, price, cost: 0, warranty_days: 0, show_on_pos: true, device_id: selectedDevId }),
     })
     const j = await res.json()
     if (j.data?.id) setServices(p => p.map(s => s.id === tmp.id ? { ...s, id: j.data.id } : s))
@@ -461,7 +492,7 @@ export default function ServiceCataloguePage() {
       setServices(p => [...p, tmp])
       const res = await fetch('/api/services/problems', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, device_id: deviceId, category_id: data.category_id || null }),
+        body: JSON.stringify({ ...data, device_id: deviceId, category_id: data.category_id || null, ...(deviceId ? {} : { use_for_all_models: true }) }),
       })
       const j = await res.json()
       if (j.data?.id) setServices(p => p.map(s => s.id === tmp.id ? { ...s, id: j.data.id } : s))
@@ -478,7 +509,7 @@ export default function ServiceCataloguePage() {
   function openSvcModal(editing: Service | null = null) {
     svcForm.reset(editing
       ? { name: editing.name, price: editing.price, cost: editing.cost, warranty_days: editing.warranty_days, category_id: editing.category_id ?? '', show_on_pos: editing.show_on_pos }
-      : { name: newSvcName, price: parseFloat(newSvcPrice) || 0, cost: 0, warranty_days: 0, show_on_pos: true, category_id: '' }
+      : { name: newSvcName, price: parseFloat(newSvcPrice) || 0, cost: 0, warranty_days: 0, show_on_pos: true, category_id: selectedDevId ? '' : (selectedTypeId ?? '') }
     )
     setSvcModal({ open: true, editing, deviceId: editing?.device_id ?? selectedDevId })
   }
@@ -496,7 +527,7 @@ export default function ServiceCataloguePage() {
       <div>
         <h1 className="text-xl font-bold text-on-surface">Service Catalogue</h1>
         <p className="text-sm text-on-surface-variant mt-0.5">
-          Define device types, brands, devices and repair services.
+          {L.subtitle}
         </p>
       </div>
 
@@ -505,15 +536,15 @@ export default function ServiceCataloguePage() {
         <Info className="h-3.5 w-3.5 text-outline shrink-0" />
         <span className="font-medium text-on-surface-variant">Hierarchy:</span>
         <span className="flex items-center gap-1">
-          <Tag className="h-3 w-3 text-purple-500" /> Device Type
+          <Tag className="h-3 w-3 text-purple-500" /> {L.type}
         </span>
         <ChevronRight className="h-3 w-3 text-outline-variant" />
         <span className="flex items-center gap-1">
-          <Layers className="h-3 w-3 text-brand-teal" /> Brand
+          <Layers className="h-3 w-3 text-brand-teal" /> {L.brand}
         </span>
         <ChevronRight className="h-3 w-3 text-outline-variant" />
         <span className="flex items-center gap-1">
-          <Cpu className="h-3 w-3 text-blue-500" /> Device
+          <Cpu className="h-3 w-3 text-blue-500" /> {L.device}
         </span>
         <ChevronRight className="h-3 w-3 text-outline-variant" />
         <span className="flex items-center gap-1">
@@ -529,7 +560,7 @@ export default function ServiceCataloguePage() {
             onClick={() => setMobileStep(0)}
             className={`px-2.5 py-1 rounded-full font-medium transition-colors ${mobileStep === 0 ? 'bg-purple-600 text-white' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
           >
-            Device Types
+            {L.types}
           </button>
           {selectedTypeId && (<>
             <ChevronRight className="h-3 w-3 text-outline-variant shrink-0" />
@@ -537,7 +568,7 @@ export default function ServiceCataloguePage() {
               onClick={() => setMobileStep(1)}
               className={`px-2.5 py-1 rounded-full font-medium transition-colors ${mobileStep === 1 ? 'bg-brand-teal text-white' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
             >
-              {selectedType?.name ?? 'Brands'}
+              {selectedType?.name ?? L.brands}
             </button>
           </>)}
           {selectedBrandId && (<>
@@ -546,7 +577,7 @@ export default function ServiceCataloguePage() {
               onClick={() => setMobileStep(2)}
               className={`px-2.5 py-1 rounded-full font-medium transition-colors ${mobileStep === 2 ? 'bg-blue-500 text-white' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
             >
-              {selectedBrand?.name ?? 'Devices'}
+              {selectedBrand?.name ?? L.devices}
             </button>
           </>)}
           {selectedDevId && (<>
@@ -555,7 +586,7 @@ export default function ServiceCataloguePage() {
               onClick={() => setMobileStep(3)}
               className={`px-2.5 py-1 rounded-full font-medium transition-colors ${mobileStep === 3 ? 'bg-orange-500 text-white' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
             >
-              {selectedDevice?.name ?? 'Services'}
+              {selectedDevice?.name ?? L.services}
             </button>
           </>)}
         </div>
@@ -565,14 +596,14 @@ export default function ServiceCataloguePage() {
 
           {/* ── Col 1: Device Types ── */}
           <div className={`flex flex-col border-b lg:border-b-0 border-outline-variant ${mobileStep !== 0 ? 'hidden lg:flex' : 'flex'}`}>
-            <ColHeader icon={Tag} iconColor="text-purple-500" label="Device Types" count={deviceTypes.length} loading={loadingTypes} />
+            <ColHeader icon={Tag} iconColor="text-purple-500" label={L.types} count={deviceTypes.length} loading={loadingTypes} />
 
             {/* Quick add */}
             <div className="px-3 py-2 border-b border-outline-variant shrink-0">
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="e.g. Phone, Laptop…"
+                  placeholder={L.typePh}
                   value={newTypeName}
                   onChange={(e) => {
                     setNewTypeName(e.target.value)
@@ -599,7 +630,7 @@ export default function ServiceCataloguePage() {
 
             <div className="flex-1 overflow-y-auto">
               {deviceTypes.length === 0 && (
-                <p className="text-xs text-outline text-center py-10">No device types yet</p>
+                <p className="text-xs text-outline text-center py-10">No {L.types.toLowerCase()} yet</p>
               )}
               {deviceTypes.map(dt => {
                 const isSelected = selectedTypeId === dt.id
@@ -663,14 +694,14 @@ export default function ServiceCataloguePage() {
 
           {/* ── Col 2: Brands (was Manufacturers) ── */}
           <div className={`flex flex-col border-b lg:border-b-0 border-outline-variant ${mobileStep !== 1 ? 'hidden lg:flex' : 'flex'}`}>
-            <ColHeader icon={Layers} iconColor="text-brand-teal" label="Brands" count={selectedTypeId ? brandsTotal : null} loading={loadingBrands} />
+            <ColHeader icon={Layers} iconColor="text-brand-teal" label={L.brands} count={selectedTypeId ? brandsTotal : null} loading={loadingBrands} />
 
             {!selectedTypeId ? (
-              <EmptyPrompt icon={Layers} text="Select a device type first" />
+              <EmptyPrompt icon={Layers} text={`Select a ${L.type.toLowerCase()} first`} />
             ) : (
               <>
                 <AddRow
-                  placeholder="e.g. Apple, Samsung…"
+                  placeholder={L.brandPh}
                   value={newBrandName}
                   onChange={setNewBrandName}
                   onAdd={addBrand}
@@ -680,7 +711,7 @@ export default function ServiceCataloguePage() {
                   {loadingBrands && brands.length === 0
                     ? <ColSpinner />
                     : brands.length === 0
-                      ? <p className="text-xs text-outline text-center py-10">No brands yet</p>
+                      ? <p className="text-xs text-outline text-center py-10">No {L.brands.toLowerCase()} yet</p>
                       : brands.map((brand: Brand) => {
                           const isSelected = selectedBrandId === brand.id
                           const isEditing  = editingBrandId === brand.id
@@ -735,14 +766,14 @@ export default function ServiceCataloguePage() {
 
           {/* ── Col 3: Devices ── */}
           <div className={`flex flex-col border-b lg:border-b-0 border-outline-variant ${mobileStep !== 2 ? 'hidden lg:flex' : 'flex'}`}>
-            <ColHeader icon={Cpu} iconColor="text-blue-500" label="Devices" count={selectedBrandId ? devicesTotal : null} loading={loadingDevices} />
+            <ColHeader icon={Cpu} iconColor="text-blue-500" label={L.devices} count={selectedBrandId ? devicesTotal : null} loading={loadingDevices} />
 
             {!selectedBrandId ? (
-              <EmptyPrompt icon={Cpu} text="Select a brand first" />
+              <EmptyPrompt icon={Cpu} text={`Select a ${L.brand.toLowerCase()} first`} />
             ) : (
               <>
                 <AddRow
-                  placeholder="e.g. iPhone 15, Galaxy S24…"
+                  placeholder={L.devicePh}
                   value={newDevName}
                   onChange={setNewDevName}
                   onAdd={addDevice}
@@ -752,7 +783,7 @@ export default function ServiceCataloguePage() {
                   {loadingDevices && devices.length === 0
                     ? <ColSpinner />
                     : devices.length === 0
-                      ? <p className="text-xs text-outline text-center py-10">No devices yet</p>
+                      ? <p className="text-xs text-outline text-center py-10">No {L.devices.toLowerCase()} yet</p>
                       : devices.map((dev: Device) => {
                           const isSelected = selectedDevId === dev.id
                           const isEditing  = editingDevId === dev.id
@@ -816,19 +847,19 @@ export default function ServiceCataloguePage() {
             <ColHeader
               icon={Wrench}
               iconColor="text-orange-400"
-              label="Services"
-              count={selectedDevId ? servicesTotal : null}
+              label={!selectedDevId && selectedType ? `${L.services} · all ${selectedType.name}` : L.services}
+              count={selectedDevId || selectedTypeId ? servicesTotal : null}
               loading={loadingServices}
             />
 
-            {!selectedDevId ? (
-              <EmptyPrompt icon={Wrench} text="Select a device first" />
+            {!selectedDevId && !selectedTypeId ? (
+              <EmptyPrompt icon={Wrench} text={`Select a ${L.type.toLowerCase()} first`} />
             ) : (
               <>
                 <div className="px-3 py-2 border-b border-outline-variant space-y-1.5 shrink-0">
                   <div className="flex gap-1.5">
                     <input
-                      type="text" placeholder="Service name…" value={newSvcName}
+                      type="text" placeholder={L.servicePh} value={newSvcName}
                       onChange={(e) => setNewSvcName(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && addServiceInline()}
                       className="h-10 flex-1 min-w-0 rounded-md border border-outline-variant px-3 text-[15px] focus:border-orange-400 focus:outline-none"
@@ -855,6 +886,11 @@ export default function ServiceCataloguePage() {
                   </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
+                  {!selectedDevId && (
+                    <p className="px-4 pt-3 text-[11px] text-outline">
+                      Applies to every {L.device.toLowerCase()}. Pick a {L.device.toLowerCase()} to add {L.device.toLowerCase()}-specific services.
+                    </p>
+                  )}
                   {loadingServices && services.length === 0
                     ? <ColSpinner />
                     : services.length === 0
@@ -887,7 +923,10 @@ export default function ServiceCataloguePage() {
                   }
                 </div>
                 <LoadMoreBtn
-                  onClick={() => selectedDevId && loadServices(selectedDevId, servicesPage + 1, true)}
+                  onClick={() => {
+                    if (selectedDevId) loadServices({ deviceId: selectedDevId }, servicesPage + 1, true)
+                    else if (selectedTypeId) loadServices({ categoryId: selectedTypeId }, servicesPage + 1, true)
+                  }}
                   loading={loadingServices}
                   shown={services.length}
                   total={servicesTotal}
@@ -923,7 +962,7 @@ export default function ServiceCataloguePage() {
           <div className="grid grid-cols-2 gap-3">
             <Input label="Warranty (days)" type="number" min="0" {...svcForm.register('warranty_days')} />
             <div>
-              <label className="mb-1 block text-sm font-medium text-on-surface-variant">Device Type</label>
+              <label className="mb-1 block text-sm font-medium text-on-surface-variant">{L.type}</label>
               <select
                 {...svcForm.register('category_id')}
                 className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-purple-400 focus:outline-none"
@@ -945,7 +984,7 @@ export default function ServiceCataloguePage() {
       <Modal
         open={typeModal.open}
         onClose={() => setTypeModal({ open: false, editing: null })}
-        title={typeModal.editing ? 'Edit Device Type' : 'New Device Type'}
+        title={typeModal.editing ? `Edit ${L.type}` : `New ${L.type}`}
         size="sm"
       >
         <form onSubmit={typeForm.handleSubmit(saveTypeModal)} className="space-y-3">
@@ -964,7 +1003,7 @@ export default function ServiceCataloguePage() {
             label="Slug"
             {...typeForm.register('slug')}
             error={typeForm.formState.errors.slug?.message}
-            placeholder="e.g. phone, laptop"
+            placeholder={L.slugPh}
             hint="Used in URLs and POS filters. Lowercase, hyphens only."
           />
           <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -972,7 +1011,7 @@ export default function ServiceCataloguePage() {
             Show on POS
           </label>
           <Button type="submit" className="w-full" loading={typeForm.formState.isSubmitting}>
-            Save Device Type
+            Save {L.type}
           </Button>
         </form>
       </Modal>

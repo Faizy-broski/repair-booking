@@ -59,6 +59,9 @@ export default function NewProductPage() {
   // enabled/disabled state.
   const hasRepairs = verticalTemplateSlug !== 'retail-store' && verticalTemplateSlug !== 'mobile-tyre-fitting'
   const router = useRouter()
+  // Warm the Inventory route while the form is being filled in, so the
+  // redirect after Save is near-instant (route prefetch only — no data change).
+  useEffect(() => { router.prefetch('/inventory') }, [router])
   const [saving, setSaving] = useState(false)
   const [saveAndNew, setSaveAndNew] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)

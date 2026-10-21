@@ -18,6 +18,8 @@ import { createAdminClient } from '@/backend/config/supabase'
 import { SubscriptionSyncService } from '@/backend/services/subscription-sync.service'
 import { invalidateBusinessCache } from '@/backend/services/module-config.service'
 import { SubscriptionEmailService } from '@/backend/services/subscription-email.service'
+import { SubscriptionNoticeService } from '@/backend/services/subscription-notice.service'
+import { nextPeriodEnd } from '@/lib/billing-anchor'
 import { CUSTOM_PLAN_YEARLY_DISCOUNT, customMonthlyPriceFromMetadata, type CustomPlanDimensions } from '@/backend/services/custom-plan-pricing'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', { apiVersion: '2026-02-25.clover' })
@@ -225,6 +227,8 @@ export async function createPlanCheckoutSession(opts: {
   // re-add VAT for them.
   const vatTaxRateId = business?.vat_exempt ? null : await resolveVatTaxRateId(process.env.STRIPE_VAT_TAX_RATE_ID)
 
+  const billingAnchor = source === 'upgrade' ? await lapsedRenewalAnchor(supabase, businessId, billingCycle) : null
+
   const session = await stripe.checkout.sessions.create({
     ...customerParam,
     mode: 'subscription',
@@ -235,6 +239,9 @@ export async function createPlanCheckoutSession(opts: {
     subscription_data: {
       metadata,
       ...(vatTaxRateId ? { default_tax_rates: [vatTaxRateId] } : {}),
+      // Lapsed renewal: keep the original renewal day; Stripe prorates the
+      // first charge up to it, then bills the full price on that day.
+      ...(billingAnchor ? { billing_cycle_anchor: billingAnchor, proration_behavior: 'create_prorations' } : {}),
     },
     metadata,
     success_url: successUrl,
@@ -243,6 +250,42 @@ export async function createPlanCheckoutSession(opts: {
 
   if (!session.url) throw new PlanCheckoutError('Stripe did not return a checkout URL', 500)
   return { url: session.url, sessionId: session.id }
+}
+
+/**
+ * Renewal anchor for a business renewing a LAPSED paid subscription by card:
+ * the unix time of its next renewal on the original cycle (e.g. lapsed 21 Oct,
+ * pays 25 Oct → anchor 21 Nov). Returns null — normal checkout, exactly as
+ * before — for trials, new signups, active subscriptions (plan changes),
+ * or anything without a real paid period.
+ */
+async function lapsedRenewalAnchor(
+  supabase: ReturnType<typeof createAdminClient>,
+  businessId: string,
+  cycle: 'monthly' | 'yearly',
+): Promise<number | null> {
+  try {
+    const { data: sub } = await (supabase as any)
+      .from('subscriptions')
+      .select('status, trial_ends_at, current_period_end, stripe_sub_id')
+      .eq('business_id', businessId)
+      .maybeSingle()
+    if (!sub?.current_period_end || sub.trial_ends_at || ['trialing', 'incomplete'].includes(sub.status)) return null
+
+    const end = new Date(sub.current_period_end)
+    const now = new Date()
+    const lapsedCard = sub.status === 'canceled'
+    const lapsedManual = !sub.stripe_sub_id && ['active', 'past_due'].includes(sub.status) && end.getTime() <= now.getTime()
+    if (!lapsedCard && !lapsedManual) return null
+
+    const anchor = nextPeriodEnd(end, cycle, now)
+    // Stripe requires a future anchor; keep a small margin so it can't slip into the past mid-request
+    if (anchor.getTime() - now.getTime() < 60 * 60 * 1000) return null
+    return Math.floor(anchor.getTime() / 1000)
+  } catch (err) {
+    console.warn('[plan-checkout] renewal anchor skipped:', err instanceof Error ? err.message : err)
+    return null
+  }
 }
 
 /**
@@ -404,6 +447,9 @@ export async function activateFromCheckoutSession(
   // Fire subscription confirmation emails (owner + super-admin).
   // Intentionally NOT awaited — email delivery must never block the UI response.
   SubscriptionEmailService.sendNewSubscriptionEmails(businessId, resolvedPlanId!, periodEnd)
+
+  // Paid → remove any "payment due" announcement (never throws)
+  await SubscriptionNoticeService.clearForBusiness(businessId)
 
   return { businessId, planId: resolvedPlanId!, plan }
 }

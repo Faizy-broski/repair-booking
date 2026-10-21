@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { GraceAccountBanner } from '@/components/layout/grace-notice'
 import Image from 'next/image'
 import {
   User, CreditCard, Receipt, CheckCircle2, AlertTriangle,
@@ -267,6 +268,8 @@ function AccountPageInner() {
   const isCanceled = ['canceled', 'suspended'].includes(sub?.status ?? '')
   // New signup that hasn't completed Stripe Checkout yet
   const isIncomplete = sub?.status === 'incomplete'
+  // Lapsed paid subscription still inside its 24h grace period (access kept)
+  const inGrace = !!subscriptionStatus?.inGrace
 
   // Plans eligible for the upgrade/resubscribe section:
   // - past_due: don't show plans — owner needs to fix payment, not create a new sub
@@ -277,7 +280,7 @@ function AccountPageInner() {
   const wasFreeTrial = isExpired && !!sub?.trial_ends_at
   // When expired/canceled and a plan exists, show it as the primary resubscribe option.
   // Fall back to the plan from the subscription itself in case it's inactive in the plans list.
-  const resubscribePlan = isExpired && plan
+  const resubscribePlan = (isExpired || (inGrace && !isPastDue)) && plan
     ? (plans.find((p) => p.id === plan.id) ?? plan)
     : null
   const upgradablePlans = isPastDue
@@ -299,8 +302,13 @@ function AccountPageInner() {
     <div className="mx-auto max-w-5xl space-y-6">
       <h1 className="text-2xl font-bold text-on-surface">Account settings</h1>
 
+      {/* Grace period — expired but still working for up to 24h */}
+      {inGrace && (
+        <GraceAccountBanner graceEndsAt={subscriptionStatus?.graceEndsAt} isStripe={isPastDue} />
+      )}
+
       {/* Past-due payment failure banner */}
-      {isPastDue && (
+      {isPastDue && !inGrace && (
         <div className="flex items-start justify-between gap-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
           <div className="flex items-start gap-3">
             <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />

@@ -1,7 +1,13 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useImperativeHandle } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Search, X, Plus, Loader2 } from 'lucide-react'
+
+/** Imperative controls — e.g. a "+ New" button next to the label. */
+export interface EmployeeSelectHandle {
+  /** Clear any selection, open the picker and focus the search box ready to type a new name. */
+  startCreate: () => void
+}
 
 export interface EmployeeOption {
   id: string
@@ -39,7 +45,12 @@ interface AsyncEmployeeSelectProps {
    * not otherwise use it — `value`/`onChange` stay the source of truth.
    */
   externalSelection?: EmployeeOption | null
+  /** Exposes startCreate() so an outside "+ New" button can jump straight into typing a name. */
+  controlRef?: React.Ref<EmployeeSelectHandle>
 }
+
+/** Optimistic, not-yet-saved employees carry a "pending:" temp id. */
+const isPendingId = (id: string) => id.startsWith('pending:')
 
 /**
  * Async autocomplete for selecting an employee.
@@ -61,6 +72,7 @@ export function AsyncEmployeeSelect({
   onCreateNew,
   createLabel = 'New',
   externalSelection,
+  controlRef,
 }: AsyncEmployeeSelectProps) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -68,7 +80,17 @@ export function AsyncEmployeeSelect({
   const [debouncedQ, setDebouncedQ] = useState('')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const [creating, setCreating] = useState(false)
+
+  useImperativeHandle(controlRef, () => ({
+    startCreate() {
+      if (selected) clear()
+      setOpen(true)
+      // The input only mounts once nothing is selected — focus on the next frame
+      requestAnimationFrame(() => inputRef.current?.focus())
+    },
+  }))
 
   // Debounce input → debouncedQ (300 ms)
   useEffect(() => {
@@ -130,6 +152,19 @@ export function AsyncEmployeeSelect({
     onEmployeeChange?.(null)
   }
 
+  // Enter: pick the exact name match if there is one, otherwise create it (when allowed)
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== 'Enter') return
+    const name = query.trim()
+    if (!name) return
+    e.preventDefault()
+    const lower = name.toLowerCase()
+    const exact = results.find((r) => `${r.first_name} ${r.last_name ?? ''}`.trim().toLowerCase() === lower)
+    if (exact) selectEmployee(exact)
+    else if (onCreateNew) createNew()
+    else if (results.length === 1) selectEmployee(results[0])
+  }
+
   async function createNew() {
     const name = query.trim()
     if (!name || !onCreateNew || creating) return
@@ -154,7 +189,9 @@ export function AsyncEmployeeSelect({
         <div className="flex h-9 items-center justify-between overflow-hidden rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface">
           <span className="min-w-0 truncate whitespace-nowrap">
             {selected.first_name} {selected.last_name ?? ''}
-            {selected.role ? <span className="ml-1.5 text-xs text-on-surface-variant">· {selected.role}</span> : null}
+            {isPendingId(selected.id)
+              ? <span className="ml-1.5 inline-flex items-center gap-1 text-xs text-on-surface-variant"><Loader2 className="h-3 w-3 animate-spin" /> saving…</span>
+              : selected.role ? <span className="ml-1.5 text-xs text-on-surface-variant">· {selected.role}</span> : null}
           </span>
           <button type="button" onClick={clear} className="ml-2 shrink-0 text-on-surface-variant hover:text-on-surface transition-colors">
             <X className="h-4 w-4" />
@@ -164,11 +201,13 @@ export function AsyncEmployeeSelect({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
           <input
+            ref={inputRef}
             type="text"
             placeholder={placeholder}
             value={query}
             onChange={e => { setQuery(e.target.value); setOpen(true) }}
             onFocus={() => setOpen(true)}
+            onKeyDown={handleKeyDown}
             className={[
               'h-9 w-full rounded-lg border bg-surface pl-9 pr-8 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-brand-teal/20 transition-colors',
               error
@@ -216,6 +255,7 @@ export function AsyncEmployeeSelect({
             >
               {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
               {createLabel} &quot;{query.trim()}&quot;
+              <kbd className="ml-auto rounded border border-outline-variant px-1 text-[10px] font-normal text-on-surface-variant">Enter</kbd>
             </button>
           )}
         </div>

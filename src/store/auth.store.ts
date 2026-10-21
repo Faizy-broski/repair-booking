@@ -9,6 +9,10 @@ export interface SubscriptionStatus {
   trialEndsAt: string | null
   currentPeriodEnd: string | null
   hasAccess: boolean
+  /** Paid subscription lapsed but still within its 24h grace period (access kept). */
+  inGrace?: boolean
+  /** When access will be locked if still unpaid (ISO). Set only while inGrace. */
+  graceEndsAt?: string | null
 }
 
 interface AuthState {

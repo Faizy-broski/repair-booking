@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, X, Car, AlertTriangle } from 'lucide-react'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 
 export interface VehicleValue {
   id?: string
@@ -29,17 +28,21 @@ const normalizePlateClient = (raw: string) => raw.trim().toUpperCase().replace(/
 
 // Vehicle selection for the mobile tyre-fitting vertical, mirroring CustomerSearch's
 // pick-existing-or-quick-add UX. Scoped to the selected customer's own vehicles.
-// Before adding a brand-new plate, checks whether it's already registered to a
-// DIFFERENT customer and warns staff (soft warning — they can still proceed, e.g.
-// a shared household vehicle — same "prompt but allow override" pattern used for
-// fitter double-booking).
+//
+// A new vehicle needs no separate "Add" click: as soon as a registration is typed
+// the draft is passed up via onChange (no id = unsaved; the job form saves it with
+// the job), and keeps syncing as make/model/tyre size are filled in. The form stays
+// open while typing. A debounced lookup warns if the plate is already registered to
+// a DIFFERENT customer (soft warning — e.g. a shared household vehicle — same
+// "prompt but allow override" pattern used for fitter double-booking).
 export function VehiclePicker({ customerId, value, onChange }: VehiclePickerProps) {
   const [vehicles, setVehicles] = useState<VehicleValue[]>([])
   const [loading, setLoading] = useState(false)
   const [showNew, setShowNew] = useState(false)
   const [draft, setDraft] = useState<VehicleValue>(EMPTY_NEW_VEHICLE)
   const [plateWarning, setPlateWarning] = useState<{ customerName: string } | null>(null)
-  const [checkingPlate, setCheckingPlate] = useState(false)
+  // True while the new-vehicle form is open and its draft is the selected value
+  const [editingDraft, setEditingDraft] = useState(false)
 
   const loadVehicles = useCallback(async (custId: string) => {
     setLoading(true)
@@ -57,53 +60,65 @@ export function VehiclePicker({ customerId, value, onChange }: VehiclePickerProp
     else setVehicles([])
   }, [customerId, loadVehicles])
 
-  // Editing the plate invalidates any stale duplicate-plate warning.
+  // Debounced duplicate-plate check — advisory only, never blocks.
   useEffect(() => {
-    setPlateWarning(null)
-  }, [draft.registration_number])
+    const plate = draft.registration_number.trim()
+    if (!plate) return
+    const ctrl = new AbortController()
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/vehicles?search=${encodeURIComponent(plate)}`, { signal: ctrl.signal })
+        const json = await res.json()
+        const matches = (json.data ?? []) as OtherCustomerVehicle[]
+        const normalized = normalizePlateClient(plate)
+        const other = matches.find(
+          (m) => normalizePlateClient(m.registration_number) === normalized && m.customers?.id !== customerId
+        )
+        const c = other?.customers
+        setPlateWarning(other ? { customerName: c ? [c.first_name, c.last_name].filter(Boolean).join(' ') : 'another customer' } : null)
+      } catch {
+        // aborted or lookup failed — the warning is advisory, so just skip it
+      }
+    }, 500)
+    return () => { clearTimeout(t); ctrl.abort() }
+  }, [draft.registration_number, customerId])
+
+  // Typing in the new-vehicle form selects the draft immediately (no "Add" click)
+  function updateDraft(fn: (d: VehicleValue) => VehicleValue) {
+    const next = fn(draft)
+    const plate = next.registration_number.trim()
+    setDraft(next)
+    if (!plate) setPlateWarning(null)
+    onChange(plate ? { ...next, registration_number: plate } : null)
+    setEditingDraft(true)
+  }
 
   function selectVehicle(v: VehicleValue) {
     onChange(v)
     setShowNew(false)
+    setEditingDraft(false)
   }
 
-  function clear() {
+  function discardDraft() {
     onChange(null)
     setDraft(EMPTY_NEW_VEHICLE)
     setPlateWarning(null)
+    setEditingDraft(false)
   }
 
-  async function confirmNewVehicle() {
-    const plate = draft.registration_number.trim()
-    if (!plate) return
-
-    setCheckingPlate(true)
-    try {
-      const res = await fetch(`/api/vehicles?search=${encodeURIComponent(plate)}`)
-      const json = await res.json()
-      const matches = (json.data ?? []) as OtherCustomerVehicle[]
-      const normalized = normalizePlateClient(plate)
-      const otherCustomerMatch = matches.find(
-        (m) => normalizePlateClient(m.registration_number) === normalized && m.customers?.id !== customerId
-      )
-      if (otherCustomerMatch && !plateWarning) {
-        const c = otherCustomerMatch.customers
-        setPlateWarning({ customerName: c ? [c.first_name, c.last_name].filter(Boolean).join(' ') : 'another customer' })
-        return
-      }
-    } catch {
-      // advisory only — if the lookup fails, fall through and let the save proceed
-    } finally {
-      setCheckingPlate(false)
-    }
-
-    onChange({ ...draft, registration_number: plate })
-    setShowNew(false)
-    setDraft(EMPTY_NEW_VEHICLE)
-    setPlateWarning(null)
+  function clear() {
+    discardDraft()
   }
 
-  if (value) {
+  const draftHint = (
+    <p className="text-[11px] text-on-surface-variant">
+      {draft.registration_number.trim()
+        ? <>Vehicle <span className="font-semibold text-on-surface">{normalizePlateClient(draft.registration_number)}</span> will be saved with this job.</>
+        : 'Enter the registration — the vehicle is saved automatically with the job.'}
+    </p>
+  )
+
+  if (value && !editingDraft) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
         <Car className="h-4 w-4 shrink-0 text-blue-600" />
@@ -126,12 +141,9 @@ export function VehiclePicker({ customerId, value, onChange }: VehiclePickerProp
     // so go straight to the new-vehicle form.
     return (
       <div className="rounded-lg border border-outline-variant bg-surface-container-low p-3 space-y-2">
-        <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">Vehicle</p>
-        <NewVehicleFields draft={draft} setDraft={setDraft} />
+        <NewVehicleFields draft={draft} setDraft={updateDraft} />
         <PlateWarningBanner warning={plateWarning} />
-        <Button type="button" size="sm" onClick={confirmNewVehicle} disabled={!draft.registration_number.trim() || checkingPlate}>
-          <Car className="h-3.5 w-3.5" /> {plateWarning ? 'Add Anyway' : checkingPlate ? 'Checking…' : 'Add Vehicle'}
-        </Button>
+        {draftHint}
       </div>
     )
   }
@@ -142,7 +154,7 @@ export function VehiclePicker({ customerId, value, onChange }: VehiclePickerProp
         <p className="text-xs text-outline">Loading vehicles…</p>
       ) : vehicles.length > 0 && !showNew ? (
         <div className="space-y-1.5">
-          <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
+          <p className="text-xs font-medium text-on-surface-variant">
             Select a vehicle <span className="text-red-500">*</span>
           </p>
           <div className="flex flex-wrap gap-2">
@@ -167,20 +179,24 @@ export function VehiclePicker({ customerId, value, onChange }: VehiclePickerProp
           </div>
         </div>
       ) : (
-        <div className="rounded-lg border border-outline-variant bg-surface-container-low p-3 space-y-2">
-          <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wide">
-            {vehicles.length > 0 ? 'New Vehicle' : 'No vehicles on file — add one'}
-          </p>
-          <NewVehicleFields draft={draft} setDraft={setDraft} />
-          <PlateWarningBanner warning={plateWarning} />
-          <div className="flex gap-2">
-            <Button type="button" size="sm" onClick={confirmNewVehicle} disabled={!draft.registration_number.trim() || checkingPlate}>
-              <Car className="h-3.5 w-3.5" /> {plateWarning ? 'Add Anyway' : checkingPlate ? 'Checking…' : 'Add Vehicle'}
-            </Button>
+        <div className="rounded-lg border border-outline-variant/60 bg-surface-container-low p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-medium text-on-surface-variant">
+              {vehicles.length > 0 ? 'New vehicle' : 'No vehicles on file — add one'}
+            </p>
             {vehicles.length > 0 && (
-              <Button type="button" size="sm" variant="outline" onClick={() => { setShowNew(false); setPlateWarning(null) }}>Cancel</Button>
+              <button
+                type="button"
+                onClick={() => { discardDraft(); setShowNew(false) }}
+                className="text-xs font-medium text-on-surface-variant hover:text-on-surface"
+              >
+                Cancel
+              </button>
             )}
           </div>
+          <NewVehicleFields draft={draft} setDraft={updateDraft} />
+          <PlateWarningBanner warning={plateWarning} />
+          {draftHint}
         </div>
       )}
     </div>
@@ -192,7 +208,7 @@ function PlateWarningBanner({ warning }: { warning: { customerName: string } | n
   return (
     <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-800">
       <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-      <span>This plate is already registered to <strong>{warning.customerName}</strong>. If that&apos;s a different customer (e.g. a shared vehicle), you can add it anyway — otherwise check the registration number.</span>
+      <span>This plate is already registered to <strong>{warning.customerName}</strong>. If that&apos;s a different customer (e.g. a shared vehicle) you can carry on — otherwise check the registration number.</span>
     </div>
   )
 }

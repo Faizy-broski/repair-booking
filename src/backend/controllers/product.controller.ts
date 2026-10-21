@@ -242,57 +242,64 @@ export const ProductController = {
       const targetBranch = branch_id ?? ctx.auth.branchId
       if (targetBranch && low_stock_alert !== undefined) {
         const { adminSupabase } = await import('@/backend/config/supabase')
-        const { data: existing } = await adminSupabase
-          .from('inventory')
-          .select('id, quantity')
-          .eq('branch_id', targetBranch)
-          .eq('product_id', id)
-          .is('variant_id', null)
-          .maybeSingle()
-        const openingCost = (product as any)?.cost_price ?? 0
-        const openingPrice = (product as any)?.selling_price ?? null
-        if (existing) {
-          const updatePayload: Record<string, unknown> = { low_stock_alert: low_stock_alert ?? 5 }
-          if (initial_stock !== undefined) updatePayload.quantity = initial_stock
-          const { error: updErr } = await adminSupabase.from('inventory')
-            .update(updatePayload)
+        // The inventory sync and the branch-catalog upsert are independent —
+        // run them in parallel (one fewer sequential DB round trip on save).
+        // Each keeps its own error handling exactly as before.
+        const syncInventory = async () => {
+          const { data: existing } = await adminSupabase
+            .from('inventory')
+            .select('id, quantity')
             .eq('branch_id', targetBranch)
             .eq('product_id', id)
             .is('variant_id', null)
-          if (updErr) console.error('[ProductController.update] Update inventory error:', updErr)
-          // Only a net INCREASE in stock gets a new cost layer — the product
-          // form sets an absolute quantity, not a delta, so a decrease here
-          // is a correction, not a new purchase, and shouldn't fabricate cost.
-          const delta = initial_stock !== undefined ? initial_stock - (existing.quantity ?? 0) : 0
-          if (!updErr && delta > 0) {
-            const { error: layerErr } = await adminSupabase.from('inventory_cost_layers').insert({
-              branch_id: targetBranch, product_id: id, quantity: delta,
-              unit_cost: openingCost, selling_price: openingPrice, source_type: 'adjustment',
+            .maybeSingle()
+          const openingCost = (product as any)?.cost_price ?? 0
+          const openingPrice = (product as any)?.selling_price ?? null
+          if (existing) {
+            const updatePayload: Record<string, unknown> = { low_stock_alert: low_stock_alert ?? 5 }
+            if (initial_stock !== undefined) updatePayload.quantity = initial_stock
+            const { error: updErr } = await adminSupabase.from('inventory')
+              .update(updatePayload)
+              .eq('branch_id', targetBranch)
+              .eq('product_id', id)
+              .is('variant_id', null)
+            if (updErr) console.error('[ProductController.update] Update inventory error:', updErr)
+            // Only a net INCREASE in stock gets a new cost layer — the product
+            // form sets an absolute quantity, not a delta, so a decrease here
+            // is a correction, not a new purchase, and shouldn't fabricate cost.
+            const delta = initial_stock !== undefined ? initial_stock - (existing.quantity ?? 0) : 0
+            if (!updErr && delta > 0) {
+              const { error: layerErr } = await adminSupabase.from('inventory_cost_layers').insert({
+                branch_id: targetBranch, product_id: id, quantity: delta,
+                unit_cost: openingCost, selling_price: openingPrice, source_type: 'adjustment',
+              })
+              if (layerErr) console.error('[ProductController.update] inventory_cost_layers insert failed:', layerErr)
+            }
+          } else {
+            const { error: insErr } = await adminSupabase.from('inventory').insert({
+              branch_id: targetBranch,
+              product_id: id,
+              quantity: initial_stock ?? 0,
+              low_stock_alert: low_stock_alert ?? 5,
             })
-            if (layerErr) console.error('[ProductController.update] inventory_cost_layers insert failed:', layerErr)
-          }
-        } else {
-          const { error: insErr } = await adminSupabase.from('inventory').insert({
-            branch_id: targetBranch,
-            product_id: id,
-            quantity: initial_stock ?? 0,
-            low_stock_alert: low_stock_alert ?? 5,
-          })
-          if (insErr) console.error('[ProductController.update] Insert inventory error:', insErr)
-          if (!insErr && (initial_stock ?? 0) > 0) {
-            const { error: layerErr } = await adminSupabase.from('inventory_cost_layers').insert({
-              branch_id: targetBranch, product_id: id, quantity: initial_stock,
-              unit_cost: openingCost, selling_price: openingPrice, source_type: 'adjustment',
-            })
-            if (layerErr) console.error('[ProductController.update] inventory_cost_layers insert failed:', layerErr)
+            if (insErr) console.error('[ProductController.update] Insert inventory error:', insErr)
+            if (!insErr && (initial_stock ?? 0) > 0) {
+              const { error: layerErr } = await adminSupabase.from('inventory_cost_layers').insert({
+                branch_id: targetBranch, product_id: id, quantity: initial_stock,
+                unit_cost: openingCost, selling_price: openingPrice, source_type: 'adjustment',
+              })
+              if (layerErr) console.error('[ProductController.update] inventory_cost_layers insert failed:', layerErr)
+            }
           }
         }
-        
-        // ── NEW: Ensure product is enabled in this branch's catalog ──
-        await adminSupabase.from('branch_products').upsert(
-          { branch_id: targetBranch, product_id: id, is_enabled: true },
-          { onConflict: 'branch_id,product_id' }
-        )
+        const ensureInCatalog = async () => {
+          const { error: bpErr } = await adminSupabase.from('branch_products').upsert(
+            { branch_id: targetBranch, product_id: id, is_enabled: true },
+            { onConflict: 'branch_id,product_id' }
+          )
+          if (bpErr) console.error('[ProductController.update] branch_products upsert failed:', bpErr)
+        }
+        await Promise.all([syncInventory(), ensureInCatalog()])
       }
 
       return ok(product)

@@ -1,6 +1,7 @@
 import { getAdminSupabase } from '@/backend/config/supabase'
 import { slugify } from '@/lib/utils'
 import { NotificationTemplateService } from '@/backend/services/notification-template.service'
+import { seedGenericRepairDefaults } from '@/backend/services/repair-defaults.service'
 
 interface RegisterPayload {
   businessName: string
@@ -161,31 +162,9 @@ export const AuthService = {
         is_active: true,
       })
 
-    // 5. Seed default repair statuses
-    const defaultStatuses = [
-      { name: 'Received', color: '#64748b', sort_order: 1, is_terminal: false },
-      { name: 'In Progress', color: '#0ea5e9', sort_order: 2, is_terminal: false },
-      { name: 'Waiting for Parts', color: '#f59e0b', sort_order: 3, is_terminal: false },
-      { name: 'Ready for Collection', color: '#10b981', sort_order: 4, is_terminal: false },
-      { name: 'Collected', color: '#6366f1', sort_order: 5, is_terminal: true },
-      { name: 'Unrepairable', color: '#ef4444', sort_order: 6, is_terminal: true },
-    ]
-    await supabase.from('repair_custom_statuses').insert(
-      defaultStatuses.map(s => ({ ...s, business_id: business.id }))
-    )
-
-    // 6. Seed common faults
-    const defaultFaults = [
-      { name: 'No Power', sort_order: 1 },
-      { name: 'Broken Screen', sort_order: 2 },
-      { name: 'Liquid Damage', sort_order: 3 },
-      { name: 'Software Issue', sort_order: 4 },
-      { name: 'Battery Issue', sort_order: 5 },
-      { name: 'Charging Port', sort_order: 6 },
-    ]
-    await supabase.from('repair_faults').insert(
-      defaultFaults.map(f => ({ ...f, business_id: business.id }))
-    )
+    // 5–6. Seed generic repair statuses + common faults. A vertical template
+    // applied afterwards swaps these for its own (see repair-defaults.service).
+    await seedGenericRepairDefaults(business.id)
 
     // 7. Seed default notification templates (ticket_created, ticket_status_changed,
     // repair_ready, etc.) — without these, NotificationEngine.fire() silently no-ops

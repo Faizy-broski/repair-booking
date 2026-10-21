@@ -111,6 +111,9 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
   // enabled/disabled state.
   const hasRepairs = verticalTemplateSlug !== 'retail-store' && verticalTemplateSlug !== 'mobile-tyre-fitting'
   const router = useRouter()
+  // Warm the Inventory route while the form is being filled in, so the
+  // redirect after Save is near-instant (route prefetch only — no data change).
+  useEffect(() => { router.prefetch('/inventory') }, [router])
   const qc = useQueryClient()
 
   const [product, setProduct] = useState<Product | null>(null)

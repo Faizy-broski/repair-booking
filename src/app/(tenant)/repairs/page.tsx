@@ -2,10 +2,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Plus, Search, LayoutGrid, List, Wrench, Banknote, AlertTriangle, Clock, TrendingUp, CheckCircle, ChevronLeft, Smartphone, StickyNote, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail, Send, RefreshCw, MoreHorizontal, Wallet, Star, CreditCard } from 'lucide-react'
+import { Plus, Search, LayoutGrid, List, AlertTriangle, Clock, ChevronLeft, Eye, Pencil, Trash2, FileText, Receipt, ChevronDown, FileDown, FileSpreadsheet, Printer, Columns, Lock, X, Mail, Send, RefreshCw, MoreHorizontal, Wallet, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
-import { AsyncEmployeeSelect, type EmployeeOption } from '@/components/shared/async-employee-select'
+import { AsyncEmployeeSelect, type EmployeeOption, type EmployeeSelectHandle } from '@/components/shared/async-employee-select'
 import { Modal } from '@/components/ui/modal'
 import { KanbanBoard } from '@/components/repairs/kanban-board'
 import { CreatableCombobox } from '@/components/ui/creatable-combobox'
@@ -86,7 +86,7 @@ const EMPTY_JOB = {
   discount_value: '',
 }
 
-function ActionsMenu({ onEdit, onSlip, onInvoice, onDelete, onMessage, onEmail, canEmail }: {
+function ActionsMenu({ onEdit, onSlip, onInvoice, onDelete, onMessage, onEmail, canEmail, onOpen }: {
   onEdit: () => void
   onSlip: () => void
   onInvoice: () => void
@@ -94,11 +94,13 @@ function ActionsMenu({ onEdit, onSlip, onInvoice, onDelete, onMessage, onEmail, 
   onMessage: () => void
   onEmail: () => void
   canEmail: boolean
+  /** Fired when the menu opens — used to warm the invoice before "Invoice" is clicked */
+  onOpen?: () => void
 }) {
   const item = 'flex w-full cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low focus:outline-none transition-colors'
 
   return (
-    <DropdownMenu.Root>
+    <DropdownMenu.Root onOpenChange={(open) => { if (open) onOpen?.() }}>
       <DropdownMenu.Trigger asChild>
         <button className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-on-surface hover:bg-surface-container hover:text-black transition-colors focus:outline-none">
           <MoreHorizontal className="h-5 w-5" />
@@ -298,6 +300,46 @@ function exportPDF(repairs: RepairRow[]) {
   w.print()
 }
 
+// ── Compact stat tiles (repairs header strip) ─────────────────────────────────
+
+function StatTile({ label, accent, children }: { label: string; accent: string; children: React.ReactNode }) {
+  return (
+    <div className="relative overflow-hidden rounded-lg border border-outline-variant bg-surface-container-lowest py-2 pl-3.5 pr-3">
+      <span className={`absolute inset-y-0 left-0 w-1 ${accent}`} aria-hidden />
+      <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant">{label}</p>
+      {children}
+    </div>
+  )
+}
+
+function StatValue({ value }: { value: number | undefined }) {
+  return value === undefined
+    ? <div className="mt-1 h-6 w-10 rounded bg-surface-container animate-pulse" />
+    : <p className="mt-0.5 text-xl font-bold leading-tight text-on-surface">{value}</p>
+}
+
+function StatSub({ loading, title, children }: { loading: boolean; title?: string; children: React.ReactNode }) {
+  return loading
+    ? <div className="mt-1 h-3 w-24 rounded bg-surface-container animate-pulse" />
+    : <p className="mt-0.5 truncate text-[11px] text-on-surface-variant" title={title}>{children}</p>
+}
+
+function StatPair({ loading, rows }: { loading: boolean; rows: { label: string; value: string; tone?: string; title?: string }[] }) {
+  if (loading) return <div className="mt-1 h-9 w-full rounded bg-surface-container animate-pulse" />
+  return (
+    <div className="mt-1 space-y-px">
+      {rows.map((r) => (
+        <p key={r.label} className="flex items-baseline justify-between gap-2 text-xs" title={r.title}>
+          <span className="truncate text-on-surface-variant">{r.label}</span>
+          <span className={`shrink-0 whitespace-nowrap font-bold ${r.tone ?? 'text-on-surface'}`}>{r.value}</span>
+        </p>
+      ))}
+    </div>
+  )
+}
+
+const STATS_OPEN_KEY = 'repairs.statsOpen'
+
 export default function RepairsPage() {
   const { activeBranch, verticalTemplateSlug } = useAuthStore()
   const isRetail = verticalTemplateSlug === 'retail-store'
@@ -310,6 +352,16 @@ export default function RepairsPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [pageSize, setPageSize] = useState(20)
   const [statsPeriod, setStatsPeriod] = useState<'today' | 'month' | '3months' | '6months' | 'year'>('month')
+  // Stats strip can be hidden to give the jobs table the room — remembered per browser
+  const [statsOpen, setStatsOpen] = useState<boolean>(() => {
+    try { return typeof window === 'undefined' || window.localStorage.getItem(STATS_OPEN_KEY) !== '0' } catch { return true }
+  })
+  function toggleStats() {
+    setStatsOpen((open) => {
+      try { window.localStorage.setItem(STATS_OPEN_KEY, open ? '0' : '1') } catch { /* storage unavailable */ }
+      return !open
+    })
+  }
 
   // URL-based state
   const page = parseInt(searchParams.get('page') || '0', 10)
@@ -334,6 +386,7 @@ export default function RepairsPage() {
   const [newCust, setNewCust] = useState(EMPTY_NEW_CUST)
   const [phoneError, setPhoneError] = useState('')
   const [jobData, setJobData] = useState(EMPTY_JOB)
+  const [showDiscount, setShowDiscount] = useState(false)
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleValue | null>(null)
   const [fitterConflict, setFitterConflict] = useState<{ id: string; job_number: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -383,10 +436,11 @@ export default function RepairsPage() {
   // Tyre-shop "+ New Fitter" — standalone button beside the Fitter field
   // (separate from AsyncEmployeeSelect's own inline create-in-dropdown option,
   // which is easy to miss since it only appears after typing a search query).
-  const [showNewFitter, setShowNewFitter] = useState(false)
-  const [newFitterName, setNewFitterName] = useState('')
-  const [newFitterCreating, setNewFitterCreating] = useState(false)
   const [newFitterSelection, setNewFitterSelection] = useState<EmployeeOption | null>(null)
+  // Optimistic fitter creation: temp id ("pending:…") → in-flight save resolving to the real id (or null on failure)
+  const pendingFitters = useRef(new Map<string, Promise<string | null>>())
+  // "+ New" chip → fitterPicker.startCreate() focuses the picker ready to type a name
+  const fitterPickerRef = useRef<EmployeeSelectHandle | null>(null)
   // Variant drill-down — set when a search result with variants is clicked;
   // the dropdown swaps from search results to this product's variant list.
   const [variantsFor, setVariantsFor] = useState<{ id: string; name: string } | null>(null)
@@ -610,6 +664,17 @@ export default function RepairsPage() {
     setConfirmDelete({ id: repairId, jobNumber })
   }
 
+  // Warm the server's invoice caches (data → rendered PDF) as soon as a row's
+  // action menu opens, so clicking "Invoice" is usually a cache hit. Fire and
+  // forget, at most once per job per 30s.
+  const invoicePrefetchedAt = useRef(new Map<string, number>())
+  function prefetchInvoice(repairId: string) {
+    const last = invoicePrefetchedAt.current.get(repairId) ?? 0
+    if (Date.now() - last < 30_000) return
+    invoicePrefetchedAt.current.set(repairId, Date.now())
+    fetch(`/api/repairs/${repairId}/pdf?fallback=json`).catch(() => {})
+  }
+
   function handleOpenInvoice(r: RepairRow) {
     setSelectedInvoiceRepair(r)
     setJustCreatedInvoice(false)
@@ -829,6 +894,7 @@ export default function RepairsPage() {
     setSelectedCustomer(null)
     setNewCust(EMPTY_NEW_CUST)
     setJobData(EMPTY_JOB)
+    setShowDiscount(false)
     setSelectedVehicle(null)
     setFitterConflict(null)
     setStep1Error('')
@@ -871,7 +937,7 @@ export default function RepairsPage() {
   // Mobile tyre-fitting vertical: advisory-only double-booking check — never
   // blocks saving, just warns so staff can confirm the fitter really is free.
   useEffect(() => {
-    if (!isTyreShop || !jobData.assigned_to || !jobData.scheduled_start || !jobData.scheduled_end) {
+    if (!isTyreShop || !jobData.assigned_to || jobData.assigned_to.startsWith('pending:') || !jobData.scheduled_start || !jobData.scheduled_end) {
       setFitterConflict(null)
       return
     }
@@ -1094,47 +1160,41 @@ export default function RepairsPage() {
   // spot from just a typed name, so booking a job never blocks on a trip to
   // the Employees page first. Splits on the first space; a single word is
   // taken as the first name with no surname.
-  async function createInstantFitter(name: string) {
-    if (!activeBranch) return null
+  // Returns a temporary fitter immediately so the picker selects it with no wait;
+  // the real employee is created in the background. createRepair() awaits the
+  // pending save before submitting, so a job is never saved with a temp id.
+  function createInstantFitter(name: string): Promise<EmployeeOption | null> {
+    if (!activeBranch) return Promise.resolve(null)
     const [first, ...rest] = name.trim().split(/\s+/)
-    try {
-      const res = await fetch('/api/employees', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          branch_id: activeBranch.id,
-          first_name: first,
-          last_name: rest.join(' ') || null,
-          role: 'Fitter',
-        }),
-      })
-      const json = await res.json()
-      if (!res.ok || !json.data?.id) {
-        toast.error(json.error?.message ?? 'Failed to create fitter. Please try again.')
+    const tempId = `pending:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+    const temp: EmployeeOption = { id: tempId, first_name: first, last_name: rest.join(' ') || null, role: 'Fitter' }
+
+    const save = (async (): Promise<string | null> => {
+      try {
+        const res = await fetch('/api/employees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ branch_id: activeBranch.id, first_name: temp.first_name, last_name: temp.last_name, role: 'Fitter' }),
+        })
+        const json = await res.json()
+        if (!res.ok || !json.data?.id) throw new Error(json.error?.message ?? 'Failed to create fitter. Please try again.')
+        const real: EmployeeOption = { id: json.data.id, first_name: json.data.first_name, last_name: json.data.last_name ?? null, role: json.data.role ?? 'Fitter' }
+        // Swap the temp id for the real one — only if the user hasn't picked someone else meanwhile
+        setJobData((p) => (p.assigned_to === tempId ? { ...p, assigned_to: real.id } : p))
+        setNewFitterSelection((prev) => (prev?.id === tempId ? real : prev))
+        queryClient.invalidateQueries({ queryKey: ['employee-search'] })
+        return real.id
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to create fitter. Please try again.')
+        setJobData((p) => (p.assigned_to === tempId ? { ...p, assigned_to: '' } : p))
+        setNewFitterSelection((prev) => (prev?.id === tempId ? null : prev))
         return null
       }
-      return { id: json.data.id, first_name: json.data.first_name, last_name: json.data.last_name ?? null, role: json.data.role ?? 'Fitter' }
-    } catch {
-      toast.error('Failed to create fitter. Please try again.')
-      return null
-    }
-  }
+    })()
 
-  async function submitNewFitter() {
-    const name = newFitterName.trim()
-    if (!name || newFitterCreating) return
-    setNewFitterCreating(true)
-    try {
-      const emp = await createInstantFitter(name)
-      if (emp) {
-        setJobData((p) => ({ ...p, assigned_to: emp.id }))
-        setNewFitterSelection(emp)
-        setNewFitterName('')
-        setShowNewFitter(false)
-      }
-    } finally {
-      setNewFitterCreating(false)
-    }
+    pendingFitters.current.set(tempId, save)
+    setNewFitterSelection(temp)
+    return Promise.resolve(temp)
   }
 
   function addNewTyre() {
@@ -1250,6 +1310,17 @@ export default function RepairsPage() {
     setPaymentSplitError('')
     setSubmitting(true)
 
+    let assignedTo: string | null = jobData.assigned_to || null
+    if (assignedTo?.startsWith('pending:')) {
+      const realId = await pendingFitters.current.get(assignedTo)
+      if (!realId) {
+        toast.error('The new fitter could not be saved — pick or add the fitter again before creating the job.')
+        setSubmitting(false)
+        return
+      }
+      assignedTo = realId
+    }
+
     let customerId = selectedCustomer?.id ?? null
 
     // Create new customer if no existing customer was selected
@@ -1330,7 +1401,7 @@ export default function RepairsPage() {
         discount_type: jobData.discount_type,
         discount_value: discountValueVal,
         discount_amount: discountAmount,
-        assigned_to: jobData.assigned_to || null,
+        assigned_to: assignedTo,
         status: jobData.status || undefined,
         lock_type: jobData.lock_type || null,
         passcode: jobData.passcode.trim() || null,
@@ -1862,6 +1933,7 @@ export default function RepairsPage() {
             onEdit={() => openEdit(r)}
             onSlip={() => setSlipRepair(r)}
             onInvoice={() => handleOpenInvoice(r)}
+            onOpen={() => prefetchInvoice(r.id)}
             onDelete={() => deleteRepair(r.id, r.job_number)}
             onMessage={() => setEmailPrompt({ repairId: r.id, jobNumber: r.job_number, currentStatus: r.status ?? 'received' })}
             canEmail={!!r.customers?.email}
@@ -1904,11 +1976,12 @@ export default function RepairsPage() {
   })
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
 
-      {/* ── Repair Dashboard Stats ── */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+      {/* Header + stats read as one block (tight gap); sections below get space-y-6 */}
+      <div className="space-y-3">
+        {/* ── Header: title + period + stats toggle on one line ── */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-on-surface">Repairs</h1>
             <button
@@ -1918,199 +1991,80 @@ export default function RepairsPage() {
               Settings
             </button>
           </div>
-          <p className="text-sm text-on-surface-variant">Real-time overview of your workshop performance.</p>
-        </div>
-        <div className="flex items-center gap-1 rounded-lg border border-outline-variant bg-surface-container p-1">
-          {(['today', 'month', '3months', '6months', 'year'] as const).map((p) => (
+          <div className="flex items-center gap-2">
+            {statsOpen && (
+              <div className="flex items-center gap-0.5 rounded-lg border border-outline-variant bg-surface-container p-0.5">
+                {(['today', 'month', '3months', '6months', 'year'] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setStatsPeriod(p)}
+                    className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                      statsPeriod === p
+                        ? 'bg-primary text-white shadow-sm'
+                        : 'text-on-surface-variant hover:bg-surface-container-high'
+                    }`}
+                  >
+                    {p === 'today' ? 'Today' : p === 'month' ? 'Month' : p === '3months' ? '3M' : p === '6months' ? '6M' : 'Year'}
+                  </button>
+                ))}
+              </div>
+            )}
             <button
-              key={p}
-              onClick={() => setStatsPeriod(p)}
-              className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
-                statsPeriod === p
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'text-on-surface-variant hover:bg-surface-container-high'
-              }`}
+              onClick={toggleStats}
+              className="flex items-center gap-1 rounded-lg border border-outline-variant bg-surface px-2.5 py-1.5 text-xs font-medium text-on-surface-variant hover:text-on-surface transition-colors"
+              aria-expanded={statsOpen}
             >
-              {p === 'today' ? 'Today' : p === 'month' ? 'Month' : p === '3months' ? '3M' : p === '6months' ? '6M' : 'Year'}
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${statsOpen ? 'rotate-180' : ''}`} />
+              {statsOpen ? 'Hide stats' : 'Show stats'}
             </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Capped at 3 columns (not 4/6 on wider screens) — beyond that, cards
-          get too narrow for their labels/values to fit without truncating,
-          even short ones like "Booked" or the "TOTAL REPAIRS" title itself. */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
-        {/* Total Repairs */}
-        <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm">
-          <div className="flex items-start justify-between gap-2 sm:gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Total Repairs</p>
-              {repairStats ? (
-                <p className="mt-2 text-sm sm:text-base lg:text-lg font-bold text-on-surface whitespace-nowrap" title={String(repairStats.total_repairs)}>{repairStats.total_repairs}</p>
-              ) : (
-                <div className="mt-2 h-8 w-24 rounded bg-surface-container animate-pulse" />
-              )}
-            </div>
-            <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl bg-primary-container">
-              <Wrench className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-            </div>
           </div>
-          {repairStats ? (
-            <p className="mt-3 flex items-center gap-1 text-xs font-medium text-primary">
-              <TrendingUp className="h-3 w-3" />
-              {repairStats.repairs_completed} completed this period
-            </p>
-          ) : (
-            <div className="mt-3 h-4 w-36 rounded bg-surface-container animate-pulse" />
-          )}
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />
         </div>
 
-        {/* Revenue — same row layout as Deposits by Method below: neither
-            figure is "the" number, they update at different moments
-            (booking vs completion), so both get equal bold weight instead of
-            one hero + one footnote. Rows use justify-between + shrink-0 on
-            the value so growing amounts push the layout wider without
-            wrapping or crowding the label. */}
-        <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm">
-          <div className="flex items-start justify-between gap-2 sm:gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Revenue</p>
-              {repairStats ? (
-                <div className="mt-2 space-y-0.5">
-                  <p className="flex items-center justify-between gap-2 text-xs sm:text-sm" title="Updates once a job is marked complete — matches Reports' Total Revenue">
-                    <span className="truncate text-on-surface-variant">P&amp;L</span>
-                    <span className="shrink-0 whitespace-nowrap font-bold text-on-surface">{formatCurrency(repairStats.revenue_completed)}</span>
-                  </p>
-                  <p className="flex items-center justify-between gap-2 text-xs sm:text-sm" title="Updates as soon as a new job is booked, even before it's finished">
-                    <span className="truncate text-on-surface-variant">Booked</span>
-                    <span className="shrink-0 whitespace-nowrap font-bold text-on-surface">{formatCurrency(repairStats.total_sales)}</span>
-                  </p>
-                </div>
-              ) : (
-                <div className="mt-2 h-8 w-24 rounded bg-surface-container animate-pulse" />
-              )}
-            </div>
-            <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl bg-tertiary-container/40">
-              <Banknote className="h-4 w-4 sm:h-5 sm:w-5 text-tertiary" />
-            </div>
-          </div>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-tertiary" />
-        </div>
+        {/* ── Compact stats strip — every figure from the old cards, ~70px tall.
+            Two-figure tiles (Revenue / Margin / Deposits) keep both numbers at
+            equal weight: they update at different moments (booking vs
+            completion), so neither is "the" number. ── */}
+        {statsOpen && (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+            <StatTile label="Total Repairs" accent="bg-primary">
+              <StatValue value={repairStats?.total_repairs} />
+              <StatSub loading={!repairStats}>{repairStats?.repairs_completed} completed this period</StatSub>
+            </StatTile>
 
-        {/* Profit — same row layout as Revenue/Deposits by Method above. */}
-        <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm">
-          <div className="flex items-start justify-between gap-2 sm:gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Repair Margin</p>
-              {repairStats ? (
-                <div className="mt-2 space-y-0.5">
-                  <p className="flex items-center justify-between gap-2 text-xs sm:text-sm" title="Revenue minus parts cost and lab fees for jobs completed this period — excludes business expenses &amp; salaries (see Net Profit on Reports for the full P&amp;L figure)">
-                    <span className="truncate text-on-surface-variant">P&amp;L</span>
-                    <span className={`shrink-0 whitespace-nowrap font-bold ${repairStats.profit_completed >= 0 ? 'text-green-600' : 'text-error'}`}>{formatCurrency(repairStats.profit_completed)}</span>
-                  </p>
-                  <p className="flex items-center justify-between gap-2 text-xs sm:text-sm" title="Updates as soon as a new job is booked, even before it's finished">
-                    <span className="truncate text-on-surface-variant">Booked</span>
-                    <span className={`shrink-0 whitespace-nowrap font-bold ${repairStats.repairs_profit >= 0 ? 'text-green-600' : 'text-error'}`}>{formatCurrency(repairStats.repairs_profit)}</span>
-                  </p>
-                </div>
-              ) : (
-                <div className="mt-2 h-8 w-24 rounded bg-surface-container animate-pulse" />
-              )}
-            </div>
-            <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl bg-green-50">
-              <TrendingUp className="h-4 w-4 sm:h-5 w-5 text-green-600" />
-            </div>
-          </div>
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-green-500" />
-        </div>
+            <StatTile label="Open Jobs" accent="bg-brand-yellow">
+              <StatValue value={repairStats?.repairs_open} />
+              <StatSub loading={!repairStats} title="All currently active jobs — ignores the period filter">All active · any date</StatSub>
+            </StatTile>
 
-        {/* Open Jobs */}
-        <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm">
-          <div className="flex items-start justify-between gap-2 sm:gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Open Jobs</p>
-              {repairStats ? (
-                <p className="mt-2 text-sm sm:text-base lg:text-lg font-bold text-on-surface whitespace-nowrap" title={String(repairStats.repairs_open)}>{repairStats.repairs_open}</p>
-              ) : (
-                <div className="mt-2 h-8 w-16 rounded bg-surface-container animate-pulse" />
-              )}
-            </div>
-            <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl bg-brand-yellow-light">
-              <Wrench className="h-4 w-4 sm:h-5 sm:w-5 text-[#b45309]" />
-            </div>
-          </div>
-          {repairStats ? (
-            <p className="mt-3 flex items-center gap-1 text-xs font-medium text-[#b45309]">
-              All currently active jobs (all-time, ignores period)
-            </p>
-          ) : (
-            <div className="mt-3 h-4 w-36 rounded bg-surface-container animate-pulse" />
-          )}
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-brand-yellow" />
-        </div>
+            <StatTile label="Completed Jobs" accent="bg-primary">
+              <StatValue value={repairStats?.repairs_completed} />
+              <StatSub loading={!repairStats}>
+                {repairStats?.repairs_completed === 0 ? 'None completed yet' : 'Booked this period, now done'}
+              </StatSub>
+            </StatTile>
 
-        {/* Completed Jobs */}
-        <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm">
-          <div className="flex items-start justify-between gap-2 sm:gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Completed Jobs</p>
-              {repairStats ? (
-                <p className="mt-2 text-sm sm:text-base lg:text-lg font-bold text-on-surface whitespace-nowrap" title={String(repairStats.repairs_completed)}>{repairStats.repairs_completed}</p>
-              ) : (
-                <div className="mt-2 h-8 w-12 rounded bg-surface-container animate-pulse" />
-              )}
-            </div>
-            <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl bg-primary-container">
-              <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-            </div>
-          </div>
-          {repairStats ? (
-            <p className="mt-3 flex items-center gap-1 text-xs font-medium text-primary">
-              <CheckCircle className="h-3 w-3" />
-              {repairStats.repairs_completed === 0 ? 'None completed yet' : 'Booked this period, now complete'}
-            </p>
-          ) : (
-            <div className="mt-3 h-4 w-28 rounded bg-surface-container animate-pulse" />
-          )}
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />
-        </div>
+            <StatTile label="Revenue" accent="bg-tertiary">
+              <StatPair loading={!repairStats} rows={[
+                { label: 'P&L',    value: formatCurrency(repairStats?.revenue_completed ?? 0), title: "Updates once a job is marked complete — matches Reports' Total Revenue" },
+                { label: 'Booked', value: formatCurrency(repairStats?.total_sales ?? 0),       title: "Updates as soon as a new job is booked, even before it's finished" },
+              ]} />
+            </StatTile>
 
-        {/* Cash vs Card Deposits */}
-        <div className="relative overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm">
-          <div className="flex items-start justify-between gap-2 sm:gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">Deposits by Method</p>
-              {repairStats ? (
-                <div className="mt-2 space-y-0.5">
-                  <p className="flex items-center justify-between text-xs sm:text-sm">
-                    <span className="text-on-surface-variant">Cash</span>
-                    <span className="font-bold text-on-surface">{formatCurrency(repairStats.cash_deposits)}</span>
-                  </p>
-                  <p className="flex items-center justify-between text-xs sm:text-sm">
-                    <span className="text-on-surface-variant">Card</span>
-                    <span className="font-bold text-on-surface">{formatCurrency(repairStats.card_deposits)}</span>
-                  </p>
-                </div>
-              ) : (
-                <div className="mt-2 h-8 w-24 rounded bg-surface-container animate-pulse" />
-              )}
-            </div>
-            <div className="flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl bg-tertiary-container/40">
-              <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-tertiary" />
-            </div>
+            <StatTile label="Repair Margin" accent="bg-green-500">
+              <StatPair loading={!repairStats} rows={[
+                { label: 'P&L',    value: formatCurrency(repairStats?.profit_completed ?? 0), tone: (repairStats?.profit_completed ?? 0) >= 0 ? 'text-green-600' : 'text-error', title: 'Revenue minus parts cost and lab fees for jobs completed this period — excludes business expenses & salaries (see Net Profit on Reports for the full P&L figure)' },
+                { label: 'Booked', value: formatCurrency(repairStats?.repairs_profit ?? 0),   tone: (repairStats?.repairs_profit ?? 0) >= 0 ? 'text-green-600' : 'text-error', title: "Updates as soon as a new job is booked, even before it's finished" },
+              ]} />
+            </StatTile>
+
+            <StatTile label="Deposits · this period" accent="bg-tertiary">
+              <StatPair loading={!repairStats} rows={[
+                { label: 'Cash', value: formatCurrency(repairStats?.cash_deposits ?? 0) },
+                { label: 'Card', value: formatCurrency(repairStats?.card_deposits ?? 0) },
+              ]} />
+            </StatTile>
           </div>
-          {repairStats ? (
-            <p className="mt-3 flex items-center gap-1 text-xs font-medium text-tertiary">
-              <TrendingUp className="h-3 w-3" />
-              this period
-            </p>
-          ) : (
-            <div className="mt-3 h-4 w-20 rounded bg-surface-container animate-pulse" />
-          )}
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-tertiary" />
-        </div>
+        )}
       </div>
 
       <RepairInvoiceModal
@@ -2120,121 +2074,131 @@ export default function RepairsPage() {
         justCreated={justCreatedInvoice}
       />
 
-      {/* ── List header ── */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-on-surface-variant">{total} total jobs</p>
+      {/* ── Toolbar ──
+          row 1: search + status (left) · New Repair (right)
+          row 2: export tools (left)   · view toggle + refresh (right) */}
+      <div className="space-y-3">
         <div className="flex items-center gap-2">
-          {/* View toggle */}
-          <div className="flex rounded-lg border border-outline-variant bg-surface-container-low p-0.5">
+          {view === 'list' && (
+            <>
+              <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
+                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
+                <input
+                  type="search"
+                  placeholder="Search job #, device, phone…"
+                  value={search}
+                  onChange={(e) => { setSearch(e.target.value); setPage(0) }}
+                  className="h-9 w-full rounded-lg border border-outline bg-surface pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+              {/* Select's root is w-full — pin its width so it sits beside the search box */}
+              <div className="w-40 shrink-0">
+                <Select
+                  options={[
+                    { value: '', label: 'All Statuses' },
+                    ...allStatusOptions.map((o) => ({ value: o.value, label: o.label })),
+                  ]}
+                  value={statusFilter}
+                  onValueChange={(v) => { setStatusFilter(v); setPage(0) }}
+                  placeholder="All Statuses"
+                  className="w-40"
+                />
+              </div>
+            </>
+          )}
+          <div className="ml-auto shrink-0">
+            <Button onClick={openModal}>
+              <Plus className="h-4 w-4" />
+              New Repair
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {view === 'list' && (
+            <>
             <button
-              onClick={() => setView('list')}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${view === 'list' ? 'bg-surface-container-lowest shadow-sm text-on-surface' : 'text-on-surface-variant hover:text-on-surface'
-                }`}
+              onClick={() => exportCSV(repairs)}
+              className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 h-8 px-3 text-xs text-emerald-700 hover:bg-emerald-100 transition-colors"
             >
-              <List className="h-3.5 w-3.5" />
-              List
+              <FileDown className="h-3.5 w-3.5" /> Export CSV
             </button>
             <button
-              onClick={() => setView('kanban')}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${view === 'kanban' ? 'bg-surface-container-lowest shadow-sm text-on-surface' : 'text-on-surface-variant hover:text-on-surface'
-                }`}
+              onClick={() => exportExcel(repairs)}
+              className="flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 h-8 px-3 text-xs text-green-700 hover:bg-green-100 transition-colors"
             >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Kanban
+              <FileSpreadsheet className="h-3.5 w-3.5" /> Export Excel
+            </button>
+            <button
+              onClick={() => exportPDF(repairs)}
+              className="flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 h-8 px-3 text-xs text-sky-700 hover:bg-sky-100 transition-colors"
+            >
+              <Printer className="h-3.5 w-3.5" /> Print
+            </button>
+            <div className="relative" ref={colMenuRef}>
+              <button
+                onClick={() => setColMenuOpen((v) => !v)}
+                className="flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 h-8 px-3 text-xs text-violet-700 hover:bg-violet-100 transition-colors"
+              >
+                <Columns className="h-3.5 w-3.5" /> Columns
+              </button>
+              {colMenuOpen && (
+                <div className="absolute left-0 top-full z-20 mt-1 w-48 rounded-xl border border-gray-700 bg-gray-900 py-2 shadow-xl">
+                  <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant">Toggle columns</p>
+                  {TOGGLEABLE_COLS.map((key) => {
+                    const isCustomerDetail = key === 'customer_phone' || key === 'customer_email'
+                    const checked = effectiveColVisibility[key] !== false
+                    return (
+                      <label key={key} className={`flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 transition-colors ${isCustomerDetail ? 'pl-6' : ''}`}>
+                        <span className={isCustomerDetail ? 'text-outline' : ''}>{isCustomerDetail ? '↳ ' : ''}{COL_LABELS[key]}</span>
+                        <span className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${checked ? 'bg-teal-500' : 'bg-gray-600'}`}>
+                          <span className={`inline-block h-3 w-3 transform rounded-full bg-surface shadow transition-transform ${checked ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                          <input
+                            type="checkbox"
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                            checked={checked}
+                            onChange={(e) => setColVisibility((v) => ({ ...v, [key]: e.target.checked }))}
+                          />
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+            </>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            {/* View toggle */}
+            <div className="flex rounded-lg border border-outline-variant bg-surface-container-low p-0.5">
+              <button
+                onClick={() => setView('list')}
+                className={`flex items-center gap-1.5 rounded-md h-7 px-2.5 text-xs font-medium transition-colors ${view === 'list' ? 'bg-surface-container-lowest shadow-sm text-on-surface' : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+              >
+                <List className="h-3.5 w-3.5" />
+                List
+              </button>
+              <button
+                onClick={() => setView('kanban')}
+                className={`flex items-center gap-1.5 rounded-md h-7 px-2.5 text-xs font-medium transition-colors ${view === 'kanban' ? 'bg-surface-container-lowest shadow-sm text-on-surface' : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Kanban
+              </button>
+            </div>
+            <button
+              onClick={() => fetchRepairs()}
+              disabled={repairsFetching}
+              className="flex items-center h-8 w-8 justify-center rounded-lg border border-outline-variant bg-surface text-sm font-medium text-on-surface-variant hover:border-outline hover:text-on-surface transition-colors disabled:opacity-50"
+              title="Refresh repairs"
+            >
+              <RefreshCw className={`h-4 w-4 ${repairsFetching ? 'animate-spin' : ''}`} />
             </button>
           </div>
-          <button
-            onClick={() => fetchRepairs()}
-            disabled={repairsFetching}
-            className="flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-medium text-on-surface-variant hover:border-outline hover:text-on-surface transition-colors disabled:opacity-50"
-            title="Refresh repairs"
-          >
-            <RefreshCw className={`h-4 w-4 ${repairsFetching ? 'animate-spin' : ''}`} />
-          </button>
-          <Button onClick={openModal}>
-            <Plus className="h-4 w-4" />
-            New Repair
-          </Button>
         </div>
       </div>
-
-      {/* Filters — only shown in list view */}
-      {view === 'list' && (
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
-            <input
-              type="search"
-              placeholder="Search by job #, device, email or phone..."
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(0) }}
-              className="h-9 w-full rounded-lg border border-outline bg-surface pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
-            />
-          </div>
-          <Select
-            options={[
-              { value: '', label: 'All Statuses' },
-              ...allStatusOptions.map((o) => ({ value: o.value, label: o.label })),
-            ]}
-            value={statusFilter}
-            onValueChange={(v) => { setStatusFilter(v); setPage(0) }}
-            placeholder="All Statuses"
-            className="w-40"
-          />
-
-          <div className="h-6 w-px bg-surface-container-high mx-1" />
-
-          <button
-            onClick={() => exportCSV(repairs)}
-            className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-700 hover:bg-emerald-100 transition-colors"
-          >
-            <FileDown className="h-3.5 w-3.5" /> Export CSV
-          </button>
-          <button
-            onClick={() => exportExcel(repairs)}
-            className="flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs text-green-700 hover:bg-green-100 transition-colors"
-          >
-            <FileSpreadsheet className="h-3.5 w-3.5" /> Export Excel
-          </button>
-          <button
-            onClick={() => exportPDF(repairs)}
-            className="flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs text-sky-700 hover:bg-sky-100 transition-colors"
-          >
-            <Printer className="h-3.5 w-3.5" /> Print
-          </button>
-          <div className="relative" ref={colMenuRef}>
-            <button
-              onClick={() => setColMenuOpen((v) => !v)}
-              className="flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs text-violet-700 hover:bg-violet-100 transition-colors"
-            >
-              <Columns className="h-3.5 w-3.5" /> Columns
-            </button>
-            {colMenuOpen && (
-              <div className="absolute left-0 top-full z-20 mt-1 w-48 rounded-xl border border-gray-700 bg-gray-900 py-2 shadow-xl">
-                <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant">Toggle columns</p>
-                {TOGGLEABLE_COLS.map((key) => {
-                  const isCustomerDetail = key === 'customer_phone' || key === 'customer_email'
-                  const checked = effectiveColVisibility[key] !== false
-                  return (
-                    <label key={key} className={`flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 transition-colors ${isCustomerDetail ? 'pl-6' : ''}`}>
-                      <span className={isCustomerDetail ? 'text-outline' : ''}>{isCustomerDetail ? '↳ ' : ''}{COL_LABELS[key]}</span>
-                      <span className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${checked ? 'bg-teal-500' : 'bg-gray-600'}`}>
-                        <span className={`inline-block h-3 w-3 transform rounded-full bg-surface shadow transition-transform ${checked ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
-                        <input
-                          type="checkbox"
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                          checked={checked}
-                          onChange={(e) => setColVisibility((v) => ({ ...v, [key]: e.target.checked }))}
-                        />
-                      </span>
-                    </label>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* List or Kanban */}
       {view === 'list' ? (
@@ -2560,18 +2524,16 @@ export default function RepairsPage() {
             : (parseFloat(jobData.discount_value) || 0)
           const remaining = (parseFloat(jobData.estimated_cost) || 0) - Math.max(0, jobDiscountAmount) - (parseFloat(jobData.deposit_paid) || 0)
           const pricePending = jobData.price_pending
-          const inp = 'h-8 w-full rounded-md border-2 border-outline-variant bg-surface px-2.5 text-sm text-on-surface placeholder:text-outline transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20'
+          // Soft, single-pixel borders + sentence-case labels keep this long form calm to scan
+          const inp = 'h-9 w-full rounded-lg border border-[var(--outline-variant)] bg-surface-container-lowest px-3 text-sm text-on-surface placeholder:text-on-surface-variant/70 transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/15'
           const sel = `${inp} appearance-none`
-          const lbl = 'mb-0.5 block text-[11px] font-bold uppercase tracking-wide text-brand-teal'
+          const lbl = 'mb-1 block text-xs font-medium text-on-surface-variant'
 
           return (
-            <div className="space-y-2.5">
+            <div className="space-y-5">
 
               {/* Row A: Device / Item identification */}
               <div>
-                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
-                  <Smartphone className="h-2.5 w-2.5" /> {isTyreShop ? 'Vehicle & Tyres' : isRetail ? 'Item' : 'Device'}
-                </p>
 
                 {isTyreShop ? (
                   /* ── Mobile tyre fitting: vehicle + tyre details + stranded location ── */
@@ -2638,7 +2600,6 @@ export default function RepairsPage() {
                     {/* Dynamic category attributes */}
                     {categoryAttrs.length > 0 && (
                       <div>
-                        <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">Item Details</p>
                         <div className="grid grid-cols-3 gap-2">
                           {categoryAttrs.map(attr => (
                             <div key={attr.name}>
@@ -2747,13 +2708,10 @@ export default function RepairsPage() {
                 )}
               </div>
 
-              <div className="h-px bg-surface-container" />
+              <div className="h-px bg-outline-variant/30" />
 
               {/* REPAIR PARTS */}
               <div>
-                <p className="mb-1.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
-                  <Wrench className="h-2.5 w-2.5" /> {isTyreShop ? 'Tyres & Extras' : isRetail ? 'Parts & Labour' : 'Repair Parts'}
-                </p>
 
                 {isTyreShop && !selectedVehicle && (
                   <p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-600">
@@ -3158,13 +3116,10 @@ export default function RepairsPage() {
                 )}
               </div>
 
-              <div className="h-px bg-surface-container" />
+              <div className="h-px bg-outline-variant/30" />
 
               {/* Row B: Fault | Due Date | Status | Assigned To */}
               <div>
-                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
-                  <Wrench className="h-2.5 w-2.5" /> Fault & Assignment
-                </p>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <div className="col-span-2">
                     <label className={lbl}>Fault <span className="text-red-400">*</span></label>
@@ -3214,13 +3169,10 @@ export default function RepairsPage() {
                 </div>
               </div>
 
-              <div className="h-px bg-surface-container" />
+              <div className="h-px bg-outline-variant/30" />
 
               {/* Row C: Total | Deposit | Remaining | Assigned To */}
               <div>
-                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
-                  <Banknote className="h-2.5 w-2.5" /> Financials & Assignment
-                </p>
                 {/* Price Pending toggle — device-repair verticals only. A tyre job always
                     has a known price (tyres/labour are priced up front), so "no fault
                     found" has no equivalent here. */}
@@ -3237,7 +3189,7 @@ export default function RepairsPage() {
                     ) : 'No fault found / Price TBD'}
                   </span>
                 </label>}
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                <div className={`grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-3 ${showDiscount ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}>
                   {/* Job Fee (labour) */}
                   <div>
                     <label className={lbl}>Job Fee (Labour)</label>
@@ -3259,8 +3211,8 @@ export default function RepairsPage() {
                       />
                     </div>
                   </div>
-                  {/* Overall Discount */}
-                  <div>
+                  {/* Overall Discount — only shown once "Apply discount" is ticked */}
+                  {showDiscount && <div>
                     <label className={lbl}>Discount</label>
                     <div className="flex gap-1">
                       <div className="relative flex-1">
@@ -3289,12 +3241,12 @@ export default function RepairsPage() {
                           setJobData((p) => ({ ...p, discount_type: nextType }))
                         }}
                         title={jobData.discount_type === 'percent' ? 'Switch to fixed amount' : 'Switch to percentage'}
-                        className={`h-8 w-8 shrink-0 rounded-md border text-xs font-semibold transition-colors ${pricePending ? 'opacity-40 cursor-not-allowed border-outline-variant text-outline-variant' : 'border-outline text-on-surface-variant hover:bg-surface-container-low'}`}
+                        className={`h-9 w-9 shrink-0 rounded-lg border text-xs font-semibold transition-colors ${pricePending ? 'opacity-40 cursor-not-allowed border-outline-variant text-outline-variant' : 'border-outline text-on-surface-variant hover:bg-surface-container-low'}`}
                       >
                         {jobData.discount_type === 'percent' ? '%' : '£'}
                       </button>
                     </div>
-                  </div>
+                  </div>}
                   {/* Total Charges = job fee + parts - discount */}
                   <div>
                     <label className={lbl}>Total Charges {!pricePending && <span className="text-red-400">*</span>}</label>
@@ -3336,7 +3288,7 @@ export default function RepairsPage() {
                   </div>
                   <div>
                     <label className={lbl}>Remaining</label>
-                    <div className={`flex h-8 items-center rounded-md border px-2.5 text-sm font-semibold ${
+                    <div className={`flex h-9 items-center rounded-lg border px-3 text-sm font-semibold ${
                       pricePending
                         ? 'border-amber-200 bg-amber-50 text-amber-600'
                         : remaining > 0 ? 'border-orange-200 bg-orange-50 text-orange-600' : 'border-green-200 bg-green-50 text-green-600'
@@ -3384,6 +3336,25 @@ export default function RepairsPage() {
                       </div>
                     </>
                   )}
+                  {/* Apply discount — a grid cell, so it sits on the Dispatch row,
+                      bottom-aligned with the inputs */}
+                  {!pricePending && (
+                    <div className="flex items-end">
+                      <label className="inline-flex h-9 cursor-pointer select-none items-center gap-2 text-xs font-medium text-on-surface-variant">
+                        <input
+                          type="checkbox"
+                          checked={showDiscount}
+                          onChange={(e) => {
+                            setShowDiscount(e.target.checked)
+                            // Unticking removes the discount, so a hidden value can never apply silently
+                            if (!e.target.checked) setJobData((p) => ({ ...p, discount_value: '' }))
+                          }}
+                          className="h-4 w-4 rounded accent-brand-teal"
+                        />
+                        Apply discount
+                      </label>
+                    </div>
+                  )}
                 </div>
                 {isTyreShop && dispatchError && (
                   <p className="mt-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-600">{dispatchError}</p>
@@ -3393,7 +3364,7 @@ export default function RepairsPage() {
                     ⚠ This fitter is already booked on job #{fitterConflict.job_number} during this time slot. You can still assign them — just confirm they&apos;re actually available.
                   </p>
                 )}
-                <div className="mt-2">
+                <div className="mt-5">
                   <label className={lbl}>Payment Method <span className="font-normal normal-case text-outline-variant">(opt, select multiple to split)</span></label>
                   <div className="flex flex-wrap gap-2">
                     {(['cash', 'card', 'store_credit', 'loyalty_points'] as const).map((m) => {
@@ -3413,7 +3384,7 @@ export default function RepairsPage() {
                             const loyalty_apply_input = m === 'loyalty_points' && active ? '' : p.loyalty_apply_input
                             return { ...p, payment_methods, payment_amounts, credit_apply_input, loyalty_apply_input }
                           })}
-                          className={`flex items-center gap-1 rounded-md border px-3 py-1 text-xs font-medium capitalize transition-colors ${
+                          className={`flex h-8 items-center gap-1.5 rounded-lg border px-3.5 text-xs font-medium capitalize transition-colors ${
                             active
                               ? 'border-gray-900 bg-gray-900 text-white'
                               : disabled
@@ -3512,14 +3483,14 @@ export default function RepairsPage() {
 
                 {/* Assigned To — moved out of the narrow 6-col grid above so the
                     selected employee's full name/role isn't clipped. */}
-                <div className="mt-3 max-w-xs">
+                <div className="mt-5 max-w-xs">
                   <div className="mb-0.5 flex items-center justify-between">
                     <label className={`${lbl} !mb-0`}>{isTyreShop ? 'Fitter' : 'Assigned To'} <span className="font-normal normal-case text-outline-variant">(opt)</span></label>
                     {isTyreShop && (
                       <button
                         type="button"
-                        onClick={() => setShowNewFitter((v) => !v)}
-                        title="Add a new fitter"
+                        onClick={() => fitterPickerRef.current?.startCreate()}
+                        title="Add a new fitter — type a name and press Enter"
                         className="flex items-center gap-0.5 rounded-full bg-brand-teal px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm hover:bg-brand-teal/90 transition-colors"
                       >
                         <Plus className="h-2.5 w-2.5" /> New
@@ -3532,51 +3503,21 @@ export default function RepairsPage() {
                       value={jobData.assigned_to ?? ''}
                       onChange={(id) => setJobData((p) => ({ ...p, assigned_to: id }))}
                       label=""
-                      placeholder="Search employee..."
+                      placeholder={isTyreShop ? 'Search or type a new fitter…' : 'Search employee...'}
                       onCreateNew={isTyreShop ? createInstantFitter : undefined}
                       createLabel="Add fitter"
                       externalSelection={newFitterSelection}
+                      controlRef={fitterPickerRef}
                     />
-                  )}
-                  {showNewFitter && (
-                    <div className="mt-1.5 flex items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-low p-2">
-                      <input
-                        autoFocus
-                        type="text"
-                        value={newFitterName}
-                        onChange={(e) => setNewFitterName(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && submitNewFitter()}
-                        placeholder="Fitter name…"
-                        className="h-8 flex-1 rounded-md border border-outline bg-surface px-2 text-sm focus:border-brand-teal focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={submitNewFitter}
-                        disabled={!newFitterName.trim() || newFitterCreating}
-                        className="h-8 shrink-0 rounded-md bg-gray-900 px-3 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
-                      >
-                        {newFitterCreating ? 'Adding…' : 'Add'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setShowNewFitter(false); setNewFitterName('') }}
-                        className="h-8 w-8 shrink-0 rounded-md text-outline hover:bg-surface-container hover:text-on-surface-variant flex items-center justify-center"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
                   )}
                 </div>
               </div>
 
-              {!isRetail && !isTyreShop && <div className="h-px bg-surface-container" />}
+              {!isRetail && !isTyreShop && <div className="h-px bg-outline-variant/30" />}
 
               {/* Row D: Lock / Passcode / Pattern — device-repair shops only.
                   Not applicable to retail (no device) or tyre jobs (no device to lock). */}
               {!isRetail && !isTyreShop && <div>
-                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
-                  <Lock className="h-2.5 w-2.5" /> Device Lock
-                </p>
                 <div className="flex items-center gap-2 mb-2">
                   {(['', 'passcode', 'pattern'] as const).map((t) => (
                     <button
@@ -3622,31 +3563,42 @@ export default function RepairsPage() {
                 )}
               </div>}
 
-              <div className="h-px bg-surface-container" />
+              <div className="h-px bg-outline-variant/30" />
 
               {/* Row E: Customer Note | Staff Note */}
               <div>
-                <p className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-teal">
-                  <StickyNote className="h-2.5 w-2.5" /> Notes
-                </p>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={lbl}>Customer Note</label>
-                    <textarea rows={2} value={jobData.customer_note} onChange={(e) => setJobData((p) => ({ ...p, customer_note: e.target.value }))} placeholder="Visible to customer…" className="w-full resize-none rounded-md border border-indigo-200 bg-surface px-2.5 py-1.5 text-sm text-on-surface placeholder:text-outline transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400/20" />
+                    <textarea rows={2} value={jobData.customer_note} onChange={(e) => setJobData((p) => ({ ...p, customer_note: e.target.value }))} placeholder="Visible to customer…" className="w-full resize-none rounded-lg border border-[var(--outline-variant)] bg-surface-container-lowest px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/70 transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/15" />
                   </div>
                   <div>
                     <label className={lbl}>Staff Note</label>
-                    <textarea rows={2} value={jobData.staff_note} onChange={(e) => setJobData((p) => ({ ...p, staff_note: e.target.value }))} placeholder="Internal only…" className="w-full resize-none rounded-md border border-indigo-200 bg-surface px-2.5 py-1.5 text-sm text-on-surface placeholder:text-outline transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-400/20" />
+                    <textarea rows={2} value={jobData.staff_note} onChange={(e) => setJobData((p) => ({ ...p, staff_note: e.target.value }))} placeholder="Internal only…" className="w-full resize-none rounded-lg border border-[var(--outline-variant)] bg-surface-container-lowest px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/70 transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/15" />
                   </div>
                 </div>
               </div>
 
-              {/* Footer */}
-              <div className="flex items-center justify-between gap-2 border-t border-outline-variant pt-2.5">
+              {/* Footer — sticky to the bottom of the scrolling dialog (the negative
+                  offsets cancel the Modal's p-4/sm:p-6) with a fade above it, which
+                  doubles as the "there's more below" cue while scrolling. */}
+              <div className="sticky -bottom-4 sm:-bottom-6 z-10 -mx-4 -mb-4 sm:-mx-6 sm:-mb-6">
+                <div className="pointer-events-none h-6 bg-gradient-to-t from-surface to-transparent" aria-hidden />
+                <div className="flex items-center justify-between gap-3 border-t border-outline-variant/50 bg-surface px-4 pb-4 pt-3 sm:px-6 sm:pb-6">
                 <button onClick={() => setModalStep(1)} className="flex items-center gap-1 text-sm text-on-surface-variant hover:text-on-surface transition-colors">
                   <ChevronLeft className="h-4 w-4" /> Back
                 </button>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-3">
+                  <p className="hidden text-right text-xs leading-tight text-on-surface-variant sm:block">
+                    {pricePending ? (
+                      <span className="font-medium text-amber-600">Price TBD</span>
+                    ) : (
+                      <>
+                        <span className="block">Total <span className="font-semibold text-on-surface">£{(parseFloat(jobData.estimated_cost) || 0).toFixed(2)}</span></span>
+                        <span className={remaining > 0 ? 'text-orange-600' : 'text-green-600'}>Due £{Math.max(0, remaining).toFixed(2)}</span>
+                      </>
+                    )}
+                  </p>
                   <Button variant="outline" onClick={() => setModalOpen(false)}>Cancel</Button>
                   <Button
                     onClick={createRepair}
@@ -3663,6 +3615,7 @@ export default function RepairsPage() {
                   >
                     Create Job
                   </Button>
+                </div>
                 </div>
               </div>
             </div>

@@ -5,6 +5,7 @@ import { AuthService } from '@/backend/services/auth.service'
 import { EmailService } from '@/backend/services/email.service'
 import { SubscriptionSyncService } from '@/backend/services/subscription-sync.service'
 import { invalidateBusinessCache } from '@/backend/services/module-config.service'
+import { SubscriptionNoticeService } from '@/backend/services/subscription-notice.service'
 import { customMonthlyPriceFromMetadata } from '@/backend/services/custom-plan-pricing'
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'repairbooking.co.uk'
@@ -484,6 +485,8 @@ export async function POST(request: NextRequest) {
         const supabase = getAdminSupabase() as any
         await supabase.from('businesses').update({ is_active: true }).eq('id', businessId)
         await invalidateBusinessCache(businessId)
+        // Paid → remove any "payment due" announcement (never throws)
+        await SubscriptionNoticeService.clearForBusiness(businessId)
       }
     }
 
@@ -540,6 +543,8 @@ export async function POST(request: NextRequest) {
     }
 
     await invalidateBusinessCache(businessId)
+    // 24h grace started → dashboard announcement, once per unpaid invoice (never throws)
+    if (invoice.id) await SubscriptionNoticeService.notifyCardPaymentFailed(businessId, invoice.id)
     return NextResponse.json({ received: true })
   }
 

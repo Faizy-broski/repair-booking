@@ -4,6 +4,7 @@
  * and applies them to businesses by seeding module_access rows.
  */
 import { adminSupabase } from '@/backend/config/supabase'
+import { applyTemplateRepairDefaults, applyTemplateCatalogue } from '@/backend/services/repair-defaults.service'
 import type {
   BusinessVerticalTemplate,
   CreateVerticalTemplatePayload,
@@ -138,6 +139,17 @@ export const VerticalTemplateService = {
       const { error } = await db('business_module_access')
         .upsert(rows, { onConflict: 'business_id,module' })
       if (error) throw error
+    }
+
+    // Swap the generic phone-repair faults/statuses for this vertical's own
+    // (only while still untouched — never wipes a business's customisations).
+    if (mode !== 'merge') {
+      try {
+        await applyTemplateRepairDefaults(businessId, template.module_settings)
+        await applyTemplateCatalogue(businessId, template.module_settings)
+      } catch (err) {
+        console.error('[VerticalTemplateService] repair defaults failed for', businessId, err)
+      }
     }
 
     // Link business to vertical template and stamp the version they received

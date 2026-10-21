@@ -1,12 +1,11 @@
 'use client'
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, ShoppingCart, Wrench, Package, Users, Calendar,
   DollarSign, BarChart2, MessageSquare, FileText, Gift, Star,
-  Phone, Settings, UserCheck, LogOut, Receipt, X, UploadCloud,
+  Phone, Settings, UserCheck, Receipt, X, UploadCloud,
   CreditCard, AlertCircle, Smartphone, BookOpen, TrendingUp, PieChart,
   ChevronDown, Bell, Server, Clock, Activity, Mail, Users2,
   Store, GitBranch, Sliders, Layers, Settings2, PackagePlus, Cpu, Tag,
@@ -15,9 +14,9 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import { useModuleConfigStore } from '@/store/module-config.store'
-import { performSignOut } from '@/lib/sign-out'
 import { useRouter } from 'next/navigation'
 import { BranchSwitcher } from './branch-switcher'
+import { GraceSidebarNotice } from './grace-notice'
 import type { Role } from '@/backend/config/constants'
 import type { ModuleName } from '@/types/module-config'
 
@@ -105,6 +104,26 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Account',          href: '/account',                                 icon: CreditCard,    requiredRole: 'cashier' },
 ]
 
+// Sidebar section headings, keyed by top-level item href. Items not listed fall under 'System'.
+const SECTION_BY_HREF: Record<string, string> = {
+  '/dashboard':      'Operations',
+  '/pos':            'Operations',
+  '/repairs':        'Operations',
+  '/appointments':   'Operations',
+  '/customers':      'Customers',
+  '/messages':       'Customers',
+  '/phone':          'Customers',
+  '/google-reviews': 'Customers',
+  '/inventory':      'Stock',
+  '/employees':      'Team',
+  '/invoices':       'Finance',
+  '/gift-cards':     'Finance',
+  '/expenses':       'Finance',
+  '/reports':        'Finance',
+}
+const SECTION_ORDER = ['Operations', 'Stock', 'Customers', 'Team', 'Finance', 'System']
+const sectionOf = (href: string) => SECTION_BY_HREF[href] ?? 'System'
+
 const ROLE_HIERARCHY: Role[] = ['cashier', 'staff', 'branch_manager', 'business_owner', 'super_admin']
 
 function hasAccess(userRole: string, required: Role): boolean {
@@ -158,10 +177,6 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
   // Set of parent hrefs whose children are visible
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
-  async function handleLogout() {
-    await performSignOut()
-  }
-
   function toggleSection(href: string, e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
@@ -198,7 +213,13 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
     return true
   }).map((item) => (isTyreShop && TYRE_SHOP_LABELS[item.href]) ? { ...item, label: TYRE_SHOP_LABELS[item.href] } : item)
 
+  // Top-level groups ordered by section (stable within a section), so headings never repeat
   const groups = buildGroups(visibleItems)
+    .map((g, i) => ({ g, i }))
+    .sort((a, b) =>
+      SECTION_ORDER.indexOf(sectionOf(a.g.parent.href)) - SECTION_ORDER.indexOf(sectionOf(b.g.parent.href)) || a.i - b.i
+    )
+    .map(({ g }) => g)
 
   // Auto-expand any group that contains the currently active path
   useEffect(() => {
@@ -252,7 +273,9 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
           </div>
         )}
 
-        {navReady && groups.map(({ parent, children }) => {
+        {navReady && groups.map(({ parent, children }, groupIndex) => {
+          const section        = sectionOf(parent.href)
+          const startsSection  = groupIndex === 0 || sectionOf(groups[groupIndex - 1].parent.href) !== section
           const hasChildren    = children.length > 0
           const isOpen         = expanded.has(parent.href)
           const isDisabled     = !hasSubscriptionAccess && parent.href !== '/account'
@@ -261,12 +284,23 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
 
           return (
             <div key={parent.href}>
+              {/* ── Section heading ── */}
+              {startsSection && (
+                collapsed
+                  ? groupIndex > 0 && <div className="mx-3 my-2 h-px bg-white/10" />
+                  : (
+                    <p className={cn('px-3 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/35', groupIndex === 0 ? 'pt-1' : 'pt-4')}>
+                      {section}
+                    </p>
+                  )
+              )}
+
               {/* ── Parent row ── */}
               {isDisabled ? (
                 <div
                   title={collapsed ? parent.label : undefined}
                   className={cn(
-                    'relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium mb-0.5',
+                    'relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium mb-0.5',
                     'opacity-30 cursor-not-allowed select-none text-white/50',
                     collapsed && 'justify-center'
                   )}
@@ -279,27 +313,22 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
                   className={cn(
                     'group relative flex items-center rounded-lg mb-0.5 transition-all duration-150',
                     isParentActive
-                      ? 'bg-brand-teal/20'
+                      ? 'bg-brand-teal shadow-sm'
                       : childIsActive
                         ? 'bg-white/5'
                         : 'hover:bg-white/8',
                     collapsed && 'justify-center'
                   )}
                 >
-                  {/* Active indicator */}
-                  {isParentActive && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-0.5 rounded-full bg-brand-teal" />
-                  )}
-
                   {/* Link part */}
                   <Link
                     href={parent.href}
                     title={collapsed ? parent.label : undefined}
                     className={cn(
-                      'flex flex-1 items-center gap-3 px-3 py-2.5 text-sm font-medium',
+                      'flex flex-1 items-center gap-3 px-3 py-2 text-sm font-medium',
                       collapsed && 'justify-center',
                       isParentActive
-                        ? 'text-brand-teal'
+                        ? 'text-white font-semibold'
                         : childIsActive
                           ? 'text-white'
                           : 'text-white/80 group-hover:text-white'
@@ -307,7 +336,7 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
                   >
                     <parent.icon className={cn(
                       'h-[18px] w-[18px] shrink-0 transition-colors',
-                      isParentActive ? 'text-brand-teal' : childIsActive ? 'text-white/90' : 'text-white/60 group-hover:text-white'
+                      isParentActive ? 'text-white' : childIsActive ? 'text-white/90' : 'text-white/60 group-hover:text-white'
                     )} />
                     {!collapsed && <span className="truncate flex-1">{parent.label}</span>}
                     {!collapsed && parent.badge && (
@@ -322,8 +351,8 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
                     <button
                       onClick={(e) => toggleSection(parent.href, e)}
                       className={cn(
-                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-md mr-1 transition-colors',
-                        'text-white/40 hover:text-white hover:bg-white/10'
+                        'flex h-7 w-7 shrink-0 items-center justify-center rounded-md mr-1 transition-colors',
+                        isParentActive ? 'text-white/80 hover:bg-white/15' : 'text-white/40 hover:text-white hover:bg-white/10'
                       )}
                       aria-label={isOpen ? 'Collapse' : 'Expand'}
                     >
@@ -384,6 +413,13 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
         })}
       </nav>
 
+      {/* Grace period — subscription lapsed but access is still on for up to 24h */}
+      {hasSubscriptionAccess && subscriptionStatus?.inGrace && (
+        <div className="shrink-0 mx-2 mb-2">
+          <GraceSidebarNotice graceEndsAt={subscriptionStatus.graceEndsAt} collapsed={collapsed} />
+        </div>
+      )}
+
       {/* Subscription warning banner — shown when access is revoked */}
       {!hasSubscriptionAccess && subscriptionStatus !== null && (
         <div className="shrink-0 mx-2 mb-2">
@@ -439,34 +475,6 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
         </div>
       )}
 
-      {/* User footer */}
-      <div className="shrink-0 border-t border-white/10 p-3">
-        {!collapsed && profile && (
-          <div className="mb-2 flex items-center gap-2.5 rounded-xl px-2 py-2">
-            <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full overflow-hidden bg-brand-teal text-sm font-bold text-white shadow">
-              {profile.avatar_url ? (
-                <Image src={profile.avatar_url} alt={profile.full_name ?? 'User'} fill className="object-cover" />
-              ) : (
-                (profile.full_name ?? 'U').charAt(0).toUpperCase()
-              )}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-white/90">{profile.full_name}</p>
-              <p className="text-[11px] text-white/40 capitalize">{profile.role?.replace(/_/g, ' ')}</p>
-            </div>
-          </div>
-        )}
-        <button
-          onClick={handleLogout}
-          className={cn(
-            'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/70 transition-colors hover:bg-white/5 hover:text-red-400',
-            collapsed ? 'justify-center' : ''
-          )}
-        >
-          <LogOut className="h-[18px] w-[18px] shrink-0" />
-          {!collapsed && <span>Sign out</span>}
-        </button>
-      </div>
     </aside>
   )
 }

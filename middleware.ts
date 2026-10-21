@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
+import { resolveAccess } from '@/lib/subscription-access'
 import { verifyImpersonationJwt } from '@/lib/impersonation'
 
 // '/api/webhooks/' is a legacy path kept for safety; the real Stripe webhook
@@ -333,7 +334,7 @@ async function handleRequest(request: NextRequest) {
         ? Promise.resolve({ data: null })
         : tenantSupabase
             .from('subscriptions')
-            .select('status, trial_ends_at, plans(plan_type)')
+            .select('status, trial_ends_at, current_period_start, current_period_end, stripe_sub_id, plans(plan_type)')
             .eq('business_id', business.id)
             .order('created_at', { ascending: false })
             .limit(1)
@@ -362,24 +363,21 @@ async function handleRequest(request: NextRequest) {
 
     // ── Trial / subscription enforcement ──────────────────────────────────────
     if (!isExemptPath) {
-      const sub = subResult.data
-      const planType = (sub?.plans as { plan_type?: string } | null)?.plan_type
+      const sub = subResult.data as {
+        status: string | null; trial_ends_at: string | null
+        current_period_start: string | null; current_period_end: string | null
+        stripe_sub_id: string | null; plans: { plan_type?: string } | null
+      } | null
 
-      // Free trial expired: free-typed plan whose trial_ends_at has passed
-      const freeTrialExpired =
-        planType === 'free' &&
-        sub?.trial_ends_at &&
-        new Date(sub.trial_ends_at) < new Date()
+      // Same checks as before (free trial expired / paid sub not active|trialing),
+      // plus a 24h grace: a past_due subscription keeps access for 24h after it
+      // lapsed. Grace only ever adds access — never locks anyone new.
+      const access = resolveAccess(
+        sub ? { ...sub, plan_type: sub.plans?.plan_type ?? null } : null,
+        'middleware',
+      )
 
-      // Paid subscription inactive: ANY plan (including free-typed plans the user
-      // has paid for) where the subscription status is not active/trialing.
-      // trial_ends_at being null means it's a paid resubscription, not a trial.
-      const paidSubInactive =
-        sub?.status &&
-        !sub.trial_ends_at &&
-        !['active', 'trialing'].includes(sub.status)
-
-      if (freeTrialExpired || paidSubInactive) {
+      if (!access.hasAccess) {
         const accountUrl = new URL('/account', request.url)
         return forwardAuthCookies(supabaseResponse, NextResponse.redirect(accountUrl))
       }

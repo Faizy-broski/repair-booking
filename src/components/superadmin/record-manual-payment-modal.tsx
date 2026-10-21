@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { X, RefreshCw, AlertCircle, Landmark } from 'lucide-react'
 import type { PlanOption } from '@/components/superadmin/edit-subscription-modal'
 import { CUSTOM_PLAN_YEARLY_DISCOUNT } from '@/backend/services/custom-plan-pricing'
+import { nextPeriodEnd } from '@/lib/billing-anchor'
 
 export interface ManualPaymentBusiness {
   id: string
@@ -50,6 +51,18 @@ function addCycle(dateStr: string, cycle: Cycle): string {
   return d.toISOString().slice(0, 10)
 }
 
+// Renewal-day anchor: a paid (non-trial) subscription keeps its renewal day no
+// matter when the payment arrives — expired 21 Oct, paid 22 Oct → ends 21 Nov.
+function anchoredDates(anchorEnd: string, cycle: Cycle) {
+  const end = nextPeriodEnd(new Date(anchorEnd), cycle, new Date())
+  // The covered period is the cycle that ends on `end`
+  const start = new Date(end)
+  if (cycle === 'yearly') start.setUTCFullYear(start.getUTCFullYear() - 1)
+  else start.setUTCMonth(start.getUTCMonth() - 1)
+  const startDay = new Date(anchorEnd) > start ? new Date(anchorEnd) : start
+  return { start: startDay.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) }
+}
+
 function fmtGBP(amount: number) {
   return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 }).format(amount)
 }
@@ -67,19 +80,27 @@ export function RecordManualPaymentModal({
 }) {
   const sub = business.subscriptions?.[0]
   const defaultCycle: Cycle = sub?.billing_cycle === 'yearly' ? 'yearly' : 'monthly'
+  // Anchor only on a real paid period — trials (and subs with no end) keep the
+  // old "from the payment date" suggestion.
+  const anchorEnd = sub?.current_period_end && sub.status !== 'trialing' && !sub.trial_ends_at
+    ? sub.current_period_end
+    : null
+  const initial = anchorEnd
+    ? anchoredDates(anchorEnd, defaultCycle)
+    : { start: todayInput(), end: addCycle(todayInput(), defaultCycle) }
 
   const [planId, setPlanId]         = useState(sub?.plan_id ?? '')
   const [billingCycle, setBillingCycle] = useState<Cycle>(defaultCycle)
   const [method, setMethod]         = useState<Method>('bank_transfer')
   const [reference, setReference]   = useState('')
   const [paidAt, setPaidAt]         = useState(todayInput())
-  const [periodStart, setPeriodStart] = useState(todayInput())
-  const [periodEnd, setPeriodEnd]     = useState(addCycle(todayInput(), defaultCycle))
+  const [periodStart, setPeriodStart] = useState(initial.start)
+  const [periodEnd, setPeriodEnd]     = useState(initial.end)
   const [notes, setNotes]           = useState('')
 
   const [extend, setExtend]           = useState(true)
   const [newStatus, setNewStatus]     = useState<Status>('active')
-  const [newPeriodEnd, setNewPeriodEnd] = useState(addCycle(todayInput(), defaultCycle))
+  const [newPeriodEnd, setNewPeriodEnd] = useState(initial.end)
 
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState<string | null>(null)
@@ -118,7 +139,9 @@ export function RecordManualPaymentModal({
 
   function onPaidAtChange(v: string) {
     setPaidAt(v)
-    // Keep the period-covered and extend-period suggestions in sync until the admin edits them directly
+    // Anchored subscriptions keep their renewal day regardless of when the
+    // payment arrived — only un-anchored ones (trials) follow the payment date.
+    if (anchorEnd) return
     setPeriodStart(v)
     setPeriodEnd(addCycle(v, billingCycle))
     setNewPeriodEnd(addCycle(v, billingCycle))
@@ -126,6 +149,13 @@ export function RecordManualPaymentModal({
 
   function onCycleChange(c: Cycle) {
     setBillingCycle(c)
+    if (anchorEnd) {
+      const d = anchoredDates(anchorEnd, c)
+      setPeriodStart(d.start)
+      setPeriodEnd(d.end)
+      setNewPeriodEnd(d.end)
+      return
+    }
     setPeriodEnd(addCycle(paidAt, c))
     setNewPeriodEnd(addCycle(paidAt, c))
   }
@@ -386,6 +416,11 @@ export function RecordManualPaymentModal({
                     onChange={(e) => setNewPeriodEnd(e.target.value)}
                     className="w-full h-9 rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition-colors"
                   />
+                  {anchorEnd && (
+                    <p className="text-[11px] text-gray-500">
+                      Suggested from the current renewal date ({new Date(anchorEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}) — the renewal day stays the same even when paying late. You can still change it.
+                    </p>
+                  )}
                 </div>
                 <p className="text-[11px] text-gray-500 leading-relaxed">
                   Sets the subscription to this plan/cycle on your platform only — it does not touch Stripe.

@@ -247,7 +247,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
 
   if (!isHydrated || !sessionVerified) {
     return (
-      <div className="flex h-screen overflow-hidden bg-surface-container-low">
+      <div className="flex h-screen overflow-hidden bg-background">
         {/* Sidebar skeleton */}
         <div className="hidden lg:flex w-64 flex-shrink-0 flex-col bg-surface-container border-r border-outline-variant">
           <div className="h-14 border-b border-outline-variant px-4 flex items-center">
@@ -281,7 +281,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
 
   return (
     <Providers>
-      <div className="flex h-screen overflow-hidden bg-surface-container-low print:hidden" style={getBrandStyle(brandColor, brandMode)}>
+      <div className="flex h-screen overflow-hidden bg-background print:hidden" style={getBrandStyle(brandColor, brandMode)}>
         <div className="hidden lg:flex">
           <Suspense fallback={null}>
             <Sidebar collapsed={collapsed} />

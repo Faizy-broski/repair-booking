@@ -75,15 +75,17 @@ export const EmployeeController = {
     const { data, error } = await validateBody(request, createSchema)
     if (error) return error
     try {
-      const limitCheck = await PlanLimitService.checkLimit(ctx.businessId, 'max_employees')
+      // Independent pre-checks run in parallel to keep quick-add (e.g. a new
+      // fitter from the job sheet) fast.
+      const email = data.email || null
+      const [limitCheck, isUnique] = await Promise.all([
+        PlanLimitService.checkLimit(ctx.businessId, 'max_employees'),
+        email ? EmployeeService.checkEmailUnique(email, data.branch_id) : Promise.resolve(true),
+      ])
       if (!limitCheck.allowed) {
         return forbidden(`Employee limit reached. Your plan allows ${limitCheck.limit} employee${limitCheck.limit === 1 ? '' : 's'}.`, 'LIMIT_REACHED')
       }
-      const email = data.email || null
-      if (email) {
-        const isUnique = await EmployeeService.checkEmailUnique(email, data.branch_id)
-        if (!isUnique) return badRequest('An employee with this email already exists.')
-      }
+      if (!isUnique) return badRequest('An employee with this email already exists.')
       const employee = await EmployeeService.create({
         ...data,
         email,

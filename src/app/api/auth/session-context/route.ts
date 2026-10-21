@@ -4,6 +4,7 @@ import { adminSupabase } from '@/backend/config/supabase'
 import { ok, serverError } from '@/backend/utils/api-response'
 import type { RequestContext } from '@/backend/middleware'
 import type { SubscriptionStatus } from '@/store/auth.store'
+import { resolveAccess } from '@/lib/subscription-access'
 
 /**
  * GET /api/auth/session-context
@@ -48,7 +49,7 @@ async function getSessionContext(
       businessId
         ? adminSupabase
             .from('subscriptions')
-            .select('status, trial_ends_at, current_period_end, stripe_sub_id, plans(name, plan_type)')
+            .select('status, trial_ends_at, current_period_start, current_period_end, stripe_sub_id, plans(name, plan_type)')
             .eq('business_id', businessId)
             .order('created_at', { ascending: false })
             .limit(1)
@@ -66,17 +67,22 @@ async function getSessionContext(
     const planName = plans?.name ?? null
     const trialEndsAt = sub?.trial_ends_at ?? null
     const currentPeriodEnd = (sub as any)?.current_period_end ?? null
-    const freeTrialExpired = planType === 'free' && trialEndsAt && new Date(trialEndsAt) < new Date()
-    // Mirrors middleware.ts's subscription gate — deliberately does not depend on
-    // plan_type (a mislabeled plans row must never bypass this check).
-    const paidSubInactive =
-      !!sub?.status &&
-      !trialEndsAt &&
-      !['active', 'trialing'].includes(sub.status)
-    const manualSubExpired =
-      !(sub as any)?.stripe_sub_id &&
-      currentPeriodEnd &&
-      new Date(currentPeriodEnd) < new Date()
+
+    // Same checks as before (free trial expired / paid sub inactive / manual sub
+    // expired) plus a 24h grace after a paid subscription lapses.
+    const access = resolveAccess(
+      sub
+        ? {
+            status: sub.status,
+            trial_ends_at: trialEndsAt,
+            current_period_start: (sub as any).current_period_start ?? null,
+            current_period_end: currentPeriodEnd,
+            stripe_sub_id: (sub as any).stripe_sub_id ?? null,
+            plan_type: planType,
+          }
+        : null,
+      'session',
+    )
 
     const subscriptionStatus: SubscriptionStatus = {
       status: sub?.status ?? null,
@@ -84,7 +90,9 @@ async function getSessionContext(
       planName,
       trialEndsAt,
       currentPeriodEnd,
-      hasAccess: !freeTrialExpired && !paidSubInactive && !manualSubExpired,
+      hasAccess: access.hasAccess,
+      inGrace: access.inGrace,
+      graceEndsAt: access.graceEndsAt,
     }
 
     const verticalTemplateSlug =

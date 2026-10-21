@@ -80,7 +80,7 @@ export default async function SuperAdminDashboard() {
         <p className="text-sm text-on-surface-variant">Platform-wide overview</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {statCards.map((card) => (
           <StatsCard
             key={card.label}

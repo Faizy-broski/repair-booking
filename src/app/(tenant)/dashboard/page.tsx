@@ -173,18 +173,21 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Stats Grid (6 cards) ── */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 lg:grid-cols-4">
+      {/* ── Stats strip (8 compact tiles: 2 / 4 / 8 per row) ── */}
+      {/* Columns follow the space actually available (container query), not the
+          screen width — so 8-across only appears when there's room beside the sidebar */}
+      <div className="@container">
+      <div className="grid grid-cols-2 gap-2 @2xl:grid-cols-4 @6xl:grid-cols-8">
         {loading ? (
           Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="h-28 sm:h-32 animate-pulse rounded-xl bg-surface-container" />
+            <div key={i} className="h-[76px] animate-pulse rounded-lg bg-surface-container" />
           ))
         ) : (
           <>
             {/* Row 1 */}
             <StatsCard title="Sales Revenue" value={formatCurrency(stats?.total_sales ?? 0)} subtitle={PERIODS.find(p => p.value === period)?.label} icon={<Banknote className="h-5 w-5" />} color="green" />
-            <StatsCard title="Sales Profit" value={formatCurrency(stats?.sales_profit ?? 0)} subtitle="revenue − cost of goods" icon={<TrendingUp className="h-5 w-5" />} color={(stats?.sales_profit ?? 0) >= 0 ? 'green' : 'red'} />
-            <StatsCard title="Net Profit" value={formatCurrency(stats?.net_profit ?? 0)} subtitle="all revenue − expenses" icon={<TrendingUp className="h-5 w-5" />} color={(stats?.net_profit ?? 0) >= 0 ? 'green' : 'red'} />
+            <StatsCard title="Sales Profit" value={formatCurrency(stats?.sales_profit ?? 0)} subtitle="after cost of goods" hint="Sales profit = sales revenue − cost of goods sold" icon={<TrendingUp className="h-5 w-5" />} color={(stats?.sales_profit ?? 0) >= 0 ? 'green' : 'red'} />
+            <StatsCard title="Net Profit" value={formatCurrency(stats?.net_profit ?? 0)} subtitle="after all expenses" hint="Net profit = all revenue (sales + repairs) − total expenses" icon={<TrendingUp className="h-5 w-5" />} color={(stats?.net_profit ?? 0) >= 0 ? 'green' : 'red'} />
             <StatsCard title="Open Repairs" value={stats?.repairs_open ?? 0} icon={<Wrench className="h-5 w-5" />} color="yellow" />
             {/* Row 2 */}
             {isRetail ? (
@@ -198,11 +201,12 @@ export default function DashboardPage() {
               <StatsCard title="Repairs Revenue" value={formatCurrency(stats?.repairs_revenue ?? 0)} subtitle="collected" icon={<Receipt className="h-5 w-5" />} color="purple" />
             )}
             <StatsCard title="Total Expenses" value={formatCurrency(stats?.total_expenses ?? 0)} subtitle={PERIODS.find(p => p.value === period)?.label} icon={<TrendingUp className="h-5 w-5" />} color="red" />
-            <Link href="/inventory?low_stock=true" className="block w-full h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl">
-              <StatsCard title="Low Stock" value={stats?.low_stock_count ?? 0} subtitle={(stats?.low_stock_count ?? 0) > 0 ? 'view in inventory' : 'items'} icon={<AlertTriangle className="h-5 w-5" />} color={(stats?.low_stock_count ?? 0) > 0 ? 'red' : 'green'} className="cursor-pointer hover:shadow-md transition-shadow" />
+            <Link href="/inventory?low_stock=true" className="block w-full h-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg">
+              <StatsCard title="Low Stock" value={stats?.low_stock_count ?? 0} subtitle={(stats?.low_stock_count ?? 0) > 0 ? 'view in inventory' : 'items'} icon={<AlertTriangle className="h-5 w-5" />} color={(stats?.low_stock_count ?? 0) > 0 ? 'red' : 'green'} className="cursor-pointer transition-colors hover:bg-surface-container-low" />
             </Link>
           </>
         )}
+      </div>
       </div>
 
       {/* ── Revenue by Branch (owner only) ── */}

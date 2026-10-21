@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Poppins } from "next/font/google";
+import { Space_Grotesk } from "next/font/google";
 import Script from "next/script";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 
-const poppins = Poppins({
-  variable: "--font-poppins",
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
   display: "swap",
@@ -53,7 +53,7 @@ export default function RootLayout({
         </Script>
       </head>
       <body
-        className={`${poppins.variable} antialiased`}
+        className={`${spaceGrotesk.variable} antialiased`}
       >
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
           {children}

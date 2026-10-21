@@ -71,6 +71,20 @@ export const RepairService = {
     return data
   },
 
+  // Lean variant of getById for invoice rendering — only the relations the
+  // invoice reads (no status history / profiles / vehicles), so the PDF path
+  // pulls far less data per request.
+  async getForInvoice(id: string, branchId?: string) {
+    let q = adminSupabase
+      .from('repairs')
+      .select('*, customers(*), repair_items(*), repair_payments(id,amount,method,created_at)')
+      .eq('id', id)
+    if (branchId) q = q.eq('branch_id', branchId)
+    const { data, error } = await q.single()
+    if (error) throw error
+    return data
+  },
+
   // Soft double-booking check for the assigned fitter/technician: returns the
   // conflicting job (if any) so the UI can warn but still let staff assign
   // anyway — this never blocks create/update, it's purely advisory.

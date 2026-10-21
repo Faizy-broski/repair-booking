@@ -12,6 +12,8 @@ import { getPagination } from '@/backend/utils/pagination'
 import { PdfCacheService } from '@/backend/services/pdf-cache.service'
 import { shortenUrl, sendInvoiceCreatedEmail, WHATSAPP_PDF_TTL_SECONDS } from '@/backend/services/document-share.service'
 import { buildWhatsAppInvoiceLink } from '@/lib/whatsapp-link'
+import { MemoryCache } from '@/backend/utils/memory-cache'
+import { createHash } from 'node:crypto'
 import { z } from 'zod'
 
 
@@ -51,7 +53,7 @@ function aggregatePaymentMethods(payments: unknown): Array<{ method: string; amo
 // means both paths always agree on totals/items/branch info.
 async function getRepairInvoiceData(repairId: string, branchId: string | null, businessId: string) {
   const [repair, { InvoiceSettingsService }, { DEFAULT_INVOICE_SETTINGS }] = await Promise.all([
-    RepairService.getById(repairId, branchId ?? undefined),
+    RepairService.getForInvoice(repairId, branchId ?? undefined),
     import('@/backend/services/invoice-settings.service'),
     import('@/types/invoice-settings'),
   ])
@@ -152,18 +154,70 @@ async function getRepairInvoiceData(repairId: string, branchId: string | null, b
   }
 }
 
-async function buildRepairInvoiceBuffer(repairId: string, branchId: string | null, businessId: string) {
-  const [data, renderToBuffer, { InvoicePdf }, React] = await Promise.all([
-    getRepairInvoiceData(repairId, branchId, businessId),
+type RepairInvoiceData = NonNullable<Awaited<ReturnType<typeof getRepairInvoiceData>>>
+
+// Thermal sizes print as client-side HTML, not a server PDF — keep in sync with
+// THERMAL_SIZES in src/components/repairs/invoice-modal.tsx.
+const THERMAL_PAPER_SIZES = ['Receipt80', 'Receipt58', 'Custom']
+
+// ── Invoice render caches (per server instance; a miss is always safe) ─────
+// Logo: @react-pdf would otherwise download + decode the remote logo on every
+// render. Cached as a data URI; on failure we render without the logo rather
+// than block or fail the invoice.
+const logoCache = new MemoryCache<string | null>(50, 30 * 60 * 1000)
+// Rendered PDFs, keyed by a hash of the exact invoice data — any change to
+// totals, items, payments or design settings changes the key, so a stale
+// invoice can never be served.
+const invoicePdfCache = new MemoryCache<Buffer>(30, 30 * 60 * 1000)
+
+async function resolveLogoDataUri(url: string): Promise<string | null> {
+  if (url.startsWith('data:')) return url
+  const cached = logoCache.get(url)
+  if (cached !== undefined) return cached
+  let dataUri: string | null = null
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(2500) })
+    if (res.ok) {
+      const type = res.headers.get('content-type') ?? 'image/png'
+      const bytes = Buffer.from(await res.arrayBuffer())
+      dataUri = `data:${type};base64,${bytes.toString('base64')}`
+    }
+  } catch {
+    dataUri = null
+  }
+  logoCache.set(url, dataUri)
+  return dataUri
+}
+
+/** Renders invoice data to a PDF, reusing a cached render when the data is identical. */
+async function renderRepairInvoicePdf(data: RepairInvoiceData, timing?: string[]) {
+  const t0 = Date.now()
+  const key = createHash('sha1').update(JSON.stringify(data)).digest('hex')
+  const hit = invoicePdfCache.get(key)
+  if (hit) {
+    timing?.push('cache;desc=hit')
+    return hit
+  }
+
+  const [renderToBuffer, { InvoicePdf }, React, logo] = await Promise.all([
     import('@react-pdf/renderer').then((m) => m.renderToBuffer),
     import('@/components/pdf/invoice-pdf'),
     import('react').then((m) => m.default),
+    data.settings.show_logo && data.settings.logo_url ? resolveLogoDataUri(data.settings.logo_url) : Promise.resolve(null),
   ])
+  const t1 = Date.now()
 
-  if (!data) return null
-  const doc = React.createElement(InvoicePdf, data)
-  return { buffer: await renderToBuffer(doc as any), jobNumber: data.jobNumber }
+  const renderData = data.settings.show_logo && data.settings.logo_url
+    ? { ...data, settings: { ...data.settings, logo_url: logo, show_logo: !!logo } }
+    : data
+  const doc = React.createElement(InvoicePdf, renderData as any)
+  const buffer = Buffer.from(await renderToBuffer(doc as any))
+  invoicePdfCache.set(key, buffer)
+
+  timing?.push('cache;desc=miss', `prep;dur=${t1 - t0}`, `render;dur=${Date.now() - t1}`)
+  return buffer
 }
+
 
 // Pricing figures for notification emails. estimated_cost is the fixed gross total
 // (job fee + net parts) — never mutated by the overall job discount — so it's used
@@ -816,11 +870,29 @@ export const RepairController = {
     }
   },
 
-  async generateInvoicePdf(_request: NextRequest, ctx: RequestContext, id: string) {
+  // ?fallback=json (used by the invoice modal): build the data ONCE and either
+  // return it as JSON (thermal paper → client-side HTML receipt) or render the
+  // PDF from that same data — one round trip instead of invoice-data + pdf.
+  // Without the param this always returns a PDF, as before.
+  async generateInvoicePdf(request: NextRequest, ctx: RequestContext, id: string) {
     try {
-      const result = await buildRepairInvoiceBuffer(id, ctx.auth.branchId ?? null, ctx.businessId)
-      if (!result) return notFound('Repair not found')
-      return pdfResponse(result.buffer, `invoice-${result.jobNumber}.pdf`)
+      const timing: string[] = []
+      const t0 = Date.now()
+      const data = await getRepairInvoiceData(id, ctx.auth.branchId ?? null, ctx.businessId)
+      if (!data) return notFound('Repair not found')
+      timing.push(`data;dur=${Date.now() - t0}`)
+
+      const wantsJsonFallback = request.nextUrl.searchParams.get('fallback') === 'json'
+      if (wantsJsonFallback && THERMAL_PAPER_SIZES.includes(String(data.settings.paper_size))) {
+        const res = ok(data)
+        res.headers.set('Server-Timing', timing.join(', '))
+        return res
+      }
+
+      const buffer = await renderRepairInvoicePdf(data, timing)
+      const res = pdfResponse(buffer, `invoice-${data.jobNumber}.pdf`)
+      res.headers.set('Server-Timing', timing.join(', '))
+      return res
     } catch (err) {
       return serverError('Failed to generate invoice PDF', err)
     }
@@ -846,9 +918,8 @@ export const RepairController = {
       const filename = `invoice-${data.jobNumber}.pdf`
       let pdfUrl = await PdfCacheService.getSignedUrl(cachePath, filename, WHATSAPP_PDF_TTL_SECONDS)
       if (!pdfUrl) {
-        const result = await buildRepairInvoiceBuffer(id, ctx.auth.branchId ?? null, ctx.businessId)
-        if (!result) return notFound('Repair not found')
-        pdfUrl = await PdfCacheService.store(cachePath, result.buffer, filename, WHATSAPP_PDF_TTL_SECONDS)
+        const buffer = await renderRepairInvoicePdf(data)
+        pdfUrl = await PdfCacheService.store(cachePath, buffer, filename, WHATSAPP_PDF_TTL_SECONDS)
       }
       if (!pdfUrl) return serverError('Failed to prepare invoice PDF for sending')
 
@@ -883,11 +954,10 @@ export const RepairController = {
 
       // Always render the buffer (not just on a cache miss) — it's needed to
       // attach the actual PDF to the email, not just link to it.
-      const result = await buildRepairInvoiceBuffer(id, ctx.auth.branchId ?? null, ctx.businessId)
-      if (!result) return notFound('Repair not found')
+      const buffer = await renderRepairInvoicePdf(data)
 
       let pdfUrl = await PdfCacheService.getSignedUrl(cachePath, filename, WHATSAPP_PDF_TTL_SECONDS)
-      if (!pdfUrl) pdfUrl = await PdfCacheService.store(cachePath, result.buffer, filename, WHATSAPP_PDF_TTL_SECONDS)
+      if (!pdfUrl) pdfUrl = await PdfCacheService.store(cachePath, buffer, filename, WHATSAPP_PDF_TTL_SECONDS)
       if (!pdfUrl) return serverError('Failed to prepare invoice PDF for sending')
 
       const shortUrl = await shortenUrl(pdfUrl, ctx.businessId, WHATSAPP_PDF_TTL_SECONDS)
@@ -905,7 +975,7 @@ export const RepairController = {
         storeName: data.businessName,
         dueAt: data.dueAt,
         invoiceLink: shortUrl,
-        attachment: { filename, content: result.buffer },
+        attachment: { filename, content: buffer },
       })
       if (emailError) return badRequest(emailError)
 

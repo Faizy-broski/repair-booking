@@ -215,6 +215,7 @@ async function postHandler(
       subscriptionExtended = await extendSubscriptionPeriod(supabase, businessId, {
         status: newStatus as SubscriptionStatus,
         currentPeriodEnd: new Date(newPeriodEnd).toISOString(),
+        currentPeriodStart: periodStart ? new Date(periodStart).toISOString() : undefined,
         planId,
         billingCycle: billingCycle as Cycle,
       })

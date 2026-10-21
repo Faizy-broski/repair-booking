@@ -99,14 +99,39 @@ function RowActionsMenu({
         menuRef.current && !menuRef.current.contains(e.target as Node)
       ) setOpen(false)
     }
-    if (open) document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    // A fixed-position menu doesn't follow its button when anything scrolls —
+    // close it instead (standard menu behaviour). Capture catches the inner
+    // <main> scroll container too, not just the window.
+    function close() { setOpen(false) }
+    if (open) {
+      document.addEventListener('mousedown', handler)
+      window.addEventListener('scroll', close, true)
+      window.addEventListener('resize', close)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
   }, [open])
+
+  const MENU_WIDTH = 192
+  // Item rows are a fixed 36px + 8px vertical padding, so the height is known up front
+  const menuHeight = (showDiscount ? 6 : 5) * 36 + 8
 
   function toggle() {
     if (!btnRef.current) return
     const r = btnRef.current.getBoundingClientRect()
-    setPos({ top: r.bottom + window.scrollY + 4, left: r.right + window.scrollX - 144 })
+    const gap = 4, margin = 8
+    // Viewport coordinates (position: fixed) — the menu never extends the page,
+    // so no scrollbar appears and nothing shifts. Flip above the button when
+    // there isn't room below; always keep it inside the viewport.
+    const fitsBelow = r.bottom + gap + menuHeight <= window.innerHeight - margin
+    const top = fitsBelow
+      ? r.bottom + gap
+      : Math.max(margin, r.top - gap - menuHeight)
+    const left = Math.min(Math.max(margin, r.right - MENU_WIDTH), window.innerWidth - MENU_WIDTH - margin)
+    setPos({ top, left })
     setOpen((v) => !v)
   }
 
@@ -128,20 +153,20 @@ function RowActionsMenu({
       {open && typeof document !== 'undefined' && createPortal(
         <div
           ref={menuRef}
-          style={{ position: 'absolute', top: pos.top, left: pos.left, zIndex: 9999 }}
-          className="w-36 rounded-lg border border-outline-variant bg-surface py-1 shadow-lg"
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: MENU_WIDTH, maxHeight: `calc(100vh - 16px)`, zIndex: 9999 }}
+          className="overflow-y-auto rounded-lg border border-outline-variant bg-surface py-1 shadow-lg"
         >
           <Link
             href={`/inventory/${productId}`}
             onClick={() => setOpen(false)}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low"
+            className="flex w-full items-center gap-2.5 whitespace-nowrap px-3 py-2 text-left text-sm text-on-surface-variant hover:bg-surface-container-low"
           >
             <Edit2 className="h-3.5 w-3.5" />
             Edit
           </Link>
           <button
             onClick={() => { onDuplicate(); setOpen(false) }}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-on-surface-variant hover:bg-surface-container-low"
+            className="flex w-full items-center gap-2.5 whitespace-nowrap px-3 py-2 text-left text-sm text-on-surface-variant hover:bg-surface-container-low"
           >
             <Copy className="h-3.5 w-3.5" />
             Duplicate
@@ -149,7 +174,7 @@ function RowActionsMenu({
           {showDiscount && (
             <button
               onClick={() => { onPutOnSale?.(); setOpen(false) }}
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-teal-700 hover:bg-teal-50"
+              className="flex w-full items-center gap-2.5 whitespace-nowrap px-3 py-2 text-left text-sm text-teal-700 hover:bg-teal-50"
             >
               <Percent className="h-3.5 w-3.5" />
               {hasActiveDiscount ? 'Edit Sale Price' : 'Put on Sale'}
@@ -157,21 +182,21 @@ function RowActionsMenu({
           )}
           <button
             onClick={() => { onMoveToBin(); setOpen(false) }}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-amber-700 hover:bg-amber-50"
+            className="flex w-full items-center gap-2.5 whitespace-nowrap px-3 py-2 text-left text-sm text-amber-700 hover:bg-amber-50"
           >
             <Archive className="h-3.5 w-3.5" />
             Move to Bin
           </button>
           <button
             onClick={() => { onReturnToSupplier(); setOpen(false) }}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-orange-700 hover:bg-orange-50"
+            className="flex w-full items-center gap-2.5 whitespace-nowrap px-3 py-2 text-left text-sm text-orange-700 hover:bg-orange-50"
           >
             <Undo2 className="h-3.5 w-3.5" />
             Return to Supplier
           </button>
           <button
             onClick={() => { onDelete(); setOpen(false) }}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+            className="flex w-full items-center gap-2.5 whitespace-nowrap px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
           >
             <Trash2 className="h-3.5 w-3.5" />
             Delete

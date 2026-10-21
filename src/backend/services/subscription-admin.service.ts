@@ -26,9 +26,11 @@ export function resolveIsActive(status: SubscriptionStatus) {
 export async function extendSubscriptionPeriod(
   supabase: any,
   businessId: string,
-  { status, currentPeriodEnd, planId, billingCycle }: {
+  { status, currentPeriodEnd, currentPeriodStart, planId, billingCycle }: {
     status: SubscriptionStatus
     currentPeriodEnd: string
+    /** Optional — start of the newly covered period (was never written before, so it went stale). */
+    currentPeriodStart?: string
     planId?: string
     billingCycle?: 'monthly' | 'yearly'
   }
@@ -40,6 +42,7 @@ export async function extendSubscriptionPeriod(
     .update({
       status,
       current_period_end: currentPeriodEnd,
+      ...(currentPeriodStart ? { current_period_start: currentPeriodStart } : {}),
       canceled_at: canceledAt,
       ...(planId ? { plan_id: planId } : {}),
       ...(billingCycle ? { billing_cycle: billingCycle } : {}),
@@ -61,5 +64,9 @@ export async function extendSubscriptionPeriod(
   }
 
   await invalidateBusinessCache(businessId)
+  // Payment recorded → remove any "payment due" announcement (never throws).
+  // Lazy import keeps this admin helper's dependencies unchanged at load time.
+  const { SubscriptionNoticeService } = await import('@/backend/services/subscription-notice.service')
+  await SubscriptionNoticeService.clearForBusiness(businessId)
   return true
 }

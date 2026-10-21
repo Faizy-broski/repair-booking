@@ -165,7 +165,7 @@ export const ServiceDeviceService = {
 export const ServiceProblemService = {
   async list(
     businessId: string,
-    params: { deviceId?: string; categoryId?: string },
+    params: { deviceId?: string; categoryId?: string; allModels?: boolean },
     opts?: { page?: number; limit?: number },
   ) {
     const page  = Math.max(1, opts?.page  ?? 1)
@@ -182,6 +182,7 @@ export const ServiceProblemService = {
 
     if (params.deviceId)   q = q.eq('device_id', params.deviceId)
     if (params.categoryId) q = q.eq('category_id', params.categoryId)
+    if (params.allModels)  q = q.is('device_id', null)
 
     const { data, count, error } = await q
     if (error) throw error

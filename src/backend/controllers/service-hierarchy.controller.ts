@@ -213,6 +213,8 @@ export const ServiceProblemController = {
       const result = await ServiceProblemService.list(ctx.businessId, {
         deviceId:   searchParams.get('device_id')   ?? undefined,
         categoryId: searchParams.get('category_id') ?? undefined,
+        // all_models=1 -> only services that apply to every model of the type (no device_id)
+        allModels:  searchParams.get('all_models') === '1',
       }, { page, limit })
       return ok(result.data, { page, limit, total: result.total })
     } catch (err) {

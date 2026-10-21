@@ -388,9 +388,9 @@ export const EmailService = {
 
     const nextAttemptLine = payload.nextAttemptAt
       ? `<p style="color:#6B7280;font-size:14px;margin:0 0 24px;">
-           We will automatically retry the charge on
-           <strong>${new Date(payload.nextAttemptAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>.
-           Update your payment method before then to avoid losing access.
+           We will also automatically retry the charge on
+           <strong>${new Date(payload.nextAttemptAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>,
+           but access is locked after the 24-hour grace period if it is still unpaid.
          </p>`
       : `<p style="color:#6B7280;font-size:14px;margin:0 0 24px;">
            No further automatic retries will be made. Please update your payment method immediately to restore full access.
@@ -413,7 +413,8 @@ export const EmailService = {
               We were unable to process the payment of <strong>${amount}</strong> for your
               <strong>${payload.businessName}</strong> subscription
               ${payload.attemptCount > 1 ? `(attempt ${payload.attemptCount})` : ''}.
-              Your account is still active but access will be revoked if the payment cannot be collected.
+              Everything keeps working for <strong>24 hours</strong> — please pay or update your card before then
+              to avoid your team losing access. Your renewal date stays the same.
             </p>
             ${nextAttemptLine}
             <div style="text-align:center;margin-bottom:32px;">
@@ -422,11 +423,68 @@ export const EmailService = {
             <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px 20px;">
               <p style="margin:0;font-size:13px;color:#991b1b;font-weight:600;">What happens if I don't act?</p>
               <ul style="margin:8px 0 0;padding-left:20px;color:#b91c1c;font-size:13px;line-height:1.8;">
-                <li>Stripe will retry the payment automatically</li>
-                <li>After all retries fail, your subscription will be cancelled</li>
+                <li>After 24 hours unpaid, the dashboard is locked until payment is made</li>
+                <li>Stripe will keep retrying; after all retries fail, the subscription is cancelled</li>
                 <li>All staff will lose access to the dashboard</li>
                 <li>Your data is retained and will be restored when you resubscribe</li>
               </ul>
+            </div>
+          </div>
+          <div style="background:#F9FAFB;border-top:1px solid #F3F4F6;padding:20px 40px;text-align:center;">
+            <p style="color:#9CA3AF;font-size:12px;margin:0;">© ${new Date().getFullYear()} The Social Nexus Ltd · <a href="https://${ROOT_DOMAIN}" style="color:#9CA3AF;">repairbooking.co.uk</a></p>
+          </div>
+        </div>
+      </body></html>`,
+    })
+  },
+
+  /**
+   * Grace-period reminders (cron/subscription-notices).
+   *  - 'expiring_3d':   manual subscription ends in ≤ 3 days
+   *  - 'grace_started': subscription lapsed — 24h left before access locks
+   */
+  async sendSubscriptionReminder(payload: {
+    to: string
+    businessName: string
+    subdomain: string
+    kind: 'expiring_3d' | 'grace_started'
+    expiresAt: string
+    graceEndsAt?: string | null
+  }) {
+    const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'repairbooking.co.uk'
+    const billingUrl = `https://${payload.subdomain}.${ROOT_DOMAIN}/account?tab=billing`
+    const fmt = (iso: string) => new Date(iso).toLocaleString('en-GB', {
+      day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London',
+    })
+    const isGrace = payload.kind === 'grace_started'
+    const subject = isGrace
+      ? `Payment due: ${payload.businessName} — 24 hours before access is locked`
+      : `Your ${payload.businessName} subscription expires on ${fmt(payload.expiresAt)}`
+    const headline = isGrace ? 'Payment due — 24 hours left' : 'Your subscription expires soon'
+    const lapsed = new Date(payload.expiresAt).getTime() <= Date.now()
+    const body = isGrace
+      ? `Your <strong>${payload.businessName}</strong> subscription ${lapsed ? 'expired' : 'expires'} on <strong>${fmt(payload.expiresAt)}</strong>.
+         Everything keeps working for now — please pay before <strong>${fmt(payload.graceEndsAt ?? payload.expiresAt)}</strong>
+         to avoid your team losing access. Your renewal date stays the same.`
+      : `Your <strong>${payload.businessName}</strong> subscription expires on <strong>${fmt(payload.expiresAt)}</strong>.
+         Renew before then to keep everything running without interruption.`
+
+    const transport = await getGlobalTransporter()
+    await transport.sendMail({
+      from: globalFromAddress('RepairBooking'),
+      to: payload.to,
+      subject,
+      html: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f8f9fa;font-family:Arial,sans-serif;">
+        <div style="max-width:600px;margin:40px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+          <div style="background:${isGrace ? '#f59e0b' : '#008080'};padding:32px 40px;text-align:center;">
+            <h1 style="color:#fff;margin:0;font-size:24px;font-weight:800;">RepairBooking</h1>
+            <p style="color:rgba(255,255,255,0.9);margin:8px 0 0;font-size:14px;">${headline}</p>
+          </div>
+          <div style="padding:40px;">
+            <p style="color:#374151;font-size:16px;margin:0 0 8px;">Hi there,</p>
+            <p style="color:#6B7280;font-size:14px;line-height:1.6;margin:0 0 24px;">${body}</p>
+            <div style="text-align:center;margin-bottom:8px;">
+              <a href="${billingUrl}" style="display:inline-block;background:#008080;color:#fff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">${isGrace ? 'Pay now →' : 'Renew subscription →'}</a>
             </div>
           </div>
           <div style="background:#F9FAFB;border-top:1px solid #F3F4F6;padding:20px 40px;text-align:center;">

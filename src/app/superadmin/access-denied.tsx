@@ -8,7 +8,7 @@ interface AccessDeniedProps {
 
 export function AccessDenied({ email }: AccessDeniedProps) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+    <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
           <ShieldOff className="h-6 w-6 text-red-600" />
