@@ -11,6 +11,7 @@ import {
   RefreshCw, Globe, MapPin, Link2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { normalizeWebsiteUrl } from '@/lib/website-url'
 import { Input } from '@/components/ui/input'
 import { PhoneInput } from '@/components/ui/phone-input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -63,6 +64,11 @@ interface OnboardResult {
 
 // ── Steps config ──────────────────────────────────────────────────────────────
 
+interface VerticalTemplate {
+  id: string; name: string; slug: string; description: string | null
+  icon: string; modules_enabled: string[]
+}
+
 const STEPS = [
   { label: 'Business Info', icon: Building2 },
   { label: 'Account Setup', icon: User },
@@ -104,6 +110,11 @@ export default function OnboardBusinessPage() {
   const [step2Data, setStep2Data] = useState<Step2Data | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<DbPlan | null>(null)
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly')
+  // Business type (vertical template) — pre-configures modules, same as public signup
+  const [templates, setTemplates] = useState<VerticalTemplate[]>([])
+  const [templatesLoading, setTemplatesLoading] = useState(true)
+  const [selectedTemplate, setSelectedTemplate] = useState<VerticalTemplate | null>(null)
+  const [templateError, setTemplateError] = useState('')
   // Optional superadmin-granted free trial (off by default — business pays on first login)
   const [giveTrial, setGiveTrial] = useState(false)
   const [trialDays, setTrialDays] = useState('14')
@@ -130,6 +141,14 @@ export default function OnboardBusinessPage() {
   const form2 = useForm<Step2Data>({ resolver: zodResolver(step2Schema) })
 
   // Fetch plans when reaching step 3
+  useEffect(() => {
+    fetch('/api/vertical-templates/public')
+      .then(r => r.json())
+      .then(j => setTemplates(j.data ?? []))
+      .catch(() => {})
+      .finally(() => setTemplatesLoading(false))
+  }, [])
+
   useEffect(() => {
     if (step === 3 && plans.length === 0) {
       setPlansLoading(true)
@@ -179,6 +198,10 @@ export default function OnboardBusinessPage() {
   // ── Step handlers ─────────────────────────────────────────────────────────
 
   async function onStep1Submit(data: Step1Data) {
+    if (templates.length > 0 && !selectedTemplate) {
+      setTemplateError('Choose a business type')
+      return
+    }
     if (subdomainAvailable === false) {
       form1.setError('subdomain', { message: 'This subdomain is already taken' })
       return
@@ -209,7 +232,13 @@ export default function OnboardBusinessPage() {
         return
       }
     }
-    setStep1Data(data)
+    // Accept bare domains like "myshop.co.uk" — stored as https://myshop.co.uk
+    const website = noWebsite ? '' : normalizeWebsiteUrl(data.website)
+    if (website === null) {
+      form1.setError('website', { message: 'Enter a valid website, e.g. myshop.co.uk' })
+      return
+    }
+    setStep1Data({ ...data, website })
     setStep(2)
   }
 
@@ -231,6 +260,7 @@ export default function OnboardBusinessPage() {
           ...step2Data,
           planId: selectedPlan?.id,
           billingCycle: billing,
+          ...(selectedTemplate ? { verticalTemplateSlug: selectedTemplate.slug } : {}),
           trialDays: selectedPlan && giveTrial ? Math.max(0, Math.min(365, parseInt(trialDays, 10) || 0)) : 0,
         }),
       })
@@ -365,6 +395,37 @@ export default function OnboardBusinessPage() {
         <Card>
           <CardContent className="pt-6">
             <form onSubmit={form1.handleSubmit(onStep1Submit)} className="space-y-4">
+              {/* Business type */}
+              <div className="space-y-1">
+                <label htmlFor="business-type" className="text-sm font-medium text-gray-700">Business Type</label>
+                <select
+                  id="business-type"
+                  value={selectedTemplate?.slug ?? ''}
+                  disabled={templatesLoading || templates.length === 0}
+                  onChange={(e) => {
+                    setSelectedTemplate(templates.find(t => t.slug === e.target.value) ?? null)
+                    setTemplateError('')
+                  }}
+                  className={`h-10 w-full rounded-lg border bg-white px-3 text-sm text-gray-900 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 disabled:bg-gray-50 disabled:text-gray-400 ${templateError ? 'border-red-400' : 'border-gray-300'}`}
+                >
+                  <option value="" disabled>
+                    {templatesLoading ? 'Loading…' : templates.length === 0 ? 'Default (no types configured)' : 'Select a business type…'}
+                  </option>
+                  {templates.map(t => (
+                    <option key={t.slug} value={t.slug}>{t.name}</option>
+                  ))}
+                </select>
+                {templateError ? (
+                  <p className="text-xs text-red-600">{templateError}</p>
+                ) : selectedTemplate ? (
+                  <p className="text-xs text-gray-500">
+                    {selectedTemplate.description ? `${selectedTemplate.description} · ` : ''}{selectedTemplate.modules_enabled.length} modules pre-configured
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-400">Pre-configures the modules this business starts with. Can be changed later.</p>
+                )}
+              </div>
+
               {/* Business name */}
               <div className="space-y-1">
                 <label className="text-sm font-medium text-gray-700">Business Name</label>
@@ -444,8 +505,10 @@ export default function OnboardBusinessPage() {
                 <div className="relative">
                   <Globe className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                   <input
-                    type="url"
-                    placeholder="https://yourwebsite.com"
+                    type="text"
+                    inputMode="url"
+                    autoComplete="url"
+                    placeholder="yourwebsite.co.uk"
                     disabled={noWebsite}
                     className={`w-full rounded-lg border px-3 py-2 pl-9 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/40 ${noWebsite ? 'cursor-not-allowed bg-gray-50 text-gray-400' : 'border-gray-200'}`}
                     {...form1.register('website')}
@@ -463,6 +526,9 @@ export default function OnboardBusinessPage() {
                   />
                   Don&apos;t have a website
                 </label>
+                {form1.formState.errors.website && (
+                  <p className="text-xs text-red-600">{form1.formState.errors.website.message}</p>
+                )}
               </div>
 
               {/* WhatsApp */}
@@ -790,6 +856,8 @@ export default function OnboardBusinessPage() {
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                   <span className="text-gray-500">Name</span>
                   <span className="font-medium text-gray-900">{step1Data.businessName}</span>
+                  <span className="text-gray-500">Business type</span>
+                  <span className="font-medium text-gray-900">{selectedTemplate?.name ?? 'Default'}</span>
                   <span className="text-gray-500">Subdomain</span>
                   <span className="font-medium text-gray-900">{step1Data.subdomain}.repairbooking.co.uk</span>
                   <span className="text-gray-500">Email</span>

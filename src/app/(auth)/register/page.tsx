@@ -18,6 +18,7 @@ import {
 
 import validations from '@/components/layout/number-validations.json'
 import { parseGoogleMapsLink } from '@/lib/maps-link'
+import { normalizeWebsiteUrl } from '@/lib/website-url'
 import {
   CustomPlanBanner,
   deriveCustomPlanBaseline,
@@ -312,6 +313,13 @@ export default function RegisterPage() {
       form1.setError('website', { message: 'Enter your website URL or tick "Don\'t have a website"' })
       return
     }
+    // Accept bare domains like "myshop.co.uk" — stored as https://myshop.co.uk
+    const website = noWebsite ? '' : normalizeWebsiteUrl(data.website)
+    if (website === null) {
+      form1.setError('website', { message: 'Enter a valid website, e.g. myshop.co.uk' })
+      return
+    }
+    data = { ...data, website }
 
     setStep1Data(data)
     await sendOtp(data.email)
@@ -728,8 +736,10 @@ export default function RegisterPage() {
                         <Globe className="h-4 w-4" />
                       </span>
                       <input
-                        type="url"
-                        placeholder="https://yourwebsite.com"
+                        type="text"
+                        inputMode="url"
+                        autoComplete="url"
+                        placeholder="yourwebsite.co.uk"
                         disabled={noWebsite}
                         className={`w-full rounded-lg border px-3 py-2 pl-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 ${noWebsite ? 'cursor-not-allowed bg-gray-50 text-gray-400' : ''} ${form1.formState.errors.website ? 'border-error' : 'border-gray-300'}`}
                         {...form1.register('website')}
