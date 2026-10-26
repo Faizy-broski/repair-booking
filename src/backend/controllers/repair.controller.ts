@@ -741,6 +741,13 @@ export const RepairController = {
       // Custom status names keep the business's own casing (e.g. "REFUNDED"),
       // so match case-insensitively like repair-financials.service does.
       if (data.status.toLowerCase().trim() === 'refunded') {
+        // Put the job's parts back into stock. Idempotent (returns only what's
+        // still out per stock_movements), so it runs on every refund save.
+        const { error: restoreError } = await adminSupabase.rpc('restore_repair_parts_on_refund' as any, {
+          p_repair_id: id,
+        })
+        if (restoreError) console.error('[RepairController.updateStatus] restore_repair_parts_on_refund failed:', restoreError)
+
         const branchId = ctx.auth.branchId ?? null
         const repair = await RepairService.getById(id, branchId)
         // Skip if already refunded — re-saving the status must not reverse
