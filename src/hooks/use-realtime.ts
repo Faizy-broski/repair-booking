@@ -40,6 +40,14 @@ export function useRealtime<T extends Record<string, unknown>>({
 }: UseRealtimeOptions<T>) {
   const channelRef = useRef<RealtimeChannel | null>(null)
 
+  // Keep callback refs always pointing to the latest version, so a caller's
+  // inline callbacks never tear down the channel (each resubscribe is a
+  // database write to realtime.subscription).
+  const handlersRef = useRef({ onInsert, onUpdate, onDelete })
+  useEffect(() => {
+    handlersRef.current = { onInsert, onUpdate, onDelete }
+  }, [onInsert, onUpdate, onDelete])
+
   const cleanup = useCallback(() => {
     if (channelRef.current) {
       const supabase = createClient()
@@ -67,7 +75,7 @@ export function useRealtime<T extends Record<string, unknown>>({
           table,
           filter,
         },
-        (payload) => onInsert?.(payload.new as T)
+        (payload) => handlersRef.current.onInsert?.(payload.new as T)
       )
       .on(
         'postgres_changes',
@@ -77,7 +85,7 @@ export function useRealtime<T extends Record<string, unknown>>({
           table,
           filter,
         },
-        (payload) => onUpdate?.(payload.new as T)
+        (payload) => handlersRef.current.onUpdate?.(payload.new as T)
       )
       .on(
         'postgres_changes',
@@ -87,14 +95,14 @@ export function useRealtime<T extends Record<string, unknown>>({
           table,
           filter,
         },
-        (payload) => onDelete?.({ old: payload.old as T })
+        (payload) => handlersRef.current.onDelete?.({ old: payload.old as T })
       )
       .subscribe()
 
     channelRef.current = channel
 
     return cleanup
-  }, [table, filterColumn, filterValue, onInsert, onUpdate, onDelete, cleanup])
+  }, [table, filterColumn, filterValue, cleanup])
 }
 
 /**
