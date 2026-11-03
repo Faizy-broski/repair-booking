@@ -1,10 +1,12 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
-import { Save, Store, ChevronRight, Star, ShieldCheck, Eye, EyeOff, Globe, MapPin, Link2, User } from 'lucide-react'
+import { Save, Store, ChevronRight, Star, ShieldCheck, Eye, EyeOff, Globe, MapPin, Link2, User, ShoppingCart } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Toggle } from '@/components/ui/toggle'
 import { useAuthStore } from '@/store/auth.store'
+import { useModuleConfigStore } from '@/store/module-config.store'
 import { useForm, Controller } from 'react-hook-form'
 import { Select } from '@/components/ui/select'
 import { CURRENCIES } from '@/lib/currencies'
@@ -43,9 +45,32 @@ function InfoRow({ label, value, capitalize }: { label: string; value: string; c
 }
 
 export default function GeneralSettingsPage() {
-  const { setCurrency, verticalTemplateSlug, profile, isOwner } = useAuthStore()
+  const { setCurrency, verticalTemplateSlug, profile, isOwner, activeBranch } = useAuthStore()
   const isRetailTemplate = verticalTemplateSlug === 'retail-store'
+  const isTyreShop = verticalTemplateSlug === 'mobile-tyre-fitting'
   const canEdit = isOwner()
+
+  const { configs, isModuleEnabled, invalidate: invalidateConfigs, fetchConfigs } = useModuleConfigStore()
+  const [savingPos, setSavingPos] = useState(false)
+
+  async function handlePosToggle(enabled: boolean) {
+    setSavingPos(true)
+    try {
+      const res = await fetch('/api/settings/modules/pos', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_enabled: enabled }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      invalidateConfigs()
+      if (activeBranch) await fetchConfigs(activeBranch.id)
+      toast.success(enabled ? 'POS switched on' : 'POS switched off')
+    } catch {
+      toast.error('Could not update POS. Please try again.')
+    } finally {
+      setSavingPos(false)
+    }
+  }
 
   const [savedBusiness, setSavedBusiness] = useState(false)
   const [subdomain, setSubdomain] = useState('')
@@ -141,6 +166,29 @@ export default function GeneralSettingsPage() {
 
   return (
     <div className="space-y-4">
+      {/* POS on/off — tyre template only. First on the page so it's seen without scrolling. */}
+      {isTyreShop && canEdit && configs !== null && (
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-primary/30 bg-primary/5 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <ShoppingCart className="h-4 w-4" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-on-surface">Point of Sale</p>
+              <p className="text-xs text-on-surface-variant">
+                Show POS, Sales and Customer Credit in the menu. Your existing sales are kept when this is off.
+              </p>
+            </div>
+          </div>
+          <Toggle
+            checked={isModuleEnabled('pos')}
+            onChange={handlePosToggle}
+            disabled={savingPos}
+            aria-label="Switch Point of Sale on or off"
+          />
+        </div>
+      )}
+
       <div className="rounded-xl border border-outline-variant bg-surface p-6">
         <h3 className="mb-4 font-semibold text-on-surface">Business Information</h3>
         <form onSubmit={businessForm.handleSubmit(onSaveBusiness)} className="space-y-4 max-w-lg">

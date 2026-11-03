@@ -181,13 +181,15 @@ export const InvoiceController = {
     }
   },
 
-  async getWhatsAppLink(_request: NextRequest, ctx: RequestContext, id: string) {
+  async getWhatsAppLink(request: NextRequest, ctx: RequestContext, id: string) {
     try {
+      // ?copy=1 → just the shareable PDF link (for "Copy link"), no phone needed
+      const copyOnly = request.nextUrl.searchParams.has('copy')
       const branchId = ctx.auth.branchId ?? null
       const invoice = await InvoiceService.getById(id, branchId)
       if (!invoice) return notFound('Invoice not found')
       const customerPhone = (invoice as any).customers?.phone as string | null
-      if (!customerPhone) return badRequest('This customer has no phone number on file.')
+      if (!copyOnly && !customerPhone) return badRequest('This customer has no phone number on file.')
 
       const cachePath = PdfCacheService.cachePath('invoices', id)
       const filename = `invoice-${(invoice as any).invoice_number}.pdf`
@@ -197,11 +199,12 @@ export const InvoiceController = {
         pdfUrl = await PdfCacheService.store(cachePath, buffer, filename, WHATSAPP_PDF_TTL_SECONDS)
       }
       if (!pdfUrl) return serverError('Failed to prepare invoice PDF for sending')
+      if (copyOnly) return ok({ link: await shortenUrl(pdfUrl, ctx.businessId, WHATSAPP_PDF_TTL_SECONDS) })
 
       const { data: business } = await adminSupabase.from('businesses').select('name, currency').eq('id', ctx.businessId).single()
 
       const link = buildWhatsAppInvoiceLink({
-        phone: customerPhone,
+        phone: customerPhone!,
         invoiceNumber: (invoice as any).invoice_number,
         total: (invoice as any).total ?? 0,
         currency: (business as any)?.currency ?? 'GBP',

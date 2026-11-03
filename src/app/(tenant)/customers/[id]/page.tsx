@@ -1067,10 +1067,11 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
       >
         <div className="space-y-3">
           <Input label="Registration Number *" placeholder="AB12 CDE" value={vehicleForm.registration_number} onChange={(e) => setVehicleForm((f) => ({ ...f, registration_number: e.target.value }))} />
-          <div className="grid grid-cols-2 gap-2">
-            <Input label="Make"  value={vehicleForm.make}  onChange={(e) => setVehicleForm((f) => ({ ...f, make: e.target.value }))} />
-            <Input label="Model" value={vehicleForm.model} onChange={(e) => setVehicleForm((f) => ({ ...f, model: e.target.value }))} />
-          </div>
+          <Input
+            label="Make & Model"
+            value={[vehicleForm.make, vehicleForm.model].filter(Boolean).join(' ')}
+            onChange={(e) => setVehicleForm((f) => ({ ...f, make: e.target.value, model: '' }))}
+          />
           <div className="grid grid-cols-2 gap-2">
             <Input label="Colour"    value={vehicleForm.colour}    onChange={(e) => setVehicleForm((f) => ({ ...f, colour: e.target.value }))} />
             <Input label="Tyre Size" placeholder="205/55R16" value={vehicleForm.tyre_size} onChange={(e) => setVehicleForm((f) => ({ ...f, tyre_size: e.target.value }))} />

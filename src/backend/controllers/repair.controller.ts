@@ -691,8 +691,15 @@ export const RepairController = {
   },
 
   async update(request: NextRequest, ctx: RequestContext, id: string) {
-    const { data, error } = await validateBody(request, updateSchema)
+    // Zod 4 applies .default() even under .partial(), so a PATCH of one field
+    // would also reset deposit_paid, custom_fields, lab_fee, discounts etc.
+    // Keep only the fields this request actually sent.
+    const sentKeys = new Set(Object.keys(await request.clone().json().catch(() => ({}))))
+    const { data: parsed, error } = await validateBody(request, updateSchema)
     if (error) return error
+    const data = Object.fromEntries(
+      Object.entries(parsed).filter(([key]) => sentKeys.has(key))
+    ) as typeof parsed
     const branchId = ctx.auth.branchId ?? undefined
     try {
       const { data: existing } = await adminSupabase
@@ -703,10 +710,10 @@ export const RepairController = {
 
       const priorDeposit = (existing as any)?.deposit_paid ?? 0
       const paymentDue = (data.deposit_paid ?? priorDeposit) - priorDeposit
-      const splitError = validatePaymentSplits(data.payment_splits, paymentDue)
+      const splitError = validatePaymentSplits(data.payment_splits ?? [], paymentDue)
       if (splitError) return badRequest(splitError)
 
-      const { parts, store_credit_applied, loyalty_points_applied, payment_splits, ...repairPayload } = data
+      const { parts, store_credit_applied, loyalty_points_applied, payment_splits = [], ...repairPayload } = data
       const repair = await RepairService.update(id, branchId, repairPayload)
 
       if (repair && payment_splits.length > 0) {
@@ -915,11 +922,13 @@ export const RepairController = {
     }
   },
 
-  async getWhatsAppLink(_request: NextRequest, ctx: RequestContext, id: string) {
+  async getWhatsAppLink(request: NextRequest, ctx: RequestContext, id: string) {
     try {
+      // ?copy=1 → just the shareable PDF link (for "Copy link"), no phone needed
+      const copyOnly = request.nextUrl.searchParams.has('copy')
       const data = await getRepairInvoiceData(id, ctx.auth.branchId ?? null, ctx.businessId)
       if (!data) return notFound('Repair not found')
-      if (!data.customerPhone) return badRequest('This customer has no phone number on file.')
+      if (!copyOnly && !data.customerPhone) return badRequest('This customer has no phone number on file.')
 
       const cachePath = PdfCacheService.cachePath('invoices', id)
       const filename = `invoice-${data.jobNumber}.pdf`
@@ -931,8 +940,9 @@ export const RepairController = {
       if (!pdfUrl) return serverError('Failed to prepare invoice PDF for sending')
 
       const shortUrl = await shortenUrl(pdfUrl, ctx.businessId, WHATSAPP_PDF_TTL_SECONDS)
+      if (copyOnly) return ok({ link: shortUrl })
       const link = buildWhatsAppInvoiceLink({
-        phone: data.customerPhone,
+        phone: data.customerPhone!,
         invoiceNumber: data.jobNumber,
         total: data.total,
         currency: data.currency,

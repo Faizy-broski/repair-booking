@@ -399,6 +399,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
                 <InfoRow label="Quantity" value={repair.tyre_quantity ? String(repair.tyre_quantity) : null} />
                 <InfoRow label="Quality" value={repair.tyre_quality} />
                 <InfoRow label="Location" value={repair.location_notes} />
+                {repair.custom_fields?.outsourced && <InfoRow label="Outsourced" value={repair.custom_fields?.outsourced_phone} />}
                 <InfoRow label="Dispatch Start" value={repair.scheduled_start ? formatDateTime(repair.scheduled_start) : null} />
                 <InfoRow label="Dispatch End" value={repair.scheduled_end ? formatDateTime(repair.scheduled_end) : null} />
                 <InfoRow label="Job" value={repair.issue} />
@@ -485,9 +486,9 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
               <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs">
                 <FlaskConical className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
                 <span className="text-amber-900">
-                  <span className="font-semibold">Lab / 3rd-Party Fee: {formatCurrency(repair.lab_fee)}</span>
+                  <span className="font-semibold">{isTyreShop ? 'Outsourced Cost' : 'Lab / 3rd-Party Fee'}: {formatCurrency(repair.lab_fee)}</span>
                   <br />
-                  Paid to an outsourced lab — deducted from business revenue/profit in reports, not part of the customer&apos;s balance above.
+                  Paid to an outsourced {isTyreShop ? 'job' : 'lab'} — deducted from business revenue/profit in reports, not part of the customer&apos;s balance above.
                 </span>
               </div>
             )}

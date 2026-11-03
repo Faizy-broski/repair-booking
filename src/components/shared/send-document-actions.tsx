@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { Mail } from 'lucide-react'
+import { Mail, Link2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 
@@ -26,6 +26,25 @@ export async function sendWhatsAppFromUrl(url: string): Promise<boolean> {
   return true
 }
 
+/** Copies the same short PDF link the WhatsApp message carries (GET ?copy=1). */
+export async function copyDocumentLinkFromUrl(url: string): Promise<boolean> {
+  const res = await fetch(`${url}${url.includes('?') ? '&' : '?'}copy=1`)
+  const json = await res.json().catch(() => ({}))
+  const link: string | undefined = json.data?.link
+  if (!res.ok || !link) {
+    toast.error(json.error?.message ?? 'Failed to prepare the link.')
+    return false
+  }
+  try {
+    await navigator.clipboard.writeText(link)
+    toast.success('Link copied.')
+  } catch {
+    // Clipboard can be refused (e.g. Safari after an await) — let them copy by hand
+    window.prompt('Copy this link:', link)
+  }
+  return true
+}
+
 /** Sends a document via email (POST) and toasts the outcome. */
 export async function sendEmailFromUrl(url: string, email?: string | null): Promise<boolean> {
   const res = await fetch(url, { method: 'POST' })
@@ -45,14 +64,19 @@ interface Props {
   email?: string | null
 }
 
-/** WhatsApp + Email buttons. Each only renders when the customer has that contact detail. */
+/** WhatsApp + Email buttons (each only when the customer has that contact detail), plus Copy link. */
 export function SendDocumentActions({ whatsappUrl, emailUrl, phone, email }: Props) {
   const [sendingWhatsApp, setSendingWhatsApp] = useState(false)
   const [sendingEmail, setSendingEmail] = useState(false)
+  const [copying, setCopying] = useState(false)
 
   async function wa() {
     setSendingWhatsApp(true)
     try { await sendWhatsAppFromUrl(whatsappUrl) } finally { setSendingWhatsApp(false) }
+  }
+  async function copy() {
+    setCopying(true)
+    try { await copyDocumentLinkFromUrl(whatsappUrl) } finally { setCopying(false) }
   }
   async function mail() {
     setSendingEmail(true)
@@ -67,6 +91,10 @@ export function SendDocumentActions({ whatsappUrl, emailUrl, phone, email }: Pro
           WhatsApp
         </Button>
       )}
+      <Button variant="outline" className="whitespace-nowrap shrink-0" loading={copying} onClick={copy}>
+        <Link2 className="h-4 w-4 mr-2" />
+        Copy link
+      </Button>
       {!!email && (
         <Button className="whitespace-nowrap shrink-0 bg-blue-600 text-white hover:bg-blue-700" loading={sendingEmail} onClick={mail}>
           <Mail className="h-4 w-4 mr-2" />

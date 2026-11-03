@@ -109,7 +109,20 @@ export async function updateBusinessModuleSettings(
     const { module } = await routeCtx.params
     if (!isValidModule(module)) return badRequest(`Invalid module: ${module}`)
 
-    const body = await request.json() as { settings_override: Record<string, unknown> }
+    const body = await request.json() as { settings_override?: Record<string, unknown>; is_enabled?: boolean }
+
+    // Owners can only switch POS on/off, and only on the tyre template.
+    // Every other module's is_enabled stays superadmin-only.
+    if (body.is_enabled !== undefined) {
+      if (typeof body.is_enabled !== 'boolean') return badRequest('is_enabled must be a boolean')
+      if (module !== 'pos') return forbidden('Only POS can be switched on or off here')
+      const slug = await ModuleConfigService.getBusinessVerticalSlug(ctx.businessId)
+      if (slug !== 'mobile-tyre-fitting') return forbidden('POS can only be switched off on the tyre template')
+
+      await ModuleConfigService.updateBusinessModuleAccess(ctx.businessId, module, { is_enabled: body.is_enabled })
+      return ok({ success: true })
+    }
+
     if (!body.settings_override || typeof body.settings_override !== 'object') {
       return badRequest('settings_override must be an object')
     }

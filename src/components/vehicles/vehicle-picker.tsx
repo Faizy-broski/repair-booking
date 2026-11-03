@@ -230,20 +230,14 @@ export function NewVehicleFields({ draft, setDraft }: { draft: VehicleValue; set
           onChange={(e) => setDraft((d) => ({ ...d, tyre_size: e.target.value }))}
         />
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <Input
-          label="Make"
-          placeholder="Ford"
-          value={draft.make ?? ''}
-          onChange={(e) => setDraft((d) => ({ ...d, make: e.target.value }))}
-        />
-        <Input
-          label="Model"
-          placeholder="Focus"
-          value={draft.model ?? ''}
-          onChange={(e) => setDraft((d) => ({ ...d, model: e.target.value }))}
-        />
-      </div>
+      {/* One field: the text is stored in `make`. Older vehicles with a separate
+          `model` show joined here and collapse into `make` once edited. */}
+      <Input
+        label="Make & Model"
+        placeholder="Ford Focus"
+        value={[draft.make, draft.model].filter(Boolean).join(' ')}
+        onChange={(e) => setDraft((d) => ({ ...d, make: e.target.value, model: '' }))}
+      />
     </>
   )
 }

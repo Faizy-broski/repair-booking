@@ -72,6 +72,9 @@ const EMPTY_JOB = {
   job_fee: '', estimated_cost: '', deposit_paid: '',
   due_date: '', customer_note: '', staff_note: '',
   status: '', assigned_to: '',
+  // Tyre jobs sent to an outside fitter. Phone lives in custom_fields; the cost
+  // uses lab_fee so it reduces profit the same way as a device-repair lab fee.
+  outsourced: false, outsourced_phone: '', lab_fee: '',
   // Mobile tyre-fitting vertical only — the actual tyre (size/brand/price) is
   // picked from inventory in Repair Parts below, not typed here.
   location_notes: '', scheduled_start: '', scheduled_end: '',
@@ -389,6 +392,7 @@ export default function RepairsPage() {
   const [showDiscount, setShowDiscount] = useState(false)
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleValue | null>(null)
   const [fitterConflict, setFitterConflict] = useState<{ id: string; job_number: string } | null>(null)
+  const [outsourcedPhoneError, setOutsourcedPhoneError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [step1Error, setStep1Error] = useState('')
   const [chargesError, setChargesError] = useState('')
@@ -468,10 +472,10 @@ export default function RepairsPage() {
   // Edit Job Sheet modal
   const [editOpen, setEditOpen] = useState(false)
   const [editRepair, setEditRepair] = useState<RepairRow | null>(null)
-  const [editData, setEditData] = useState({ due_date: '', estimated_cost: '', deposit_paid: '', payment_methods: [] as ('cash' | 'card' | 'store_credit' | 'loyalty_points')[], payment_amounts: { cash: '', card: '' }, status: '', credit_apply_input: '', loyalty_apply_input: '', discount_type: 'fixed' as 'fixed' | 'percent', discount_value: '', lab_fee: '' })
+  const [editData, setEditData] = useState({ due_date: '', estimated_cost: '', deposit_paid: '', payment_methods: [] as ('cash' | 'card' | 'store_credit' | 'loyalty_points')[], payment_amounts: { cash: '', card: '' }, status: '', credit_apply_input: '', loyalty_apply_input: '', discount_type: 'fixed' as 'fixed' | 'percent', discount_value: '', lab_fee: '', outsourced: false, outsourced_phone: '' })
   const [editPaymentSplitError, setEditPaymentSplitError] = useState('')
   const [editSaving, setEditSaving] = useState(false)
-  const [editErrors, setEditErrors] = useState<{ due_date?: string; estimated_cost?: string; deposit_paid?: string }>({})
+  const [editErrors, setEditErrors] = useState<{ due_date?: string; estimated_cost?: string; deposit_paid?: string; outsourced_phone?: string }>({})
   // Store credit / loyalty balances for the repair's customer (editing)
   const [editCreditBalance, setEditCreditBalance] = useState<number | null>(null)
   const [editLoyaltyBalance, setEditLoyaltyBalance] = useState<number | null>(null)
@@ -809,6 +813,8 @@ export default function RepairsPage() {
       discount_type: (rAny.discount_type as 'fixed' | 'percent') ?? 'fixed',
       discount_value: rAny.discount_value != null ? String(rAny.discount_value) : '',
       lab_fee: rAny.lab_fee != null ? String(rAny.lab_fee) : '',
+      outsourced: !!cf.outsourced || Number(rAny.lab_fee) > 0,
+      outsourced_phone: cf.outsourced_phone ?? '',
     })
     setEditErrors({})
     setEditPaymentSplitError('')
@@ -818,7 +824,7 @@ export default function RepairsPage() {
   async function saveEdit() {
     if (!editRepair) return
     // Validate required fields
-    const errs: { due_date?: string; estimated_cost?: string; deposit_paid?: string } = {}
+    const errs: { due_date?: string; estimated_cost?: string; deposit_paid?: string; outsourced_phone?: string } = {}
     // Tyre jobs use scheduled_start/scheduled_end (dispatch slot) instead of a
     // generic due date, so it isn't collected/required for that vertical.
     if (!isTyreShop) {
@@ -831,6 +837,8 @@ export default function RepairsPage() {
     const depositVal = parseFloat(editData.deposit_paid)
     if (editData.deposit_paid.trim() === '' || isNaN(depositVal) || depositVal < 0)
       errs.deposit_paid = 'Deposit is required and must be a valid amount.'
+    if (isTyreShop && editData.outsourced && !editData.outsourced_phone.trim())
+      errs.outsourced_phone = 'Enter the phone number of who this job is outsourced to.'
     if (Object.keys(errs).length > 0) { setEditErrors(errs); return }
     setEditErrors({})
 
@@ -862,6 +870,7 @@ export default function RepairsPage() {
           custom_fields: {
             ...cf,
             due_date: editData.due_date || null,
+            ...(isTyreShop ? { outsourced: editData.outsourced || undefined, outsourced_phone: editData.outsourced_phone.trim() || null } : {}),
             payment_method: editData.payment_methods.length === 1 ? editData.payment_methods[0] : editData.payment_methods.length > 1 ? 'split' : (cf.payment_method ?? null),
           },
           store_credit_applied: editData.payment_methods.includes('store_credit') ? (parseFloat(editData.credit_apply_input) || 0) : undefined,
@@ -1301,6 +1310,12 @@ export default function RepairsPage() {
     }
     setChargesError('')
 
+    if (isTyreShop && jobData.outsourced && !jobData.outsourced_phone.trim()) {
+      setOutsourcedPhoneError('Enter the phone number of who this job is outsourced to.')
+      return
+    }
+    setOutsourcedPhoneError('')
+
     const depositVal = parseFloat(jobData.deposit_paid) || 0
     const splits = buildPaymentSplits(jobData.payment_methods, jobData.payment_amounts, jobData.credit_apply_input, jobData.loyalty_apply_input, loyaltyRate)
     if (splits.length > 0 && Math.abs(paymentSplitTotal(splits) - depositVal) >= 0.01) {
@@ -1402,6 +1417,7 @@ export default function RepairsPage() {
         discount_value: discountValueVal,
         discount_amount: discountAmount,
         assigned_to: assignedTo,
+        lab_fee: isTyreShop ? parseFloat(jobData.lab_fee) || 0 : undefined,
         status: jobData.status || undefined,
         lock_type: jobData.lock_type || null,
         passcode: jobData.passcode.trim() || null,
@@ -1413,6 +1429,7 @@ export default function RepairsPage() {
           due_date: jobData.due_date || null,
           customer_note: jobData.customer_note || null,
           staff_note: jobData.staff_note || null,
+          ...(isTyreShop && jobData.outsourced ? { outsourced: true, outsourced_phone: jobData.outsourced_phone.trim() } : {}),
           price_pending: jobData.price_pending || undefined,
           payment_method: jobData.payment_methods.length === 1 ? jobData.payment_methods[0] : jobData.payment_methods.length > 1 ? 'split' : null,
           ...(isRetail && Object.keys(itemAttributes).length > 0 ? { item_attributes: itemAttributes } : {}),
@@ -3299,7 +3316,18 @@ export default function RepairsPage() {
                   {isTyreShop && (
                     <>
                       <div>
-                        <label className={lbl}>Dispatch Start</label>
+                        <div className="flex items-baseline justify-between gap-2">
+                          <label className={lbl}>Dispatch Start <span className="font-normal text-outline">(optional)</span></label>
+                          {jobData.scheduled_start && (
+                            <button
+                              type="button"
+                              onClick={() => { setJobData((p) => ({ ...p, scheduled_start: '' })); setDispatchError('') }}
+                              className="mb-1 text-xs font-medium text-on-surface-variant hover:text-on-surface"
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
                         <input
                           type="datetime-local"
                           min={nowForDatetimeLocal()}
@@ -3317,7 +3345,18 @@ export default function RepairsPage() {
                         />
                       </div>
                       <div>
-                        <label className={lbl}>Dispatch End</label>
+                        <div className="flex items-baseline justify-between gap-2">
+                          <label className={lbl}>Dispatch End <span className="font-normal text-outline">(optional)</span></label>
+                          {jobData.scheduled_end && (
+                            <button
+                              type="button"
+                              onClick={() => { setJobData((p) => ({ ...p, scheduled_end: '' })); setDispatchError('') }}
+                              className="mb-1 text-xs font-medium text-on-surface-variant hover:text-on-surface"
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
                         <input
                           type="datetime-local"
                           min={jobData.scheduled_start || nowForDatetimeLocal()}
@@ -3340,19 +3379,15 @@ export default function RepairsPage() {
                       bottom-aligned with the inputs */}
                   {!pricePending && (
                     <div className="flex items-end">
-                      <label className="inline-flex h-9 cursor-pointer select-none items-center gap-2 text-xs font-medium text-on-surface-variant">
-                        <input
-                          type="checkbox"
-                          checked={showDiscount}
-                          onChange={(e) => {
-                            setShowDiscount(e.target.checked)
-                            // Unticking removes the discount, so a hidden value can never apply silently
-                            if (!e.target.checked) setJobData((p) => ({ ...p, discount_value: '' }))
-                          }}
-                          className="h-4 w-4 rounded accent-brand-teal"
-                        />
-                        Apply discount
-                      </label>
+                      <SwitchChip
+                        label="Apply discount"
+                        checked={showDiscount}
+                        onChange={(on) => {
+                          setShowDiscount(on)
+                          // Switching off removes the discount, so a hidden value can never apply silently
+                          if (!on) setJobData((p) => ({ ...p, discount_value: '' }))
+                        }}
+                      />
                     </div>
                   )}
                 </div>
@@ -3483,7 +3518,8 @@ export default function RepairsPage() {
 
                 {/* Assigned To — moved out of the narrow 6-col grid above so the
                     selected employee's full name/role isn't clipped. */}
-                <div className="mt-5 max-w-xs">
+                <div className="mt-5 flex flex-wrap items-start gap-4">
+                <div className="w-full max-w-xs">
                   <div className="mb-0.5 flex items-center justify-between">
                     <label className={`${lbl} !mb-0`}>{isTyreShop ? 'Fitter' : 'Assigned To'} <span className="font-normal normal-case text-outline-variant">(opt)</span></label>
                     {isTyreShop && (
@@ -3510,6 +3546,53 @@ export default function RepairsPage() {
                       controlRef={fitterPickerRef}
                     />
                   )}
+                </div>
+
+                {/* Outsourced — tyre jobs sent to an outside fitter */}
+                {isTyreShop && (
+                  <div className="min-w-[240px] flex-1">
+                    <SwitchChip
+                      label="Outsourced"
+                      className="mb-2"
+                      checked={jobData.outsourced}
+                      onChange={(on) => {
+                        setOutsourcedPhoneError('')
+                        setJobData((p) => ({ ...p, outsourced: on, ...(on ? {} : { outsourced_phone: '', lab_fee: '' }) }))
+                      }}
+                    />
+                    {jobData.outsourced && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className={lbl}>Phone <span className="text-red-500">*</span></label>
+                          <input
+                            type="tel"
+                            value={jobData.outsourced_phone}
+                            onChange={(e) => {
+                              setOutsourcedPhoneError('')
+                              setJobData((p) => ({ ...p, outsourced_phone: e.target.value }))
+                            }}
+                            placeholder="07123 456789"
+                            className={inp}
+                          />
+                        </div>
+                        <div>
+                          <label className={lbl}>Cost <span className="font-normal normal-case text-outline-variant">(opt)</span></label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={jobData.lab_fee}
+                            onChange={(e) => setJobData((p) => ({ ...p, lab_fee: e.target.value }))}
+                            placeholder="0.00"
+                            className={inp}
+                          />
+                        </div>
+                        <p className="col-span-2 text-xs text-outline">Reduces your profit in reports. Not added to the customer&apos;s bill.</p>
+                        {outsourcedPhoneError && <p className="col-span-2 text-xs text-red-500">{outsourcedPhoneError}</p>}
+                      </div>
+                    )}
+                  </div>
+                )}
                 </div>
               </div>
 
@@ -3745,6 +3828,52 @@ export default function RepairsPage() {
                 </div>
               )}
 
+              {/* Outsourced — tyre jobs sent to an outside fitter. The cost is the same
+                  lab_fee as above, so it reduces profit and is never billed. */}
+              {isTyreShop && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <SwitchChip
+                    label="Outsourced"
+                    checked={editData.outsourced}
+                    onChange={(on) => {
+                      setEditErrors((p) => ({ ...p, outsourced_phone: undefined }))
+                      setEditData((p) => ({ ...p, outsourced: on, ...(on ? {} : { outsourced_phone: '', lab_fee: '' }) }))
+                    }}
+                  />
+                  {editData.outsourced && (
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <div>
+                        <label className={lbl}>Phone <span className="text-red-500">*</span></label>
+                        <input
+                          type="tel"
+                          value={editData.outsourced_phone}
+                          onChange={(e) => {
+                            setEditErrors((p) => ({ ...p, outsourced_phone: undefined }))
+                            setEditData((p) => ({ ...p, outsourced_phone: e.target.value }))
+                          }}
+                          placeholder="07123 456789"
+                          className={`${inp} bg-surface`}
+                        />
+                      </div>
+                      <div>
+                        <label className={lbl}>Cost</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={editData.lab_fee}
+                          onChange={(e) => setEditData((p) => ({ ...p, lab_fee: e.target.value }))}
+                          placeholder="0.00"
+                          className={`${inp} bg-surface`}
+                        />
+                      </div>
+                      <p className="col-span-2 text-xs text-amber-700">Reduces your profit in reports. Not added to the customer&apos;s bill.</p>
+                      {editErrors.outsourced_phone && <p className="col-span-2 text-xs text-red-500">{editErrors.outsourced_phone}</p>}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Deposit */}
               <div>
                 <label className={lbl}>Deposit <span className="text-red-500">*</span></label>
@@ -3954,5 +4083,28 @@ export default function RepairsPage() {
       {/* Repair slip */}
       <RepairSlipModal repair={slipRepair as any} onClose={() => setSlipRepair(null)} />
     </div>
+  )
+}
+
+// On/off option shown as a pill with a switch — clearer than a bare checkbox
+// for options that reveal extra fields (discount, outsourced).
+function SwitchChip({ label, checked, onChange, className = '' }: { label: string; checked: boolean; onChange: (on: boolean) => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`inline-flex h-9 select-none items-center gap-2.5 rounded-lg border px-3 text-xs font-semibold transition-colors ${
+        checked
+          ? 'border-brand-teal bg-brand-teal/10 text-brand-teal'
+          : 'border-[var(--outline-variant)] bg-surface-container-lowest text-on-surface-variant hover:border-outline'
+      } ${className}`}
+    >
+      <span className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${checked ? 'bg-brand-teal' : 'bg-outline/40'}`}>
+        <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-all ${checked ? 'left-3.5' : 'left-0.5'}`} />
+      </span>
+      {label}
+    </button>
   )
 }

@@ -362,11 +362,13 @@ export const PosController = {
     }
   },
 
-  async getReceiptWhatsAppLink(_request: NextRequest, ctx: RequestContext, id: string, paymentId?: string) {
+  async getReceiptWhatsAppLink(request: NextRequest, ctx: RequestContext, id: string, paymentId?: string) {
     try {
       const prepared = await prepareSaleShare(id, ctx, paymentId)
       if ('error' in prepared) return prepared.error as NextResponse
       const { sale, number, pdfUrl, currency, businessName } = prepared
+      // ?copy=1 → just the shareable PDF link (for "Copy link"), no phone needed
+      if (request.nextUrl.searchParams.has('copy')) return ok({ link: pdfUrl })
       if (!sale.customers?.phone) return badRequest('This customer has no phone number on file.')
 
       const link = buildWhatsAppInvoiceLink({

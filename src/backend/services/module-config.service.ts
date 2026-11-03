@@ -198,6 +198,17 @@ export const ModuleConfigService = {
     await invalidateBusinessCache(businessId)
   },
 
+  /** The business's vertical template slug, e.g. 'mobile-tyre-fitting'. */
+  async getBusinessVerticalSlug(businessId: string): Promise<string | null> {
+    const { data, error } = await (adminSupabase as any)
+      .from('businesses')
+      .select('business_vertical_templates(slug)')
+      .eq('id', businessId)
+      .single()
+    if (error) throw error
+    return data?.business_vertical_templates?.slug ?? null
+  },
+
   // ── Template CRUD (superadmin) ─────────────────────────────────────────────
 
   async listTemplates(module?: ModuleName): Promise<ModuleConfigTemplate[]> {
