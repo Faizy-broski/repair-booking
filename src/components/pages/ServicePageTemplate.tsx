@@ -6,9 +6,12 @@ import FaqSection from "@/components/pages/FaqSection";
 import CtaSection from "@/components/pages/CtaSection";
 import RelatedLinks from "@/components/pages/RelatedLinks";
 import { FadeIn, Stagger, StaggerItem } from "@/components/landing/motion";
-import type { ServicePage } from "@/lib/footer-pages";
+import { ArticleContent } from "@/components/pages/ArticlePageTemplate";
+import { serviceArticlePages, type ServicePage } from "@/lib/footer-pages";
 
 export default function ServicePageTemplate({ page }: { page: ServicePage }) {
+  const article = serviceArticlePages.find((a) => a.cluster === page.cluster);
+
   return (
     <PageShell>
       <PageHero
@@ -91,6 +94,19 @@ export default function ServicePageTemplate({ page }: { page: ServicePage }) {
             </Stagger>
           </div>
         </section>
+      )}
+
+      {article && (
+        <>
+          <section className="bg-white px-4 pt-14 sm:px-6 sm:pt-20 lg:px-8">
+            <FadeIn className="mx-auto max-w-6xl">
+              <h2 className="max-w-3xl text-2xl font-medium tracking-[-0.02em] text-slate-950 sm:text-4xl">
+                {article.title}
+              </h2>
+            </FadeIn>
+          </section>
+          <ArticleContent page={article} includeLead />
+        </>
       )}
 
       <FaqSection heading={`${page.name} FAQs`} faqs={page.faqs} />
