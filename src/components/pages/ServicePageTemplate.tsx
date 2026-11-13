@@ -70,6 +70,29 @@ export default function ServicePageTemplate({ page }: { page: ServicePage }) {
         </div>
       </section>
 
+      {page.moreAbout && page.moreAbout.length > 0 && (
+        <section className="bg-white px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
+          <div className="mx-auto max-w-7xl">
+            <FadeIn className="mb-10 sm:mb-14">
+              <h2 className="max-w-2xl text-2xl font-medium tracking-[-0.02em] text-slate-950 sm:text-4xl">
+                More about {page.name.toLowerCase()}
+              </h2>
+            </FadeIn>
+
+            <Stagger className="grid gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
+              {page.moreAbout.map((item) => (
+                <StaggerItem key={item.title}>
+                  <div className="h-full rounded-[1.5rem] bg-slate-50/60 p-6">
+                    <h3 className="text-sm font-bold text-slate-950">{item.title}</h3>
+                    <p className="mt-1.5 text-sm leading-6 text-slate-600">{item.text}</p>
+                  </div>
+                </StaggerItem>
+              ))}
+            </Stagger>
+          </div>
+        </section>
+      )}
+
       <FaqSection heading={`${page.name} FAQs`} faqs={page.faqs} />
 
       <CtaSection

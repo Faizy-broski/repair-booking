@@ -56,6 +56,8 @@ export interface IndustryPage {
 /** Service cluster pages share the industry page shape, plus a cluster grouping for nav/listing. */
 export interface ServicePage extends IndustryPage {
   cluster: string;
+  /** Short keyword-focused blurbs shown in a "More about" section. */
+  moreAbout?: { title: string; text: string }[];
 }
 
 export interface ArticleSubsection {

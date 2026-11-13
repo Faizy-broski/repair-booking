@@ -29,10 +29,21 @@ export const servicePages: ServicePage[] = [
     kicker: "Service Software",
     tagline: "Every vehicle job, from check-in to handover, in one system.",
     description:
-      "Auto and vehicle repair shops juggle diagnostics, multi-stage labour, and parts sourcing on every job. iRepairly gives you vehicle-linked tickets, parts-aware workflows, and automatic customer updates built specifically for automotive repair.",
+      "Repair Booking is automotive repair software that will make your automotive repair business much simpler. It schedules bookings, streamlines jobs, and ensures customers' information is secure and well-organized. It provides you with a visual record of each job's status, rather than relying on paper or memory checks.",
     metaDescription:
-      "Auto and vehicle repair software — vehicle-linked job tickets, parts tracking, multi-stage repairs, and customer updates for repair shops.",
+      "Comparing auto repair software UK garages use? Explore key features, cloud vs installed options, and tips to find the right fit. Learn more.",
     keywords: ["auto repair software", "vehicle repair software", "automotive repair system"],
+    moreAbout: [
+      { title: "Auto Repair Software UK", text: "UK garages rely on Repair Booking to manage bookings, monitor jobs and maintain customer records. It provides a clear system instead of jumbled paper, showing what's wrong and when. Customers can reserve their car online, alleviating the need for phone calls." },
+      { title: "Vehicle Repair Software", text: "Repair Booking is vehicle repair software that helps you run your repair company efficiently. It combines bookings, job tracking and customer information into one easy solution. Where paper or spreadsheets were used, Repair Booking gives you a clear view of each repair job." },
+      { title: "Vehicle Repair Shop Software", text: "Repair Booking is vehicle repair shop software designed to make your day-to-day work easier. It lets you keep a record of bookings, follow repairs, and maintain all your customers' details in a single location. With Repair Booking you won't use paper notes but have a clear view of the status of all jobs." },
+      { title: "Auto Repair Shop Software", text: "Repair Booking is software designed specifically for auto repair shops to relieve the strain. It manages jobs, bookings and customer data within a single easy-to-use solution. No more missing papers or appointments." },
+      { title: "Auto Repair Shop Programs", text: "Repair Booking is considered one of the best programs for handling the day-to-day activities of an auto repair shop. It combines bookings, customer records and job tracking into one convenient system. Instead of paper or several tools, Repair Booking provides a solid overview of each repair job." },
+      { title: "Software Automotive Repair", text: "Repair Booking gives automotive repair companies a solution they can run their business on daily. It saves your staff time and reduces the calls you receive from people booking their cars in for repairs. Repair Booking also notifies and updates automatically, so the customer is always informed about the car's situation." },
+      { title: "Auto Repair Software", text: "Repair Booking is auto repair software that makes running a repair business easy and stress-free. It keeps a record of jobs, manages bookings and holds customer records in one place. With a clear snapshot of repair status, Repair Booking removes the need to consult paper or rely on memory." },
+      { title: "Auto Repair Computer Software", text: "Repair Booking is computer software designed for ease of auto repair. It integrates job tracking, bookings and customer records into a single streamlined solution. Forget paper files and forgotten information. With Repair Booking, customers can book repairs online, saving your staff time." },
+      { title: "Automotive Software", text: "Repair Booking is automotive software made to help garages and repair shops operate more smoothly. It is a convenient system that integrates bookings, jobs and customer information. No more lost paperwork or confusion over who's doing what on a job." },
+    ],
     painPoints: [
       { title: "Multi-stage repairs", desc: "A single job can span diagnosis, parts ordering, and several labour stages that are easy to lose track of." },
       { title: "Vehicle history spread thin", desc: "Repeat customers expect a full service history, but paper and spreadsheets scatter it." },
@@ -69,10 +80,13 @@ export const servicePages: ServicePage[] = [
     kicker: "Service Software",
     tagline: "Run the whole workshop floor from one screen.",
     description:
-      "Garages and workshops need more than a job list — they need bay scheduling, technician workload, and parts stock all working together. iRepairly connects the shop floor to the front desk so nothing gets lost between a quote and a completed job.",
+      "Repair Booking is a garage management system which performs everything in one solution. It can be used for scheduling appointments, monitoring vehicle maintenance, and more, making daily garage tasks easy. No lost paperwork, no missed calls – see which jobs are progressing, finished or waiting for customers.",
     metaDescription:
-      "Garage and workshop management software — bay scheduling, technician workload, parts stock, and job tracking in one platform.",
+      "Choosing a garage management system? Discover the core features, pricing factors, and setup tips to run your workshop more efficiently. Explore now.",
     keywords: ["garage management software", "workshop management system", "auto shop management"],
+    moreAbout: [
+      { title: "Workshop Management Software UK", text: "Repair Booking is workshop management software for UK repair businesses, organising customers, staff and jobs without chaos. No more multiple notebooks or apps \u2013 it's all in one convenient system. See the work done and what is still to be done." },
+    ],
     painPoints: [
       { title: "Bay & technician scheduling", desc: "Coordinating which vehicle is in which bay, and who's working on it, is hard to do from memory or a whiteboard." },
       { title: "Disconnected parts and jobs", desc: "Technicians often don't know if a part has arrived without walking over to ask." },
@@ -109,10 +123,13 @@ export const servicePages: ServicePage[] = [
     kicker: "Service Software",
     tagline: "Sales, servicing, and trade-ins under one roof.",
     description:
-      "Dealerships sell vehicles, service them, and take trade-ins, often all in the same building. iRepairly connects sales, workshop, and inventory so a vehicle's full lifecycle — from trade-in to resale to servicing — stays in one place.",
+      "Repair Booking (CDM software) is car dealership management software designed to organize and streamline your business. It integrates booking, customer information and job tracking in a single convenient platform. Elimination of lost paperwork or confused staffing.",
     metaDescription:
-      "Car dealership software — vehicle inventory, trade-ins, workshop servicing, and sales tracking in a single connected platform.",
+      "Looking for car dealership management software? See how it helps you track stock, manage sales, and cut daily paperwork. Explore Repair Booking today.",
     keywords: ["car dealership software", "dealership management system", "vehicle inventory software"],
+    moreAbout: [
+      { title: "Car Dealer Computer Software", text: "Repair Booking is car dealer computer software designed to help dealerships run their business easily. It manages bookings, customer information and vehicle service records in one system. With everything on a single platform, staff can locate information quickly instead of navigating spreadsheets or paper files." },
+    ],
     painPoints: [
       { title: "Disconnected sales and service", desc: "Sales teams and workshop staff often work from separate systems that don't talk to each other." },
       { title: "Trade-in tracking", desc: "Vehicles taken in trade need condition, valuation, and reconditioning tracked before resale." },
@@ -149,10 +166,15 @@ export const servicePages: ServicePage[] = [
     kicker: "Service Software",
     tagline: "High-volume device repairs, tracked from intake to pickup.",
     description:
-      "Mobile and general repair shops move fast — high ticket volume, quick turnaround, and constant parts reordering. iRepairly gives repair shops IMEI capture, rapid intake, and model-level stock tracking built for high-volume device work.",
+      "If you do repairs on mobile phones for a living, then you need Mobile Phone Repair Software like Repair Booking. It deals with all repairs, from the customer entering the door to taking the repaired phone home. Nothing gets overlooked with Repair Booking, which keeps track of parts, pricing and repair status.",
     metaDescription:
-      "Mobile and repair shop software — IMEI tracking, fast intake, model-level parts stock, and customer updates for device repair shops.",
+      "Find mobile phone repair software that streamlines bookings, tracks jobs, and saves time for busy repair shops. Explore Repair Booking today.",
     keywords: ["mobile repair shop software", "phone repair software", "repair shop management system"],
+    moreAbout: [
+      { title: "Repair Shop UK", text: "A repair shop in the UK can run more easily with Repair Booking. Whether you fix phones, laptops or gadgets, Repair Booking gives you one simple solution to oversee jobs, customers and payments. No more paper notes or spreadsheets \u2013 every repair is documented so nothing is lost." },
+      { title: "Repair Shop Software", text: "Repair Booking is repair shop software designed to ease the everyday tasks of a repair shop. It manages jobs, organises bookings and keeps customer records in one place, with no need to wrestle with paper forms or keep things in your head. Customers can schedule visits online, which reduces staff time and phone calls." },
+      { title: "Repair Management Software", text: "Repair Booking is repair management software that helps your business run smoother. It checks in every repair job from start to finish so nothing gets missed. Manage bookings, update customers and keep records in one place instead of juggling paperwork or losing jobs." },
+    ],
     painPoints: [
       { title: "High job volume", desc: "Dozens of device jobs a day make manual tracking error-prone and slow." },
       { title: "Fast-moving parts stock", desc: "Screens and batteries for popular models run out quickly without reorder alerts." },
@@ -189,7 +211,7 @@ export const servicePages: ServicePage[] = [
     kicker: "Service Software",
     tagline: "Take bookings, check out customers, get paid, all in one flow.",
     description:
-      "Getting a customer from booking to checkout should take seconds, not phone tag and manual invoices. iRepairly combines online booking, an in-store point of sale, and integrated payments so every job — booked or walk-in — closes cleanly.",
+      "With Repair Booking, online appointment booking is easy for you and your customers. Repair or service appointments can be made at a time convenient for them, including after hours, and your staff always know what is happening. Repair Booking also includes simple POS software: process payments, print receipts and view sales all from a single place.",
     metaDescription:
       "Booking and point of sale software for repair and service businesses — online booking, in-store POS, and integrated payments.",
     keywords: ["repair shop booking software", "repair shop POS", "service booking and payments"],
