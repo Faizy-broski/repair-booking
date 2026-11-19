@@ -217,6 +217,9 @@ function IndustryCard({
       <img
         src={image}
         alt={title}
+        width={800}
+        height={300}
+        loading="lazy"
         className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
       />
 

@@ -100,6 +100,7 @@ export const resourcePages: ResourcePage[] = [
   },
   {
     slug: "changelog",
+    noindex: true,
     name: "Changelog",
     icon: History,
     kicker: "Product Updates",
@@ -132,6 +133,7 @@ export const resourcePages: ResourcePage[] = [
   },
   {
     slug: "status",
+    noindex: true,
     name: "Status",
     icon: Activity,
     kicker: "System Status",
@@ -240,6 +242,7 @@ export const resourcePages: ResourcePage[] = [
   },
   {
     slug: "help-centre",
+    noindex: true,
     name: "Help Centre",
     icon: HelpCircle,
     kicker: "Self-Service Help",
@@ -271,6 +274,7 @@ export const resourcePages: ResourcePage[] = [
   },
   {
     slug: "blog",
+    noindex: true,
     name: "Blog",
     icon: Newspaper,
     kicker: "Insights & Updates",
@@ -337,6 +341,7 @@ export const resourcePages: ResourcePage[] = [
   },
   {
     slug: "case-studies",
+    noindex: true,
     name: "Case Studies",
     icon: Award,
     kicker: "Customer Stories",
@@ -373,7 +378,7 @@ export const resourcePages: ResourcePage[] = [
     keywords: ["iRepairly FAQ", "frequently asked questions", "repair software questions"],
     sections: [
       {
-        heading: "Getting started",
+        heading: "Getting started FAQs",
         body: [
           "Most shops can be up and running within a day, with guided onboarding and support for importing existing data.",
         ],
@@ -393,6 +398,7 @@ export const resourcePages: ResourcePage[] = [
   },
   {
     slug: "development-roadmap",
+    noindex: true,
     name: "Development Roadmap",
     icon: Map,
     kicker: "What's Next",

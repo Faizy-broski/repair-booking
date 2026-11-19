@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { buildTitle, fullTitle } from "@/lib/seo";
 import { notFound } from "next/navigation";
 import IndustryPageTemplate from "@/components/pages/IndustryPageTemplate";
 import { industryPages, getIndustryPage } from "@/lib/footer-pages";
@@ -16,13 +17,15 @@ export async function generateMetadata({
   const page = getIndustryPage(slug);
   if (!page) return {};
 
+  const title = buildTitle(`${page.name} Software`, [" – POS & Repair Management", " – Repair Management"]);
+
   return {
-    title: `${page.name} Software | iRepairly`,
+    title,
     description: page.metaDescription,
     keywords: page.keywords,
     alternates: { canonical: `/industries/${page.slug}` },
     openGraph: {
-      title: `${page.name} Software | iRepairly`,
+      title: fullTitle(title),
       description: page.metaDescription,
       type: "website",
     },

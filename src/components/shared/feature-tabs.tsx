@@ -191,6 +191,7 @@ export function FeatureTabs() {
           </ul>
           <Link
             href="/register"
+            rel="nofollow"
             className={cn('inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-white transition-colors shadow-sm', colors.btnBg, colors.btnHover)}
           >
             Get Started

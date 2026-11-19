@@ -43,7 +43,7 @@ export default function IndustryPageTemplate({ page }: { page: IndustryPage }) {
         </div>
       </section>
 
-      <BenefitsGrid heading="How iRepairly helps" benefits={page.howWeHelp} />
+      <BenefitsGrid heading={`How RepairBooking helps ${page.name.toLowerCase()} shops`} benefits={page.howWeHelp} />
 
       {/* Workflow */}
       <section className="bg-slate-50/60 px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
@@ -77,7 +77,7 @@ export default function IndustryPageTemplate({ page }: { page: IndustryPage }) {
         scriptWord="smarter."
       />
 
-      <RelatedLinks heading="Related industries & tools" links={page.related} />
+      <RelatedLinks heading={`More tools for ${page.name.toLowerCase()} shops`} links={page.related} />
     </PageShell>
   );
 }

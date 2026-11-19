@@ -92,6 +92,8 @@ export interface ContentSection {
 }
 
 export interface CompanyPage {
+  /** Keep out of search results while the page only holds placeholder content. */
+  noindex?: boolean;
   slug: string;
   name: string;
   icon: LucideIcon;
@@ -117,6 +119,8 @@ export interface LegalPage {
 }
 
 export interface ResourcePage {
+  /** Keep out of search results while the page only holds placeholder content. */
+  noindex?: boolean;
   slug: string;
   name: string;
   icon: LucideIcon;

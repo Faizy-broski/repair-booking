@@ -47,7 +47,7 @@ export default function LegalPageTemplate({ page }: { page: LegalPage }) {
         </div>
       </section>
 
-      <RelatedLinks heading="Other legal documents" links={page.related} />
+      <RelatedLinks heading={`Other legal documents besides ${page.name}`} links={page.related} />
     </PageShell>
   );
 }

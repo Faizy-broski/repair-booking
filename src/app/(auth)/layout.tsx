@@ -3,7 +3,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 
 export const metadata: Metadata = {
-  title: 'RepairBooking — Sign In',
+  title: { absolute: 'RepairBooking — Sign In' },
   robots: { index: false, follow: false },
 }
 

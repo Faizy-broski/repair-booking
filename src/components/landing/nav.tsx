@@ -30,6 +30,8 @@ export default function Nav() {
             <img
               src="/images/logo.svg"
               alt="iRepairly"
+              width={230}
+              height={70}
               className="h-8 w-auto sm:h-11"
             />
           </Link>
@@ -105,6 +107,7 @@ export default function Nav() {
           <div className="flex items-center gap-2 my-2 sm:gap-5">
             <Link
               href="/login"
+              rel="nofollow"
               className="hidden md:inline-flex items-center text-[15px] font-bold text-slate-800 hover:text-primary transition-colors"
             >
               Login
@@ -112,6 +115,7 @@ export default function Nav() {
 
             <Link
               href="/register"
+              rel="nofollow"
               className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,_#008080_0%,_#008080_37%,_#18E3CD_100%)] px-4 py-3 text-xs font-bold text-white shadow-sm transition-transform hover:scale-[1.02] sm:px-7 sm:py-4 sm:text-sm"
             >
               <Sparkles className="h-4 w-4" />
@@ -234,6 +238,7 @@ export default function Nav() {
             <div className="mt-auto border-t border-white/10 px-4 py-5 flex flex-col gap-3">
               <Link
                 href="/login"
+                rel="nofollow"
                 className="inline-flex items-center justify-center rounded-xl border border-white/40 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/10 transition-colors"
                 onClick={() => setMobileNavOpen(false)}
               >
@@ -241,6 +246,7 @@ export default function Nav() {
               </Link>
               <Link
                 href="/register"
+                rel="nofollow"
                 className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-brand-teal transition-colors shadow-sm"
                 onClick={() => setMobileNavOpen(false)}
               >

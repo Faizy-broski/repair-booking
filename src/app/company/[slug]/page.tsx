@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { buildTitle, fullTitle } from "@/lib/seo";
 import { notFound, redirect } from "next/navigation";
 import CompanyPageTemplate from "@/components/pages/CompanyPageTemplate";
 import LegalPageTemplate from "@/components/pages/LegalPageTemplate";
@@ -16,13 +17,15 @@ export async function generateMetadata({
   const { slug } = await params;
   const company = getCompanyPage(slug);
   if (company) {
+    const title = buildTitle(company.name, [" – About RepairBooking", " – Repair Shop Software"]);
     return {
-      title: `${company.name} | iRepairly`,
+      title,
       description: company.metaDescription,
       keywords: company.keywords,
       alternates: { canonical: `/company/${company.slug}` },
+      ...(company.noindex ? { robots: { index: false, follow: true } } : {}),
       openGraph: {
-        title: `${company.name} | iRepairly`,
+        title: fullTitle(title),
         description: company.metaDescription,
         type: "website",
       },
@@ -31,12 +34,13 @@ export async function generateMetadata({
 
   const legal = getLegalPage(slug);
   if (legal) {
+    const title = buildTitle(legal.name, [" – RepairBooking Legal", " – RepairBooking Legal Policies"]);
     return {
-      title: `${legal.name} | iRepairly`,
+      title,
       description: legal.metaDescription,
       alternates: { canonical: `/company/${legal.slug}` },
       openGraph: {
-        title: `${legal.name} | iRepairly`,
+        title: fullTitle(title),
         description: legal.metaDescription,
         type: "website",
       },

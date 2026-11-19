@@ -62,14 +62,7 @@ export default function Footer() {
         <div className="mt-14 flex flex-col items-center justify-between gap-5 border-t border-slate-200 py-9 text-xs text-slate-500 sm:mt-24 sm:flex-row">
           <p>
             © {new Date().getFullYear()}{" "}
-            <a
-              href="https://thesocialnexus.co.uk/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-slate-800 transition-colors"
-            >
-            <strong>The Social Nexus Ltd.</strong>
-            </a>{" "}
+            <strong>The Social Nexus Ltd.</strong>{" "}
             All rights reserved.
           </p>
        

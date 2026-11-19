@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { industryPages } from "@/lib/footer-pages";
 
 export const metadata: Metadata = {
-  title: "All Industries | iRepairly",
+  title: "Software for Every Repair Industry",
   description:
     "iRepairly powers repair businesses across electronics, vehicles, sporting goods, and specialist trades. Explore every industry we support.",
   keywords: ["repair software industries", "repair business types", "industries supported"],
@@ -28,6 +28,19 @@ export default function AllIndustriesPage() {
 
       <section className="bg-white px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
         <div className="mx-auto max-w-7xl">
+          <div className="mx-auto mb-10 max-w-3xl text-center sm:mb-14">
+            <h2 className="text-2xl font-medium tracking-[-0.02em] text-slate-950 sm:text-4xl">
+              Repair software for every trade
+            </h2>
+            <p className="mt-4 text-base leading-7 text-slate-600 sm:text-lg sm:leading-8">
+              iRepairly is not only for phone repair. Each industry page shows how the platform fits a different trade,
+              including {industryPages.slice(0, -1).map((i) => i.name.toLowerCase()).join(", ")} and{" "}
+              {industryPages[industryPages.length - 1].name.toLowerCase()}. Whatever you repair, the same core tools
+              apply: custom intake fields for each item, ticket stages that match your workflow, stock tracking for
+              parts, and automatic updates so customers always know where their repair stands. Pick your trade below
+              to see the common problems it faces and how a typical job moves from check-in to collection.
+            </p>
+          </div>
           <Stagger className="grid gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4">
             {industryPages.map((industry) => (
               <StaggerItem key={industry.slug}>
@@ -50,7 +63,7 @@ export default function AllIndustriesPage() {
         </div>
       </section>
 
-      <CtaSection />
+      <CtaSection heading="Try it in your industry." scriptWord="industry." />
     </PageShell>
   );
 }

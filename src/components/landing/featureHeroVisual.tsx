@@ -8,12 +8,10 @@ export default function FeatureHeroVisual() {
       className="relative mx-auto h-[280px] w-full max-w-7xl overflow-hidden bg-white sm:h-[420px] md:h-[560px] lg:h-[700px]"
     >
       {/* radial lines svg */}
-      <Image
-        src="/images/radiallines.svg"
-        alt=""
-        fill
-        priority
-        className="pointer-events-none select-none object-cover"
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 select-none bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/images/radiallines.svg')" }}
       />
 
       {/* main dashboard */}
@@ -31,7 +29,7 @@ export default function FeatureHeroVisual() {
       {/* sms card */}
       <Image
         src="/images/smscard.svg"
-        alt=""
+        alt="SMS notification sent to a customer"
         width={235}
         height={76}
         className="absolute left-[6%] top-[60px] z-20 hidden w-[150px] md:block lg:left-[13%] lg:top-[70px] lg:w-[235px]"
@@ -40,7 +38,7 @@ export default function FeatureHeroVisual() {
       {/* revenue KPI */}
       <Image
         src="/images/revenuecard.svg"
-        alt=""
+        alt="Revenue summary card"
         width={260}
         height={180}
         className="absolute right-[6%] top-[0px] z-20 hidden w-[170px] md:block lg:right-[10%] lg:w-[260px]"
@@ -49,7 +47,7 @@ export default function FeatureHeroVisual() {
       {/* queue card */}
       <Image
         src="/images/queuecard.svg"
-        alt=""
+        alt="Repair queue card"
         width={260}
         height={230}
         className="absolute bottom-[25px] left-[4%] z-20 hidden w-[170px] md:block lg:bottom-[35px] lg:left-[8%] lg:w-[260px]"
@@ -58,7 +56,7 @@ export default function FeatureHeroVisual() {
       {/* pixel battery chip */}
       <Image
         src="/images/batterychip.svg"
-        alt=""
+        alt="Battery repair job card"
         width={250}
         height={90}
         className="absolute bottom-[35px] right-[4%] z-20 hidden w-[160px] md:block lg:bottom-[50px] lg:right-[8%] lg:w-[250px]"

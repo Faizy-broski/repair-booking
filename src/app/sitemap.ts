@@ -22,6 +22,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${BASE_URL}/features`, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${BASE_URL}/industries`, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${BASE_URL}/services`, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${BASE_URL}/contact`, changeFrequency: 'monthly', priority: 0.6 },
+    { url: `${BASE_URL}/demo`, changeFrequency: 'monthly', priority: 0.6 },
   ]
 
   const dynamicRoutes: MetadataRoute.Sitemap = [
@@ -50,7 +52,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly' as const,
       priority: 0.6,
     })),
-    ...companyPages.map((p) => ({
+    ...companyPages.filter((p) => !p.noindex).map((p) => ({
       url: `${BASE_URL}/company/${p.slug}`,
       changeFrequency: 'monthly' as const,
       priority: 0.5,
@@ -60,7 +62,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'yearly' as const,
       priority: 0.3,
     })),
-    ...resourcePages.map((p) => ({
+    ...resourcePages.filter((p) => !p.noindex).map((p) => ({
       url: `${BASE_URL}/resources/${p.slug}`,
       changeFrequency: 'weekly' as const,
       priority: 0.6,

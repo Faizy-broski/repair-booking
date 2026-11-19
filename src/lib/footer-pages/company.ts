@@ -7,7 +7,7 @@ export const companyPages: CompanyPage[] = [
     name: "About",
     icon: Building2,
     kicker: "Our Story",
-    tagline: "The operating system for repair businesses that take their craft seriously.",
+    tagline: "The operating system for repair shops that take their craft seriously.",
     description:
       "iRepairly was built to give repair businesses the same operational polish that modern retail and hospitality brands take for granted — without forcing them into software that wasn't designed for repair work.",
     metaDescription:
@@ -48,7 +48,7 @@ export const companyPages: CompanyPage[] = [
     kicker: "Who We Serve",
     tagline: "Repair businesses of every size and trade, worldwide.",
     description:
-      "From single-counter mobile phone repair shops to multi-branch electronics and vehicle service groups, repair businesses choose iRepairly to run their day-to-day operations.",
+      "From single-counter phone repair shops to multi-branch electronics and vehicle service groups, repair businesses use iRepairly to run their day.",
     metaDescription:
       "See the kinds of repair businesses that run on iRepairly, from independent shops to multi-branch groups.",
     keywords: ["iRepairly customers", "repair shop case studies", "who uses iRepairly"],
@@ -56,25 +56,28 @@ export const companyPages: CompanyPage[] = [
       {
         heading: "Independent shops",
         body: [
-          "Single-location repair shops use iRepairly to replace spreadsheets and paper tickets with a connected system covering intake, POS, and inventory — often going live within a day.",
+          "Single-location repair shops use iRepairly to replace spreadsheets and paper tickets with one connected system for intake, POS and stock. Many go live within a day.",
         ],
       },
       {
         heading: "Multi-branch groups",
         body: [
-          "Growing repair businesses with several locations rely on iRepairly's multi-branch tools to standardise workflows, centralise reporting, and give owners visibility across every site without extra admin overhead.",
+          "Growing repair businesses with several locations use iRepairly's multi-branch tools. Every site shares the same workflows and reports in one place, and owners can see all of them without extra admin.",
         ],
       },
       {
         heading: "Specialist trades",
         body: [
-          "Beyond electronics, iRepairly supports specialist trades including jewellery and watch repair, instrument restoration, sporting goods servicing, and clothing alterations — each with fields and workflows tuned to the trade.",
+          "Beyond electronics, iRepairly supports jewellery and watch repair, instrument restoration, sporting goods servicing and clothing alterations. Each trade gets fields and workflows to suit it.",
         ],
       },
     ],
     faqs: [
       { question: "What size of business is iRepairly built for?", answer: "iRepairly scales from a single independent counter to multi-branch groups with dozens of staff." },
       { question: "Are there case studies available?", answer: "Yes, see our Case Studies page for detailed examples of shops using the platform." },
+      { question: "Where are your customers based?", answer: "Repair businesses in many countries use iRepairly, across many different trades, from one-counter shops to multi-branch groups." },
+      { question: "Is iRepairly only for electronics repair?", answer: "No. It also supports jewellery and watch repair, instruments, sporting goods and clothing alterations." },
+      { question: "Can a small shop start with one branch and grow?", answer: "Yes. Start with a single counter and add more branches later without changing systems." },
     ],
     related: [
       { label: "Case Studies", href: "/resources/case-studies" },
@@ -84,6 +87,7 @@ export const companyPages: CompanyPage[] = [
   },
   {
     slug: "careers",
+    noindex: true,
     name: "Careers",
     icon: Briefcase,
     kicker: "Join Us",
@@ -120,6 +124,7 @@ export const companyPages: CompanyPage[] = [
   },
   {
     slug: "press",
+    noindex: true,
     name: "Press",
     icon: Newspaper,
     kicker: "Media & News",

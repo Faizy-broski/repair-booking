@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { buildTitle, fullTitle } from "@/lib/seo";
 import { notFound } from "next/navigation";
 import ServicePageTemplate from "@/components/pages/ServicePageTemplate";
 import ArticlePageTemplate from "@/components/pages/ArticlePageTemplate";
@@ -22,13 +23,14 @@ export async function generateMetadata({
 
   const page = getServicePage(slug);
   if (page) {
+    const title = buildTitle(page.name, [" – Repair Management", " – POS & Repair Management"]);
     return {
-      title: `${page.name} | iRepairly`,
+      title,
       description: page.metaDescription,
       keywords: page.keywords,
       alternates: { canonical: `/services/${page.slug}` },
       openGraph: {
-        title: `${page.name} | iRepairly`,
+        title: fullTitle(title),
         description: page.metaDescription,
         type: "website",
       },
@@ -38,7 +40,7 @@ export async function generateMetadata({
   const article = getServiceArticlePage(slug);
   if (article) {
     return {
-      title: article.seoTitle,
+      title: { absolute: article.seoTitle },
       description: article.metaDescription,
       keywords: article.keywords,
       alternates: { canonical: `/services/${article.slug}` },

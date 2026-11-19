@@ -19,13 +19,13 @@ export default function ProductPageTemplate({ page }: { page: CapabilityPage }) 
 
       <BenefitsGrid heading={`Why shops use ${page.name}`} benefits={page.benefits} />
 
-      <UseCasesSection heading="Where it fits into your day" items={page.useCases} />
+      <UseCasesSection heading={`Where ${page.name} fits into your day`} items={page.useCases} />
 
-      <FaqSection faqs={page.faqs} />
+      <FaqSection heading={`${page.name} FAQs`} faqs={page.faqs} />
 
-      <CtaSection />
+      <CtaSection heading={`Try ${page.name} free.`} scriptWord="free." />
 
-      <RelatedLinks heading="Explore related products" links={page.related} />
+      <RelatedLinks heading={`Products related to ${page.name}`} links={page.related} />
     </PageShell>
   );
 }

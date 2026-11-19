@@ -7,7 +7,7 @@ import { FadeIn } from "@/components/landing/motion";
 import { LeadForm } from "@/components/marketing/lead-form";
 
 export const metadata: Metadata = {
-  title: "Contact Us | iRepairly",
+  title: "Contact Our Repair Shop Software Team",
   description: "Contact the iRepairly team for sales, support, press, or partnership enquiries.",
   keywords: ["contact iRepairly", "repair software support", "sales enquiries"],
   alternates: { canonical: "/contact" },
@@ -15,15 +15,15 @@ export const metadata: Metadata = {
 
 const SECTIONS = [
   {
-    heading: "Sales enquiries",
+    heading: "Talk to our sales team",
     body: "Interested in iRepairly for your shop? Get started from the homepage, book a 20-minute demo, or send us a message and a member of our team will get back to you.",
   },
   {
-    heading: "Existing customers",
+    heading: "Support for existing customers",
     body: "Already using iRepairly? Visit our Help Centre or Support pages for the fastest way to get an answer, or reach your account contact directly.",
   },
   {
-    heading: "Press & partnerships",
+    heading: "Press and partnership enquiries",
     body: "For press enquiries or partnership discussions, send us a message below and our team will route it appropriately.",
   },
 ];
@@ -76,6 +76,7 @@ export default function ContactPage() {
       </section>
 
       <RelatedLinks
+        heading="More ways to get help"
         links={[
           { label: "Support", href: "/resources/support" },
           { label: "Help Centre", href: "/resources/help-centre" },

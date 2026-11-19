@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { buildTitle, fullTitle } from "@/lib/seo";
 import { notFound } from "next/navigation";
 import FeaturePageTemplate from "@/components/pages/FeaturePageTemplate";
 import { featurePages, getFeaturePage } from "@/lib/footer-pages";
@@ -16,13 +17,15 @@ export async function generateMetadata({
   const page = getFeaturePage(slug);
   if (!page) return {};
 
+  const title = buildTitle(page.name, [" for Repair Shops", " Software for Repair Shops", " Feature for Repair Shop Software"]);
+
   return {
-    title: `${page.name} | iRepairly Features`,
+    title,
     description: page.metaDescription,
     keywords: page.keywords,
     alternates: { canonical: `/features/${page.slug}` },
     openGraph: {
-      title: `${page.name} | iRepairly Features`,
+      title: fullTitle(title),
       description: page.metaDescription,
       type: "website",
     },

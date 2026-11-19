@@ -6,7 +6,7 @@ import { FadeIn } from "@/components/landing/motion";
 import { LeadForm } from "@/components/marketing/lead-form";
 
 export const metadata: Metadata = {
-  title: "Book a Demo | iRepairly",
+  title: "Book a Free Repair Shop Software Demo",
   description: "Book a 20-minute demo with the iRepairly team and see the platform walked through live.",
   alternates: { canonical: "/demo" },
 };

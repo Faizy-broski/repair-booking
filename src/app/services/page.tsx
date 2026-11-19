@@ -9,9 +9,9 @@ import { Card } from "@/components/ui/card";
 import { servicePages } from "@/lib/footer-pages";
 
 export const metadata: Metadata = {
-  title: "All Services | iRepairly",
+  title: "Repair, Garage & Dealership Software Services",
   description:
-    "iRepairly powers auto repair, garage and workshop management, dealerships, mobile repair shops, and booking & POS workflows. Explore every service we support.",
+    "iRepairly powers auto repair, garage and workshop management, dealerships, mobile repair shops and booking & POS. Explore every service.",
   keywords: ["repair software services", "repair shop solutions", "services supported"],
   alternates: { canonical: "/services" },
 };
@@ -28,6 +28,7 @@ export default function AllServicesPage() {
 
       <section className="bg-white px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
         <div className="mx-auto max-w-7xl">
+          <h2 className="sr-only">All services</h2>
           <Stagger className="grid gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
             {servicePages.map((service) => (
               <StaggerItem key={service.slug}>
@@ -54,7 +55,7 @@ export default function AllServicesPage() {
         </div>
       </section>
 
-      <CtaSection />
+      <CtaSection heading="Try it for your service." scriptWord="service." />
     </PageShell>
   );
 }

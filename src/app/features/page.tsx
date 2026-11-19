@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { featurePages } from "@/lib/footer-pages";
 
 export const metadata: Metadata = {
-  title: "All Features | iRepairly",
+  title: "All Features – Repair Shop POS & Management",
   description:
     "Explore every iRepairly feature — from job management and CRM to invoicing, automation, and multi-branch reporting.",
   keywords: ["iRepairly features", "repair shop software features", "all features"],
@@ -28,6 +28,7 @@ export default function AllFeaturesPage() {
 
       <section className="bg-white px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
         <div className="mx-auto max-w-7xl">
+          <h2 className="sr-only">All features</h2>
           <Stagger className="grid gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
             {featurePages.map((feature) => (
               <StaggerItem key={feature.slug}>
@@ -51,7 +52,7 @@ export default function AllFeaturesPage() {
         </div>
       </section>
 
-      <CtaSection />
+      <CtaSection heading="Try every feature free." scriptWord="free." />
     </PageShell>
   );
 }

@@ -32,7 +32,7 @@ export const productPages: CapabilityPage[] = [
     description:
       "iRepairly's ticketing system gives your shop a single, organised view of every repair in progress. Log intake details in seconds, assign jobs to technicians, and keep customers updated automatically as status changes — so nothing falls through the cracks and nobody has to chase you for an update.",
     metaDescription:
-      "Manage every repair job with iRepairly's ticketing system — intake, status tracking, technician assignment, and automated customer updates in one place.",
+      "Manage every repair job with iRepairly's ticketing system: intake, status tracking, technician assignment and automated customer updates.",
     keywords: ["repair tickets", "job tracking software", "repair ticketing system", "repair shop workflow"],
     benefits: [
       { icon: Clock, title: "Faster intake", desc: "Capture device details, faults, and photos in under a minute with guided intake forms." },

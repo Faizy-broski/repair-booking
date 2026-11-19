@@ -46,14 +46,14 @@ export default function ServicePageTemplate({ page }: { page: ServicePage }) {
         </div>
       </section>
 
-      <BenefitsGrid heading="How iRepairly helps" benefits={page.howWeHelp} />
+      <BenefitsGrid heading={`How RepairBooking helps with ${page.name.toLowerCase()}`} benefits={page.howWeHelp} />
 
       {/* Workflow */}
       <section className="bg-slate-50/60 px-4 py-14 sm:px-6 sm:py-20 lg:px-8">
         <div className="mx-auto max-w-5xl">
           <FadeIn className="mb-10 text-center sm:mb-14">
             <h2 className="text-2xl font-medium tracking-[-0.02em] text-slate-950 sm:text-4xl">
-              A typical workflow
+              A typical {page.name.toLowerCase()} workflow
             </h2>
           </FadeIn>
 
@@ -98,9 +98,12 @@ export default function ServicePageTemplate({ page }: { page: ServicePage }) {
 
       {article && (
         <>
-          <section className="bg-white px-4 pt-14 sm:px-6 sm:pt-20 lg:px-8">
+          <section className="bg-white px-4 pb-8 pt-16 sm:px-6 sm:pb-10 sm:pt-24 lg:px-8">
             <FadeIn className="mx-auto max-w-6xl">
-              <h2 className="max-w-3xl text-2xl font-medium tracking-[-0.02em] text-slate-950 sm:text-4xl">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-brand-teal">
+                {article.kicker}
+              </p>
+              <h2 className="mt-3 max-w-3xl text-3xl font-medium tracking-[-0.03em] text-slate-950 sm:text-5xl sm:leading-[1.1]">
                 {article.title}
               </h2>
             </FadeIn>
@@ -112,11 +115,11 @@ export default function ServicePageTemplate({ page }: { page: ServicePage }) {
       <FaqSection heading={`${page.name} FAQs`} faqs={page.faqs} />
 
       <CtaSection
-        heading={`Run your business smarter.`}
-        scriptWord="smarter."
+        heading={`Try ${page.name} free.`}
+        scriptWord="free."
       />
 
-      <RelatedLinks heading="Related services & tools" links={page.related} />
+      <RelatedLinks heading={`Services related to ${page.name}`} links={page.related} />
     </PageShell>
   );
 }

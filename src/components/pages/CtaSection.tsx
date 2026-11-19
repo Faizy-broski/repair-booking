@@ -41,6 +41,7 @@ export default function CtaSection({
             <div className="flex flex-col items-stretch gap-4 sm:items-start sm:gap-7 lg:items-end lg:justify-end">
               <Link
                 href="/register"
+                rel="nofollow"
                 className="inline-flex w-full items-center justify-center rounded-full bg-white px-7 py-4 text-sm font-medium text-slate-950 shadow-none transition-colors hover:bg-white/90 sm:w-auto sm:py-5 sm:text-md"
               >
                 Get started

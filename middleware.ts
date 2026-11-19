@@ -514,6 +514,10 @@ async function handleRequest(request: NextRequest) {
   return supabaseResponse
 }
 
+// WordPress folders/files, plus the old shop-style /items/, /cate-N and /shop/ URLs.
+const LEGACY_GONE_PATTERN =
+  /^\/(wp-[^/]+|xmlrpc\.php|items|shop|cate-[^/]*|elementor[^/]*|litespeed[^/]*)(\/|$)/i
+
 // Public customer-facing tenant pages that a shop may want Google to index.
 const INDEXABLE_SUBDOMAIN_PATHS = ['/book/', '/s/']
 
@@ -535,6 +539,25 @@ export async function middleware(request: NextRequest) {
       status: 200,
       headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' },
     })
+  }
+
+  // ── Legacy URLs from a previous WordPress/shop site on this domain ────────
+  // Answer 410 Gone (cheaper and faster for Google to drop than 404) before any
+  // auth/DB work. Root domain only; none of these patterns exist in this app.
+  if (!subdomain) {
+    if (pathname === '/terms' || pathname === '/terms/') {
+      return NextResponse.redirect(new URL('/company/website-terms-and-conditions', request.url), 301)
+    }
+    if (LEGACY_GONE_PATTERN.test(pathname)) {
+      return new NextResponse('Gone', {
+        status: 410,
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Cache-Control': 'public, max-age=86400',
+          'X-Robots-Tag': 'noindex',
+        },
+      })
+    }
   }
 
   const response = await handleRequest(request)

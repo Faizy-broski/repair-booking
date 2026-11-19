@@ -39,6 +39,7 @@ export default function Hero() {
         >
           <Link
             href="/register"
+            rel="nofollow"
             className="inline-flex w-full items-center justify-center gap-3 rounded-full bg-[linear-gradient(90deg,_#008080_0%,_#008080_37%,_#18E3CD_100%)] px-8 py-4 text-base font-bold text-white shadow-sm transition-transform hover:scale-[1.02] sm:w-auto"
           >
             Get Started

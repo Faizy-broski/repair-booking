@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { buildTitle, fullTitle } from "@/lib/seo";
 import { notFound } from "next/navigation";
 import ResourcePageTemplate from "@/components/pages/ResourcePageTemplate";
 import { resourcePages, getResourcePage } from "@/lib/footer-pages";
@@ -16,13 +17,16 @@ export async function generateMetadata({
   const page = getResourcePage(slug);
   if (!page) return {};
 
+  const title = buildTitle(page.name, [" – RepairBooking Resources", " – Repair Shop Software Resources", " – Resources"]);
+
   return {
-    title: `${page.name} | iRepairly`,
+    title,
     description: page.metaDescription,
     keywords: page.keywords,
     alternates: { canonical: `/resources/${page.slug}` },
+    ...(page.noindex ? { robots: { index: false, follow: true } } : {}),
     openGraph: {
-      title: `${page.name} | iRepairly`,
+      title: fullTitle(title),
       description: page.metaDescription,
       type: "website",
     },

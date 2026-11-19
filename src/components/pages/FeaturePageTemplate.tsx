@@ -17,19 +17,19 @@ export default function FeaturePageTemplate({ page }: { page: CapabilityPage }) 
         description={page.description}
       />
 
-      <BenefitsGrid heading="Main benefits" benefits={page.benefits} />
+      <BenefitsGrid heading={`${page.name} benefits`} benefits={page.benefits} />
 
-      <UseCasesSection heading="Common use cases" items={page.useCases} />
+      <UseCasesSection heading={`${page.name} use cases`} items={page.useCases} />
 
-      <FaqSection faqs={page.faqs} />
+      <FaqSection heading={`${page.name} FAQs`} faqs={page.faqs} />
 
       <CtaSection
-        heading="Try it in your shop."
-        scriptWord="shop."
+        heading={`Try ${page.name} free.`}
+        scriptWord="free."
         description="Every feature is included in every plan — no upsells, no surprises."
       />
 
-      <RelatedLinks heading="Related features" links={page.related} />
+      <RelatedLinks heading={`Features related to ${page.name}`} links={page.related} />
     </PageShell>
   );
 }

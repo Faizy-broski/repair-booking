@@ -11,10 +11,17 @@ const spaceGrotesk = Space_Grotesk({
   display: "swap",
 });
 
+const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || "repairbooking.co.uk";
+
 export const metadata: Metadata = {
-  title: "RepairBooking POS & Repair Management for Modern Shops",
+  // Makes every relative canonical / OG URL resolve to an absolute URL.
+  metadataBase: new URL(`https://${ROOT_DOMAIN}`),
+  title: {
+    default: "RepairBooking POS & Repair Management for Modern Shops",
+    template: "%s | RepairBooking",
+  },
   description:
-    "All-in-one cloud POS and repair booking platform for repair shops, electronics stores, and multi-branch retail. Manage repairs, inventory, staff, invoices and more.",
+    "Cloud POS and repair booking platform for repair shops, electronics stores and multi-branch retail. Manage repairs, inventory, staff and invoices.",
   keywords: "repair shop software, POS system, repair booking, inventory management, multi-branch POS",
   openGraph: {
     title: "RepairBooking POS & Repair Management",

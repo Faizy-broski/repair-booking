@@ -37,11 +37,11 @@ export default function ResourcePageTemplate({ page }: { page: ResourcePage }) {
         </div>
       </section>
 
-      {page.faqs && <FaqSection faqs={page.faqs} />}
+      {page.faqs && <FaqSection heading={`${page.name} FAQs`} faqs={page.faqs} />}
 
-      <CtaSection />
+      <CtaSection heading={`${page.name}: start your trial.`} scriptWord="trial." />
 
-      <RelatedLinks links={page.related} />
+      <RelatedLinks heading={`More like ${page.name}`} links={page.related} />
     </PageShell>
   );
 }
