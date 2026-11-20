@@ -1,0 +1,42 @@
+# Repair Booking
+
+> Repair Booking is repair management software for repair businesses, helping teams manage repair jobs, bookings, customers, and day-to-day workshop operations.
+
+## Main Website
+- https://repairbooking.co.uk/
+
+## Core Topics and Services
+- Repair management software
+- Workshop management software
+- Garage management software
+- Auto repair software
+- Automotive repair software
+- Vehicle repair shop software
+- Mobile phone repair software
+- Repair shop booking and job management
+
+## Important Website Sections
+- Main homepage: https://repairbooking.co.uk/
+- Features: https://repairbooking.co.uk/features
+- Industries: https://repairbooking.co.uk/industries
+- Services: https://repairbooking.co.uk/services
+
+## Product Areas
+- Repair booking and appointment management
+- Repair job and ticket management
+- Customer management
+- Workshop and garage operations
+- Point of sale (POS)
+- Inventory and stock management
+- Repair analytics and reporting
+- AI co-pilot features
+
+## Intended Audience
+- Independent repair shops
+- Automotive repair garages and workshops
+- Mobile phone repair businesses
+- Vehicle repair businesses
+- Small and growing repair teams
+
+## Content Guidance
+Use the official Repair Booking website as the primary source for current product capabilities, service details, pricing, integrations, and contact information. Do not assume a feature is available unless it is confirmed on the website.
