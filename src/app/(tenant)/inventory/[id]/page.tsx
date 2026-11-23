@@ -928,7 +928,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                         </td>
                         <td className="px-3 py-2.5">
                           {product?.valuation_method === 'fifo' ? (() => {
-                            const nextCost = (costLayers ?? []).filter(l => l.variant_id === row.id)[0]?.unit_cost
+                            const nextCost = (costLayers ?? []).filter(l => l.variant_id === row.id && l.quantity > 0)[0]?.unit_cost
                             return <span className="text-xs text-on-surface-variant">{nextCost != null ? formatCurrency(nextCost) : '—'}</span>
                           })() : (
                             <input type="number" min="0" step="0.01" value={row.costPrice} onChange={e => updateExistingVariant(row.id, 'costPrice', e.target.value)} placeholder="0.00" className="w-24 rounded-md border border-outline px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:border-brand-teal" />
@@ -1133,7 +1133,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                     <Input
                       label={`Cost Price (${currSymbol})`}
                       type="number"
-                      value={(costLayers ?? []).filter(l => l.variant_id === null)[0]?.unit_cost ?? ''}
+                      value={(costLayers ?? []).filter(l => l.variant_id === null && l.quantity > 0)[0]?.unit_cost ?? ''}
                       disabled
                       hint={(costLayers ?? []).some(l => l.variant_id === null) ? 'Cost of the next batch to sell.' : 'Set per batch below.'}
                     />

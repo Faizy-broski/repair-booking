@@ -98,16 +98,27 @@ export const ProductService = {
     const { data, error } = await q
     if (error) throw error
 
-    const map = new Map<string, { totalValue: number; totalQty: number; nextUnitCost: number }>()
+    // Layers are ordered oldest-first. The "next to sell" cost is the first layer that
+    // still has stock — depleted (quantity 0) layers must be skipped, otherwise an old
+    // empty batch with cost 0 hides the real cost of the batch being sold.
+    const map = new Map<string, { totalValue: number; totalQty: number; nextUnitCost: number; hasStock: boolean }>()
     for (const layer of (data ?? []) as any[]) {
       const key = `${layer.product_id}::${layer.variant_id ?? 'null'}`
       const value = layer.quantity * layer.unit_cost
+      const inStock = layer.quantity > 0
       const existing = map.get(key)
       if (existing) {
         existing.totalValue += value
         existing.totalQty += layer.quantity
+        if (inStock && !existing.hasStock) {
+          existing.nextUnitCost = layer.unit_cost
+          existing.hasStock = true
+        } else if (!existing.hasStock) {
+          // Everything so far is depleted: fall back to the most recent batch's cost.
+          existing.nextUnitCost = layer.unit_cost
+        }
       } else {
-        map.set(key, { totalValue: value, totalQty: layer.quantity, nextUnitCost: layer.unit_cost })
+        map.set(key, { totalValue: value, totalQty: layer.quantity, nextUnitCost: layer.unit_cost, hasStock: inStock })
       }
     }
     return map
