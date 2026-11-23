@@ -20,6 +20,7 @@ interface SupplierReturnRow {
   po_id: string | null
   suppliers?: { name: string } | null
   purchase_orders?: { po_number: string } | null
+  supplier_return_items?: { name: string | null; sku: string | null }[] | null
 }
 
 const STATUS_VARIANT: Record<string, 'default' | 'warning' | 'success' | 'destructive'> = {
@@ -32,6 +33,7 @@ export default function DamageReturnsPage() {
   const { activeBranch } = useAuthStore()
   const router = useRouter()
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_FILTERS)[number]>('all')
+  const [search, setSearch] = useState('')
 
   const { data: returns = [], isLoading } = useQuery<SupplierReturnRow[]>({
     queryKey: ['supplier-returns', activeBranch?.id, statusFilter],
@@ -45,6 +47,18 @@ export default function DamageReturnsPage() {
     enabled: !!activeBranch,
     staleTime: 30_000,
   })
+
+  const term = search.trim().toLowerCase()
+  const visibleReturns = term
+    ? returns.filter((r) =>
+        [
+          r.return_number,
+          r.suppliers?.name,
+          r.purchase_orders?.po_number,
+          ...(r.supplier_return_items ?? []).flatMap((i) => [i.name, i.sku]),
+        ].some((v) => v?.toLowerCase().includes(term))
+      )
+    : returns
 
   const columns: ColumnDef<SupplierReturnRow>[] = [
     { id: 'return_number', header: 'Return #', cell: ({ row }) => (
@@ -88,6 +102,14 @@ export default function DamageReturnsPage() {
         </Button>
       </div>
 
+      <input
+        type="search"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search by product, SKU, return #, supplier or PO…"
+        className="h-9 w-full max-w-md rounded-lg border border-outline px-3 text-sm"
+      />
+
       <div className="flex gap-2">
         {STATUS_FILTERS.map((s) => (
           <button
@@ -103,7 +125,7 @@ export default function DamageReturnsPage() {
       </div>
 
       <DataTable
-        data={returns}
+        data={visibleReturns}
         columns={columns}
         isLoading={isLoading}
         emptyMessage="No damage returns found."

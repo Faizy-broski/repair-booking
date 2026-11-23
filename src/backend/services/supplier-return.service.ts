@@ -19,7 +19,7 @@ export const SupplierReturnService = {
   async list(businessId: string, branchId: string, params: { status?: string; supplierId?: string; poId?: string; page?: number; limit?: number }) {
     const { page = 1, limit = 20, status, supplierId, poId } = params
     let q = db('supplier_returns')
-      .select('*, suppliers(name), purchase_orders(po_number)', { count: 'exact' })
+      .select('*, suppliers(name), purchase_orders(po_number), supplier_return_items(name, sku)', { count: 'exact' })
       .eq('business_id', businessId)
       .eq('branch_id', branchId)
       .order('created_at', { ascending: false })
