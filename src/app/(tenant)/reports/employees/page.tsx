@@ -1,24 +1,32 @@
 'use client'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Download, ArrowLeft } from 'lucide-react'
+import { Download, Banknote, Percent } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
+import { PageHeader } from '@/components/shared/page-header'
+import { MetricCard } from '@/components/shared/ui-kit'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency } from '@/lib/utils'
 import { exportExcel } from '@/lib/export-excel'
 import { DateRangeBar } from '../_components/date-range-bar'
-import Link from 'next/link'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
-import { chartAxisTick, chartGridStroke, chartTooltipStyle, chartLegendStyle } from '@/lib/chart-theme'
+import { chartAxisTick, chartLegendStyle } from '@/lib/chart-theme'
 import type { ColumnDef } from '@tanstack/react-table'
 
 interface EmployeeRow {
   employee_id: string; employee_name: string
   repairs_completed: number; repair_revenue: number
   sales_count: number; sales_revenue: number; commission_total: number
+}
+
+// Tooltip chrome shared with the dashboard: 12px rounded hairline border.
+const TOOLTIP_PROPS = {
+  contentStyle: { background: 'var(--surface-container-lowest)', border: '1px solid var(--hairline)', borderRadius: 12 },
+  itemStyle: { color: 'var(--on-surface)' },
+  labelStyle: { color: 'var(--on-surface-variant)' },
 }
 
 function firstOfMonth() { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] }
@@ -53,49 +61,37 @@ export default function EmployeesReportPage() {
   ]
 
   return (
-    <div className="p-6 space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/reports">
-            <button className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container transition-colors">
-              <ArrowLeft className="h-5 w-5" strokeWidth={3} />
-            </button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-on-surface">Employees Report</h1>
-            <p className="text-sm text-on-surface-variant mt-0.5">Staff productivity and commission for the period</p>
-          </div>
-        </div>
-        <Button size="sm" className="w-full sm:w-auto" onClick={() => exportExcel(data as unknown as Record<string, unknown>[], `employees-${dateFrom}-${dateTo}.xlsx`)}>
-          <Download className="h-4 w-4" /> Export Excel
-        </Button>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="Employees Report"
+        description="Staff productivity and commission for the period"
+        back={{ href: '/reports', label: 'Back to Reports' }}
+        actions={
+          <Button size="sm" className="w-full sm:w-auto" onClick={() => exportExcel(data as unknown as Record<string, unknown>[], `employees-${dateFrom}-${dateTo}.xlsx`)}>
+            <Download className="h-4 w-4" /> Export Excel
+          </Button>
+        }
+      />
 
       <DateRangeBar dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} onApply={refetch} />
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-xl border border-outline-variant bg-surface p-4">
-          <p className="text-sm text-on-surface-variant">Total Revenue Generated</p>
-          <p className="mt-1 text-2xl font-bold text-green-600 sm:text-3xl">{formatCurrency(totalRevenue)}</p>
-        </div>
-        <div className="rounded-xl border border-outline-variant bg-surface p-4">
-          <p className="text-sm text-on-surface-variant">Total Commission</p>
-          <p className="mt-1 text-2xl font-bold text-on-surface sm:text-3xl">{formatCurrency(totalCommission)}</p>
-        </div>
+      <div className="grid grid-cols-2 gap-4">
+        <MetricCard label="Total Revenue Generated" value={formatCurrency(totalRevenue)} icon={Banknote} tone="bg-emerald-500/10 text-emerald-600" />
+        <MetricCard label="Total Commission" value={formatCurrency(totalCommission)} icon={Percent} tone="bg-primary/10 text-primary" />
       </div>
 
       {data.length > 0 && (
-        <div className="rounded-xl border border-outline-variant bg-surface p-4">
-          <h3 className="mb-3 text-base font-semibold text-on-surface">Revenue by Employee</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
-              <XAxis dataKey="employee_name" tick={chartAxisTick} />
-              <YAxis tick={chartAxisTick} tickFormatter={(v) => `£${v}`} />
-              <Tooltip formatter={(v: unknown) => formatCurrency(v as number)} {...chartTooltipStyle} />
-              <Legend wrapperStyle={chartLegendStyle} />
-              <Bar dataKey="sales_revenue"  name="Sales"   fill="var(--primary)" stackId="a" />
-              <Bar dataKey="repair_revenue" name="Repairs" fill="var(--tertiary)" stackId="a" />
+        <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
+          <h3 className="mb-4 text-base font-semibold text-on-surface">Revenue by Employee</h3>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid vertical={false} stroke="var(--hairline)" />
+              <XAxis dataKey="employee_name" axisLine={false} tickLine={false} tick={chartAxisTick} />
+              <YAxis axisLine={false} tickLine={false} width={56} tick={chartAxisTick} tickFormatter={(v) => `£${v}`} />
+              <Tooltip cursor={{ fill: 'var(--surface-container-low)' }} formatter={(v: unknown) => formatCurrency(v as number)} {...TOOLTIP_PROPS} />
+              <Legend wrapperStyle={chartLegendStyle} iconType="circle" />
+              <Bar dataKey="sales_revenue"  name="Sales"   fill="var(--primary)" stackId="a" maxBarSize={64} />
+              <Bar dataKey="repair_revenue" name="Repairs" fill="var(--navy)" stackId="a" radius={[6, 6, 0, 0]} maxBarSize={64} />
             </BarChart>
           </ResponsiveContainer>
         </div>

@@ -107,7 +107,7 @@ export function QuickCreateModal({ open, onClose, barcode, branchId, onCreated, 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {/* Prefill source badge */}
         {prefill?.name && (
-          <div className="flex items-center gap-2 rounded-lg bg-teal-50 border border-teal-200 px-3 py-2">
+          <div className="flex items-center gap-2 rounded-xl bg-teal-50 border border-teal-200 px-3 py-2">
             <span className="text-xs font-medium text-teal-700">
               ✓ Details auto-filled from QR code{prefill.brand ? ` · ${prefill.brand}` : ''}
             </span>
@@ -122,18 +122,18 @@ export function QuickCreateModal({ open, onClose, barcode, branchId, onCreated, 
           <input
             {...register('barcode')}
             readOnly
-            className="w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-sm font-mono text-on-surface-variant cursor-default"
+            className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2 text-sm font-mono text-on-surface-variant cursor-default"
           />
         </div>
 
         {/* Item type toggle */}
         <div>
           <label className="mb-1.5 block text-xs font-medium text-on-surface-variant">Item Type</label>
-          <div className="flex overflow-hidden rounded-lg border border-outline-variant">
+          <div className="flex overflow-hidden rounded-xl border border-outline-variant">
             {(['product', 'part'] as const).map((type) => (
               <label
                 key={type}
-                className="flex flex-1 cursor-pointer items-center justify-center py-2 text-sm font-medium transition-colors has-[:checked]:bg-brand-teal has-[:checked]:text-white text-on-surface-variant hover:bg-surface-container-low"
+                className="flex flex-1 cursor-pointer items-center justify-center py-2 text-sm font-medium transition-colors has-[:checked]:bg-primary has-[:checked]:text-white text-on-surface-variant hover:bg-surface-container-low"
               >
                 <input type="radio" value={type} {...register('item_type')} className="sr-only" />
                 {type === 'product' ? 'Product' : 'Part'}
@@ -151,7 +151,7 @@ export function QuickCreateModal({ open, onClose, barcode, branchId, onCreated, 
             {...register('name')}
             autoFocus
             placeholder="e.g. iPhone 14 Screen"
-            className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
+            className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:border-primary focus:outline-none"
           />
           {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name.message}</p>}
         </div>
@@ -162,7 +162,7 @@ export function QuickCreateModal({ open, onClose, barcode, branchId, onCreated, 
           <input
             {...register('sku')}
             placeholder="Leave blank to assign later"
-            className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
+            className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:border-primary focus:outline-none"
           />
         </div>
 
@@ -180,7 +180,7 @@ export function QuickCreateModal({ open, onClose, barcode, branchId, onCreated, 
                 step="0.01"
                 min="0"
                 placeholder="0.00"
-                className="w-full rounded-lg border border-outline py-2 pl-7 pr-3 text-sm focus:border-brand-teal focus:outline-none"
+                className="w-full rounded-xl border border-outline-variant py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none"
               />
             </div>
             {errors.selling_price && <p className="mt-1 text-xs text-red-500">{errors.selling_price.message}</p>}
@@ -195,7 +195,7 @@ export function QuickCreateModal({ open, onClose, barcode, branchId, onCreated, 
                 step="0.01"
                 min="0"
                 placeholder="0.00"
-                className="w-full rounded-lg border border-outline py-2 pl-7 pr-3 text-sm focus:border-brand-teal focus:outline-none"
+                className="w-full rounded-xl border border-outline-variant py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none"
               />
             </div>
           </div>

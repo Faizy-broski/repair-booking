@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { Plus, Download, CreditCard, RotateCcw, Loader2, UserPlus, MoreVertical, Pencil, Trash2, MessageCircle, Mail } from 'lucide-react'
+import { Plus, Download, CreditCard, RotateCcw, Loader2, UserPlus, MoreVertical, Pencil, Trash2, MessageCircle, Mail, AlertCircle, Clock, CheckCircle2 } from 'lucide-react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,6 +17,8 @@ import { z } from 'zod'
 import type { ColumnDef } from '@tanstack/react-table'
 import { toast } from 'sonner'
 import { PhoneInput } from '@/components/ui/phone-input'
+import { PageHeader } from '@/components/shared/page-header'
+import { MetricCard } from '@/components/shared/ui-kit'
 
 interface LineItem { description: string; quantity: number; unit_price: number }
 
@@ -355,7 +357,7 @@ export default function InvoicesPage() {
         <button
           type="button"
           onClick={() => downloadPdf(row.original.id)}
-          className="cursor-pointer font-mono font-medium text-blue-600 hover:underline hover:text-blue-800 whitespace-nowrap transition-colors"
+          className="cursor-pointer font-mono font-medium text-primary hover:underline whitespace-nowrap transition-colors"
         >
           {getValue() as string}
         </button>
@@ -383,11 +385,11 @@ export default function InvoicesPage() {
           <select
             value={inv.status}
             onChange={e => changeStatus(inv.id, e.target.value)}
-            className={`cursor-pointer rounded-full border-0 px-2 py-0.5 text-xs font-medium focus:ring-2 focus:ring-blue-400 ${
-              inv.status === 'paid' ? 'bg-green-100 text-green-800' :
-              inv.status === 'unpaid' || inv.status === 'void' ? 'bg-red-100 text-red-800' :
-              inv.status === 'partial' || inv.status === 'issued' ? 'bg-yellow-100 text-yellow-800' :
-              'bg-surface-container text-on-surface'
+            className={`cursor-pointer rounded-full border-0 px-2.5 py-0.5 text-xs font-medium focus:ring-2 focus:ring-primary/40 focus:outline-none ${
+              inv.status === 'paid' ? 'bg-emerald-500/10 text-emerald-600' :
+              inv.status === 'unpaid' || inv.status === 'void' ? 'bg-red-500/10 text-red-600' :
+              inv.status === 'partial' || inv.status === 'issued' ? 'bg-amber-500/10 text-amber-600' :
+              'bg-surface-container text-on-surface-variant'
             }`}
           >
             {INVOICE_STATUSES.map(s => (
@@ -433,12 +435,12 @@ export default function InvoicesPage() {
             )}
             <DropdownMenu.Root>
               <DropdownMenu.Trigger asChild>
-                <button className="flex h-8 w-8 items-center justify-center rounded-lg border border-outline bg-surface text-on-surface shadow-sm hover:bg-surface-container-low focus:outline-none">
+                <button className="flex h-8 w-8 items-center justify-center rounded-full border border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container-low focus:outline-none">
                   <MoreVertical className="h-4 w-4 stroke-[2.5]" />
                 </button>
               </DropdownMenu.Trigger>
               <DropdownMenu.Portal>
-                <DropdownMenu.Content align="end" sideOffset={4} className="z-50 min-w-[160px] overflow-hidden rounded-lg border border-outline-variant bg-surface py-1 shadow-lg">
+                <DropdownMenu.Content align="end" sideOffset={4} className="z-50 min-w-[160px] overflow-hidden rounded-xl border border-outline-variant bg-surface py-1 shadow-lg">
                   <DropdownMenu.Item
                     onSelect={() => downloadPdf(inv.id)}
                     onMouseEnter={() => prefetchPdf(`/api/invoices/${inv.id}/pdf`)}
@@ -469,7 +471,7 @@ export default function InvoicesPage() {
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     onSelect={() => openEdit(inv)}
-                    className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-blue-600 outline-none hover:bg-blue-50"
+                    className="flex cursor-pointer items-center gap-2.5 px-3 py-2 text-sm text-primary outline-none hover:bg-primary/5"
                   >
                     <Pencil className="h-4 w-4" /> Edit Invoice
                   </DropdownMenu.Item>
@@ -497,39 +499,36 @@ export default function InvoicesPage() {
   const reduceTopSpace = activeBranch?.business_id === '01b4583d-a23d-48b3-83ff-339203ff07de'
 
   return (
-    <div className={`space-y-4 ${reduceTopSpace ? '-mt-4' : ''}`}>
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-on-surface">Invoices</h1>
-          <p className="text-sm text-on-surface-variant">{total} invoices</p>
-        </div>
-        <Button onClick={() => setSheetOpen(true)}>
-          <Plus className="h-4 w-4" /> New Invoice
-        </Button>
-      </div>
+    <div className={`space-y-5 ${reduceTopSpace ? '-mt-4' : ''}`}>
+      <PageHeader
+        title="Invoices"
+        description={`${total} invoices`}
+        actions={
+          <Button onClick={() => setSheetOpen(true)}>
+            <Plus className="h-4 w-4" /> New Invoice
+          </Button>
+        }
+      />
 
       {/* Status summary cards */}
       {summary && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {[
-            { label: 'Unpaid',  count: summary.unpaid,   total: summary.unpaid_total,  color: 'border-red-200 bg-red-50',    text: 'text-red-700',    filter: 'unpaid' },
-            { label: 'Partial', count: summary.partial,  total: summary.partial_total, color: 'border-yellow-200 bg-yellow-50', text: 'text-yellow-700', filter: 'partial' },
-            { label: 'Paid',    count: summary.paid,     total: summary.paid_total,    color: 'border-green-200 bg-green-50', text: 'text-green-700',  filter: 'paid' },
-            { label: 'Refunded',count: summary.refunded, total: null,                  color: 'border-outline-variant bg-surface-container-low',  text: 'text-on-surface-variant',   filter: 'refunded' },
+            { label: 'Unpaid',  count: summary.unpaid,   total: summary.unpaid_total,  icon: AlertCircle, tone: 'bg-red-500/10 text-red-600',         filter: 'unpaid' },
+            { label: 'Partial', count: summary.partial,  total: summary.partial_total, icon: Clock,       tone: 'bg-amber-500/10 text-amber-600',     filter: 'partial' },
+            { label: 'Paid',    count: summary.paid,     total: summary.paid_total,    icon: CheckCircle2, tone: 'bg-emerald-500/10 text-emerald-600', filter: 'paid' },
+            { label: 'Refunded', count: summary.refunded, total: null,                 icon: RotateCcw,   tone: 'bg-surface-container text-on-surface-variant', filter: 'refunded' },
           ].map((card) => (
-            <button
+            <MetricCard
               key={card.filter}
+              label={card.label}
+              value={card.count}
+              icon={card.icon}
+              tone={card.tone}
+              hint={card.total !== null ? formatCurrency(card.total, currency) : undefined}
+              active={statusFilter === card.filter}
               onClick={() => setStatusFilter(statusFilter === card.filter ? '' : card.filter)}
-              className={`rounded-xl border p-3 text-left transition-all ${card.color} ${
-                statusFilter === card.filter ? 'ring-2 ring-blue-500' : 'hover:opacity-80'
-              }`}
-            >
-              <p className={`text-2xl font-bold ${card.text}`}>{card.count}</p>
-              <p className="text-xs text-on-surface-variant">{card.label}</p>
-              {card.total !== null && (
-                <p className={`text-xs font-medium ${card.text}`}>{formatCurrency(card.total, currency)}</p>
-              )}
-            </button>
+            />
           ))}
         </div>
       )}
@@ -566,14 +565,14 @@ export default function InvoicesPage() {
               <button
                 type="button"
                 onClick={() => setNewCustOpen(true)}
-                className="flex items-center gap-1 text-xs text-brand-teal hover:underline font-medium"
+                className="flex items-center gap-1 text-xs text-primary hover:underline font-medium"
               >
                 <UserPlus className="h-3 w-3" /> New Customer
               </button>
             </div>
             <select
               {...register('customer_id')}
-              className="w-full rounded-lg border border-outline px-3 py-2 text-sm"
+              className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm"
             >
               <option value="">No customer</option>
               {customers.map((c) => (
@@ -586,7 +585,7 @@ export default function InvoicesPage() {
           <div>
             <div className="mb-2 flex items-center justify-between">
               <label className="text-sm font-medium text-on-surface-variant">Line Items</label>
-              <button type="button" onClick={addLineItem} className="text-xs text-blue-600 hover:underline">
+              <button type="button" onClick={addLineItem} className="text-xs text-primary hover:underline">
                 + Add row
               </button>
             </div>
@@ -611,7 +610,7 @@ export default function InvoicesPage() {
                           setLineItems(updated)
                           setValue('items', updated, { shouldValidate: true })
                         }}
-                        className={`h-8 min-w-0 flex-1 rounded-md border px-2 text-sm ${rowErrors?.description ? 'border-red-400 bg-red-50' : 'border-outline'}`}
+                        className={`h-8 min-w-0 flex-1 rounded-lg border px-2 text-sm ${rowErrors?.description ? 'border-red-400 bg-red-50' : 'border-outline-variant'}`}
                       />
                       <input
                         type="number"
@@ -624,7 +623,7 @@ export default function InvoicesPage() {
                           setValue('items', updated, { shouldValidate: true })
                         }}
                         style={{ width: '4rem' }}
-                        className={`h-8 shrink-0 rounded-md border px-2 text-sm ${rowErrors?.quantity ? 'border-red-400 bg-red-50' : 'border-outline'}`}
+                        className={`h-8 shrink-0 rounded-lg border px-2 text-sm ${rowErrors?.quantity ? 'border-red-400 bg-red-50' : 'border-outline-variant'}`}
                       />
                       <input
                         type="number"
@@ -639,7 +638,7 @@ export default function InvoicesPage() {
                           setValue('items', updated, { shouldValidate: true })
                         }}
                         style={{ width: '5rem' }}
-                        className={`h-8 shrink-0 rounded-md border px-2 text-sm ${rowErrors?.unit_price ? 'border-red-400 bg-red-50' : 'border-outline'}`}
+                        className={`h-8 shrink-0 rounded-lg border px-2 text-sm ${rowErrors?.unit_price ? 'border-red-400 bg-red-50' : 'border-outline-variant'}`}
                       />
                       {lineItems.length > 1 ? (
                         <button
@@ -670,18 +669,18 @@ export default function InvoicesPage() {
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface-variant">Discount</label>
             <div className="flex gap-2">
-              <div className="flex rounded-lg border border-outline-variant p-0.5 shrink-0">
+              <div className="flex rounded-xl border border-outline-variant p-0.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => setValue('discount_type', 'flat')}
-                  className={`rounded px-2.5 py-1 text-sm font-medium transition-colors ${discountType === 'flat' ? 'bg-brand-teal text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
+                  className={`rounded px-2.5 py-1 text-sm font-medium transition-colors ${discountType === 'flat' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
                 >
                   {currSymbol}
                 </button>
                 <button
                   type="button"
                   onClick={() => setValue('discount_type', 'percent')}
-                  className={`rounded px-2.5 py-1 text-sm font-medium transition-colors ${discountType === 'percent' ? 'bg-brand-teal text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
+                  className={`rounded px-2.5 py-1 text-sm font-medium transition-colors ${discountType === 'percent' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
                 >
                   %
                 </button>
@@ -692,7 +691,7 @@ export default function InvoicesPage() {
                 step="0.01"
                 placeholder="0"
                 {...register('discount_value')}
-                className="h-9 flex-1 rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none"
+                className="h-9 flex-1 rounded-xl border border-outline-variant px-3 text-sm focus:border-primary focus:outline-none"
               />
             </div>
           </div>
@@ -716,7 +715,7 @@ export default function InvoicesPage() {
                   <span>{formatCurrency(lineItemSubtotal, currency)}</span>
                 </div>
                 {discountAmt > 0 && (
-                  <div className="flex justify-between text-green-600 font-medium">
+                  <div className="flex justify-between text-emerald-600 font-medium">
                     <span>Discount</span>
                     <span>-{formatCurrency(discountAmt, currency)}</span>
                   </div>
@@ -737,7 +736,7 @@ export default function InvoicesPage() {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes</label>
-            <textarea rows={2} className="w-full rounded-lg border border-outline px-3 py-2 text-sm" {...register('notes')} />
+            <textarea rows={2} className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm" {...register('notes')} />
           </div>
 
           <Button type="submit" className="w-full" loading={isSubmitting}>
@@ -756,7 +755,7 @@ export default function InvoicesPage() {
                 value={newCust.first_name}
                 onChange={e => setNewCust(p => ({ ...p, first_name: e.target.value }))}
                 placeholder="First name"
-                className="h-9 w-full rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none"
+                className="h-9 w-full rounded-xl border border-outline-variant px-3 text-sm focus:border-primary focus:outline-none"
               />
             </div>
             <div>
@@ -765,7 +764,7 @@ export default function InvoicesPage() {
                 value={newCust.last_name}
                 onChange={e => setNewCust(p => ({ ...p, last_name: e.target.value }))}
                 placeholder="Last name"
-                className="h-9 w-full rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none"
+                className="h-9 w-full rounded-xl border border-outline-variant px-3 text-sm focus:border-primary focus:outline-none"
               />
             </div>
           </div>
@@ -776,7 +775,7 @@ export default function InvoicesPage() {
               value={newCust.email}
               onChange={e => setNewCust(p => ({ ...p, email: e.target.value }))}
               placeholder="email@example.com"
-              className="h-9 w-full rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none"
+              className="h-9 w-full rounded-xl border border-outline-variant px-3 text-sm focus:border-primary focus:outline-none"
             />
           </div>
           <div>
@@ -793,7 +792,7 @@ export default function InvoicesPage() {
               value={newCust.business_name}
               onChange={e => setNewCust(p => ({ ...p, business_name: e.target.value }))}
               placeholder="Company / business name"
-              className="h-9 w-full rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none"
+              className="h-9 w-full rounded-xl border border-outline-variant px-3 text-sm focus:border-primary focus:outline-none"
             />
           </div>
           <div>
@@ -803,7 +802,7 @@ export default function InvoicesPage() {
               onChange={e => setNewCust(p => ({ ...p, address: e.target.value }))}
               placeholder="Full address"
               rows={2}
-              className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none resize-none"
+              className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:border-primary focus:outline-none resize-none"
             />
           </div>
           <div className="flex gap-2 pt-1">
@@ -859,7 +858,8 @@ export default function InvoicesPage() {
           <div className="flex gap-2">
             <Button variant="outline" className="flex-1" onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
             <Button
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              variant="destructive"
+              className="flex-1"
               loading={deleting}
               onClick={() => deleteConfirmId && deleteInvoice(deleteConfirmId)}
             >

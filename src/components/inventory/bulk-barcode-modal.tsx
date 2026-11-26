@@ -151,7 +151,7 @@ export function BulkBarcodeModal({ open, products, onClose }: Props) {
         ) : (
           <>
             {items.length > 0 ? (
-              <div className="rounded-lg border border-outline-variant overflow-hidden">
+              <div className="rounded-xl border border-outline-variant overflow-hidden">
                 <table className="w-full text-sm">
                   <thead className="bg-surface-container-low text-xs uppercase text-on-surface-variant">
                     <tr>
@@ -174,14 +174,14 @@ export function BulkBarcodeModal({ open, products, onClose }: Props) {
                 </table>
               </div>
             ) : (
-              <div className="text-center py-8 border border-dashed border-outline-variant rounded-lg">
+              <div className="text-center py-8 border border-dashed border-outline-variant rounded-xl">
                 <Barcode className="h-10 w-10 text-outline-variant mx-auto mb-2" />
                 <p className="text-sm text-on-surface-variant">No labels to print for the selected products.</p>
               </div>
             )}
 
             {skipped.length > 0 && (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+              <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-500/5 px-3 py-2.5 text-xs text-amber-800">
                 <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium mb-1">{skipped.length} product{skipped.length !== 1 ? 's' : ''} skipped</p>

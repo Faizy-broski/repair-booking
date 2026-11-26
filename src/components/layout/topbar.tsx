@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
-import { Menu, ChevronDown, MessageSquare, ArrowRight, User, Settings, LogOut, Megaphone, Info, AlertTriangle, Wrench, X, Loader2, Plus, Sun, Moon } from 'lucide-react'
+import { Menu, ChevronDown, MessageSquare, Mail, ArrowRight, User, Settings, LogOut, Megaphone, Info, AlertTriangle, Wrench, X, Loader2, Plus, Sun, Moon } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useAuthStore } from '@/store/auth.store'
 import { useMessageStore } from '@/store/message.store'
@@ -79,7 +79,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   }
 
   return (
-    <header className="relative flex h-14 shrink-0 items-center gap-3 border-b border-outline-variant bg-surface-container-lowest px-4 shadow-sm">
+    <header className="relative flex h-16 shrink-0 items-center gap-3 border-b border-outline-variant bg-surface-container-lowest px-4 sm:px-6">
       {signingOut && (
         <div className="absolute inset-x-0 top-0 h-1.5 overflow-hidden bg-amber-100">
           <div className="h-full w-full animate-[progress-bar_1.4s_ease-in-out_infinite] bg-gradient-to-r from-amber-300 via-amber-500 to-amber-300" />
@@ -101,14 +101,14 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           hasSubscriptionAccess ? (
             <Link
               href="/repairs?new=true"
-              className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-sm font-medium text-on-primary transition-colors hover:bg-primary-dim"
+              className="flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-medium text-on-primary transition-colors hover:bg-primary-dim"
             >
               <Plus className="h-4 w-4" />
               Book a Repair
             </Link>
           ) : (
             <div
-              className="flex items-center gap-1.5 rounded-xl bg-primary/40 px-3 py-1.5 text-sm font-medium text-on-primary opacity-50 cursor-not-allowed select-none"
+              className="flex items-center gap-1.5 rounded-full bg-primary/40 px-4 py-2 text-sm font-medium text-on-primary opacity-50 cursor-not-allowed select-none"
               title="Your subscription has expired — renew to book new repairs"
             >
               <Plus className="h-4 w-4" />
@@ -121,7 +121,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         <div ref={announceRef} className="relative">
           <button
             onClick={() => { setAnnounceOpen((v) => !v); setBellOpen(false) }}
-            className="relative rounded-xl p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface"
+            className="relative flex h-9 w-9 items-center justify-center rounded-full border border-outline-variant text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface"
             aria-label={broadcastUnreadCount > 0 ? `${broadcastUnreadCount} system announcements` : 'System announcements'}
           >
             <Megaphone style={{ width: '1.125rem', height: '1.125rem' }} />
@@ -182,7 +182,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         {/* ── Theme toggle ── */}
         <button
           onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-          className="rounded-xl p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface"
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-outline-variant text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface"
           aria-label={resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           title={resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
         >
@@ -197,10 +197,10 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         <div ref={bellRef} className="relative">
           <button
             onClick={() => setBellOpen((v) => !v)}
-            className="relative rounded-xl p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface"
+            className="relative flex h-9 w-9 items-center justify-center rounded-full border border-outline-variant text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface"
             aria-label={unreadCount > 0 ? `${unreadCount} unread messages` : 'Messages'}
           >
-            <MessageSquare style={{ width: '1.125rem', height: '1.125rem' }} />
+            <Mail style={{ width: '1.125rem', height: '1.125rem' }} />
             {unreadCount > 0 && (
               <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-error px-0.5 text-[10px] font-bold leading-none text-on-error ring-2 ring-surface-container-lowest">
                 {unreadCount > 99 ? '99+' : unreadCount}
@@ -274,21 +274,21 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         </div>
 
         {/* Divider */}
-        <div className="mx-1 h-5 w-px bg-outline-variant" />
+        <div className="mx-2 h-8 w-px bg-outline-variant" />
 
         {/* User pill + dropdown */}
         <div ref={userRef} className="relative">
           <button
             onClick={() => setUserOpen((v) => !v)}
-            className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 transition-colors hover:bg-surface-container-low"
+            className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-2.5 transition-colors hover:bg-surface-container-low"
           >
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full overflow-hidden bg-gradient-to-br from-primary to-primary-dim text-xs font-bold text-on-primary shadow-sm shadow-primary/30">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full overflow-hidden bg-gradient-to-br from-primary to-primary-dim text-sm font-semibold text-on-primary">
               {profile?.avatar_url ? (
                 <Image
                   src={profile.avatar_url}
                   alt={profile.full_name ?? 'Avatar'}
-                  width={28}
-                  height={28}
+                  width={36}
+                  height={36}
                   className="h-full w-full object-cover"
                   unoptimized
                 />
@@ -297,11 +297,11 @@ export function Topbar({ onMenuClick }: TopbarProps) {
               )}
             </div>
             {profile?.full_name && (
-              <span className="hidden text-sm font-medium text-on-surface sm:block max-w-[120px] truncate">
+              <span className="hidden text-[15px] font-medium text-on-surface sm:block max-w-[140px] truncate">
                 {profile.full_name}
               </span>
             )}
-            <ChevronDown className={`hidden h-3.5 w-3.5 text-outline sm:block transition-transform ${userOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`hidden h-4 w-4 text-on-surface-variant sm:block transition-transform ${userOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {userOpen && (

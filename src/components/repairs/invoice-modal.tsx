@@ -100,8 +100,8 @@ export function RepairInvoiceModal({ open, onClose, repair, justCreated }: Props
   return (
     <Modal open={open} onClose={onClose} title={`Invoice - ${repair.job_number}`} size="xl">
       {justCreated && (
-        <div className="mb-4 flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100">
+        <div className="mb-4 flex items-center gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500/10">
             <Check className="h-5 w-5 text-green-600" />
           </div>
           <div>
@@ -114,7 +114,7 @@ export function RepairInvoiceModal({ open, onClose, repair, justCreated }: Props
         {loading ? (
           // Invoice-shaped skeleton — reads as "your invoice is coming" rather than an empty wait
           <div className="flex-1 overflow-hidden rounded-lg border border-outline-variant bg-surface-container-low p-6" aria-busy="true" aria-label="Preparing invoice">
-            <div className="mx-auto flex h-full max-w-xl flex-col gap-5 rounded-md bg-surface-container-lowest p-8 shadow-sm animate-pulse">
+            <div className="mx-auto flex h-full max-w-xl flex-col gap-5 rounded-2xl bg-surface-container-lowest p-8 animate-pulse">
               <div className="flex items-start justify-between">
                 <div className="space-y-2">
                   <div className="h-10 w-10 rounded-lg bg-surface-container-high" />
@@ -140,7 +140,7 @@ export function RepairInvoiceModal({ open, onClose, repair, justCreated }: Props
                 <div className="h-3.5 rounded bg-surface-container-high" />
               </div>
               <p className="mt-auto flex items-center justify-center gap-2 text-xs font-medium text-on-surface-variant">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-teal-600" /> Preparing invoice…
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" /> Preparing invoice…
               </p>
             </div>
           </div>
@@ -170,7 +170,7 @@ export function RepairInvoiceModal({ open, onClose, repair, justCreated }: Props
           <Button variant="outline" className="whitespace-nowrap shrink-0" onClick={onClose}>Close</Button>
           {!isThermal && pdfUrl && (
             <Button
-              className="whitespace-nowrap shrink-0 bg-violet-600 text-white hover:bg-violet-700"
+              className="whitespace-nowrap shrink-0 bg-primary text-white hover:bg-primary/90"
               onClick={() => window.open(pdfUrl)}
             >
               <FileText className="h-4 w-4 mr-2" />
@@ -179,7 +179,7 @@ export function RepairInvoiceModal({ open, onClose, repair, justCreated }: Props
           )}
           {isThermal && data && (
             <Button
-              className="whitespace-nowrap shrink-0 bg-violet-600 text-white hover:bg-violet-700"
+              className="whitespace-nowrap shrink-0 bg-primary text-white hover:bg-primary/90"
               onClick={() => previewReceiptHtml(data)}
             >
               <FileText className="h-4 w-4 mr-2" />

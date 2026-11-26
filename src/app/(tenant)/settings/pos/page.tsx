@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { ShoppingCart, Info, Loader2 } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
+import { PageHeader } from '@/components/shared/page-header'
 import type { Branch } from '@/types/database'
 
 interface BranchPosSettings {
@@ -27,20 +28,20 @@ function Toggle({ enabled, onChange, disabled, loading }: {
       className={`
         relative inline-flex h-7 w-14 shrink-0 items-center rounded-full
         transition-colors duration-300 ease-in-out
-        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#0d9488]
-        ${enabled ? 'bg-[#0d9488]' : 'bg-surface-container-high'}
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary
+        ${enabled ? 'bg-primary' : 'bg-surface-container-high'}
         ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
       `}
     >
       <span
         className={`
           pointer-events-none inline-flex h-5 w-5 transform items-center justify-center
-          rounded-full bg-surface shadow-md ring-0
+          rounded-full bg-surface-container-lowest ring-0
           transition-transform duration-300 ease-in-out
           ${enabled ? 'translate-x-8' : 'translate-x-1'}
         `}
       >
-        {loading && <Loader2 className="h-3 w-3 animate-spin text-outline" />}
+        {loading && <Loader2 className="h-3 w-3 animate-spin text-on-surface-variant" />}
       </span>
     </button>
   )
@@ -86,32 +87,28 @@ export default function PosSettingsPage() {
   const canEdit = isOwner()
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-4xl space-y-6">
 
-      {/* Page title */}
-      <div>
-        <h1 className="text-2xl font-bold text-on-surface">POS Settings</h1>
-        <p className="mt-1 text-sm text-on-surface-variant">Configure point of sale behaviour per branch</p>
-      </div>
+      <PageHeader title="POS Settings" description="Configure point of sale behaviour per branch" />
 
       {/* Shift System card */}
-      <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest">
 
         {/* Card header */}
-        <div className="flex items-center gap-4 px-6 py-5 border-b border-outline-variant">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0d9488]/10">
-            <ShoppingCart className="h-5 w-5 text-[#0d9488]" />
+        <div className="flex items-start gap-3 p-5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <ShoppingCart className="h-4 w-4" />
           </div>
-          <div>
-            <h2 className="font-semibold text-on-surface">Shift System</h2>
-            <p className="text-xs text-on-surface-variant mt-0.5">When enabled, staff must open a cash drawer shift before processing sales</p>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-on-surface">Shift System</h2>
+            <p className="mt-0.5 text-sm text-on-surface-variant">When enabled, staff must open a cash drawer shift before processing sales</p>
           </div>
         </div>
 
         {/* Info strip */}
-        <div className="flex items-center gap-2 bg-blue-50/60 border-b border-blue-100/60 px-6 py-2.5">
-          <Info className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-          <p className="text-xs text-blue-600">
+        <div className="flex items-center gap-2 border-y border-outline-variant bg-surface-container-low px-5 py-3">
+          <Info className="h-3.5 w-3.5 shrink-0 text-on-surface-variant" />
+          <p className="text-xs text-on-surface-variant">
             Toggle per branch. Disabling lets staff open POS instantly without counting the cash drawer.
           </p>
         </div>
@@ -119,7 +116,7 @@ export default function PosSettingsPage() {
         {/* Branch rows */}
         <div className="divide-y divide-outline-variant">
           {branches.length === 0 && (
-            <p className="px-6 py-10 text-center text-sm text-outline">No branches found.</p>
+            <p className="px-5 py-10 text-center text-sm text-on-surface-variant">No branches found.</p>
           )}
 
           {branches.map((branch) => {
@@ -127,12 +124,12 @@ export default function PosSettingsPage() {
             const isSaving = saving === branch.id
 
             return (
-              <div key={branch.id} className="flex items-center justify-between gap-4 px-6 py-4 hover:bg-surface-container-low/50 transition-colors">
+              <div key={branch.id} className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-surface-container-low">
 
                 {/* Avatar + info */}
                 <div className="flex items-center gap-3.5">
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold uppercase tracking-wide transition-colors
-                    ${enabled ? 'bg-[#0d9488]/10 text-[#0d9488]' : 'bg-surface-container text-outline'}`}
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold transition-colors
+                    ${enabled ? 'bg-primary/10 text-primary' : 'bg-surface-container text-on-surface-variant'}`}
                   >
                     {branch.name.charAt(0)}
                   </div>
@@ -140,12 +137,12 @@ export default function PosSettingsPage() {
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-on-surface">{branch.name}</span>
                       {branch.is_main && (
-                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-600 leading-none">
+                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary leading-none">
                           Main
                         </span>
                       )}
                     </div>
-                    <p className={`mt-0.5 text-xs font-medium transition-colors ${enabled ? 'text-[#0d9488]' : 'text-outline'}`}>
+                    <p className={`mt-0.5 text-xs font-medium transition-colors ${enabled ? 'text-primary' : 'text-on-surface-variant'}`}>
                       {enabled ? 'Shift required to open POS' : 'Shift system disabled'}
                     </p>
                   </div>
@@ -153,7 +150,7 @@ export default function PosSettingsPage() {
 
                 {/* Toggle + label */}
                 <div className="flex items-center gap-3 shrink-0">
-                  <span className={`text-xs font-semibold w-12 text-right transition-colors ${enabled ? 'text-[#0d9488]' : 'text-outline'}`}>
+                  <span className={`text-xs font-semibold w-12 text-right transition-colors ${enabled ? 'text-primary' : 'text-on-surface-variant'}`}>
                     {enabled ? 'On' : 'Off'}
                   </span>
                   <Toggle
@@ -170,8 +167,8 @@ export default function PosSettingsPage() {
         </div>
 
         {!canEdit && (
-          <div className="border-t border-outline-variant bg-surface-container-low/50 px-6 py-3">
-            <p className="text-xs text-outline">Only business owners can modify these settings.</p>
+          <div className="border-t border-outline-variant bg-surface-container-low px-5 py-3">
+            <p className="text-xs text-on-surface-variant">Only business owners can modify these settings.</p>
           </div>
         )}
       </div>

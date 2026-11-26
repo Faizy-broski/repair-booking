@@ -506,7 +506,7 @@ export default function MessagesPage() {
           <h1 className="font-semibold text-on-surface">Messages</h1>
           <button
             onClick={() => setSheetOpen(true)}
-            className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-on-primary shadow-sm transition-opacity hover:opacity-90"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-on-primary transition-opacity hover:opacity-90"
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -539,7 +539,7 @@ export default function MessagesPage() {
                     'w-full border-b border-outline-variant px-4 py-3 text-left transition-colors',
                     'border-l-[3px]',
                     isActive
-                      ? 'border-l-primary bg-primary-container/15 hover:bg-primary-container/20'
+                      ? 'border-l-primary bg-primary/10 hover:bg-primary/15'
                       : 'border-l-transparent hover:bg-surface-container-low',
                   ].join(' ')}
                 >
@@ -555,10 +555,10 @@ export default function MessagesPage() {
                       </span>
                     )}
                   </div>
-                  <p className="mt-0.5 truncate text-xs text-outline">
+                  <p className="mt-0.5 truncate text-xs text-on-surface-variant">
                     {getBranchName(msg, 'from')} → {getBranchName(msg, 'to')}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-outline">
+                  <p className="mt-0.5 text-[11px] text-on-surface-variant">
                     {formatDateTime(msg.created_at)}
                   </p>
                 </button>
@@ -581,7 +581,7 @@ export default function MessagesPage() {
                       {selected.subject}
                     </h2>
                   )}
-                  <p className="text-xs text-outline">
+                  <p className="text-xs text-on-surface-variant">
                     {getBranchName(selected, 'from')} → {getBranchName(selected, 'to')}
                   </p>
                 </div>
@@ -619,7 +619,7 @@ export default function MessagesPage() {
 
                       <div className={`flex max-w-[65%] flex-col gap-1 ${isMine ? 'items-end' : 'items-start'}`}>
                         {!isMine && (
-                          <p className="px-1 text-[11px] font-medium text-outline">{senderName}</p>
+                          <p className="px-1 text-[11px] font-medium text-on-surface-variant">{senderName}</p>
                         )}
 
                         {editingMessageId === msg.id ? (
@@ -640,7 +640,7 @@ export default function MessagesPage() {
                               <button
                                 onClick={() => setEditingMessageId(null)}
                                 title="Cancel"
-                                className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-container text-outline hover:text-on-surface transition-colors"
+                                className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-container text-on-surface-variant transition-colors hover:text-on-surface"
                               >
                                 <X className="h-3.5 w-3.5" />
                               </button>
@@ -657,7 +657,7 @@ export default function MessagesPage() {
                             </div>
                           </div>
                         ) : (
-                          <div className={`rounded-2xl px-4 py-2.5 shadow-sm ${
+                          <div className={`rounded-2xl px-4 py-2.5 ${
                             isMine
                               ? 'rounded-tr-sm bg-primary text-on-primary'
                               : 'rounded-tl-sm bg-surface-container text-on-surface'
@@ -704,7 +704,7 @@ export default function MessagesPage() {
                         )}
 
                         <div className={`flex items-center gap-1 px-1 ${isMine ? 'flex-row-reverse' : ''}`}>
-                          <p className="text-[10px] text-outline">
+                          <p className="text-[10px] text-on-surface-variant">
                             {formatDateTime(msg.created_at)}
                           </p>
                           {isMine && editingMessageId !== msg.id && (
@@ -740,14 +740,14 @@ export default function MessagesPage() {
                   {pendingAttachments.map((att, i) => {
                     const isImage = att.type.startsWith('image/')
                     return (
-                      <div key={i} className="group relative flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface-container-low px-2.5 py-1.5 text-xs text-on-surface max-w-[180px]">
+                      <div key={i} className="group relative flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container-low px-2.5 py-1.5 text-xs text-on-surface max-w-[180px]">
                         {isImage
                           ? <ImageIcon className="h-3.5 w-3.5 shrink-0 text-primary" />
                           : <FileText className="h-3.5 w-3.5 shrink-0 text-primary" />}
                         <span className="truncate flex-1">{att.name}</span>
                         <button
                           onClick={() => setPendingAttachments((prev) => prev.filter((_, j) => j !== i))}
-                          className="ml-1 rounded-full p-0.5 text-outline hover:text-error transition-colors"
+                          className="ml-1 rounded-full p-0.5 text-on-surface-variant transition-colors hover:text-error"
                           title="Remove"
                         >
                           <X className="h-3 w-3" />
@@ -773,7 +773,7 @@ export default function MessagesPage() {
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingFiles}
                   title="Attach files"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-outline-variant text-outline transition-colors hover:border-primary hover:text-primary disabled:opacity-40"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-outline-variant text-on-surface-variant transition-colors hover:border-primary hover:text-primary disabled:opacity-40"
                 >
                   {uploadingFiles
                     ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -797,12 +797,12 @@ export default function MessagesPage() {
                   }}
                   placeholder="Type a reply… (Enter to send, Shift+Enter for new line)"
                   rows={1}
-                  className="flex-1 resize-none overflow-hidden rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2.5 text-sm text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
+                  className="flex-1 resize-none overflow-hidden rounded-xl border border-outline-variant bg-surface-container-low px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/30 transition-colors"
                 />
                 <button
                   onClick={onReply}
                   disabled={(!replyBody.trim() && pendingAttachments.length === 0) || sending || uploadingFiles}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-on-primary shadow-sm transition-opacity hover:opacity-90 disabled:opacity-40"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary transition-opacity hover:opacity-90 disabled:opacity-40"
                 >
                   {sending ? (
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-on-primary border-t-transparent" />
@@ -817,7 +817,7 @@ export default function MessagesPage() {
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-on-surface-variant">
             <MessageSquare className="h-12 w-12 opacity-20" />
             <p className="text-sm font-medium">Select a conversation</p>
-            <p className="text-xs text-outline">Or start a new one with the + button</p>
+            <p className="text-xs text-on-surface-variant">Or start a new one with the + button</p>
           </div>
         )}
       </div>
@@ -829,7 +829,7 @@ export default function MessagesPage() {
             <label className="mb-1.5 block text-sm font-medium text-on-surface">To Branch</label>
             <select
               {...register('to_branch_id')}
-              className="w-full rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2.5 text-sm text-on-surface focus:border-primary focus:outline-none"
+              className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm text-on-surface focus:border-primary focus:outline-none"
             >
               <option value="">Select branch…</option>
               {otherBranches.map((b) => (
@@ -845,7 +845,7 @@ export default function MessagesPage() {
             <label className="mb-1.5 block text-sm font-medium text-on-surface">Message</label>
             <textarea
               rows={4}
-              className="w-full resize-none rounded-xl border border-outline-variant bg-surface-container-low px-3 py-2.5 text-sm text-on-surface focus:border-primary focus:outline-none"
+              className="w-full resize-none rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2.5 text-sm text-on-surface focus:border-primary focus:outline-none"
               {...register('body')}
             />
             {errors.body && <p className="mt-1 text-xs text-error">{errors.body.message}</p>}
@@ -857,7 +857,7 @@ export default function MessagesPage() {
       {/* ── Delete conversation confirmation ───────────────── */}
       {deleteThreadConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="mx-4 w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl">
+          <div className="mx-4 w-full max-w-sm rounded-2xl bg-surface-container-lowest p-6 shadow-xl">
             <h3 className="text-base font-semibold text-on-surface">Delete conversation?</h3>
             <p className="mt-2 text-sm text-on-surface-variant">
               This will permanently delete this conversation and all its replies. This cannot be undone.
@@ -877,7 +877,7 @@ export default function MessagesPage() {
       {/* ── Delete single message confirmation ─────────────── */}
       {deleteMessageId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="mx-4 w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl">
+          <div className="mx-4 w-full max-w-sm rounded-2xl bg-surface-container-lowest p-6 shadow-xl">
             <h3 className="text-base font-semibold text-on-surface">Delete message?</h3>
             <p className="mt-2 text-sm text-on-surface-variant">
               This will permanently remove this message. This cannot be undone.

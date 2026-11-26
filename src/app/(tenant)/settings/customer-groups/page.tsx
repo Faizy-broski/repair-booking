@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { confirmToast } from '@/lib/confirm-toast'
 import { Plus, Pencil, Trash2, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/shared/page-header'
+import { EmptyState } from '@/components/shared/ui-kit'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { Badge } from '@/components/ui/badge'
@@ -66,40 +68,37 @@ export default function CustomerGroupsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-on-surface">Customer Groups</h1>
-          <p className="text-sm text-on-surface-variant mt-0.5">Segment customers for pricing and billing</p>
-        </div>
-        <Button onClick={() => openModal()}>
-          <Plus className="h-4 w-4" /> New Group
-        </Button>
-      </div>
+      <PageHeader
+        title="Customer Groups"
+        description="Segment customers for pricing and billing"
+        actions={
+          <Button onClick={() => openModal()}>
+            <Plus className="h-4 w-4" /> New Group
+          </Button>
+        }
+      />
 
-      <div className="divide-y rounded-xl border border-outline-variant bg-surface">
+      <div className="divide-y divide-outline-variant overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest">
         {groups.length === 0 && (
-          <div className="py-16 text-center">
-            <Users className="mx-auto h-8 w-8 text-outline-variant" />
-            <p className="mt-2 text-sm text-outline">No customer groups yet.</p>
-          </div>
+          <EmptyState icon={Users} title="No customer groups yet." bordered={false} />
         )}
         {groups.map((g) => (
-          <div key={g.id} className="flex items-center justify-between px-4 py-3">
+          <div key={g.id} className="flex items-center justify-between gap-3 px-5 py-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-100">
-                <Users className="h-4 w-4 text-indigo-600" />
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Users className="h-4 w-4" />
               </div>
               <div>
                 <p className="font-medium text-on-surface">{g.name}</p>
                 <div className="flex items-center gap-2 mt-0.5">
                   {g.discount_percent > 0 && (
-                    <span className="text-xs text-green-600">{g.discount_percent}% discount</span>
+                    <span className="text-xs text-emerald-600">{g.discount_percent}% discount</span>
                   )}
                   {g.third_party_billing_enabled && (
                     <Badge variant="warning">3rd-party billing</Badge>
                   )}
                   {g.net_payment_days > 0 && (
-                    <span className="text-xs text-outline">Net {g.net_payment_days}</span>
+                    <span className="text-xs text-on-surface-variant">Net {g.net_payment_days}</span>
                   )}
                 </div>
               </div>
@@ -150,13 +149,13 @@ export default function CustomerGroupsPage() {
               type="checkbox"
               checked={form.third_party_billing_enabled}
               onChange={(e) => setForm((f) => ({ ...f, third_party_billing_enabled: e.target.checked }))}
-              className="rounded"
+              className="h-4 w-4 rounded accent-primary"
             />
             Third-party billing enabled
           </label>
 
           {form.third_party_billing_enabled && (
-            <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 space-y-2">
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 space-y-2">
               <Input
                 label="Billing Contact Name"
                 value={form.billing_contact_name}

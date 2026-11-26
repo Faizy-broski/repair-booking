@@ -55,7 +55,7 @@ function StarRating({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'lg
   return (
     <div className="flex gap-0.5">
       {Array.from({ length: 5 }, (_, i) => (
-        <Star key={i} className={`${cls} ${i < rating ? 'fill-amber-400 text-amber-400' : 'fill-gray-100 text-outline-variant'}`} />
+        <Star key={i} className={`${cls} ${i < rating ? 'fill-amber-400 text-amber-400' : 'fill-surface-container text-outline-variant'}`} />
       ))}
     </div>
   )
@@ -65,14 +65,14 @@ function StatCard({ label, value, sub, icon: Icon, color }: {
   label: string; value: string | number; sub?: string; icon: React.ElementType; color: string
 }) {
   return (
-    <div className="rounded-xl border border-outline-variant bg-surface p-5 flex items-start gap-4">
+    <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 flex items-start gap-4">
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${color}`}>
         <Icon className="h-5 w-5" />
       </div>
       <div className="min-w-0">
         <p className="text-sm text-on-surface-variant">{label}</p>
-        <p className="mt-0.5 text-2xl font-bold text-on-surface tabular-nums">{value}</p>
-        {sub && <p className="text-xs text-outline mt-0.5">{sub}</p>}
+        <p className="mt-0.5 text-2xl font-semibold tracking-tight tabular-nums text-on-surface">{value}</p>
+        {sub && <p className="text-xs text-on-surface-variant mt-0.5">{sub}</p>}
       </div>
     </div>
   )
@@ -87,7 +87,7 @@ function RatingBar({ star, count, max }: { star: number; count: number; max: num
       <div className="flex-1 h-2 rounded-full bg-surface-container overflow-hidden">
         <div className="h-full rounded-full bg-amber-400 transition-all duration-500" style={{ width: `${pct}%` }} />
       </div>
-      <span className="w-6 text-right text-xs text-outline">{count}</span>
+      <span className="w-6 text-right text-xs text-on-surface-variant">{count}</span>
     </div>
   )
 }
@@ -156,10 +156,10 @@ function BusinessSearchPanel({
   }
 
   return (
-    <div className="rounded-xl border border-outline-variant bg-surface shadow-sm overflow-hidden">
+    <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest overflow-hidden">
       {/* Header */}
       <div className="border-b border-outline-variant bg-surface-container-low px-6 py-4 flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10">
           <Building2 className="h-4 w-4 text-amber-600" />
         </div>
         <div className="flex-1">
@@ -169,7 +169,7 @@ function BusinessSearchPanel({
         {step === 'results' && (
           <button
             onClick={() => { setStep('form'); setResults([]); setSearchError(null) }}
-            className="text-xs text-blue-600 hover:underline"
+            className="text-xs text-primary hover:underline"
           >
             ← Search again
           </button>
@@ -178,7 +178,7 @@ function BusinessSearchPanel({
 
       <div className="p-6 space-y-4">
         {searchError && (
-          <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <p>{searchError}</p>
           </div>
@@ -211,7 +211,7 @@ function BusinessSearchPanel({
               <Search className="h-4 w-4" />
               {searching ? 'Searching…' : 'Search Google Business'}
             </Button>
-            <p className="text-center text-xs text-outline">
+            <p className="text-center text-xs text-on-surface-variant">
               We search Google Places to find your listing and import reviews automatically
             </p>
           </form>
@@ -221,13 +221,13 @@ function BusinessSearchPanel({
         {step === 'results' && (
           <div className="space-y-3">
             {results.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-lg border border-outline-variant py-10 gap-2">
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-outline-variant py-10 gap-2">
                 <Search className="h-8 w-8 text-outline-variant" />
                 <p className="text-sm font-medium text-on-surface-variant">No listings found</p>
-                <p className="text-xs text-outline">Try a different name or postcode</p>
+                <p className="text-xs text-on-surface-variant">Try a different name or postcode</p>
                 <button
                   onClick={() => setStep('form')}
-                  className="mt-1 text-xs text-blue-600 hover:underline"
+                  className="mt-1 text-xs text-primary hover:underline"
                 >
                   Search again
                 </button>
@@ -239,7 +239,7 @@ function BusinessSearchPanel({
                   {results.map((r) => (
                     <div
                       key={r.place_id}
-                      className="flex items-center gap-4 rounded-lg border border-outline-variant bg-surface p-4 hover:border-amber-300 hover:bg-amber-50 transition-colors"
+                      className="flex items-center gap-4 rounded-xl border border-outline-variant bg-surface-container-lowest p-4 transition-colors hover:bg-surface-container-low"
                     >
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-on-surface truncate">{r.name}</p>
@@ -250,7 +250,7 @@ function BusinessSearchPanel({
                         {r.rating !== null && (
                           <div className="mt-1 flex items-center gap-1.5">
                             <StarRating rating={Math.round(r.rating)} />
-                            <span className="text-xs text-outline">{r.rating.toFixed(1)} · {r.review_count.toLocaleString()} reviews</span>
+                            <span className="text-xs text-on-surface-variant">{r.rating.toFixed(1)} · {r.review_count.toLocaleString()} reviews</span>
                           </div>
                         )}
                       </div>
@@ -408,13 +408,13 @@ function GoogleReviewsInner() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10">
               <Star className="h-5 w-5 fill-amber-500 text-amber-500" />
             </div>
-            <h1 className="text-2xl font-bold text-on-surface">Google Reviews</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-on-surface">Google Reviews</h1>
             {isConnected && (
-              <span className="flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700 border border-green-200">
-                <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+              <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-600">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 {connectedTitle ?? 'Connected'}
               </span>
             )}
@@ -424,7 +424,7 @@ function GoogleReviewsInner() {
               ? `${reviews.length} reviews · ${avgRatingStr} avg rating`
               : 'Connect your Google Business listing to import reviews'}
             {settings?.last_synced && (
-              <span className="text-outline"> · synced {formatDate(settings.last_synced)}</span>
+              <span className="text-on-surface-variant"> · synced {formatDate(settings.last_synced)}</span>
             )}
           </p>
         </div>
@@ -434,7 +434,7 @@ function GoogleReviewsInner() {
             <>
               <button
                 onClick={disconnect}
-                className="flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:border-red-300 hover:text-red-600 transition-colors"
+                className="flex items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-xs font-medium text-on-surface-variant transition-colors hover:border-red-300 hover:text-red-600"
               >
                 <LogOut className="h-3.5 w-3.5" /> Disconnect
               </button>
@@ -449,7 +449,7 @@ function GoogleReviewsInner() {
 
       {/* OAuth error banner */}
       {oauthError && (
-        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
             <p className="font-medium">Google connection failed</p>
@@ -460,7 +460,7 @@ function GoogleReviewsInner() {
 
       {/* Sync feedback */}
       {syncError && (
-        <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
             <p className="font-medium">Sync failed</p>
@@ -470,7 +470,7 @@ function GoogleReviewsInner() {
         </div>
       )}
       {syncSuccess && (
-        <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-600">
           <CheckCircle2 className="h-4 w-4 shrink-0" /> Reviews synced successfully!
         </div>
       )}
@@ -487,20 +487,20 @@ function GoogleReviewsInner() {
       {isConnected && reviews.length > 0 && (
         <>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatCard label="Average Rating" value={avgRatingStr} sub="out of 5.0"        icon={Star}          color="bg-amber-100 text-amber-600" />
-            <StatCard label="Total Reviews"  value={reviews.length} sub="all time"        icon={MessageSquare}  color="bg-blue-100 text-blue-600" />
+            <StatCard label="Average Rating" value={avgRatingStr} sub="out of 5.0"        icon={Star}          color="bg-amber-500/10 text-amber-600" />
+            <StatCard label="Total Reviews"  value={reviews.length} sub="all time"        icon={MessageSquare}  color="bg-primary/10 text-primary" />
             <StatCard label="5-Star Reviews" value={ratingCounts[0].count}
               sub={`${reviews.length > 0 ? Math.round((ratingCounts[0].count / reviews.length) * 100) : 0}% of total`}
-              icon={ThumbsUp} color="bg-green-100 text-green-600" />
-            <StatCard label="This Month" value={trendData[5].reviews} sub="new reviews"   icon={TrendingUp}    color="bg-purple-100 text-purple-600" />
+              icon={ThumbsUp} color="bg-emerald-500/10 text-emerald-600" />
+            <StatCard label="This Month" value={trendData[5].reviews} sub="new reviews"   icon={TrendingUp}    color="bg-blue-500/10 text-blue-600" />
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-            <div className="lg:col-span-2 rounded-xl border border-outline-variant bg-surface p-5">
+            <div className="lg:col-span-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
               <div className="mb-5">
-                <p className="text-3xl font-bold text-on-surface">{avgRatingStr}</p>
+                <p className="text-3xl font-semibold tracking-tight tabular-nums text-on-surface">{avgRatingStr}</p>
                 <StarRating rating={Math.round(avgRating)} size="lg" />
-                <p className="mt-1 text-xs text-outline">{reviews.length} total reviews</p>
+                <p className="mt-1 text-xs text-on-surface-variant">{reviews.length} total reviews</p>
               </div>
               <div className="space-y-2">
                 {ratingCounts.map(({ star, count }) => (
@@ -508,8 +508,8 @@ function GoogleReviewsInner() {
                 ))}
               </div>
             </div>
-            <div className="lg:col-span-3 rounded-xl border border-outline-variant bg-surface p-5">
-              <p className="mb-4 text-sm font-semibold text-on-surface-variant">Reviews Over Time (6 months)</p>
+            <div className="lg:col-span-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
+              <p className="mb-4 text-base font-semibold text-on-surface">Reviews Over Time (6 months)</p>
               <ResponsiveContainer width="100%" height={160}>
                 <LineChart data={trendData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
@@ -523,23 +523,23 @@ function GoogleReviewsInner() {
           </div>
 
           {reviewLink && (
-            <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 flex items-center gap-4">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100">
-                <ExternalLink className="h-5 w-5 text-blue-600" />
+            <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 flex items-center gap-4">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                <ExternalLink className="h-5 w-5 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-blue-900">Customer Review Link</p>
-                <p className="text-xs text-blue-700 mt-0.5 truncate">{reviewLink}</p>
+                <p className="text-sm font-semibold text-on-surface">Customer Review Link</p>
+                <p className="mt-0.5 truncate text-xs text-on-surface-variant">{reviewLink}</p>
               </div>
               <div className="flex gap-2 shrink-0">
                 <button
                   onClick={() => navigator.clipboard.writeText(reviewLink)}
-                  className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-surface px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 transition-colors"
+                  className="flex items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-xs font-medium text-on-surface transition-colors hover:bg-surface-container-low"
                 >
                   <Copy className="h-3.5 w-3.5" /> Copy
                 </button>
                 <a href={reviewLink} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors">
+                  className="flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-on-primary transition-opacity hover:opacity-90">
                   <ExternalLink className="h-3.5 w-3.5" /> Open
                 </a>
               </div>
@@ -554,13 +554,13 @@ function GoogleReviewsInner() {
           {reviews.length > 0 && (
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-outline pointer-events-none" />
+                <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Search reviews…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full rounded-lg border border-outline-variant bg-surface pl-9 pr-3 py-2 text-sm text-on-surface placeholder:text-outline focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="h-10 w-full rounded-full border border-outline-variant bg-surface-container-lowest pl-10 pr-4 text-sm text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none"
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -569,11 +569,11 @@ function GoogleReviewsInner() {
                     <button
                       key={s}
                       onClick={() => setFilterStar(s === filterStar ? 0 : s)}
-                      className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
+                      className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                         filterStar === s && s > 0
-                          ? 'border-amber-400 bg-amber-50 text-amber-700'
+                          ? 'border-amber-400 bg-amber-500/10 text-amber-700'
                           : filterStar === 0 && s === 0
-                            ? 'border-gray-900 bg-gray-900 text-white'
+                            ? 'border-primary bg-primary/10 text-primary'
                             : 'border-outline-variant bg-surface text-on-surface-variant hover:border-outline'
                       }`}
                     >
@@ -584,14 +584,14 @@ function GoogleReviewsInner() {
                 <div className="relative">
                   <button
                     onClick={() => setShowSortMenu((v) => !v)}
-                    className="flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-xs font-medium text-on-surface-variant hover:border-outline transition-colors"
+                    className="flex items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-xs font-medium text-on-surface-variant transition-colors hover:border-outline"
                   >
                     <Filter className="h-3.5 w-3.5" />
                     {SORT_LABELS[sort]}
-                    <ChevronDown className="h-3.5 w-3.5 text-outline" />
+                    <ChevronDown className="h-3.5 w-3.5 text-on-surface-variant" />
                   </button>
                   {showSortMenu && (
-                    <div className="absolute right-0 top-full mt-1 z-20 w-40 rounded-xl border border-outline-variant bg-surface py-1 shadow-lg">
+                    <div className="absolute right-0 top-full mt-1 z-20 w-40 rounded-2xl border border-outline-variant bg-surface-container-lowest py-1 shadow-lg">
                       {(Object.keys(SORT_LABELS) as SortOption[]).map((o) => (
                         <button key={o} onClick={() => { setSort(o); setShowSortMenu(false) }}
                           className={`w-full px-3 py-2 text-left text-xs font-medium transition-colors ${sort === o ? 'bg-surface-container-low text-on-surface' : 'text-on-surface-variant hover:bg-surface-container-low'}`}>
@@ -608,16 +608,16 @@ function GoogleReviewsInner() {
           {loading && (
             <div className="space-y-3">
               {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-28 animate-pulse rounded-xl bg-surface-container" />
+                <div key={i} className="h-28 animate-pulse rounded-2xl bg-surface-container" />
               ))}
             </div>
           )}
 
           {!loading && reviews.length === 0 && isConnected && (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-outline-variant bg-surface py-16 gap-3">
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-lowest py-16 gap-3">
               <Clock className="h-10 w-10 text-outline-variant" />
               <p className="text-sm font-medium text-on-surface-variant">No reviews synced yet</p>
-              <p className="text-xs text-outline">Click "Sync Now" to import your Google reviews</p>
+              <p className="text-xs text-on-surface-variant">Click "Sync Now" to import your Google reviews</p>
               <Button size="sm" onClick={syncReviews} loading={syncing}>
                 <RefreshCw className="h-4 w-4" /> Sync Now
               </Button>
@@ -625,17 +625,17 @@ function GoogleReviewsInner() {
           )}
 
           {!loading && reviews.length > 0 && visibleReviews.length === 0 && (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-outline-variant bg-surface py-10 gap-2">
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-lowest py-10 gap-2">
               <Search className="h-8 w-8 text-outline-variant" />
               <p className="text-sm text-on-surface-variant">No reviews match your filter</p>
-              <button onClick={() => { setSearch(''); setFilterStar(0) }} className="text-xs text-blue-600 hover:underline">Clear filters</button>
+              <button onClick={() => { setSearch(''); setFilterStar(0) }} className="text-xs text-primary hover:underline">Clear filters</button>
             </div>
           )}
 
           {!loading && visibleReviews.map((review) => (
-            <div key={review.id} className="group rounded-xl border border-outline-variant bg-surface p-5 shadow-sm hover:shadow-md hover:border-outline transition-all">
+            <div key={review.id} className="group rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 transition-colors hover:bg-surface-container-low">
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-sm font-bold text-white shadow-sm">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
                   {review.author_name.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -644,14 +644,14 @@ function GoogleReviewsInner() {
                       <p className="font-semibold text-on-surface">{review.author_name}</p>
                       <div className="mt-0.5 flex items-center gap-2">
                         <StarRating rating={review.rating} />
-                        <span className="text-xs text-outline">{formatDate(review.published_at)}</span>
+                        <span className="text-xs text-on-surface-variant">{formatDate(review.published_at)}</span>
                       </div>
                     </div>
                     {settings?.place_id && (
                       <a
                         href={`https://www.google.com/maps/place/?q=place_id:${settings.place_id}`}
                         target="_blank" rel="noopener noreferrer"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-xs text-outline hover:text-blue-600"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-xs text-on-surface-variant hover:text-primary"
                       >
                         <ExternalLink className="h-3.5 w-3.5" />
                       </a>
@@ -659,14 +659,14 @@ function GoogleReviewsInner() {
                   </div>
                   {review.text
                     ? <p className="mt-2.5 text-sm text-on-surface-variant leading-relaxed">{review.text}</p>
-                    : <p className="mt-2.5 text-xs text-outline italic">No written review</p>}
+                    : <p className="mt-2.5 text-xs italic text-on-surface-variant">No written review</p>}
                 </div>
               </div>
             </div>
           ))}
 
           {!loading && visibleReviews.length > 0 && (
-            <p className="text-center text-xs text-outline py-2">
+            <p className="text-center text-xs text-on-surface-variant py-2">
               Showing {visibleReviews.length} of {reviews.length} reviews{filterStar > 0 && ` · filtered to ${filterStar}★`}
             </p>
           )}
@@ -680,7 +680,7 @@ function GoogleReviewsInner() {
 
 export default function GoogleReviewsPage() {
   return (
-    <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-surface-container" />}>
+    <Suspense fallback={<div className="h-64 animate-pulse rounded-2xl bg-surface-container" />}>
       <GoogleReviewsInner />
     </Suspense>
   )

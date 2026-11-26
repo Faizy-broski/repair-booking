@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Gift, Printer, X, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/shared/page-header'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/data-table'
@@ -147,10 +148,10 @@ export default function GiftCardsPage() {
       header: 'Code',
       cell: ({ getValue, row }) => (
         <div className="flex items-center gap-2">
-          <Gift className="h-4 w-4 text-purple-500" />
+          <Gift className="h-4 w-4 text-primary" />
           <button
             onClick={() => setQrCard(row.original)}
-            className="font-mono font-semibold text-blue-600 hover:underline"
+            className="font-mono font-semibold text-primary hover:underline"
           >
             {getValue() as string}
           </button>
@@ -162,7 +163,7 @@ export default function GiftCardsPage() {
       header: 'Customer',
       cell: ({ row }) => {
         const ids: string[] = row.original.customer_ids ?? []
-        if (ids.length === 0) return <span className="text-xs text-outline">All Customers</span>
+        if (ids.length === 0) return <span className="text-xs text-on-surface-variant">All Customers</span>
         // Legacy single customer fallback
         const c = row.original.customers
         if (c && ids.length === 1) return `${c.first_name} ${c.last_name ?? ''}`
@@ -182,11 +183,11 @@ export default function GiftCardsPage() {
         const pct = (balance / row.original.initial_value) * 100
         return (
           <div>
-            <span className={`font-semibold ${balance === 0 ? 'text-outline' : 'text-green-600'}`}>
+            <span className={`font-semibold tabular-nums ${balance === 0 ? 'text-on-surface-variant' : 'text-emerald-600'}`}>
               {formatCurrency(balance)}
             </span>
             <div className="mt-0.5 h-1 w-16 rounded-full bg-surface-container">
-              <div className="h-1 rounded-full bg-green-500" style={{ width: `${pct}%` }} />
+              <div className="h-1 rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />
             </div>
           </div>
         )
@@ -231,16 +232,16 @@ export default function GiftCardsPage() {
   const activeCount = giftCards.filter((g) => g.is_active).length
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-on-surface">Gift Cards</h1>
-          <p className="text-sm text-on-surface-variant">{activeCount} active · {formatCurrency(totalBalance)} outstanding</p>
-        </div>
-        <Button onClick={() => setSheetOpen(true)}>
-          <Plus className="h-4 w-4" /> Create Gift Card
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Gift Cards"
+        description={`${activeCount} active · ${formatCurrency(totalBalance)} outstanding`}
+        actions={
+          <Button onClick={() => setSheetOpen(true)}>
+            <Plus className="h-4 w-4" /> Create Gift Card
+          </Button>
+        }
+      />
 
       <DataTable
         data={giftCards}
@@ -257,12 +258,12 @@ export default function GiftCardsPage() {
       {/* QR Modal */}
       {qrCard && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setQrCard(null)}>
-          <div className="rounded-xl bg-surface p-8 text-center shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <Gift className="mx-auto mb-3 h-8 w-8 text-purple-500" />
+          <div className="rounded-2xl bg-surface-container-lowest p-8 text-center shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <Gift className="mx-auto mb-3 h-8 w-8 text-primary" />
             <p className="text-lg font-bold text-on-surface">{qrCard.code}</p>
             <p className="text-sm text-on-surface-variant">Balance: {formatCurrency(qrCard.balance)}</p>
-            <div className="mt-4 rounded-lg bg-surface-container-low p-4">
-              <p className="text-xs text-outline">QR code generation requires the qrcode package</p>
+            <div className="mt-4 rounded-xl bg-surface-container-low p-4">
+              <p className="text-xs text-on-surface-variant">QR code generation requires the qrcode package</p>
               <p className="mt-1 font-mono text-xs text-on-surface-variant">{qrCard.code}</p>
             </div>
             <Button className="mt-4" onClick={() => setQrCard(null)}>Close</Button>
@@ -291,9 +292,9 @@ export default function GiftCardsPage() {
                   key={method}
                   type="button"
                   onClick={() => setFormPaymentMethod(method)}
-                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
                     formPaymentMethod === method
-                      ? 'border-brand-teal bg-brand-teal/10 text-brand-teal'
+                      ? 'border-primary bg-primary/10 text-primary'
                       : 'border-outline-variant text-on-surface-variant hover:bg-surface-container-low'
                   }`}
                 >
@@ -302,7 +303,7 @@ export default function GiftCardsPage() {
               ))}
             </div>
             {formPaymentMethod === 'cash' && (
-              <p className="mt-1 text-xs text-outline">Requires an open register — the amount will be added to Expected Cash.</p>
+              <p className="mt-1 text-xs text-on-surface-variant">Requires an open register — the amount will be added to Expected Cash.</p>
             )}
           </div>
 
@@ -313,9 +314,9 @@ export default function GiftCardsPage() {
               <button
                 type="button"
                 onClick={() => { setFormAllCustomers(true); setFormCustomerIds([]) }}
-                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                   formAllCustomers
-                    ? 'border-brand-teal bg-brand-teal/10 text-brand-teal'
+                    ? 'border-primary bg-primary/10 text-primary'
                     : 'border-outline-variant text-on-surface-variant hover:bg-surface-container-low'
                 }`}
               >
@@ -324,9 +325,9 @@ export default function GiftCardsPage() {
               <button
                 type="button"
                 onClick={() => setFormAllCustomers(false)}
-                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                   !formAllCustomers
-                    ? 'border-brand-teal bg-brand-teal/10 text-brand-teal'
+                    ? 'border-primary bg-primary/10 text-primary'
                     : 'border-outline-variant text-on-surface-variant hover:bg-surface-container-low'
                 }`}
               >
@@ -343,7 +344,7 @@ export default function GiftCardsPage() {
                       const c = customers.find(cu => cu.id === id)
                       if (!c) return null
                       return (
-                        <span key={id} className="inline-flex items-center gap-1 rounded-full bg-brand-teal/10 px-2.5 py-0.5 text-xs font-medium text-brand-teal">
+                        <span key={id} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
                           {c.first_name} {c.last_name ?? ''}
                           <button type="button" onClick={() => toggleCustomer(id)} className="hover:text-red-500">
                             <X className="h-3 w-3" />
@@ -361,12 +362,12 @@ export default function GiftCardsPage() {
                   value={custSearch}
                   onChange={e => { setCustSearch(e.target.value); setCustDropdownOpen(true) }}
                   onFocus={() => setCustDropdownOpen(true)}
-                  className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
+                  className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none"
                 />
                 {custDropdownOpen && (
-                  <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-outline-variant bg-surface shadow-lg">
+                  <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-outline-variant bg-surface-container-lowest shadow-lg">
                     {filteredCustomers.length === 0 ? (
-                      <p className="px-3 py-2 text-xs text-outline">No customers found</p>
+                      <p className="px-3 py-2 text-xs text-on-surface-variant">No customers found</p>
                     ) : filteredCustomers.map(c => {
                       const selected = formCustomerIds.includes(c.id)
                       return (
@@ -374,9 +375,9 @@ export default function GiftCardsPage() {
                           key={c.id}
                           type="button"
                           onClick={() => { toggleCustomer(c.id); setCustSearch('') }}
-                          className={`flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-surface-container-low ${selected ? 'bg-brand-teal/5' : ''}`}
+                          className={`flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-surface-container-low ${selected ? 'bg-primary/5' : ''}`}
                         >
-                          <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${selected ? 'border-brand-teal bg-brand-teal text-white' : 'border-outline'}`}>
+                          <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${selected ? 'border-primary bg-primary text-on-primary' : 'border-outline-variant'}`}>
                             {selected && <Check className="h-3 w-3" />}
                           </span>
                           <span className="truncate">{c.first_name} {c.last_name ?? ''}</span>
@@ -386,7 +387,7 @@ export default function GiftCardsPage() {
                     <button
                       type="button"
                       onClick={() => setCustDropdownOpen(false)}
-                      className="w-full border-t border-outline-variant px-3 py-1.5 text-xs font-medium text-outline hover:bg-surface-container-low"
+                      className="w-full border-t border-outline-variant px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-container-low"
                     >
                       Close
                     </button>
@@ -397,7 +398,7 @@ export default function GiftCardsPage() {
           </div>
 
           <Input label="Expiry Date (optional)" type="date" value={formExpiry} onChange={e => setFormExpiry(e.target.value)} />
-          <p className="text-xs text-outline">A unique code will be auto-generated</p>
+          <p className="text-xs text-on-surface-variant">A unique code will be auto-generated</p>
           {formError && <p className="text-sm text-red-600">{formError}</p>}
           <Button type="submit" className="w-full" loading={formSubmitting} disabled={!formValue}>Create Gift Card</Button>
         </form>

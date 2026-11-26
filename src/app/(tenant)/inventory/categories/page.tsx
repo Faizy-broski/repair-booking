@@ -69,14 +69,14 @@ export default function CategoriesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-on-surface-variant hover:text-on-surface">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-10 w-10 rounded-full border border-outline-variant text-on-surface-variant hover:text-on-surface">
             <ArrowLeft className="h-5 w-5" strokeWidth={3} />
           </Button>
           <div>
-            <h1 className="text-xl font-bold text-on-surface">Categories</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-on-surface">Categories</h1>
             <p className="text-sm text-on-surface-variant mt-0.5">
               Organise products into categories. Assign attributes to a category when creating them under{' '}
-              <Link href="/inventory/attributes" className="text-brand-teal underline">Attributes</Link>.
+              <Link href="/inventory/attributes" className="text-primary underline">Attributes</Link>.
             </p>
           </div>
         </div>
@@ -91,7 +91,7 @@ export default function CategoriesPage() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search categories..."
-          className="w-full rounded-lg border border-outline-variant bg-surface pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal"
+          className="w-full rounded-xl border border-outline-variant bg-surface pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-primary focus:border-primary"
         />
       </div>
 
@@ -116,17 +116,17 @@ export default function CategoriesPage() {
         <div className="rounded-xl border border-outline-variant bg-surface overflow-hidden divide-y divide-outline-variant">
           {filtered.map(cat => (
             <div key={cat.id} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-container-low transition-colors">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-teal/10 shrink-0">
-                <Layers className="h-4 w-4 text-brand-teal" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 shrink-0">
+                <Layers className="h-4 w-4 text-primary" />
               </div>
               <span className="flex-1 text-sm font-medium text-on-surface">{cat.name}</span>
               <div className="flex items-center gap-1 shrink-0">
                 <button onClick={() => openEdit(cat)}
-                  className="rounded p-1.5 text-blue-500 hover:bg-blue-50 transition-colors" title="Rename">
+                  className="rounded-xl p-1.5 text-primary hover:bg-primary/5 transition-colors" title="Rename">
                   <Edit2 className="h-3.5 w-3.5" />
                 </button>
                 <button onClick={() => setDeleteCat(cat)}
-                  className="rounded p-1.5 text-red-500 hover:bg-red-50 transition-colors" title="Delete">
+                  className="rounded-xl p-1.5 text-red-500 hover:bg-red-50 transition-colors" title="Delete">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>

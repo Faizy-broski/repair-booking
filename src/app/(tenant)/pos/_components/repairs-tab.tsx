@@ -36,7 +36,7 @@ const EMPTY_DETAILS: RepairDetailsForm = {
   customer_note: '', staff_note: '',
 }
 
-const inp = 'h-10 w-full rounded-lg border border-outline-variant bg-surface px-3 text-sm focus:border-brand-teal focus:outline-none'
+const inp = 'h-10 w-full rounded-xl border border-outline-variant bg-surface px-3 text-sm focus:border-primary focus:outline-none'
 const sel = inp
 const lbl = 'mb-1 block text-sm font-medium text-on-surface-variant'
 
@@ -503,12 +503,12 @@ export function RepairsTab() {
       <div className="flex items-center justify-between gap-2 border-b border-outline-variant bg-surface px-4 py-2.5">
         <div className="flex items-center gap-3">
           <p className="text-sm font-semibold text-on-surface">New Repair Job</p>
-          <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${pos.customer ? 'bg-teal-50 text-brand-teal' : 'bg-surface-container text-outline'}`}>
+          <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${pos.customer ? 'bg-teal-50 text-primary' : 'bg-surface-container text-outline'}`}>
             <User className="h-3 w-3" />
             {pos.customer ? `${pos.customer.first_name} ${pos.customer.last_name ?? ''}`.trim() : 'No customer selected — walk-in'}
           </div>
         </div>
-        <Button className="bg-brand-teal hover:bg-brand-teal-dark text-sm px-4 py-1.5 h-8" loading={confirmingRepair} onClick={confirmRepair}>
+        <Button className="bg-primary hover:bg-primary/90 text-sm px-4 py-1.5 h-8" loading={confirmingRepair} onClick={confirmRepair}>
           Confirm
         </Button>
       </div>
@@ -519,7 +519,7 @@ export function RepairsTab() {
 
           {/* DEVICE */}
           <div className="rounded-xl border border-outline-variant bg-surface p-4">
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-brand-teal">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-primary">
               <Wrench className="h-3 w-3" /> Device
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
@@ -553,7 +553,7 @@ export function RepairsTab() {
                     createLabel="Add brand"
                   />
                 ) : (
-                  <div className="flex h-10 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-sm text-outline-variant select-none">
+                  <div className="flex h-10 w-full cursor-not-allowed items-center gap-2 rounded-xl border border-dashed border-outline-variant bg-surface-container-low px-3 text-sm text-outline-variant select-none">
                     <Lock className="h-3.5 w-3.5 shrink-0" /> Select type first
                   </div>
                 )}
@@ -575,7 +575,7 @@ export function RepairsTab() {
                     createLabel="Add model"
                   />
                 ) : (
-                  <div className="flex h-10 w-full cursor-not-allowed items-center gap-2 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-3 text-sm text-outline-variant select-none">
+                  <div className="flex h-10 w-full cursor-not-allowed items-center gap-2 rounded-xl border border-dashed border-outline-variant bg-surface-container-low px-3 text-sm text-outline-variant select-none">
                     <Lock className="h-3.5 w-3.5 shrink-0" /> Select brand first
                   </div>
                 )}
@@ -591,17 +591,17 @@ export function RepairsTab() {
               </div>
             </div>
             {deviceError && (
-              <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-500">{deviceError}</p>
+              <p className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-500">{deviceError}</p>
             )}
           </div>
 
           {/* REPAIR PARTS */}
           <div className="rounded-xl border border-outline-variant bg-surface p-4">
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-brand-teal">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-primary">
               <Wrench className="h-3 w-3" /> Repair Parts
             </p>
             {(!repairDetails.device_type || !repairDetails.device_brand || !repairDetails.device_model) && (
-              <p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-600">
+              <p className="mb-2 rounded-xl border border-amber-200 bg-amber-500/5 px-3 py-2 text-xs text-amber-600">
                 Select Device Type, Brand and Model above to add repair parts.
               </p>
             )}
@@ -617,18 +617,18 @@ export function RepairsTab() {
                   disabled={!repairDetails.device_model}
                 />
                 {partSearchLoading && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin rounded-full border-2 border-outline border-t-transparent" />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin rounded-full border-2 border-outline-variant border-t-transparent" />
                 )}
               </div>
 
               {showPartDrop && (
-                <div className="absolute z-50 mt-1 w-full rounded-lg border border-outline-variant bg-surface shadow-lg">
+                <div className="absolute z-50 mt-1 w-full rounded-xl border border-outline-variant bg-surface shadow-lg">
                   <ul className="max-h-44 overflow-y-auto py-1">
                     {partResults.map((p) => (
                       <li key={p.id}>
                         <button
                           type="button"
-                          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
+                          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-primary/5 transition-colors"
                           onMouseDown={(e) => { e.preventDefault(); addPartFromInventory(p) }}
                         >
                           <span className="min-w-0 flex-1 truncate text-on-surface-variant">{p.name}</span>
@@ -653,7 +653,7 @@ export function RepairsTab() {
                                 value={quickPartCost}
                                 onChange={(e) => setQuickPartCost(e.target.value)}
                                 placeholder="0.00"
-                                className="h-7 w-full rounded border border-outline-variant bg-surface-container-low px-2 text-xs text-on-surface"
+                                className="h-9 w-full rounded-xl border border-outline-variant bg-surface-container-low px-2 text-xs text-on-surface"
                                 onMouseDown={(e) => e.stopPropagation()}
                               />
                             </div>
@@ -664,13 +664,13 @@ export function RepairsTab() {
                                 value={quickPartPrice}
                                 onChange={(e) => setQuickPartPrice(e.target.value)}
                                 placeholder="0.00"
-                                className="h-7 w-full rounded border border-outline px-2 text-xs text-on-surface"
+                                className="h-9 w-full rounded-xl border border-outline-variant px-2 text-xs text-on-surface"
                                 onMouseDown={(e) => e.stopPropagation()}
                               />
                             </div>
                             <button
                               type="button"
-                              className="mt-4 shrink-0 rounded bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-700 transition-colors"
+                              className="mt-4 shrink-0 rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary hover:bg-primary/90 transition-colors"
                               onMouseDown={(e) => { e.preventDefault(); addQuickPart() }}
                             >
                               Add
@@ -690,7 +690,7 @@ export function RepairsTab() {
             </div>
 
             {repairParts.length > 0 && (
-              <div className="mt-2 overflow-hidden rounded-lg border border-outline-variant">
+              <div className="mt-2 overflow-hidden rounded-xl border border-outline-variant">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="bg-surface-container-low font-semibold text-on-surface-variant">
@@ -716,21 +716,21 @@ export function RepairsTab() {
                               if (requested > cap) toast.error(`Only ${cap} in stock for "${r.name}"`)
                               return { ...r, qty: Math.min(requested, cap) }
                             }))}
-                            className="h-6 w-12 rounded border border-outline-variant px-1 text-center text-xs"
+                            className="h-6 w-12 rounded-xl border border-outline-variant px-1 text-center text-xs"
                           />
                         </td>
                         <td className="px-2 py-1.5 text-right">
                           <input
                             type="number" step="0.01" min="0" value={p.unit_cost}
                             onChange={(e) => setRepairParts(prev => prev.map(r => r.tempId === p.tempId ? { ...r, unit_cost: parseFloat(e.target.value) || 0 } : r))}
-                            className="h-6 w-16 rounded border border-outline-variant bg-surface-container-low px-1 text-right text-xs text-on-surface-variant"
+                            className="h-6 w-16 rounded-xl border border-outline-variant bg-surface-container-low px-1 text-right text-xs text-on-surface-variant"
                           />
                         </td>
                         <td className="px-2 py-1.5 text-right">
                           <input
                             type="number" step="0.01" min="0" value={p.unit_price}
                             onChange={(e) => setRepairParts(prev => prev.map(r => r.tempId === p.tempId ? { ...r, unit_price: parseFloat(e.target.value) || 0 } : r))}
-                            className="h-6 w-16 rounded border border-outline-variant px-1 text-right text-xs"
+                            className="h-6 w-16 rounded-xl border border-outline-variant px-1 text-right text-xs"
                           />
                         </td>
                         <td className="px-2 py-1.5 text-right font-semibold text-on-surface-variant">{formatCurrency(p.unit_price * p.qty)}</td>
@@ -756,7 +756,7 @@ export function RepairsTab() {
 
           {/* FAULT & ASSIGNMENT */}
           <div className="rounded-xl border border-outline-variant bg-surface p-4">
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-brand-teal">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-primary">
               <Wrench className="h-3 w-3" /> Fault &amp; Assignment
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
@@ -806,7 +806,7 @@ export function RepairsTab() {
 
           {/* FINANCIALS & ASSIGNMENT */}
           <div className="rounded-xl border border-outline-variant bg-surface p-4">
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-brand-teal">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-primary">
               <Banknote className="h-3 w-3" /> Financials &amp; Assignment
             </p>
             <label className="mb-3 flex w-fit cursor-pointer items-center gap-2.5">
@@ -882,9 +882,9 @@ export function RepairsTab() {
               </div>
               <div>
                 <label className={lbl}>Remaining</label>
-                <div className={`flex h-10 items-center rounded-lg border px-3 text-sm font-semibold ${
-                  pricePending ? 'border-amber-200 bg-amber-50 text-amber-600'
-                    : remaining > 0 ? 'border-orange-200 bg-orange-50 text-orange-600' : 'border-green-200 bg-green-50 text-green-600'
+                <div className={`flex h-10 items-center rounded-xl border px-3 text-sm font-semibold ${
+                  pricePending ? 'border-amber-200 bg-amber-500/5 text-amber-600'
+                    : remaining > 0 ? 'border-orange-200 bg-orange-50 text-orange-600' : 'border-green-200 bg-emerald-500/5 text-emerald-700'
                 }`}>
                   {pricePending ? 'TBD' : `${getCurrencySymbol()}${remaining.toFixed(2)}`}
                 </div>
@@ -923,9 +923,9 @@ export function RepairsTab() {
                         const loyalty_apply_input = m === 'loyalty_points' && active ? '' : p.loyalty_apply_input
                         return { ...p, payment_methods, payment_amounts, credit_apply_input, loyalty_apply_input }
                       })}
-                      className={`flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
+                      className={`flex items-center gap-1 rounded-xl border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
                         active
-                          ? 'border-gray-900 bg-gray-900 text-white'
+                          ? 'border-primary bg-primary text-on-primary'
                           : disabled
                             ? 'border-outline-variant text-outline-variant cursor-not-allowed'
                             : 'border-outline-variant bg-surface text-on-surface-variant hover:bg-surface-container-low'
@@ -1012,7 +1012,7 @@ export function RepairsTab() {
                 const due = parseFloat(repairDetails.deposit_paid) || 0
                 const remaining = due - applied
                 return (
-                  <p className={`mt-2 text-xs font-medium ${Math.abs(remaining) < 0.01 ? 'text-green-600' : 'text-amber-600'}`}>
+                  <p className={`mt-2 text-xs font-medium ${Math.abs(remaining) < 0.01 ? 'text-emerald-700' : 'text-amber-600'}`}>
                     Applied {formatCurrency(applied)} / {formatCurrency(due)} {Math.abs(remaining) >= 0.01 && `· Remaining ${formatCurrency(remaining)}`}
                   </p>
                 )
@@ -1022,7 +1022,7 @@ export function RepairsTab() {
 
           {/* DEVICE LOCK */}
           <div className="rounded-xl border border-outline-variant bg-surface p-4">
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-brand-teal">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-primary">
               <Lock className="h-3 w-3" /> Device Lock
             </p>
             <div className="mb-2 flex items-center gap-2">
@@ -1031,7 +1031,7 @@ export function RepairsTab() {
                   key={t}
                   type="button"
                   onClick={() => setRepairDetails(p => ({ ...p, lock_type: t, passcode: '' }))}
-                  className={`rounded-md border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${repairDetails.lock_type === t ? 'border-gray-900 bg-gray-900 text-white' : 'border-outline-variant bg-surface text-on-surface-variant hover:bg-surface-container-low'}`}
+                  className={`rounded-xl border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${repairDetails.lock_type === t ? 'border-primary bg-primary text-on-primary' : 'border-outline-variant bg-surface text-on-surface-variant hover:bg-surface-container-low'}`}
                 >
                   {t === '' ? 'None' : t}
                 </button>
@@ -1067,7 +1067,7 @@ export function RepairsTab() {
 
           {/* POS EXTRAS */}
           <div className="rounded-xl border border-outline-variant bg-surface p-4">
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-brand-teal">
+            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-primary">
               <StickyNote className="h-3 w-3" /> Additional Details
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -1101,7 +1101,7 @@ export function RepairsTab() {
                 type="checkbox" id="rush_job"
                 checked={repairDetails.is_rush}
                 onChange={(e) => setRepairDetails(d => ({ ...d, is_rush: e.target.checked }))}
-                className="h-4 w-4 rounded border-outline text-brand-teal"
+                className="h-4 w-4 rounded-xl border-outline-variant text-primary"
               />
               <label htmlFor="rush_job" className="text-sm font-medium text-on-surface-variant">Mark as Rush Job</label>
             </div>
@@ -1113,7 +1113,7 @@ export function RepairsTab() {
                   value={repairDetails.customer_note}
                   onChange={(e) => setRepairDetails(d => ({ ...d, customer_note: e.target.value }))}
                   placeholder="Visible to customer…"
-                  className="w-full resize-none rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface placeholder:text-outline transition focus:border-brand-teal focus:outline-none"
+                  className="w-full resize-none rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface placeholder:text-outline transition focus:border-primary focus:outline-none"
                 />
               </div>
               <div>
@@ -1123,7 +1123,7 @@ export function RepairsTab() {
                   value={repairDetails.staff_note}
                   onChange={(e) => setRepairDetails(d => ({ ...d, staff_note: e.target.value }))}
                   placeholder="Internal only…"
-                  className="w-full resize-none rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface placeholder:text-outline transition focus:border-brand-teal focus:outline-none"
+                  className="w-full resize-none rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm text-on-surface placeholder:text-outline transition focus:border-primary focus:outline-none"
                 />
               </div>
             </div>
@@ -1131,8 +1131,8 @@ export function RepairsTab() {
 
           {/* Custom Fields */}
           {repairCustomFieldDefs.length > 0 && (
-            <div className="rounded-xl border border-brand-teal-light bg-brand-teal-light p-4">
-              <p className="mb-2 text-xs font-semibold text-brand-teal-dark">Additional Fields</p>
+            <div className="rounded-xl border border-primary/10 bg-primary/10 p-4">
+              <p className="mb-2 text-xs font-semibold text-primary">Additional Fields</p>
               <CustomFieldRenderer
                 values={repairCustomFields}
                 definitions={repairCustomFieldDefs}
@@ -1149,9 +1149,9 @@ export function RepairsTab() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="rounded-2xl bg-surface px-16 py-14 text-center shadow-2xl">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-              <CheckCircle2 className="h-9 w-9 text-green-600" />
+              <CheckCircle2 className="h-9 w-9 text-emerald-700" />
             </div>
-            <p className="text-xl font-bold text-green-700">Repair Job Created!</p>
+            <p className="text-xl font-bold text-emerald-700">Repair Job Created!</p>
             <p className="mt-1 text-sm text-on-surface-variant">Invoice has been sent to print.</p>
             {repairShare && (
               <div className="mt-6 border-t border-outline-variant pt-5">

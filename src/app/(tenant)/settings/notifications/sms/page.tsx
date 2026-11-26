@@ -2,11 +2,12 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { MessageSquare, Settings2, Send, CheckCircle2 } from 'lucide-react'
+import { Settings2, Send, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, type SelectOption } from '@/components/ui/select'
 import { useAuthStore } from '@/store/auth.store'
+import { PageHeader } from '@/components/shared/page-header'
 
 interface SmsConfig {
   sms_gateway: string | null
@@ -73,22 +74,21 @@ export default function SmsGatewayPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
-          <MessageSquare className="h-5 w-5 text-green-600" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-on-surface">SMS Gateway</h1>
-          <p className="text-sm text-on-surface-variant">Connect an SMS provider to send text notifications to customers</p>
-        </div>
-      </div>
+      <PageHeader title="SMS Gateway" description="Connect an SMS provider to send text notifications to customers" />
 
-      <div className="max-w-lg space-y-6">
-        <div className="rounded-lg border border-outline-variant bg-surface p-6 shadow-sm">
-          <h3 className="mb-4 text-lg font-semibold text-on-surface">SMS Gateway Configuration</h3>
+      <div className="max-w-4xl space-y-6">
+        <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
+          <div className="mb-5 flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Settings2 className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold text-on-surface">SMS Gateway Configuration</h3>
+              <p className="mt-0.5 text-sm text-on-surface-variant">Enter your provider credentials to start sending texts.</p>
+            </div>
+          </div>
           {smsConfig?.is_configured && (
-            <div className="mb-4 flex items-center gap-2 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
+            <div className="mb-4 flex items-center gap-2 rounded-xl bg-emerald-500/10 px-3 py-2 text-sm text-emerald-600">
               <CheckCircle2 className="h-4 w-4" /> SMS gateway is configured ({smsConfig.sms_gateway})
             </div>
           )}
@@ -128,8 +128,16 @@ export default function SmsGatewayPage() {
         </div>
 
         {/* Test SMS */}
-        <div className="rounded-lg border border-outline-variant bg-surface p-6 shadow-sm">
-          <h3 className="mb-4 text-lg font-semibold text-on-surface">Send Test SMS</h3>
+        <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
+          <div className="mb-5 flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Send className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold text-on-surface">Send Test SMS</h3>
+              <p className="mt-0.5 text-sm text-on-surface-variant">Check the connection by sending a test message.</p>
+            </div>
+          </div>
           <div className="flex gap-3">
             <Input
               placeholder="+447911123456"

@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Phone, PhoneOff, PhoneCall, PhoneMissed, Mic, MicOff, Volume2, VolumeX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/shared/page-header'
 import { Badge } from '@/components/ui/badge'
 import { useAuthStore } from '@/store/auth.store'
 import { createBrowserClient } from '@supabase/ssr'
@@ -261,32 +262,29 @@ export default function PhonePage() {
   if (authLoading || branches.length < 2) return null
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-bold text-on-surface">Branch Phone</h1>
-        <p className="text-sm text-on-surface-variant">Internal WebRTC calling between branches</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader title="Branch Phone" description="Internal WebRTC calling between branches" />
 
       <audio ref={remoteAudioRef} className="hidden" />
 
       {/* Incoming call alert */}
       {callStatus === 'incoming' && (
-        <div className="rounded-xl border border-green-200 bg-green-50 p-4">
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 animate-pulse">
-                <PhoneCall className="h-5 w-5 text-green-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10 animate-pulse">
+                <PhoneCall className="h-5 w-5 text-emerald-600" />
               </div>
               <div>
-                <p className="font-semibold text-green-900">Incoming call</p>
-                <p className="text-sm text-green-700">{callerInfo?.branchName}</p>
+                <p className="font-semibold text-on-surface">Incoming call</p>
+                <p className="text-sm text-on-surface-variant">{callerInfo?.branchName}</p>
               </div>
             </div>
             <div className="flex gap-2">
               <Button size="sm" variant="destructive" onClick={rejectCall}>
                 <PhoneOff className="h-4 w-4" /> Decline
               </Button>
-              <Button size="sm" className="bg-green-600 hover:bg-green-700" onClick={acceptCall}>
+              <Button size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={acceptCall}>
                 <Phone className="h-4 w-4" /> Answer
               </Button>
             </div>
@@ -296,21 +294,21 @@ export default function PhonePage() {
 
       {/* Active call */}
       {(callStatus === 'connected' || callStatus === 'calling') && (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 p-6 text-center">
-          <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-full bg-blue-100">
-            <Phone className="h-7 w-7 text-blue-600" />
+        <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+            <Phone className="h-7 w-7 text-primary" />
           </div>
-          <p className="mt-3 font-semibold text-blue-900">
+          <p className="mt-3 font-semibold text-on-surface">
             {callStatus === 'calling' ? 'Calling...' : 'Connected'}
           </p>
-          <p className="text-sm text-blue-700">{callTarget?.name ?? callerInfo?.branchName}</p>
+          <p className="text-sm text-on-surface-variant">{callTarget?.name ?? callerInfo?.branchName}</p>
           {callStatus === 'connected' && (
-            <p className="mt-1 font-mono text-lg text-blue-800">{formatDuration(callDuration)}</p>
+            <p className="mt-1 font-mono text-lg tabular-nums text-on-surface">{formatDuration(callDuration)}</p>
           )}
           <div className="mt-4 flex justify-center gap-3">
             <button
               onClick={toggleMute}
-              className={`flex h-10 w-10 items-center justify-center rounded-full ${isMuted ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}
+              className={`flex h-10 w-10 items-center justify-center rounded-full ${isMuted ? 'bg-red-500/10 text-red-600' : 'bg-primary/10 text-primary'}`}
             >
               {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
             </button>
@@ -322,7 +320,7 @@ export default function PhonePage() {
             </button>
             <button
               onClick={toggleSpeaker}
-              className={`flex h-10 w-10 items-center justify-center rounded-full ${isSpeakerOff ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}
+              className={`flex h-10 w-10 items-center justify-center rounded-full ${isSpeakerOff ? 'bg-red-500/10 text-red-600' : 'bg-primary/10 text-primary'}`}
             >
               {isSpeakerOff ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
             </button>
@@ -332,13 +330,13 @@ export default function PhonePage() {
 
       {/* Branch directory */}
       {callStatus === 'idle' && (
-        <div className="rounded-xl border border-outline-variant bg-surface">
-          <div className="border-b border-outline-variant px-4 py-3">
-            <h3 className="font-medium text-on-surface">Branch Directory</h3>
+        <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest">
+          <div className="border-b border-outline-variant px-4 py-3.5">
+            <h3 className="text-base font-semibold text-on-surface">Branch Directory</h3>
           </div>
           <div className="divide-y divide-outline-variant">
             {onlineBranches.length === 0 ? (
-              <div className="flex h-24 items-center justify-center text-sm text-outline">
+              <div className="flex h-24 items-center justify-center text-sm text-on-surface-variant">
                 No other branches available
               </div>
             ) : (

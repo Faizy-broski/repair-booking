@@ -146,14 +146,14 @@ export function ScannerModal({
         size="lg"
       >
         {/* ── Tab bar ──────────────────────────────────────────────────────── */}
-        <div className="mb-4 flex overflow-hidden rounded-lg border border-outline-variant">
+        <div className="mb-4 flex overflow-hidden rounded-xl border border-outline-variant">
           {(['webcam', 'hid'] as const).map((t) => (
             <button
               key={t}
               onClick={() => { setTab(t); resetToScanning() }}
               className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-medium transition-colors ${
                 tab === t
-                  ? 'bg-brand-teal text-white'
+                  ? 'bg-primary text-on-primary'
                   : 'text-on-surface-variant hover:bg-surface-container-low'
               }`}
             >
@@ -174,8 +174,8 @@ export function ScannerModal({
         {/* ── HID / Physical scanner tab ───────────────────────────────────── */}
         {tab === 'hid' && scanState === 'scanning' && (
           <div className="flex flex-col items-center gap-4 rounded-xl bg-surface-container-low border border-outline-variant px-6 py-10 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-teal-50 border-2 border-brand-teal">
-              <ScanLine className="h-8 w-8 text-brand-teal" />
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-teal-50 border-2 border-primary">
+              <ScanLine className="h-8 w-8 text-primary" />
             </div>
             <div>
               <p className="font-semibold text-on-surface">Physical Scanner Ready</p>
@@ -185,9 +185,9 @@ export function ScannerModal({
                 The code will be detected automatically.
               </p>
             </div>
-            <div className="flex items-center gap-2 rounded-full bg-green-50 border border-green-200 px-4 py-1.5">
+            <div className="flex items-center gap-2 rounded-full bg-emerald-500/5 border border-green-200 px-4 py-1.5">
               <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-xs font-medium text-green-700">Listening for scanner input</span>
+              <span className="text-xs font-medium text-emerald-700">Listening for scanner input</span>
             </div>
           </div>
         )}
@@ -195,7 +195,7 @@ export function ScannerModal({
         {/* ── Looking up ───────────────────────────────────────────────────── */}
         {(scanState === 'looking' || isLooking) && (
           <div className="flex flex-col items-center gap-3 py-10">
-            <Loader2 className="h-8 w-8 animate-spin text-brand-teal" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-sm text-on-surface-variant">
               Looking up <span className="font-mono font-medium text-on-surface">{lastBarcode}</span>…
             </p>
@@ -205,15 +205,15 @@ export function ScannerModal({
         {/* ── Product found ────────────────────────────────────────────────── */}
         {scanState === 'found' && foundProduct && (
           <div className="space-y-4">
-            <div className="flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 p-4">
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600" />
+            <div className="flex items-start gap-3 rounded-xl border border-green-200 bg-emerald-500/5 p-4">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium uppercase tracking-wider text-green-600">Product Found</p>
+                <p className="text-xs font-medium uppercase tracking-wider text-emerald-700">Product Found</p>
                 <p className="mt-1 text-base font-semibold text-on-surface leading-snug">
                   {foundProduct.name}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-on-surface-variant">
-                  <span className="font-bold text-brand-teal">
+                  <span className="font-bold text-primary">
                     {formatCurrency(foundProduct.selling_price)}
                   </span>
                   {foundProduct.sku && (
@@ -231,10 +231,10 @@ export function ScannerModal({
                 <img
                   src={foundProduct.image_url}
                   alt={foundProduct.name}
-                  className="h-14 w-14 shrink-0 rounded-lg object-cover"
+                  className="h-14 w-14 shrink-0 rounded-xl object-cover"
                 />
               ) : (
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-surface-container">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-surface-container">
                   {(foundProduct as any).item_type === 'part'
                     ? <Package className="h-6 w-6 text-outline-variant" />
                     : <ShoppingBag className="h-6 w-6 text-outline-variant" />}
@@ -253,7 +253,7 @@ export function ScannerModal({
                 <Link
                   href={`/inventory/${foundProduct.id}`}
                   onClick={handleClose}
-                  className="flex items-center gap-1.5 rounded-lg border border-outline bg-surface px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low"
+                  className="flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
                   {isInventory ? 'View Product' : 'Edit Product'}
@@ -271,7 +271,7 @@ export function ScannerModal({
         {/* ── Product not found ────────────────────────────────────────────── */}
         {scanState === 'not_found' && (
           <div className="space-y-4">
-            <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-500/5 p-4">
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
               <div>
                 <p className="text-xs font-medium uppercase tracking-wider text-amber-600">No Product Found</p>

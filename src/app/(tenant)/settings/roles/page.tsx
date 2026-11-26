@@ -1,7 +1,8 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { Save, ShieldCheck } from 'lucide-react'
+import { Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/shared/page-header'
 import { useAuthStore } from '@/store/auth.store'
 
 // The modules and actions to manage
@@ -118,40 +119,35 @@ export default function RolesPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-40 text-outline">
+      <div className="flex items-center justify-center h-40 text-on-surface-variant">
         Loading permissions...
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-on-surface flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-blue-600" />
-            Role Permissions
-          </h1>
-          <p className="text-sm text-on-surface-variant mt-0.5">
-            Control what each role can access. PIN-required actions prompt a confirmation code.
-          </p>
-        </div>
-        <Button onClick={handleSave} loading={saving} variant={saveOk ? 'success' : 'default'}>
-          <Save className="h-4 w-4" />
-          {saveOk ? 'Saved!' : 'Save Changes'}
-        </Button>
-      </div>
+    <div className="max-w-5xl space-y-6">
+      <PageHeader
+        title="Role Permissions"
+        description="Control what each role can access. PIN-required actions prompt a confirmation code."
+        actions={
+          <Button onClick={handleSave} loading={saving} variant={saveOk ? 'success' : 'default'}>
+            <Save className="h-4 w-4" />
+            {saveOk ? 'Saved!' : 'Save Changes'}
+          </Button>
+        }
+      />
 
-      <div className="overflow-x-auto rounded-xl border border-outline-variant bg-surface">
+      <div className="overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-lowest">
         <table className="min-w-full text-sm">
-          <thead className="bg-surface-container-low border-b border-outline-variant">
+          <thead className="bg-primary">
             <tr>
-              <th className="py-3 px-4 text-left font-semibold text-on-surface-variant w-36">Module</th>
-              <th className="py-3 px-4 text-left font-semibold text-on-surface-variant w-24">Action</th>
+              <th className="whitespace-nowrap py-3.5 px-4 text-left text-[13px] font-medium text-white w-36">Module</th>
+              <th className="whitespace-nowrap py-3.5 px-4 text-left text-[13px] font-medium text-white w-24">Action</th>
               {ROLES.map((role) => (
-                <th key={role.key} className="py-3 px-4 text-center font-semibold text-on-surface-variant" colSpan={2}>
+                <th key={role.key} className="whitespace-nowrap py-3.5 px-4 text-center text-[13px] font-medium text-white" colSpan={2}>
                   {role.label}
-                  <div className="flex justify-center gap-4 mt-1 text-xs font-normal text-outline">
+                  <div className="flex justify-center gap-4 mt-1 text-xs font-normal text-white/75">
                     <span>Allow</span>
                     <span>PIN</span>
                   </div>
@@ -160,13 +156,13 @@ export default function RolesPage() {
             </tr>
           </thead>
           <tbody>
-            {MODULES.map((mod, modIdx) =>
+            {MODULES.map((mod) =>
               ACTIONS.map((action, actIdx) => {
                 const isFirstAction = actIdx === 0
                 return (
                   <tr
                     key={buildKey('_', mod.key, action)}
-                    className={`border-b border-outline-variant ${modIdx % 2 === 0 ? 'bg-surface' : 'bg-surface-container-low/50'}`}
+                    className="border-b border-outline-variant last:border-b-0 hover:bg-surface-container-low"
                   >
                     {isFirstAction && (
                       <td
@@ -189,8 +185,8 @@ export default function RolesPage() {
                               onClick={() => toggle(mod.key, role.key, action, 'allowed')}
                               className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
                                 perm.allowed
-                                  ? 'bg-blue-600 border-blue-600 text-white'
-                                  : 'border-outline bg-surface'
+                                  ? 'bg-primary border-primary text-white'
+                                  : 'border-outline-variant bg-surface-container-lowest'
                               }`}
                               title="Toggle access"
                             >
@@ -208,7 +204,7 @@ export default function RolesPage() {
                               className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
                                 perm.requires_pin && perm.allowed
                                   ? 'bg-amber-500 border-amber-500 text-white'
-                                  : 'border-outline-variant bg-surface opacity-50'
+                                  : 'border-outline-variant bg-surface-container-lowest opacity-50'
                               }`}
                               title="Require PIN for this action"
                             >
@@ -230,7 +226,7 @@ export default function RolesPage() {
         </table>
       </div>
 
-      <p className="text-xs text-outline">
+      <p className="text-xs text-on-surface-variant">
         Note: business_owner and super_admin always have full access regardless of these settings.
       </p>
     </div>

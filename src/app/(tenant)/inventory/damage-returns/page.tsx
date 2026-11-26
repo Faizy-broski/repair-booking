@@ -2,13 +2,14 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { Undo2, Plus } from 'lucide-react'
+import { Plus, Search, PackageX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/data-table'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { InventoryNav } from '@/components/inventory/inventory-nav'
+import { PageHeader, FilterPills } from '@/components/shared/page-header'
 import type { ColumnDef } from '@tanstack/react-table'
 
 interface SupplierReturnRow {
@@ -84,44 +85,36 @@ export default function DamageReturnsPage() {
   ]
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <PageHeader
+        back={{ href: '/inventory', label: 'Back to Inventory' }}
+        title="Damage Returns"
+        description="Return damaged stock to suppliers and track resolution."
+        actions={
+          <Button onClick={() => router.push('/inventory/damage-returns/new')}>
+            <Plus className="h-4 w-4" /> New Damage Return
+          </Button>
+        }
+      />
+
       <InventoryNav />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-100">
-            <Undo2 className="h-6 w-6 text-orange-600" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-on-surface">Damage Returns</h1>
-            <p className="text-sm text-on-surface-variant">Return damaged stock to suppliers and track resolution</p>
-          </div>
+        <FilterPills
+          options={STATUS_FILTERS.map((s) => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) }))}
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />
+        <div className="relative w-full sm:max-w-sm">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by product, SKU, return #, supplier or PO…"
+            className="h-10 w-full rounded-full border border-outline-variant pl-10 pr-4 text-sm focus:border-primary focus:outline-none"
+          />
         </div>
-        <Button size="sm" onClick={() => router.push('/inventory/damage-returns/new')}>
-          <Plus className="h-4 w-4" /> New Damage Return
-        </Button>
-      </div>
-
-      <input
-        type="search"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search by product, SKU, return #, supplier or PO…"
-        className="h-9 w-full max-w-md rounded-lg border border-outline px-3 text-sm"
-      />
-
-      <div className="flex gap-2">
-        {STATUS_FILTERS.map((s) => (
-          <button
-            key={s}
-            onClick={() => setStatusFilter(s)}
-            className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors ${
-              statusFilter === s ? 'bg-brand-teal text-white' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-            }`}
-          >
-            {s}
-          </button>
-        ))}
       </div>
 
       <DataTable
@@ -129,6 +122,7 @@ export default function DamageReturnsPage() {
         columns={columns}
         isLoading={isLoading}
         emptyMessage="No damage returns found."
+        emptyIcon={<PackageX />}
         onRowClick={(row) => router.push(`/inventory/damage-returns/${row.id}`)}
       />
     </div>

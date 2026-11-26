@@ -120,12 +120,12 @@ export function VehiclePicker({ customerId, value, onChange }: VehiclePickerProp
 
   if (value && !editingDraft) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
-        <Car className="h-4 w-4 shrink-0 text-blue-600" />
+      <div className="flex items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2">
+        <Car className="h-4 w-4 shrink-0 text-primary" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-on-surface truncate">
             {value.registration_number.toUpperCase()}
-            {!value.id && <span className="ml-1.5 text-[10px] font-semibold uppercase text-blue-600">New</span>}
+            {!value.id && <span className="ml-1.5 text-[10px] font-semibold uppercase text-primary">New</span>}
           </p>
           <p className="text-xs text-on-surface-variant truncate">{[value.make, value.model].filter(Boolean).join(' ') || 'No make/model'}{value.tyre_size ? ` · ${value.tyre_size}` : ''}</p>
         </div>
@@ -163,7 +163,7 @@ export function VehiclePicker({ customerId, value, onChange }: VehiclePickerProp
               key={v.id}
               type="button"
               onClick={() => selectVehicle(v)}
-              className="rounded-md border border-outline bg-surface px-2.5 py-1.5 text-xs font-medium text-on-surface-variant hover:border-blue-400 hover:bg-blue-50"
+              className="rounded-md border border-outline bg-surface px-2.5 py-1.5 text-xs font-medium text-on-surface-variant hover:border-primary hover:bg-surface-container-low"
             >
               {v.registration_number.toUpperCase()}
               {(v.make || v.model) && <span className="ml-1 font-normal text-outline">{[v.make, v.model].filter(Boolean).join(' ')}</span>}
@@ -172,7 +172,7 @@ export function VehiclePicker({ customerId, value, onChange }: VehiclePickerProp
           <button
             type="button"
             onClick={() => setShowNew(true)}
-            className="flex items-center gap-1 rounded-md border border-dashed border-outline px-2.5 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50"
+            className="flex items-center gap-1 rounded-md border border-dashed border-outline px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-surface-container-low"
           >
             <Plus className="h-3 w-3" /> New vehicle
           </button>
@@ -206,7 +206,7 @@ export function VehiclePicker({ customerId, value, onChange }: VehiclePickerProp
 function PlateWarningBanner({ warning }: { warning: { customerName: string } | null }) {
   if (!warning) return null
   return (
-    <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-amber-800">
+    <div className="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-2.5 py-2 text-xs text-amber-700">
       <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
       <span>This plate is already registered to <strong>{warning.customerName}</strong>. If that&apos;s a different customer (e.g. a shared vehicle) you can carry on — otherwise check the registration number.</span>
     </div>

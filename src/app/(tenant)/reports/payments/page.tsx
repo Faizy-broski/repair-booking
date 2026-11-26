@@ -1,25 +1,35 @@
 'use client'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Download, ArrowLeft } from 'lucide-react'
+import { Download, Banknote, ShoppingCart } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
+import { PageHeader } from '@/components/shared/page-header'
+import { MetricCard } from '@/components/shared/ui-kit'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency } from '@/lib/utils'
 import { exportExcel } from '@/lib/export-excel'
 import { DateRangeBar } from '../_components/date-range-bar'
 import Link from 'next/link'
 import {
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from 'recharts'
-import { CHART_COLORS, chartAxisTick, chartGridStroke, chartTooltipStyle } from '@/lib/chart-theme'
+import { chartAxisTick } from '@/lib/chart-theme'
 import type { ColumnDef } from '@tanstack/react-table'
 import { channelLabel } from '../../pos/_types'
 
 interface PaymentRow { payment_method: string; total: number; count: number }
 
-const COLORS = CHART_COLORS
+// Tooltip chrome shared with the dashboard: 12px rounded hairline border.
+const TOOLTIP_PROPS = {
+  contentStyle: { background: 'var(--surface-container-lowest)', border: '1px solid var(--hairline)', borderRadius: 12 },
+  itemStyle: { color: 'var(--on-surface)' },
+  labelStyle: { color: 'var(--on-surface-variant)' },
+}
+
+// Series palette: navy, brand teal, cyan, then semantic emerald / amber / red.
+const COLORS = ['var(--navy)', 'var(--primary)', 'var(--primary-light)', 'var(--success)', 'var(--warning)', 'var(--error)']
 
 function firstOfMonth() { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0] }
 function today() { return new Date().toISOString().split('T')[0] }
@@ -50,65 +60,53 @@ export default function PaymentsReportPage() {
   ]
 
   return (
-    <div className="p-6 space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/reports">
-            <button className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container transition-colors">
-              <ArrowLeft className="h-5 w-5" strokeWidth={3} />
-            </button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-on-surface">Payments Report</h1>
-            <p className="text-sm text-on-surface-variant mt-0.5">Revenue breakdown by payment method</p>
+    <div className="space-y-5">
+      <PageHeader
+        title="Payments Report"
+        description="Revenue breakdown by payment method"
+        back={{ href: '/reports', label: 'Back to Reports' }}
+        actions={
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Link href="/reports/cash-card-ledger">
+              <Button size="sm" variant="outline" className="w-full sm:w-auto">View cash &amp; card ledger</Button>
+            </Link>
+            <Button size="sm" className="w-full sm:w-auto" onClick={() => exportExcel(data as unknown as Record<string, unknown>[], `payments-${dateFrom}-${dateTo}.xlsx`)}>
+              <Download className="h-4 w-4" /> Export Excel
+            </Button>
           </div>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-        <Link href="/reports/cash-card-ledger">
-          <Button size="sm" variant="outline" className="w-full sm:w-auto">View cash &amp; card ledger</Button>
-        </Link>
-        <Button size="sm" className="w-full sm:w-auto" onClick={() => exportExcel(data as unknown as Record<string, unknown>[], `payments-${dateFrom}-${dateTo}.xlsx`)}>
-          <Download className="h-4 w-4" /> Export Excel
-        </Button>
-        </div>
-      </div>
+        }
+      />
 
       <DateRangeBar dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} onApply={refetch} />
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-xl border border-outline-variant bg-surface p-4">
-          <p className="text-sm text-on-surface-variant">Total Revenue</p>
-          <p className="mt-1 text-2xl font-bold text-green-600 sm:text-3xl">{formatCurrency(totalRevenue)}</p>
-        </div>
-        <div className="rounded-xl border border-outline-variant bg-surface p-4">
-          <p className="text-sm text-on-surface-variant">Total Transactions</p>
-          <p className="mt-1 text-2xl font-bold text-on-surface sm:text-3xl">{totalTxns}</p>
-        </div>
+      <div className="grid grid-cols-2 gap-4">
+        <MetricCard label="Total Revenue" value={formatCurrency(totalRevenue)} icon={Banknote} tone="bg-emerald-500/10 text-emerald-600" />
+        <MetricCard label="Total Transactions" value={totalTxns} icon={ShoppingCart} tone="bg-primary/10 text-primary" />
       </div>
 
       {data.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="rounded-xl border border-outline-variant bg-surface p-4">
-            <h3 className="mb-3 text-base font-semibold text-on-surface">Revenue Split</h3>
+          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
+            <h3 className="mb-4 text-base font-semibold text-on-surface">Revenue Split</h3>
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
-                <Pie data={data} dataKey="total" nameKey="payment_method" cx="50%" cy="50%" outerRadius={75}
+                <Pie data={data} dataKey="total" nameKey="payment_method" cx="50%" cy="50%" outerRadius={75} stroke="none"
                   label={({ payment_method, percent }) => `${channelLabel(payment_method)} ${((percent ?? 0) * 100).toFixed(0)}%`}>
                   {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
-                <Tooltip formatter={(v: unknown) => formatCurrency(v as number)} {...chartTooltipStyle} />
+                <Tooltip formatter={(v: unknown) => formatCurrency(v as number)} {...TOOLTIP_PROPS} />
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="rounded-xl border border-outline-variant bg-surface p-4">
-            <h3 className="mb-3 text-base font-semibold text-on-surface">Transaction Count</h3>
+          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
+            <h3 className="mb-4 text-base font-semibold text-on-surface">Transaction Count</h3>
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={data} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
-                <XAxis type="number" tick={chartAxisTick} />
-                <YAxis dataKey="payment_method" type="category" tick={chartAxisTick} width={80} tickFormatter={(v) => channelLabel(v)} />
-                <Tooltip {...chartTooltipStyle} />
-                <Bar dataKey="count" fill="var(--tertiary)" radius={[0, 4, 4, 0]} name="Transactions" />
+              <BarChart data={data} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid horizontal={false} stroke="var(--hairline)" />
+                <XAxis type="number" axisLine={false} tickLine={false} tick={chartAxisTick} />
+                <YAxis dataKey="payment_method" type="category" axisLine={false} tickLine={false} tick={chartAxisTick} width={80} tickFormatter={(v) => channelLabel(v)} />
+                <Tooltip cursor={{ fill: 'var(--surface-container-low)' }} {...TOOLTIP_PROPS} />
+                <Bar dataKey="count" fill="var(--primary)" radius={[0, 6, 6, 0]} maxBarSize={28} name="Transactions" />
               </BarChart>
             </ResponsiveContainer>
           </div>

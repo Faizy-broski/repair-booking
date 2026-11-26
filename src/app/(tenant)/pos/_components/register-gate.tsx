@@ -35,15 +35,15 @@ export function RegisterGate({
   if (existingSession) {
     return (
       <div className="-m-6 flex h-[calc(100vh-3.5rem)] items-center justify-center bg-surface-container-low">
-        <div className="rounded-2xl border border-outline-variant bg-surface p-8 shadow-sm w-full max-w-md text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50">
-            <Unlock className="h-7 w-7 text-blue-600" />
+        <div className="rounded-2xl border border-outline-variant bg-surface p-8 w-full max-w-md text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/5">
+            <Unlock className="h-7 w-7 text-primary" />
           </div>
           <h2 className="mb-1 text-lg font-bold text-on-surface">Shift Already Active</h2>
           <p className="mb-6 text-sm text-on-surface-variant">
             {activeBranchName} · A shift is already open for this register
           </p>
-          <div className="mb-6 rounded-lg bg-surface-container-low px-4 py-3 text-left space-y-2 text-sm">
+          <div className="mb-6 rounded-xl bg-surface-container-low px-4 py-3 text-left space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-on-surface-variant">Opened by</span>
               <span className="font-medium">{(existingSession as any).profiles?.full_name ?? '—'}</span>
@@ -58,7 +58,7 @@ export function RegisterGate({
             </div>
           </div>
           <Button
-            className="w-full bg-brand-teal hover:bg-brand-teal-dark"
+            className="w-full bg-primary hover:bg-primary/90"
             size="lg"
             loading={sessionProcessing}
             onClick={handleJoinShift}
@@ -86,10 +86,10 @@ export function RegisterGate({
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center bg-surface-container-low">
-      <div className="rounded-2xl border border-outline-variant bg-surface p-8 shadow-sm w-full max-w-xl">
+      <div className="rounded-2xl border border-outline-variant bg-surface p-8 w-full max-w-xl">
         <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-teal-light shrink-0">
-            <Lock className="h-6 w-6 text-brand-teal" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 shrink-0">
+            <Lock className="h-6 w-6 text-primary" />
           </div>
           <div>
             <h2 className="text-lg font-bold text-on-surface">Start Shift</h2>
@@ -98,11 +98,11 @@ export function RegisterGate({
         </div>
 
         {prevClosingBalance !== null && (
-          <div className="mb-4 flex items-center justify-between rounded-lg bg-surface-container-low px-4 py-2.5 text-sm">
+          <div className="mb-4 flex items-center justify-between rounded-xl bg-surface-container-low px-4 py-2.5 text-sm">
             <span className="text-on-surface-variant">Previous shift closing balance</span>
             <div className="flex items-center gap-3">
               <span className="font-semibold text-on-surface">{formatCurrency(prevClosingBalance)}</span>
-              <Link href="/reports/z-report" className="flex items-center gap-1 text-xs font-medium text-brand-teal hover:underline">
+              <Link href="/reports/z-report" className="flex items-center gap-1 text-xs font-medium text-primary hover:underline">
                 <ExternalLink className="h-3 w-3" /> Z-Report
               </Link>
             </div>
@@ -113,7 +113,7 @@ export function RegisterGate({
           <p className="mb-2 text-xs font-semibold text-on-surface-variant uppercase tracking-wide">Count Denominations</p>
           <div className="grid grid-cols-4 gap-2">
             {DENOMINATIONS.map(d => (
-              <div key={d.value} className="flex flex-col gap-1 rounded-lg border border-outline-variant bg-surface p-1.5 shadow-sm">
+              <div key={d.value} className="flex flex-col gap-1 rounded-xl border border-outline-variant bg-surface p-1.5">
                 <span className="text-[10px] font-bold text-outline uppercase text-center">{d.label}</span>
                 <div className="flex items-center gap-1">
                   <button
@@ -122,7 +122,7 @@ export function RegisterGate({
                       const v = (openingDenoms[String(d.value)] ?? 0)
                       if (v > 0) setOpeningDenoms(prev => ({ ...prev, [String(d.value)]: v - 1 }))
                     }}
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-xl bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
                   >
                     <Minus className="h-3 w-3" />
                   </button>
@@ -141,7 +141,7 @@ export function RegisterGate({
                       const v = (openingDenoms[String(d.value)] ?? 0)
                       setOpeningDenoms(prev => ({ ...prev, [String(d.value)]: v + 1 }))
                     }}
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-brand-teal/10 text-brand-teal hover:bg-brand-teal/20"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary hover:bg-primary/20"
                   >
                     <Plus className="h-3 w-3" />
                   </button>
@@ -151,10 +151,10 @@ export function RegisterGate({
           </div>
         </div>
 
-        <div className={`mb-3 flex items-center justify-between rounded-lg px-4 py-3 text-sm font-semibold ${
+        <div className={`mb-3 flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold ${
           hasDiscrepancy
-            ? 'bg-amber-50 border border-amber-200 text-amber-800'
-            : 'bg-brand-teal-light border border-brand-teal-light text-brand-teal-dark'
+            ? 'bg-amber-500/5 border border-amber-200 text-amber-800'
+            : 'bg-primary/10 border border-primary/10 text-primary'
         }`}>
           <span>Verified Total</span>
           <span className="text-base">{formatCurrency(openingTotal)}</span>
@@ -173,13 +173,13 @@ export function RegisterGate({
               placeholder="Explain the discrepancy (e.g. '$50 missing from previous shift')"
               value={openingNote}
               onChange={e => setOpeningNote(e.target.value)}
-              className="w-full rounded-lg border border-amber-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
+              className="w-full rounded-xl border border-amber-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none"
             />
           </div>
         )}
 
         <Button
-          className="w-full bg-brand-teal hover:bg-brand-teal-dark"
+          className="w-full bg-primary hover:bg-primary/90"
           size="lg"
           loading={sessionProcessing}
           onClick={handleOpenRegister}

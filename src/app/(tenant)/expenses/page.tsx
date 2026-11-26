@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, MoreVertical, Pencil, Trash2 } from 'lucide-react'
+import { Plus, MoreVertical, Pencil, Trash2, Receipt, Users, TrendingDown } from 'lucide-react'
 import * as Tabs from '@radix-ui/react-tabs'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { DataTable } from '@/components/shared/data-table'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
+import { PageHeader } from '@/components/shared/page-header'
+import { MetricCard } from '@/components/shared/ui-kit'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useForm } from 'react-hook-form'
@@ -243,7 +245,7 @@ export default function ExpensesPage() {
         <div>
           <span className="font-medium text-on-surface">{row.original.title}</span>
           {!isInPnl(row.original) && (
-            <span className="ml-2 rounded-full bg-surface-container px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-on-surface-variant">Not in P&amp;L</span>
+            <span className="ml-2 rounded-full bg-surface-container px-2 py-0.5 text-xs font-medium text-on-surface-variant">Not in P&amp;L</span>
           )}
         </div>
       ),
@@ -254,7 +256,7 @@ export default function ExpensesPage() {
       cell: ({ getValue }) => {
         const cat = (getValue() as ExpenseRow['expense_categories'])?.name
         return cat
-          ? <span className="rounded-full bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700">{cat}</span>
+          ? <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">{cat}</span>
           : <span className="text-outline">—</span>
       },
     },
@@ -264,7 +266,7 @@ export default function ExpensesPage() {
       cell: ({ getValue }) => {
         const method = (getValue() as ExpenseRow['payment_method']) ?? 'cash'
         return (
-          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${method === 'card' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
+          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${method === 'card' ? 'bg-blue-500/10 text-blue-600' : 'bg-emerald-500/10 text-emerald-600'}`}>
             {method === 'card' ? 'Card' : 'Cash'}
           </span>
         )
@@ -296,7 +298,7 @@ export default function ExpensesPage() {
       cell: ({ row }) => (
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
-            <button className="flex h-7 w-7 items-center justify-center rounded-md border border-outline bg-surface text-on-surface shadow-sm hover:bg-surface-container-low transition-colors">
+            <button className="flex h-8 w-8 items-center justify-center rounded-full border border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container-low transition-colors">
               <MoreVertical className="h-4 w-4 stroke-[2.5]" />
             </button>
           </DropdownMenu.Trigger>
@@ -304,18 +306,18 @@ export default function ExpensesPage() {
             <DropdownMenu.Content
               align="end"
               sideOffset={4}
-              className="z-50 min-w-[140px] rounded-lg border border-outline-variant bg-surface p-1 shadow-lg"
+              className="z-50 min-w-[140px] rounded-xl border border-outline-variant bg-surface p-1 shadow-lg"
             >
               <DropdownMenu.Item
                 onClick={() => openEdit(row.original)}
-                className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 text-sm text-on-surface-variant outline-none hover:bg-surface-container-low"
+                className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-on-surface-variant outline-none hover:bg-surface-container-low"
               >
-                <Pencil className="h-3.5 w-3.5 text-blue-500" />
+                <Pencil className="h-3.5 w-3.5 text-primary" />
                 Edit
               </DropdownMenu.Item>
               <DropdownMenu.Item
                 onClick={() => setDeleteRow(row.original)}
-                className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-1.5 text-sm text-red-600 outline-none hover:bg-red-50"
+                className="flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 outline-none hover:bg-red-50"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 Delete
@@ -347,7 +349,7 @@ export default function ExpensesPage() {
         <label className="mb-1 block text-sm font-medium text-on-surface-variant">Payment Method</label>
         <select
           {...form.register('payment_method')}
-          className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
+          className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:border-primary focus:outline-none"
         >
           <option value="cash">Cash</option>
           <option value="card">Card</option>
@@ -362,12 +364,12 @@ export default function ExpensesPage() {
       <>
         <select
           {...form.register('category_id')}
-          className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
+          className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:border-primary focus:outline-none"
         >
           <option value="">No category</option>
           {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <button type="button" onClick={onCreateClick} className="mt-1.5 text-xs font-medium text-brand-teal hover:underline">
+        <button type="button" onClick={onCreateClick} className="mt-1.5 text-xs font-medium text-primary hover:underline">
           + Create new category
         </button>
       </>
@@ -380,7 +382,7 @@ export default function ExpensesPage() {
     return (
       <div>
         <label className="mb-1 block text-sm font-medium text-on-surface-variant">Profit &amp; Loss</label>
-        <select {...form.register('pnl_mode')} className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none">
+        <select {...form.register('pnl_mode')} className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:border-primary focus:outline-none">
           <option value="inherit">Use category default ({catDefault ? 'counted' : 'not counted'})</option>
           <option value="include">Count in P&amp;L</option>
           <option value="exclude">Exclude from P&amp;L</option>
@@ -391,47 +393,38 @@ export default function ExpensesPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-on-surface">Expenses</h1>
-          <p className="text-sm text-on-surface-variant">Track business and branch expenses</p>
-        </div>
-        <Button onClick={() => setSheetOpen(true)}>
-          <Plus className="h-4 w-4" /> Add Expense
-        </Button>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="Expenses"
+        description="Track business and branch expenses"
+        actions={
+          <Button onClick={() => setSheetOpen(true)}>
+            <Plus className="h-4 w-4" /> Add Expense
+          </Button>
+        }
+      />
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-xl border border-outline-variant bg-surface p-4">
-          <p className="text-sm text-on-surface-variant">Total Expenses</p>
-          <p className="text-2xl font-bold text-on-surface">{formatCurrency(totalExpAmount)}</p>
-        </div>
-        <div className="rounded-xl border border-outline-variant bg-surface p-4">
-          <p className="text-sm text-on-surface-variant">Salaries</p>
-          <p className="text-2xl font-bold text-on-surface">{formatCurrency(totalSalaryAmount)}</p>
-        </div>
-        <div className="rounded-xl border border-outline-variant bg-surface p-4">
-          <p className="text-sm text-on-surface-variant">Total Outflow</p>
-          <p className="text-2xl font-bold text-red-600">{formatCurrency(totalExpAmount + totalSalaryAmount)}</p>
-        </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <MetricCard label="Total Expenses" value={formatCurrency(totalExpAmount)} icon={Receipt} tone="bg-primary/10 text-primary" />
+        <MetricCard label="Salaries" value={formatCurrency(totalSalaryAmount)} icon={Users} tone="bg-blue-500/10 text-blue-600" />
+        <MetricCard label="Total Outflow" value={formatCurrency(totalExpAmount + totalSalaryAmount)} icon={TrendingDown} tone="bg-red-500/10 text-red-600" />
       </div>
 
       <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
-        <Tabs.List className="flex gap-1 rounded-lg bg-surface-container p-1 w-fit">
-          <Tabs.Trigger value="expenses" className="rounded-md px-4 py-1.5 text-sm font-medium data-[state=active]:bg-surface data-[state=active]:shadow-sm">
+        <Tabs.List className="no-scrollbar flex gap-1 overflow-x-auto border-b border-outline-variant">
+          <Tabs.Trigger value="expenses" className="-mb-px flex items-center gap-2 whitespace-nowrap rounded-t-lg border-b-2 border-transparent px-3.5 py-2.5 text-sm font-medium text-on-surface-variant transition-colors hover:text-on-surface data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:font-semibold data-[state=active]:text-primary">
             Expenses
           </Tabs.Trigger>
-          <Tabs.Trigger value="salaries" className="rounded-md px-4 py-1.5 text-sm font-medium data-[state=active]:bg-surface data-[state=active]:shadow-sm">
+          <Tabs.Trigger value="salaries" className="-mb-px flex items-center gap-2 whitespace-nowrap rounded-t-lg border-b-2 border-transparent px-3.5 py-2.5 text-sm font-medium text-on-surface-variant transition-colors hover:text-on-surface data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:font-semibold data-[state=active]:text-primary">
             Salaries
           </Tabs.Trigger>
-          <Tabs.Trigger value="categories" className="rounded-md px-4 py-1.5 text-sm font-medium data-[state=active]:bg-surface data-[state=active]:shadow-sm">
+          <Tabs.Trigger value="categories" className="-mb-px flex items-center gap-2 whitespace-nowrap rounded-t-lg border-b-2 border-transparent px-3.5 py-2.5 text-sm font-medium text-on-surface-variant transition-colors hover:text-on-surface data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:font-semibold data-[state=active]:text-primary">
             Categories
           </Tabs.Trigger>
         </Tabs.List>
 
-        <Tabs.Content value="expenses" className="mt-4">
+        <Tabs.Content value="expenses" className="mt-5">
           <DataTable
             data={expenses}
             columns={expenseColumns}
@@ -444,8 +437,8 @@ export default function ExpensesPage() {
           />
         </Tabs.Content>
 
-        <Tabs.Content value="categories" className="mt-4">
-          <div className="rounded-xl border border-outline-variant bg-surface">
+        <Tabs.Content value="categories" className="mt-5">
+          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest">
             <p className="border-b border-outline-variant px-4 py-3 text-sm text-on-surface-variant">
               Choose which categories count towards Profit &amp; Loss. Individual expenses can still override this.
             </p>
@@ -467,7 +460,7 @@ export default function ExpensesPage() {
                         className="flex items-center gap-2 text-xs text-on-surface-variant"
                       >
                         <span>{on ? 'Counted in P&L' : 'Excluded from P&L'}</span>
-                        <span className={`relative h-5 w-9 rounded-full transition-colors ${on ? 'bg-brand-teal' : 'bg-outline-variant'}`}>
+                        <span className={`relative h-5 w-9 rounded-full transition-colors ${on ? 'bg-primary' : 'bg-outline-variant'}`}>
                           <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${on ? 'left-[18px]' : 'left-0.5'}`} />
                         </span>
                       </button>
@@ -479,7 +472,7 @@ export default function ExpensesPage() {
           </div>
         </Tabs.Content>
 
-        <Tabs.Content value="salaries" className="mt-4">
+        <Tabs.Content value="salaries" className="mt-5">
           <DataTable data={salaries} columns={salaryColumns} isLoading={loadingSalaries} emptyMessage="No salary records yet." />
         </Tabs.Content>
       </Tabs.Root>
@@ -499,7 +492,7 @@ export default function ExpensesPage() {
                   placeholder="e.g. Rent, Supplies…"
                   value={newCategoryName}
                   onChange={e => setNewCategoryName(e.target.value)}
-                  className="flex-1 rounded-lg border border-outline px-3 py-2 text-sm focus:outline-none"
+                  className="flex-1 rounded-xl border border-outline-variant px-3 py-2 text-sm focus:outline-none"
                 />
                 <label className="flex shrink-0 items-center gap-1.5 text-xs text-on-surface-variant"><input type="checkbox" checked={newCategoryInPnl} onChange={e => setNewCategoryInPnl(e.target.checked)} /> Count in P&amp;L</label>
                 <Button type="button" size="sm" disabled={!newCategoryName.trim()} loading={savingCategory} onClick={handleAddCategory}>Add</Button>
@@ -513,7 +506,7 @@ export default function ExpensesPage() {
           <PnlSelect form={addForm} />
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes <span className="text-xs font-normal text-outline">(optional)</span></label>
-            <textarea rows={2} className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none" {...addForm.register('notes')} />
+            <textarea rows={2} className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:border-primary focus:outline-none" {...addForm.register('notes')} />
           </div>
           <Button type="submit" className="w-full" loading={addForm.formState.isSubmitting}>Add Expense</Button>
         </form>
@@ -535,7 +528,7 @@ export default function ExpensesPage() {
                     placeholder="e.g. Rent, Supplies…"
                     value={editNewCatName}
                     onChange={e => setEditNewCatName(e.target.value)}
-                    className="flex-1 rounded-lg border border-outline px-3 py-2 text-sm focus:outline-none"
+                    className="flex-1 rounded-xl border border-outline-variant px-3 py-2 text-sm focus:outline-none"
                   />
                   <label className="flex shrink-0 items-center gap-1.5 text-xs text-on-surface-variant"><input type="checkbox" checked={newCategoryInPnl} onChange={e => setNewCategoryInPnl(e.target.checked)} /> Count in P&amp;L</label>
                   <Button type="button" size="sm" disabled={!editNewCatName.trim()} loading={editSavingCat} onClick={handleEditCategory}>Add</Button>
@@ -549,7 +542,7 @@ export default function ExpensesPage() {
             <PnlSelect form={editForm} />
             <div>
               <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes <span className="text-xs font-normal text-outline">(optional)</span></label>
-              <textarea rows={2} className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none" {...editForm.register('notes')} />
+              <textarea rows={2} className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:border-primary focus:outline-none" {...editForm.register('notes')} />
             </div>
             <div className="flex gap-2 pt-1">
               <Button type="button" variant="outline" className="flex-1" onClick={() => setEditRow(null)}>Cancel</Button>
@@ -562,11 +555,11 @@ export default function ExpensesPage() {
       {/* ── Delete confirm modal ── */}
       <Modal open={!!deleteRow} onClose={() => setDeleteRow(null)} title="Delete Expense" size="sm">
         {deleteRow && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <p className="text-sm text-on-surface-variant">
               Are you sure you want to delete <strong>"{deleteRow.title}"</strong> ({formatCurrency(deleteRow.amount)})?
             </p>
-            <p className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+            <p className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-700">
               Note: If this was recorded from a POS cash out, the corresponding session movement record will remain unchanged — only the expense entry is removed.
             </p>
             <div className="flex gap-2">

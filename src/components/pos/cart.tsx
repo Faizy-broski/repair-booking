@@ -19,7 +19,7 @@ export function Cart({ onCheckout }: CartProps) {
           <ShoppingCart className="h-4 w-4 text-on-surface-variant" />
           <span className="font-medium text-on-surface">Cart</span>
           {pos.itemCount() > 0 && (
-            <span className="rounded-full bg-blue-600 px-2 py-0.5 text-xs text-white">
+            <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-white">
               {pos.itemCount()}
             </span>
           )}
@@ -47,14 +47,14 @@ export function Cart({ onCheckout }: CartProps) {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm text-on-surface">{item.product.name}</p>
                   {item.variant && <p className="text-xs text-outline">{item.variant.name}</p>}
-                  <p className="text-xs font-medium text-blue-600">{formatCurrency(item.unitPrice)}</p>
+                  <p className="text-xs font-medium text-primary">{formatCurrency(item.unitPrice)}</p>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() =>
                       pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity - 1)
                     }
-                    className="flex h-6 w-6 items-center justify-center rounded-md bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
+                    className="flex h-6 w-6 items-center justify-center rounded-xl bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
                   >
                     <Minus className="h-3 w-3" />
                   </button>
@@ -63,7 +63,7 @@ export function Cart({ onCheckout }: CartProps) {
                     onClick={() =>
                       pos.updateQuantity(item.product.id, item.variant?.id ?? null, item.quantity + 1)
                     }
-                    className="flex h-6 w-6 items-center justify-center rounded-md bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
+                    className="flex h-6 w-6 items-center justify-center rounded-xl bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
                   >
                     <Plus className="h-3 w-3" />
                   </button>
@@ -87,7 +87,7 @@ export function Cart({ onCheckout }: CartProps) {
           <span>{formatCurrency(pos.subtotal())}</span>
         </div>
         {pos.discount > 0 && (
-          <div className="flex justify-between text-sm text-green-600">
+          <div className="flex justify-between text-sm text-emerald-700">
             <span>Discount</span>
             <span>-{formatCurrency(pos.discount)}</span>
           </div>

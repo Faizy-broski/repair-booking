@@ -155,7 +155,7 @@ export function CashMovementModal({
       <div className="space-y-4">
 
         {/* Type toggle */}
-        <div className="flex rounded-lg border border-outline-variant overflow-hidden">
+        <div className="flex rounded-xl border border-outline-variant overflow-hidden">
           {(['cash_in', 'cash_out'] as const).map(t => (
             <button
               key={t}
@@ -188,7 +188,7 @@ export function CashMovementModal({
           <label className="mb-1 block text-sm font-medium text-on-surface-variant">
             {isCashOut ? 'Paid via' : 'Received via'}
           </label>
-          <div className="flex rounded-lg border border-outline-variant overflow-hidden">
+          <div className="flex rounded-xl border border-outline-variant overflow-hidden">
             {([
               ['cash', 'Cash', Banknote],
               ['card', 'Card', CreditCard],
@@ -199,7 +199,7 @@ export function CashMovementModal({
                 onClick={() => setCashMovementPaymentType(value)}
                 className={`flex flex-1 items-center justify-center gap-1.5 py-2 text-sm font-medium transition-colors ${
                   cashMovementPaymentType === value
-                    ? 'bg-brand-teal text-white'
+                    ? 'bg-primary text-on-primary'
                     : 'text-on-surface-variant hover:bg-surface-container-low'
                 }`}
               >
@@ -232,14 +232,14 @@ export function CashMovementModal({
             placeholder={isCashOut ? 'e.g. Rent payment, petty cash for supplies…' : 'e.g. Petty cash for change'}
             value={cashMovementNotes}
             onChange={e => setCashMovementNotes(e.target.value)}
-            className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
+            className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:border-primary focus:outline-none"
           />
         </div>
 
         {/* Purpose — cash out only: plain removal, expense, or buyback */}
         {isCashOut && (
           <div className="space-y-3">
-            <div className="flex rounded-lg border border-outline-variant overflow-hidden text-xs font-medium">
+            <div className="flex rounded-xl border border-outline-variant overflow-hidden text-xs font-medium">
               {([
                 ['none', 'Plain'],
                 ['expense', 'Expense'],
@@ -250,7 +250,7 @@ export function CashMovementModal({
                   key={value}
                   type="button"
                   onClick={() => setPurpose(value)}
-                  className={`flex-1 py-2 transition-colors ${purpose === value ? 'bg-brand-teal text-white' : 'text-on-surface-variant hover:bg-surface-container-low'}`}
+                  className={`flex-1 py-2 transition-colors ${purpose === value ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:bg-surface-container-low'}`}
                 >
                   {label}
                 </button>
@@ -258,7 +258,7 @@ export function CashMovementModal({
             </div>
 
             {purpose === 'none' && (
-              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+              <p className="rounded-xl border border-amber-200 bg-amber-500/5 px-3 py-2 text-xs font-medium text-amber-700">
                 ⚠ Plain cash out will not be reflected in your reports. Add a note above explaining what it's for.
               </p>
             )}
@@ -269,7 +269,7 @@ export function CashMovementModal({
                   Expense Category <span className="text-xs font-normal text-outline">(select or create)</span>
                 </label>
                 {catsLoading ? (
-                  <div className="h-9 animate-pulse rounded-lg bg-surface-container" />
+                  <div className="h-9 animate-pulse rounded-xl bg-surface-container" />
                 ) : (
                   <CreatableCombobox
                     options={categories.map(c => ({ value: c.id, label: c.name }))}
@@ -311,13 +311,13 @@ export function CashMovementModal({
                       placeholder="Leave blank to auto-generate"
                       value={buybackBarcode}
                       onChange={e => setBuybackBarcode(e.target.value)}
-                      className={`flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal ${barcodeConflict ? 'border-red-400 bg-red-50' : 'border-outline'}`}
+                      className={`flex-1 rounded-xl border px-3 py-2 text-sm focus:outline-none focus:border-primary focus:border-primary ${barcodeConflict ? 'border-red-400 bg-red-50' : 'border-outline-variant'}`}
                     />
                     <button
                       type="button"
                       title="Generate Barcode"
                       onClick={() => setBuybackBarcode(Math.floor(100000000000 + Math.random() * 900000000000).toString())}
-                      className="shrink-0 rounded-lg border border-brand-teal bg-brand-teal/10 px-2.5 py-2 text-brand-teal hover:bg-brand-teal hover:text-white transition-colors"
+                      className="shrink-0 rounded-xl border border-primary bg-primary/10 px-2.5 py-2 text-primary hover:bg-primary hover:text-on-primary transition-colors"
                     >
                       <RefreshCw className="h-4 w-4" />
                     </button>
@@ -334,7 +334,7 @@ export function CashMovementModal({
                   Supplier <span className="text-red-500">*</span>
                 </label>
                 {suppliersLoading ? (
-                  <div className="h-9 animate-pulse rounded-lg bg-surface-container" />
+                  <div className="h-9 animate-pulse rounded-xl bg-surface-container" />
                 ) : (
                   <CreatableCombobox
                     options={suppliers.map(s => ({ value: s.id, label: s.name }))}

@@ -10,6 +10,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/shared/data-table'
+import { PageHeader } from '@/components/shared/page-header'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -263,7 +264,7 @@ export default function CreditsPage() {
             {sale.payment_status !== 'paid' && (
               <button
                 onClick={() => { setPaymentSale(sale); setPaymentAmount(''); setPaymentMethod('cash') }}
-                className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-700 transition-colors"
+                className="flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
               >
                 <Banknote className="h-3.5 w-3.5" /> Record Payment
               </button>
@@ -272,7 +273,7 @@ export default function CreditsPage() {
               onClick={() => downloadReceipt(sale.id)}
               disabled={isDownloading}
               title="Download updated receipt"
-              className="flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface px-3 py-1.5 text-xs font-semibold text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50 transition-colors"
+              className="flex items-center gap-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-1.5 text-xs font-semibold text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50 transition-colors"
             >
               {isDownloading
                 ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -331,94 +332,81 @@ export default function CreditsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Customer Credit</h1>
-          <p className="text-sm text-on-surface-variant">On-account sales and outstanding balances</p>
-        </div>
-        <button
-          onClick={() => (view === 'sales' ? refetch() : refetchStoreCredit())}
-          disabled={view === 'sales' ? isFetching : isFetchingStoreCredit}
-          className="flex items-center gap-2 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-medium text-on-surface-variant shadow-sm hover:bg-surface-container-low disabled:opacity-50"
-        >
-          <RefreshCw className={`h-4 w-4 ${(view === 'sales' ? isFetching : isFetchingStoreCredit) ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
-      </div>
+      <PageHeader
+        title="Customer Credit"
+        description="On-account sales and outstanding balances"
+        actions={
+          <Button
+            variant="outline"
+            onClick={() => (view === 'sales' ? refetch() : refetchStoreCredit())}
+            disabled={view === 'sales' ? isFetching : isFetchingStoreCredit}
+          >
+            <RefreshCw className={`h-4 w-4 ${(view === 'sales' ? isFetching : isFetchingStoreCredit) ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        }
+      />
 
       {/* View toggle — two unrelated data sources: on-account sales vs. the prepaid store-credit wallet ledger */}
-      <div className="flex items-center gap-3">
-        <div className="flex rounded-lg border border-outline-variant bg-surface-container-low p-0.5 text-sm">
+      <div className="flex gap-1 border-b border-outline-variant">
+        {([['sales', 'On-Account Sales'], ['store_credit', 'Store Credit Activity']] as const).map(([v, label]) => (
           <button
-            onClick={() => setView('sales')}
-            className={`rounded-md px-3 py-1.5 font-medium transition-colors ${view === 'sales' ? 'bg-surface text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
+            key={v}
+            onClick={() => setView(v)}
+            className={`-mb-px border-b-2 px-4 py-2.5 text-sm transition-colors ${view === v ? 'border-primary font-semibold text-on-surface' : 'border-transparent font-medium text-on-surface-variant hover:text-on-surface'}`}
           >
-            On-Account Sales
+            {label}
           </button>
-          <button
-            onClick={() => setView('store_credit')}
-            className={`rounded-md px-3 py-1.5 font-medium transition-colors ${view === 'store_credit' ? 'bg-surface text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
-          >
-            Store Credit Activity
-          </button>
-        </div>
+        ))}
       </div>
 
       {view === 'sales' && (
         <>
           {/* Summary cards */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-sm">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100">
-                  <Users className="h-5 w-5 text-purple-600" />
+            <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
+              <div className="flex items-start justify-between gap-3">
+                <p className="pt-1 text-sm text-on-surface-variant">Customers on Credit</p>
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600">
+                  <Users className="h-[18px] w-[18px]" />
                 </span>
-                <div>
-                  <p className="text-xs font-medium text-on-surface-variant">Customers on Credit</p>
-                  <p className="text-2xl font-bold text-on-surface">{uniqueCustomers}</p>
-                </div>
               </div>
+              <p className="mt-3 text-2xl font-semibold tabular-nums text-on-surface">{uniqueCustomers}</p>
             </div>
-            <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-sm">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100">
-                  <AlertCircle className="h-5 w-5 text-red-600" />
+            <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
+              <div className="flex items-start justify-between gap-3">
+                <p className="pt-1 text-sm text-on-surface-variant">Total Outstanding</p>
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-500/10 text-red-600">
+                  <AlertCircle className="h-[18px] w-[18px]" />
                 </span>
-                <div>
-                  <p className="text-xs font-medium text-on-surface-variant">Total Outstanding</p>
-                  <p className="text-2xl font-bold text-red-600">{formatCurrency(totalOutstanding)}</p>
-                </div>
               </div>
+              <p className="mt-3 text-2xl font-semibold tabular-nums text-on-surface">{formatCurrency(totalOutstanding)}</p>
             </div>
-            <div className="rounded-xl border border-outline-variant bg-surface p-4 shadow-sm">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+            <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
+              <div className="flex items-start justify-between gap-3">
+                <p className="pt-1 text-sm text-on-surface-variant">Fully Cleared</p>
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
+                  <CheckCircle2 className="h-[18px] w-[18px]" />
                 </span>
-                <div>
-                  <p className="text-xs font-medium text-on-surface-variant">Fully Cleared</p>
-                  <p className="text-2xl font-bold text-green-600">{formatCurrency(totalCollected)}</p>
-                </div>
               </div>
+              <p className="mt-3 text-2xl font-semibold tabular-nums text-on-surface">{formatCurrency(totalCollected)}</p>
             </div>
           </div>
 
           {/* Filter toggle */}
-          <div className="flex items-center gap-3">
-            <div className="flex rounded-lg border border-outline-variant bg-surface-container-low p-0.5 text-sm">
-              <button
-                onClick={() => setShowAll(false)}
-                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${!showAll ? 'bg-surface text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
-              >
-                Outstanding
-              </button>
-              <button
-                onClick={() => setShowAll(true)}
-                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${showAll ? 'bg-surface text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
-              >
-                All Credit Sales
-              </button>
-            </div>
+          <div className="flex w-fit gap-1 rounded-full bg-surface-container-low p-1 text-sm">
+            <button
+              onClick={() => setShowAll(false)}
+              className={`rounded-full px-4 py-1.5 font-medium transition-colors ${!showAll ? 'bg-surface-container-lowest text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
+            >
+              Outstanding
+            </button>
+            <button
+              onClick={() => setShowAll(true)}
+              className={`rounded-full px-4 py-1.5 font-medium transition-colors ${showAll ? 'bg-surface-container-lowest text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
+            >
+              All Credit Sales
+            </button>
           </div>
 
           {/* Table */}
@@ -427,17 +415,17 @@ export default function CreditsPage() {
               <Loader2 className="h-6 w-6 animate-spin text-outline" />
             </div>
           ) : sales.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant bg-surface py-16">
-              <CreditCard className="mb-3 h-10 w-10 text-outline-variant" />
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-lowest py-16">
+              <span className="mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-outline-variant bg-surface-container-low text-on-surface-variant">
+                <CreditCard className="h-6 w-6" />
+              </span>
               <p className="text-sm font-medium text-on-surface-variant">
                 {showAll ? 'No credit sales found' : 'No outstanding credit balances'}
               </p>
               <p className="mt-1 text-xs text-outline">Credit sales will appear here after checkout</p>
             </div>
           ) : (
-            <div className="rounded-xl border border-outline-variant bg-surface shadow-sm overflow-hidden">
-              <DataTable columns={columns} data={sales} />
-            </div>
+            <DataTable columns={columns} data={sales} />
           )}
         </>
       )}
@@ -449,17 +437,17 @@ export default function CreditsPage() {
               <Loader2 className="h-6 w-6 animate-spin text-outline" />
             </div>
           ) : storeCreditTxns.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant bg-surface py-16">
-              <CreditCard className="mb-3 h-10 w-10 text-outline-variant" />
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-lowest py-16">
+              <span className="mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-outline-variant bg-surface-container-low text-on-surface-variant">
+                <CreditCard className="h-6 w-6" />
+              </span>
               <p className="text-sm font-medium text-on-surface-variant">No store credit activity found</p>
               <p className="mt-1 text-xs text-outline">
                 Wallet top-ups, spends, refunds and adjustments will appear here.
               </p>
             </div>
           ) : (
-            <div className="rounded-xl border border-outline-variant bg-surface shadow-sm overflow-hidden">
-              <DataTable columns={storeCreditColumns} data={storeCreditTxns} />
-            </div>
+            <DataTable columns={storeCreditColumns} data={storeCreditTxns} />
           )}
         </>
       )}

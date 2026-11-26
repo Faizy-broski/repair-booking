@@ -28,7 +28,7 @@ export function ProductGrid({
           placeholder="Search products or scan barcode..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="h-10 w-full rounded-lg border border-outline bg-surface pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none"
+          className="h-10 w-full rounded-xl border border-outline-variant bg-surface pl-9 pr-3 text-sm focus:border-primary focus:outline-none"
         />
       </div>
 
@@ -43,11 +43,11 @@ export function ProductGrid({
                 <button
                   key={product.id}
                   onClick={() => onProductClick(product)}
-                  className="flex flex-col items-start rounded-xl border border-outline-variant bg-surface p-3 text-left transition-all hover:border-blue-400 hover:shadow-sm"
+                  className="flex flex-col items-start rounded-xl border border-outline-variant bg-surface p-3 text-left transition-all hover:border-primary"
                 >
                   <span className="line-clamp-2 text-sm font-medium text-on-surface">{product.name}</span>
                   {product.sku && <span className="text-xs text-outline">SKU: {product.sku}</span>}
-                  <span className="mt-auto pt-2 text-base font-bold text-blue-600">
+                  <span className="mt-auto pt-2 text-base font-bold text-primary">
                     {formatCurrency(product.selling_price)}
                   </span>
                 </button>

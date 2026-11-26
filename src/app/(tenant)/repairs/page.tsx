@@ -29,6 +29,9 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { VehiclePicker, type VehicleValue } from '@/components/vehicles/vehicle-picker'
 import { buildPaymentSplits, paymentSplitTotal } from '@/lib/payment-splits'
+import { PageHeader } from '@/components/shared/page-header'
+import { SegmentedControl } from '@/components/shared/ui-kit'
+import { repairStatusChip } from '@/components/repairs/repair-status-chip'
 
 interface SelectedCustomer {
   id: string
@@ -117,25 +120,25 @@ function ActionsMenu({ onEdit, onSlip, onInvoice, onDelete, onMessage, onEmail, 
           align="end"
         >
           <DropdownMenu.Item className={item} onSelect={onEdit}>
-            <Pencil className="h-3.5 w-3.5 text-blue-500" /> Edit
+            <Pencil className="h-3.5 w-3.5 text-primary" /> Edit
           </DropdownMenu.Item>
           <DropdownMenu.Item className={item} onSelect={onSlip}>
-            <Receipt className="h-3.5 w-3.5 text-teal-500" /> Slip
+            <Receipt className="h-3.5 w-3.5 text-primary" /> Slip
           </DropdownMenu.Item>
           <DropdownMenu.Item className={item} onSelect={onInvoice}>
-            <FileText className="h-3.5 w-3.5 text-violet-500" /> Invoice
+            <FileText className="h-3.5 w-3.5 text-on-surface-variant" /> Invoice
           </DropdownMenu.Item>
           <DropdownMenu.Item className={item} onSelect={onMessage}>
-            <Mail className="h-3.5 w-3.5 text-blue-500" /> Message
+            <Mail className="h-3.5 w-3.5 text-primary" /> Message
           </DropdownMenu.Item>
           <DropdownMenu.Item
             className={cn(item, !canEmail && 'cursor-not-allowed opacity-40 hover:bg-transparent')}
             onSelect={(e) => { if (!canEmail) { e.preventDefault(); return } onEmail() }}
           >
-            <Send className="h-3.5 w-3.5 text-teal-500" /> Email
+            <Send className="h-3.5 w-3.5 text-primary" /> Email
           </DropdownMenu.Item>
           <DropdownMenu.Separator className="h-px bg-surface-container" />
-          <DropdownMenu.Item className={`${item} text-red-600 hover:bg-red-50`} onSelect={onDelete}>
+          <DropdownMenu.Item className={`${item} text-red-600 hover:bg-red-500/5`} onSelect={onDelete}>
             <Trash2 className="h-3.5 w-3.5" /> Delete
           </DropdownMenu.Item>
         </DropdownMenu.Content>
@@ -228,7 +231,7 @@ function ComboInput({ value, onChange, options, placeholder }: {
         onChange={(e) => { onChange(e.target.value); setOpen(true) }}
         onFocus={() => setOpen(true)}
         placeholder={placeholder}
-        className="h-8 w-full rounded-md border border-outline-variant bg-surface px-2.5 text-sm text-on-surface placeholder:text-outline transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
+        className="h-8 w-full rounded-md border border-outline-variant bg-surface px-2.5 text-sm text-on-surface placeholder:text-outline transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
       />
       {open && filtered.length > 0 && (
         <ul className="absolute z-50 mt-1 max-h-44 w-full overflow-y-auto rounded-lg border border-outline-variant bg-surface shadow-lg">
@@ -236,7 +239,7 @@ function ComboInput({ value, onChange, options, placeholder }: {
             <li key={o}>
               <button
                 type="button"
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-container-low"
                 onMouseDown={(e) => { e.preventDefault(); onChange(o); setOpen(false) }}
               >
                 <span className="text-on-surface-variant">{o}</span>
@@ -307,9 +310,11 @@ function exportPDF(repairs: RepairRow[]) {
 
 function StatTile({ label, accent, children }: { label: string; accent: string; children: React.ReactNode }) {
   return (
-    <div className="relative overflow-hidden rounded-lg border border-outline-variant bg-surface-container-lowest py-2 pl-3.5 pr-3">
-      <span className={`absolute inset-y-0 left-0 w-1 ${accent}`} aria-hidden />
-      <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant">{label}</p>
+    <div className="min-w-0 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
+      <p className="flex items-center gap-2 truncate text-sm text-on-surface-variant">
+        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${accent}`} aria-hidden />
+        {label}
+      </p>
       {children}
     </div>
   )
@@ -317,22 +322,22 @@ function StatTile({ label, accent, children }: { label: string; accent: string; 
 
 function StatValue({ value }: { value: number | undefined }) {
   return value === undefined
-    ? <div className="mt-1 h-6 w-10 rounded bg-surface-container animate-pulse" />
-    : <p className="mt-0.5 text-xl font-bold leading-tight text-on-surface">{value}</p>
+    ? <div className="mt-3 h-7 w-12 rounded bg-surface-container animate-pulse" />
+    : <p className="mt-2 text-2xl font-semibold leading-tight tracking-tight text-on-surface tabular-nums">{value}</p>
 }
 
 function StatSub({ loading, title, children }: { loading: boolean; title?: string; children: React.ReactNode }) {
   return loading
-    ? <div className="mt-1 h-3 w-24 rounded bg-surface-container animate-pulse" />
-    : <p className="mt-0.5 truncate text-[11px] text-on-surface-variant" title={title}>{children}</p>
+    ? <div className="mt-2 h-3 w-24 rounded bg-surface-container animate-pulse" />
+    : <p className="mt-1.5 truncate text-xs text-on-surface-variant" title={title}>{children}</p>
 }
 
 function StatPair({ loading, rows }: { loading: boolean; rows: { label: string; value: string; tone?: string; title?: string }[] }) {
-  if (loading) return <div className="mt-1 h-9 w-full rounded bg-surface-container animate-pulse" />
+  if (loading) return <div className="mt-3 h-9 w-full rounded bg-surface-container animate-pulse" />
   return (
-    <div className="mt-1 space-y-px">
+    <div className="mt-2 space-y-1">
       {rows.map((r) => (
-        <p key={r.label} className="flex items-baseline justify-between gap-2 text-xs" title={r.title}>
+        <p key={r.label} className="flex items-baseline justify-between gap-2 text-sm" title={r.title}>
           <span className="truncate text-on-surface-variant">{r.label}</span>
           <span className={`shrink-0 whitespace-nowrap font-bold ${r.tone ?? 'text-on-surface'}`}>{r.value}</span>
         </p>
@@ -342,6 +347,7 @@ function StatPair({ loading, rows }: { loading: boolean; rows: { label: string; 
 }
 
 const STATS_OPEN_KEY = 'repairs.statsOpen'
+
 
 export default function RepairsPage() {
   const { activeBranch, verticalTemplateSlug } = useAuthStore()
@@ -1715,10 +1721,10 @@ export default function RepairsPage() {
     {
       accessorKey: 'job_number', header: 'Job #', cell: ({ row }) => (
         <div className="flex items-center gap-2">
-          <Link href={`/repairs/${row.original.id}`} className="font-mono text-sm font-semibold text-blue-600 hover:underline hover:text-blue-800 transition-colors whitespace-nowrap">
+          <Link href={`/repairs/${row.original.id}`} className="font-mono text-sm font-semibold text-primary hover:underline hover:text-primary transition-colors whitespace-nowrap">
             {row.original.job_number}
           </Link>
-          {row.original.is_rush && <span className="flex h-4 items-center rounded bg-orange-100 px-1.5 text-[9px] font-bold text-orange-700 uppercase tracking-widest border border-orange-200" title="Rush Job">Rush</span>}
+          {row.original.is_rush && <span className="inline-flex items-center rounded-full bg-orange-500/10 px-2 py-0.5 text-xs font-medium text-orange-600" title="Rush Job">Rush</span>}
         </div>
       )
     },
@@ -1732,7 +1738,7 @@ export default function RepairsPage() {
       id: 'customer_phone', header: 'Phone', cell: ({ row }) => {
         const c = row.original.customers
         return c?.phone ? (
-          <a href={`tel:${c.phone}`} onClick={(e) => e.stopPropagation()} className="text-xs text-blue-600 hover:underline whitespace-nowrap">{c.phone}</a>
+          <a href={`tel:${c.phone}`} onClick={(e) => e.stopPropagation()} className="text-xs text-primary hover:underline whitespace-nowrap">{c.phone}</a>
         ) : '—'
       }
     },
@@ -1740,7 +1746,7 @@ export default function RepairsPage() {
       id: 'customer_email', header: 'Email', cell: ({ row }) => {
         const c = row.original.customers
         return c?.email ? (
-          <a href={`mailto:${c.email}`} onClick={(e) => e.stopPropagation()} className="text-xs text-blue-600 hover:underline max-w-[160px] truncate block">{c.email}</a>
+          <a href={`mailto:${c.email}`} onClick={(e) => e.stopPropagation()} className="text-xs text-primary hover:underline max-w-[160px] truncate block">{c.email}</a>
         ) : '—'
       }
     },
@@ -1772,7 +1778,7 @@ export default function RepairsPage() {
         const v = getValue() as string
         if (!v || v.toLowerCase() === 'not specified') return <span className="text-outline">—</span>
         return (
-          <span className="inline-block max-w-[170px] rounded-lg bg-violet-100 px-2.5 py-1 text-xs font-semibold leading-snug text-violet-800 break-words whitespace-normal">
+          <span className="inline-block max-w-[170px] rounded-full bg-surface-container px-2.5 py-0.5 text-xs font-medium leading-snug text-on-surface-variant break-words whitespace-normal">
             {v}
           </span>
         )
@@ -1798,11 +1804,11 @@ export default function RepairsPage() {
               ))}
             </select>
             <span
-              className="inline-flex cursor-pointer items-center whitespace-nowrap rounded-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm transition-all group-hover:ring-2 group-hover:ring-offset-2 group-hover:ring-blue-400"
-              style={{ backgroundColor: customColor ?? '#64748b' }}
+              className={`inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium transition-all group-hover:ring-2 group-hover:ring-offset-2 group-hover:ring-primary/30 ${repairStatusChip(s)}`}
             >
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" style={customColor ? { backgroundColor: customColor } : undefined} />
               {formatStatus(s)}
-              <ChevronDown className="ml-1.5 h-3 w-3 opacity-80" />
+              <ChevronDown className="h-3 w-3 opacity-70" />
             </span>
           </div>
         )
@@ -1866,8 +1872,8 @@ export default function RepairsPage() {
         const paid = r.deposit_paid ?? 0
         const status = paid <= 0 ? 'Unpaid' : paid >= total - 0.01 ? 'Paid' : 'Partial'
         const styles: Record<string, string> = {
-          Paid: 'bg-green-100 text-green-700',
-          Partial: 'bg-amber-100 text-amber-700',
+          Paid: 'bg-emerald-500/10 text-emerald-600',
+          Partial: 'bg-amber-500/10 text-amber-600',
           Unpaid: 'bg-surface-container text-on-surface-variant',
         }
         const item = 'flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-xs text-on-surface-variant hover:bg-surface-container-low focus:outline-none transition-colors'
@@ -1880,7 +1886,7 @@ export default function RepairsPage() {
                 tile has nothing to attribute the payment to. */}
             <DropdownMenu.Trigger asChild onClick={(e: React.MouseEvent) => e.stopPropagation()}>
               <span
-                className={`inline-flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-all hover:ring-2 hover:ring-offset-1 hover:ring-blue-400 ${styles[status]}`}
+                className={`inline-flex cursor-pointer items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium transition-all hover:ring-2 hover:ring-offset-1 hover:ring-primary/30 ${styles[status]}`}
               >
                 {status}
                 <ChevronDown className="ml-1 h-3 w-3 opacity-70" />
@@ -1996,46 +2002,44 @@ export default function RepairsPage() {
     <div className="space-y-6">
 
       {/* Header + stats read as one block (tight gap); sections below get space-y-6 */}
-      <div className="space-y-3">
+      <div className="space-y-4">
         {/* ── Header: title + period + stats toggle on one line ── */}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-on-surface">Repairs</h1>
-            <button
-              onClick={() => router.push('/repairs/settings')}
-              className="text-sm font-medium text-blue-600 hover:underline hover:text-blue-700 transition-colors"
-            >
-              Settings
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            {statsOpen && (
-              <div className="flex items-center gap-0.5 rounded-lg border border-outline-variant bg-surface-container p-0.5">
-                {(['today', 'month', '3months', '6months', 'year'] as const).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setStatsPeriod(p)}
-                    className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
-                      statsPeriod === p
-                        ? 'bg-primary text-white shadow-sm'
-                        : 'text-on-surface-variant hover:bg-surface-container-high'
-                    }`}
-                  >
-                    {p === 'today' ? 'Today' : p === 'month' ? 'Month' : p === '3months' ? '3M' : p === '6months' ? '6M' : 'Year'}
-                  </button>
-                ))}
-              </div>
-            )}
-            <button
-              onClick={toggleStats}
-              className="flex items-center gap-1 rounded-lg border border-outline-variant bg-surface px-2.5 py-1.5 text-xs font-medium text-on-surface-variant hover:text-on-surface transition-colors"
-              aria-expanded={statsOpen}
-            >
-              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${statsOpen ? 'rotate-180' : ''}`} />
-              {statsOpen ? 'Hide stats' : 'Show stats'}
-            </button>
-          </div>
-        </div>
+        <PageHeader
+          title="Repairs"
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              {statsOpen && (
+                <SegmentedControl
+                  size="sm"
+                  options={[
+                    { value: 'today', label: 'Today' },
+                    { value: 'month', label: 'Month' },
+                    { value: '3months', label: '3M' },
+                    { value: '6months', label: '6M' },
+                    { value: 'year', label: 'Year' },
+                  ]}
+                  value={statsPeriod}
+                  onChange={(p) => setStatsPeriod(p as typeof statsPeriod)}
+                />
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleStats}
+                aria-expanded={statsOpen}
+              >
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${statsOpen ? 'rotate-180' : ''}`} />
+                {statsOpen ? 'Hide stats' : 'Show stats'}
+              </Button>
+              <button
+                onClick={() => router.push('/repairs/settings')}
+                className="text-sm font-medium text-primary transition-colors hover:underline"
+              >
+                Settings
+              </button>
+            </div>
+          }
+        />
 
         {/* ── Compact stats strip — every figure from the old cards, ~70px tall.
             Two-figure tiles (Revenue / Margin / Deposits) keep both numbers at
@@ -2105,7 +2109,7 @@ export default function RepairsPage() {
                   placeholder="Search job #, device, phone…"
                   value={search}
                   onChange={(e) => { setSearch(e.target.value); setPage(0) }}
-                  className="h-9 w-full rounded-lg border border-outline bg-surface pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
+                  className="h-9 w-full rounded-lg border border-outline bg-surface pl-8 pr-3 text-sm focus:border-primary focus:outline-none"
                 />
               </div>
               {/* Select's root is w-full — pin its width so it sits beside the search box */}
@@ -2134,41 +2138,29 @@ export default function RepairsPage() {
         <div className="flex flex-wrap items-center gap-2">
           {view === 'list' && (
             <>
-            <button
-              onClick={() => exportCSV(repairs)}
-              className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 h-8 px-3 text-xs text-emerald-700 hover:bg-emerald-100 transition-colors"
-            >
+            <Button variant="outline" size="sm" onClick={() => exportCSV(repairs)}>
               <FileDown className="h-3.5 w-3.5" /> Export CSV
-            </button>
-            <button
-              onClick={() => exportExcel(repairs)}
-              className="flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 h-8 px-3 text-xs text-green-700 hover:bg-green-100 transition-colors"
-            >
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => exportExcel(repairs)}>
               <FileSpreadsheet className="h-3.5 w-3.5" /> Export Excel
-            </button>
-            <button
-              onClick={() => exportPDF(repairs)}
-              className="flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 h-8 px-3 text-xs text-sky-700 hover:bg-sky-100 transition-colors"
-            >
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => exportPDF(repairs)}>
               <Printer className="h-3.5 w-3.5" /> Print
-            </button>
+            </Button>
             <div className="relative" ref={colMenuRef}>
-              <button
-                onClick={() => setColMenuOpen((v) => !v)}
-                className="flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 h-8 px-3 text-xs text-violet-700 hover:bg-violet-100 transition-colors"
-              >
+              <Button variant="outline" size="sm" onClick={() => setColMenuOpen((v) => !v)}>
                 <Columns className="h-3.5 w-3.5" /> Columns
-              </button>
+              </Button>
               {colMenuOpen && (
-                <div className="absolute left-0 top-full z-20 mt-1 w-48 rounded-xl border border-gray-700 bg-gray-900 py-2 shadow-xl">
-                  <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant">Toggle columns</p>
+                <div className="absolute left-0 top-full z-20 mt-1 w-48 rounded-xl border border-outline-variant bg-surface-container-lowest py-2 shadow-lg">
+                  <p className="mb-1 px-3 text-xs font-medium text-on-surface-variant">Toggle columns</p>
                   {TOGGLEABLE_COLS.map((key) => {
                     const isCustomerDetail = key === 'customer_phone' || key === 'customer_email'
                     const checked = effectiveColVisibility[key] !== false
                     return (
-                      <label key={key} className={`flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 transition-colors ${isCustomerDetail ? 'pl-6' : ''}`}>
+                      <label key={key} className={`flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-xs text-on-surface transition-colors hover:bg-surface-container-low ${isCustomerDetail ? 'pl-6' : ''}`}>
                         <span className={isCustomerDetail ? 'text-outline' : ''}>{isCustomerDetail ? '↳ ' : ''}{COL_LABELS[key]}</span>
-                        <span className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${checked ? 'bg-teal-500' : 'bg-gray-600'}`}>
+                        <span className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${checked ? 'bg-primary' : 'bg-outline-variant'}`}>
                           <span className={`inline-block h-3 w-3 transform rounded-full bg-surface shadow transition-transform ${checked ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
                           <input
                             type="checkbox"
@@ -2260,7 +2252,7 @@ export default function RepairsPage() {
         <div className="mb-5 flex items-center gap-2">
           {[1, 2].map((s) => (
             <div key={s} className="flex items-center gap-2">
-              <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${modalStep === s ? 'bg-gray-900 text-white' : modalStep > s ? 'bg-green-500 text-white' : 'bg-surface-container-high text-on-surface-variant'}`}>
+              <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${modalStep === s ? 'bg-primary text-white' : modalStep > s ? 'bg-green-500 text-white' : 'bg-surface-container-high text-on-surface-variant'}`}>
                 {s}
               </div>
               <span className={`text-sm font-medium ${modalStep === s ? 'text-on-surface' : 'text-outline'}`}>
@@ -2277,20 +2269,20 @@ export default function RepairsPage() {
 
             {/* Existing-customer pill — shown once a suggestion is selected */}
             {selectedCustomer && (
-              <div className="flex items-center gap-3 rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-600 text-xs font-bold text-white">
+              <div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2.5">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
                   {selectedCustomer.first_name.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-teal-900 truncate">
+                  <p className="text-sm font-semibold text-on-surface truncate">
                     {selectedCustomer.first_name} {selectedCustomer.last_name ?? ''}
                   </p>
-                  <p className="text-xs text-teal-700 truncate">{selectedCustomer.phone ?? selectedCustomer.email ?? 'Existing customer'}</p>
+                  <p className="text-xs text-primary truncate">{selectedCustomer.phone ?? selectedCustomer.email ?? 'Existing customer'}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => { setSelectedCustomer(null); setNewCust(EMPTY_NEW_CUST); setSelectedVehicle(null); setStep1Error(''); setPhoneError('') }}
-                  className="shrink-0 rounded-md p-1 text-teal-600 hover:bg-teal-100 transition-colors"
+                  className="shrink-0 rounded-md p-1 text-primary hover:bg-primary/10 transition-colors"
                   title="Change customer"
                 >
                   <X className="h-4 w-4" />
@@ -2302,7 +2294,7 @@ export default function RepairsPage() {
             <div className="grid grid-cols-2 gap-3">
               {/* Customer Name — autocomplete on type */}
               <div className="relative">
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+                <label className="mb-1.5 block text-sm font-medium text-on-surface-variant">
                   Customer Name <span className="text-red-400">*</span>
                 </label>
                 <input
@@ -2353,7 +2345,7 @@ export default function RepairsPage() {
 
               {/* Email */}
               <div className="relative">
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Customer Email</label>
+                <label className="mb-1.5 block text-sm font-medium text-on-surface-variant">Customer Email</label>
                 <input
                   type="email"
                   readOnly={!!selectedCustomer}
@@ -2403,7 +2395,7 @@ export default function RepairsPage() {
             <div className="grid grid-cols-2 gap-3">
               {/* Business Name */}
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Business Name</label>
+                <label className="mb-1.5 block text-sm font-medium text-on-surface-variant">Business Name</label>
                 <input
                   readOnly={!!selectedCustomer}
                   value={newCust.business_name}
@@ -2419,7 +2411,7 @@ export default function RepairsPage() {
 
               {/* Phone Number — autocomplete on type */}
               <div className="relative">
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+                <label className="mb-1.5 block text-sm font-medium text-on-surface-variant">
                   Phone Number
                 </label>
                 <input
@@ -2480,7 +2472,7 @@ export default function RepairsPage() {
 
             {/* Address — full width */}
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Customer Address</label>
+              <label className="mb-1.5 block text-sm font-medium text-on-surface-variant">Customer Address</label>
               <textarea
                 rows={2}
                 readOnly={!!selectedCustomer}
@@ -2496,7 +2488,7 @@ export default function RepairsPage() {
             </div>
 
             {step1Error && (
-              <p className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-600">{step1Error}</p>
+              <p className="rounded-lg bg-red-500/5 border border-red-500/20 px-3 py-2 text-sm text-red-600">{step1Error}</p>
             )}
 
             <div className="flex justify-end gap-2 border-t border-outline-variant pt-3">
@@ -2542,7 +2534,7 @@ export default function RepairsPage() {
           const remaining = (parseFloat(jobData.estimated_cost) || 0) - Math.max(0, jobDiscountAmount) - (parseFloat(jobData.deposit_paid) || 0)
           const pricePending = jobData.price_pending
           // Soft, single-pixel borders + sentence-case labels keep this long form calm to scan
-          const inp = 'h-9 w-full rounded-lg border border-[var(--outline-variant)] bg-surface-container-lowest px-3 text-sm text-on-surface placeholder:text-on-surface-variant/70 transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/15'
+          const inp = 'h-9 w-full rounded-lg border border-[var(--outline-variant)] bg-surface-container-lowest px-3 text-sm text-on-surface placeholder:text-on-surface-variant/70 transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-brand-teal/15'
           const sel = `${inp} appearance-none`
           const lbl = 'mb-1 block text-xs font-medium text-on-surface-variant'
 
@@ -2567,7 +2559,7 @@ export default function RepairsPage() {
                         value={jobData.location_notes}
                         onChange={(e) => setJobData((p) => ({ ...p, location_notes: e.target.value }))}
                         placeholder="e.g. M25 Junction 10, northbound hard shoulder"
-                        className="w-full rounded-md border-2 border-outline-variant bg-surface px-2.5 py-1.5 text-sm text-on-surface placeholder:text-outline transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20 resize-none"
+                        className="w-full rounded-md border-2 border-outline-variant bg-surface px-2.5 py-1.5 text-sm text-on-surface placeholder:text-outline transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
                       />
                     </div>
                   </div>
@@ -2721,7 +2713,7 @@ export default function RepairsPage() {
                 )}
 
                 {deviceError && (
-                  <p className="mt-1.5 text-xs text-red-500 bg-red-50 border border-red-200 rounded-md px-3 py-1.5">{deviceError}</p>
+                  <p className="mt-1.5 text-xs text-red-500 bg-red-500/5 border border-red-500/20 rounded-md px-3 py-1.5">{deviceError}</p>
                 )}
               </div>
 
@@ -2731,12 +2723,12 @@ export default function RepairsPage() {
               <div>
 
                 {isTyreShop && !selectedVehicle && (
-                  <p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-600">
+                  <p className="mb-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-600">
                     Select a vehicle above to add tyres & extras.
                   </p>
                 )}
                 {!isRetail && !isTyreShop && (!jobData.device_type || !jobData.device_brand || !jobData.device_model) && (
-                  <p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-600">
+                  <p className="mb-2 rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-600">
                     Select Device Type, Brand and Model above to add repair parts.
                   </p>
                 )}
@@ -2750,7 +2742,7 @@ export default function RepairsPage() {
                       <button
                         type="button"
                         onClick={() => setShowNewTyre((v) => !v)}
-                        className="flex items-center gap-1 rounded-full border border-dashed border-outline px-2.5 py-1 text-xs font-medium text-on-surface-variant hover:border-brand-teal hover:bg-teal-50 hover:text-brand-teal transition-colors"
+                        className="flex items-center gap-1 rounded-full border border-dashed border-outline px-2.5 py-1 text-xs font-medium text-on-surface-variant hover:border-primary hover:bg-primary/5 hover:text-primary transition-colors"
                       >
                         <Plus className="h-3 w-3" /> Tyre Size
                       </button>
@@ -2759,7 +2751,7 @@ export default function RepairsPage() {
                           key={name}
                           type="button"
                           onClick={() => addPresetExtra(name)}
-                          className="flex items-center gap-1 rounded-full border border-dashed border-outline px-2.5 py-1 text-xs font-medium text-on-surface-variant hover:border-brand-teal hover:bg-teal-50 hover:text-brand-teal transition-colors"
+                          className="flex items-center gap-1 rounded-full border border-dashed border-outline px-2.5 py-1 text-xs font-medium text-on-surface-variant hover:border-primary hover:bg-primary/5 hover:text-primary transition-colors"
                         >
                           <Plus className="h-3 w-3" /> {name}
                         </button>
@@ -2768,7 +2760,7 @@ export default function RepairsPage() {
                         type="button"
                         onClick={() => setShowCustomExtra((v) => !v)}
                         title="Add another extra"
-                        className="flex items-center gap-1 rounded-full bg-brand-teal px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-brand-teal/90 transition-colors"
+                        className="flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-semibold text-white hover:bg-primary/90 transition-colors"
                       >
                         <Plus className="h-3 w-3" /> Add More
                       </button>
@@ -2776,7 +2768,7 @@ export default function RepairsPage() {
                     {showCustomExtra && (
                       <div className="flex items-end gap-2 rounded-lg border border-outline-variant bg-surface-container-low p-2">
                         <div className="flex-1">
-                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-outline">Extra Name</label>
+                          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Extra Name</label>
                           <input
                             autoFocus
                             type="text"
@@ -2784,22 +2776,22 @@ export default function RepairsPage() {
                             onChange={(e) => setCustomExtraName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && addCustomExtra()}
                             placeholder="e.g. Puncture Repair"
-                            className="h-8 w-full rounded-md border border-outline bg-surface px-2 text-sm focus:border-brand-teal focus:outline-none"
+                            className="h-8 w-full rounded-md border border-outline bg-surface px-2 text-sm focus:border-primary focus:outline-none"
                           />
                         </div>
                         <div className="w-28">
-                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-outline">Tyre Size</label>
+                          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Tyre Size</label>
                           <input
                             type="text"
                             value={customExtraTyreSize}
                             onChange={(e) => setCustomExtraTyreSize(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && addCustomExtra()}
                             placeholder="205/55R16"
-                            className="h-8 w-full rounded-md border border-outline bg-surface px-2 text-sm focus:border-brand-teal focus:outline-none"
+                            className="h-8 w-full rounded-md border border-outline bg-surface px-2 text-sm focus:border-primary focus:outline-none"
                           />
                         </div>
                         <div className="w-24">
-                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-outline">Price {getCurrencySymbol()}</label>
+                          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Price {getCurrencySymbol()}</label>
                           <input
                             type="number"
                             step="0.01"
@@ -2808,14 +2800,14 @@ export default function RepairsPage() {
                             onChange={(e) => setCustomExtraPrice(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && addCustomExtra()}
                             placeholder="0.00"
-                            className="h-8 w-full rounded-md border border-outline bg-surface px-2 text-sm focus:border-brand-teal focus:outline-none"
+                            className="h-8 w-full rounded-md border border-outline bg-surface px-2 text-sm focus:border-primary focus:outline-none"
                           />
                         </div>
                         <button
                           type="button"
                           onClick={addCustomExtra}
                           disabled={!customExtraName.trim()}
-                          className="h-8 shrink-0 rounded-md bg-gray-900 px-3 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
+                          className="h-8 shrink-0 rounded-md bg-primary px-3 text-xs font-semibold text-white hover:bg-primary/90 disabled:opacity-40 transition-colors"
                         >
                           Add
                         </button>
@@ -2831,7 +2823,7 @@ export default function RepairsPage() {
                     {showNewTyre && (
                       <div className="flex items-end gap-2 rounded-lg border border-outline-variant bg-surface-container-low p-2">
                         <div className="flex-1">
-                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-outline">Tyre Size <span className="text-red-400">*</span></label>
+                          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Tyre Size <span className="text-red-400">*</span></label>
                           <input
                             autoFocus
                             type="text"
@@ -2839,11 +2831,11 @@ export default function RepairsPage() {
                             onChange={(e) => setNewTyreSize(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && addNewTyre()}
                             placeholder="e.g. 205/55R16"
-                            className="h-8 w-full rounded-md border border-outline bg-surface px-2 text-sm focus:border-brand-teal focus:outline-none"
+                            className="h-8 w-full rounded-md border border-outline bg-surface px-2 text-sm focus:border-primary focus:outline-none"
                           />
                         </div>
                         <div className="w-24">
-                          <label className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-outline">Price {getCurrencySymbol()}</label>
+                          <label className="mb-1 block text-xs font-medium text-on-surface-variant">Price {getCurrencySymbol()}</label>
                           <input
                             type="number"
                             step="0.01"
@@ -2852,14 +2844,14 @@ export default function RepairsPage() {
                             onChange={(e) => setNewTyrePrice(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && addNewTyre()}
                             placeholder="0.00"
-                            className="h-8 w-full rounded-md border border-outline bg-surface px-2 text-sm focus:border-brand-teal focus:outline-none"
+                            className="h-8 w-full rounded-md border border-outline bg-surface px-2 text-sm focus:border-primary focus:outline-none"
                           />
                         </div>
                         <button
                           type="button"
                           onClick={addNewTyre}
                           disabled={!newTyreSize.trim()}
-                          className="h-8 shrink-0 rounded-md bg-gray-900 px-3 text-xs font-semibold text-white hover:bg-gray-700 disabled:opacity-40 transition-colors"
+                          className="h-8 shrink-0 rounded-md bg-primary px-3 text-xs font-semibold text-white hover:bg-primary/90 disabled:opacity-40 transition-colors"
                         >
                           Add
                         </button>
@@ -2898,7 +2890,7 @@ export default function RepairsPage() {
                         onClick={() => setShowCustomExtra((v) => !v)}
                         disabled={!selectedVehicle}
                         title="Add a product/extra manually"
-                        className="flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-brand-teal px-3 text-xs font-semibold text-white shadow-sm hover:bg-brand-teal/90 disabled:opacity-40 transition-colors"
+                        className="flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-md bg-primary px-3 text-xs font-semibold text-white hover:bg-primary/90 disabled:opacity-40 transition-colors"
                       >
                         <Plus className="h-3.5 w-3.5" /> Add Product
                       </button>
@@ -2926,14 +2918,14 @@ export default function RepairsPage() {
                                 <li key={v.id}>
                                   <button
                                     type="button"
-                                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
+                                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-surface-container-low transition-colors"
                                     onMouseDown={(e) => { e.preventDefault(); addPartFromInventory(variantsFor, v) }}
                                   >
                                     <span className="min-w-0 flex-1 truncate text-on-surface-variant">{v.name}</span>
                                     <span className={`shrink-0 text-xs font-medium ${(v.stock ?? 0) > 0 ? 'text-outline' : 'text-red-500'}`}>
                                       {(v.stock ?? 0) > 0 ? `${v.stock} in stock` : 'Out of stock'}
                                     </span>
-                                    <span className="shrink-0 text-xs font-semibold text-teal-700">{formatCurrency(v.selling_price ?? 0)}</span>
+                                    <span className="shrink-0 text-xs font-semibold text-primary">{formatCurrency(v.selling_price ?? 0)}</span>
                                   </button>
                                 </li>
                               ))
@@ -2946,12 +2938,12 @@ export default function RepairsPage() {
                           <li key={p.id}>
                             <button
                               type="button"
-                              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
+                              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-surface-container-low transition-colors"
                               onMouseDown={(e) => { e.preventDefault(); if (p.has_variants) loadPartVariants(p); else addPartFromInventory(p) }}
                             >
                               <span className="min-w-0 flex-1 truncate text-on-surface-variant">{p.name}</span>
                               {p.has_variants ? (
-                                <span className="shrink-0 text-xs font-semibold text-brand-teal">Select variant →</span>
+                                <span className="shrink-0 text-xs font-semibold text-primary">Select variant →</span>
                               ) : (
                                 <>
                                   {!p.is_service && (
@@ -2959,7 +2951,7 @@ export default function RepairsPage() {
                                       {(p.on_hand ?? 0) > 0 ? `${p.on_hand} in stock` : 'Out of stock'}
                                     </span>
                                   )}
-                                  <span className="shrink-0 text-xs font-semibold text-teal-700">{formatCurrency(p.selling_price ?? 0)}</span>
+                                  <span className="shrink-0 text-xs font-semibold text-primary">{formatCurrency(p.selling_price ?? 0)}</span>
                                 </>
                               )}
                             </button>
@@ -2971,7 +2963,7 @@ export default function RepairsPage() {
                               <span className="text-xs italic text-on-surface-variant">Add &quot;{partQuery.trim()}&quot;</span>
                               {isTyreShop && (
                                 <div className="flex flex-col gap-0.5">
-                                  <span className="text-[10px] font-medium text-outline uppercase tracking-wide">Tyre Size</span>
+                                  <span className="text-xs font-medium text-on-surface-variant">Tyre Size</span>
                                   <input
                                     type="text"
                                     value={quickPartTyreSize}
@@ -2984,7 +2976,7 @@ export default function RepairsPage() {
                               )}
                               <div className="flex items-center gap-2">
                                 <div className="flex flex-1 flex-col gap-0.5">
-                                  <span className="text-[10px] font-medium text-outline uppercase tracking-wide">Cost {getCurrencySymbol()}</span>
+                                  <span className="text-xs font-medium text-on-surface-variant">Cost {getCurrencySymbol()}</span>
                                   <input
                                     type="number"
                                     step="0.01"
@@ -2997,7 +2989,7 @@ export default function RepairsPage() {
                                   />
                                 </div>
                                 <div className="flex flex-1 flex-col gap-0.5">
-                                  <span className="text-[10px] font-medium text-outline uppercase tracking-wide">Price {getCurrencySymbol()}</span>
+                                  <span className="text-xs font-medium text-on-surface-variant">Price {getCurrencySymbol()}</span>
                                   <input
                                     type="number"
                                     step="0.01"
@@ -3011,7 +3003,7 @@ export default function RepairsPage() {
                                 </div>
                                 <button
                                   type="button"
-                                  className="mt-4 shrink-0 rounded bg-gray-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-700 transition-colors"
+                                  className="mt-4 shrink-0 rounded bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary/90 transition-colors"
                                   onMouseDown={(e) => { e.preventDefault(); addQuickPart() }}
                                 >
                                   Add
@@ -3307,8 +3299,8 @@ export default function RepairsPage() {
                     <label className={lbl}>Remaining</label>
                     <div className={`flex h-9 items-center rounded-lg border px-3 text-sm font-semibold ${
                       pricePending
-                        ? 'border-amber-200 bg-amber-50 text-amber-600'
-                        : remaining > 0 ? 'border-orange-200 bg-orange-50 text-orange-600' : 'border-green-200 bg-green-50 text-green-600'
+                        ? 'border-amber-500/20 bg-amber-500/5 text-amber-600'
+                        : remaining > 0 ? 'border-orange-500/20 bg-orange-500/5 text-orange-600' : 'border-emerald-500/20 bg-emerald-500/5 text-green-600'
                     }`}>
                       {pricePending ? 'TBD' : `£${remaining.toFixed(2)}`}
                     </div>
@@ -3392,10 +3384,10 @@ export default function RepairsPage() {
                   )}
                 </div>
                 {isTyreShop && dispatchError && (
-                  <p className="mt-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-600">{dispatchError}</p>
+                  <p className="mt-2 rounded-lg bg-red-500/5 border border-red-500/20 px-3 py-2 text-xs text-red-600">{dispatchError}</p>
                 )}
                 {isTyreShop && fitterConflict && (
-                  <p className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+                  <p className="mt-2 rounded-lg bg-amber-500/5 border border-amber-500/20 px-3 py-2 text-xs text-amber-700">
                     ⚠ This fitter is already booked on job #{fitterConflict.job_number} during this time slot. You can still assign them — just confirm they&apos;re actually available.
                   </p>
                 )}
@@ -3421,7 +3413,7 @@ export default function RepairsPage() {
                           })}
                           className={`flex h-8 items-center gap-1.5 rounded-lg border px-3.5 text-xs font-medium capitalize transition-colors ${
                             active
-                              ? 'border-gray-900 bg-gray-900 text-white'
+                              ? 'border-primary bg-primary text-white'
                               : disabled
                                 ? 'border-outline-variant text-outline-variant cursor-not-allowed'
                                 : 'border-outline-variant bg-surface text-on-surface-variant hover:bg-surface-container-low'
@@ -3527,7 +3519,7 @@ export default function RepairsPage() {
                         type="button"
                         onClick={() => fitterPickerRef.current?.startCreate()}
                         title="Add a new fitter — type a name and press Enter"
-                        className="flex items-center gap-0.5 rounded-full bg-brand-teal px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm hover:bg-brand-teal/90 transition-colors"
+                        className="flex items-center gap-0.5 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-white hover:bg-primary/90 transition-colors"
                       >
                         <Plus className="h-2.5 w-2.5" /> New
                       </button>
@@ -3607,7 +3599,7 @@ export default function RepairsPage() {
                       key={t}
                       type="button"
                       onClick={() => setJobData((p) => ({ ...p, lock_type: t, passcode: '' }))}
-                      className={`rounded-md border px-3 py-1 text-xs font-medium capitalize transition-colors ${jobData.lock_type === t ? 'border-gray-900 bg-gray-900 text-white' : 'border-outline-variant bg-surface text-on-surface-variant hover:bg-surface-container-low'}`}
+                      className={`rounded-md border px-3 py-1 text-xs font-medium capitalize transition-colors ${jobData.lock_type === t ? 'border-primary bg-primary text-white' : 'border-outline-variant bg-surface text-on-surface-variant hover:bg-surface-container-low'}`}
                     >
                       {t === '' ? 'None' : t}
                     </button>
@@ -3653,11 +3645,11 @@ export default function RepairsPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={lbl}>Customer Note</label>
-                    <textarea rows={2} value={jobData.customer_note} onChange={(e) => setJobData((p) => ({ ...p, customer_note: e.target.value }))} placeholder="Visible to customer…" className="w-full resize-none rounded-lg border border-[var(--outline-variant)] bg-surface-container-lowest px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/70 transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/15" />
+                    <textarea rows={2} value={jobData.customer_note} onChange={(e) => setJobData((p) => ({ ...p, customer_note: e.target.value }))} placeholder="Visible to customer…" className="w-full resize-none rounded-lg border border-[var(--outline-variant)] bg-surface-container-lowest px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/70 transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-brand-teal/15" />
                   </div>
                   <div>
                     <label className={lbl}>Staff Note</label>
-                    <textarea rows={2} value={jobData.staff_note} onChange={(e) => setJobData((p) => ({ ...p, staff_note: e.target.value }))} placeholder="Internal only…" className="w-full resize-none rounded-lg border border-[var(--outline-variant)] bg-surface-container-lowest px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/70 transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/15" />
+                    <textarea rows={2} value={jobData.staff_note} onChange={(e) => setJobData((p) => ({ ...p, staff_note: e.target.value }))} placeholder="Internal only…" className="w-full resize-none rounded-lg border border-[var(--outline-variant)] bg-surface-container-lowest px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/70 transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-brand-teal/15" />
                   </div>
                 </div>
               </div>
@@ -3808,7 +3800,7 @@ export default function RepairsPage() {
                   Device-repair concept (outsourced lab) — no equivalent for
                   tyre jobs, which don't send anything out to a lab. */}
               {!isTyreShop && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
                   <label className={lbl}>Lab / 3rd-Party Fee</label>
                   <div className="relative">
                     <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-outline">£</span>
@@ -3831,7 +3823,7 @@ export default function RepairsPage() {
               {/* Outsourced — tyre jobs sent to an outside fitter. The cost is the same
                   lab_fee as above, so it reduces profit and is never billed. */}
               {isTyreShop && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
                   <SwitchChip
                     label="Outsourced"
                     checked={editData.outsourced}
@@ -3901,7 +3893,7 @@ export default function RepairsPage() {
                   <button
                     type="button"
                     onClick={() => setEditData((p) => ({ ...p, deposit_paid: String(total - editDiscountAmount) }))}
-                    className="mt-1.5 w-full rounded-md border border-green-300 bg-green-50 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-100 transition-colors"
+                    className="mt-1.5 w-full rounded-md border border-emerald-500/20 bg-emerald-500/5 py-1.5 text-xs font-semibold text-emerald-600 hover:bg-emerald-500/10 transition-colors"
                   >
                     Mark as Fully Paid (£{(total - editDiscountAmount).toFixed(2)})
                   </button>
@@ -3911,7 +3903,7 @@ export default function RepairsPage() {
               {/* Remaining Charges */}
               <div>
                 <label className={lbl}>Remaining Charges <span className="text-red-500">*</span></label>
-                <input readOnly value={remaining.toFixed(2)} placeholder="Enter Remaining Charges" className={`h-10 w-full rounded-lg border px-3 text-sm cursor-not-allowed ${remaining > 0 ? 'border-orange-200 bg-orange-50 text-orange-600' : 'border-green-200 bg-green-50 text-green-700 font-semibold'}`} />
+                <input readOnly value={remaining.toFixed(2)} placeholder="Enter Remaining Charges" className={`h-10 w-full rounded-lg border px-3 text-sm cursor-not-allowed ${remaining > 0 ? 'border-orange-500/20 bg-orange-500/5 text-orange-600' : 'border-emerald-500/20 bg-emerald-500/5 text-emerald-600 font-semibold'}`} />
               </div>
 
               {/* Payment Method */}
@@ -3937,7 +3929,7 @@ export default function RepairsPage() {
                         })}
                         className={`flex items-center gap-1.5 rounded-lg border px-6 py-2 text-sm font-medium capitalize transition-colors ${
                           active
-                            ? 'border-gray-900 bg-gray-900 text-white'
+                            ? 'border-primary bg-primary text-white'
                             : disabled
                               ? 'border-outline-variant text-outline-variant cursor-not-allowed'
                               : 'border-outline bg-surface text-on-surface-variant hover:bg-surface-container-low'
@@ -4097,12 +4089,12 @@ function SwitchChip({ label, checked, onChange, className = '' }: { label: strin
       onClick={() => onChange(!checked)}
       className={`inline-flex h-9 select-none items-center gap-2.5 rounded-lg border px-3 text-xs font-semibold transition-colors ${
         checked
-          ? 'border-brand-teal bg-brand-teal/10 text-brand-teal'
+          ? 'border-primary bg-brand-teal/10 text-primary'
           : 'border-[var(--outline-variant)] bg-surface-container-lowest text-on-surface-variant hover:border-outline'
       } ${className}`}
     >
-      <span className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${checked ? 'bg-brand-teal' : 'bg-outline/40'}`}>
-        <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-all ${checked ? 'left-3.5' : 'left-0.5'}`} />
+      <span className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${checked ? 'bg-primary' : 'bg-outline/40'}`}>
+        <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-surface-container-lowest shadow-sm transition-all ${checked ? 'left-3.5' : 'left-0.5'}`} />
       </span>
       {label}
     </button>

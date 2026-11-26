@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Clock, Info } from 'lucide-react'
+import { PageHeader } from '@/components/shared/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, type SelectOption } from '@/components/ui/select'
@@ -58,26 +59,25 @@ export default function InvoiceRemindersPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100">
-          <Clock className="h-5 w-5 text-amber-600" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-on-surface">Invoice Reminders</h1>
-          <p className="text-sm text-on-surface-variant">Automatically notify customers about upcoming and overdue invoices</p>
-        </div>
-      </div>
+      <PageHeader title="Invoice Reminders" description="Automatically notify customers about upcoming and overdue invoices" />
 
-      <div className="max-w-lg space-y-6">
-        <div className="rounded-lg border border-outline-variant bg-surface p-6 shadow-sm">
-          <h3 className="mb-4 text-lg font-semibold text-on-surface">Automated Invoice Reminders</h3>
+      <div className="max-w-4xl space-y-6">
+        <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
+          <div className="mb-5 flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Clock className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold text-on-surface">Automated Invoice Reminders</h3>
+              <p className="mt-0.5 text-sm text-on-surface-variant">Send payment reminders before the due date and after an invoice goes overdue.</p>
+            </div>
+          </div>
           <div className="space-y-4">
             <label className="flex items-center gap-3">
               <input
                 type="checkbox"
                 checked={reminderSettings.enabled}
-                className="h-4 w-4 rounded border-outline text-blue-600 focus:ring-blue-500"
+                className="h-4 w-4 rounded accent-primary"
                 onChange={(e) => setReminderSettings((s) => ({ ...s, enabled: e.target.checked }))}
               />
               <span className="text-sm font-medium text-on-surface-variant">Enable automated invoice payment reminders</span>
@@ -124,10 +124,10 @@ export default function InvoiceRemindersPage() {
           </div>
         </div>
 
-        <div className="rounded-md bg-blue-50 px-4 py-3">
+        <div className="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3">
           <div className="flex items-start gap-2">
-            <Info className="mt-0.5 h-4 w-4 text-blue-600" />
-            <p className="text-sm text-blue-700">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-on-surface-variant" />
+            <p className="text-sm text-on-surface-variant">
               Invoice reminders use the <strong>Invoice Overdue</strong> notification template.
               Make sure to configure the template in the{' '}
               <a href="/settings/notifications" className="underline font-medium">Templates</a> section.

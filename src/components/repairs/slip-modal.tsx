@@ -114,7 +114,7 @@ export function RepairSlipModal({ repair, onClose }: Props) {
       <div className="flex flex-col h-[40vh]">
         {loading ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-on-surface-variant">
-            <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-sm font-medium">Generating slip...</p>
           </div>
         ) : isThermal && data ? (

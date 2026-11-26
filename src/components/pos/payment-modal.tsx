@@ -147,15 +147,15 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
             <span className="text-2xl">✓</span>
           </div>
-          <p className="font-semibold text-green-700">Payment Successful!</p>
+          <p className="font-semibold text-emerald-700">Payment Successful!</p>
           {successSaleId && <p className="text-xs text-outline mt-1">Sale #{successSaleId.slice(-8)}</p>}
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="rounded-lg bg-surface-container-low p-4">
+          <div className="rounded-xl bg-surface-container-low p-4">
             <div className="flex justify-between text-lg font-bold">
               <span>Total Due</span>
-              <span className="text-blue-600">{formatCurrency(pos.total())}</span>
+              <span className="text-primary">{formatCurrency(pos.total())}</span>
             </div>
           </div>
 
@@ -169,9 +169,9 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
                   disabled={disabled}
                   onClick={() => !disabled && pos.setPaymentMethod(key as Parameters<typeof pos.setPaymentMethod>[0])}
                   title={disabled ? 'Select a customer first' : undefined}
-                  className={`flex flex-col items-center gap-1 rounded-lg border p-3 text-xs font-medium transition-colors ${
+                  className={`flex flex-col items-center gap-1 rounded-xl border p-3 text-xs font-medium transition-colors ${
                     pos.paymentMethod === key
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      ? 'border-primary bg-primary/5 text-primary'
                       : disabled
                         ? 'border-outline-variant bg-surface-container-low text-outline-variant cursor-not-allowed'
                         : 'border-outline-variant text-on-surface-variant hover:bg-surface-container-low'
@@ -199,7 +199,7 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
             </div>
           )}
           {pos.giftCardId && (
-            <p className="text-xs text-green-600">
+            <p className="text-xs text-emerald-700">
               Gift card applied: -{formatCurrency(pos.giftCardAmount ?? 0)}
             </p>
           )}
@@ -225,7 +225,7 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
                 <Button variant="outline" size="sm" onClick={applyStoreCredit}>Apply</Button>
               </div>
               {pos.storeCreditAmount > 0 && (
-                <p className="text-xs text-green-600">
+                <p className="text-xs text-emerald-700">
                   Store credit applied: -{formatCurrency(pos.storeCreditAmount)}
                 </p>
               )}
@@ -254,7 +254,7 @@ export function PaymentModal({ open, onClose, onSuccess }: PaymentModalProps) {
                 <Button variant="outline" size="sm" onClick={applyLoyaltyPoints}>Apply</Button>
               </div>
               {pos.loyaltyPointsUsed > 0 && (
-                <p className="text-xs text-green-600">
+                <p className="text-xs text-emerald-700">
                   {pos.loyaltyPointsUsed} pts redeemed: -{formatCurrency(pos.loyaltyPointsAmount)}
                 </p>
               )}

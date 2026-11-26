@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/shared/page-header'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
@@ -202,44 +203,41 @@ export default function AppointmentsPage() {
   const isWeekend = (day: Date) => { const d = day.getDay(); return d === 0 || d === 6 }
 
   return (
-    <div className="space-y-5">
-      {/* Page header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-on-surface">Appointments</h1>
-          <p className="mt-0.5 text-sm text-outline font-medium">
-            {format(weekStart, 'MMM d')} – {format(addDays(weekStart, 6), 'MMM d, yyyy')}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-lg border border-outline-variant bg-surface shadow-sm overflow-hidden">
-            <button
-              onClick={() => setWeekStart((d) => addDays(d, -7))}
-              className="px-3 py-2 hover:bg-surface-container-low text-on-surface-variant hover:text-on-surface-variant border-r border-outline-variant transition-colors"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-              className="px-4 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface border-r border-outline-variant transition-colors"
-            >
-              Today
-            </button>
-            <button
-              onClick={() => setWeekStart((d) => addDays(d, 7))}
-              className="px-3 py-2 hover:bg-surface-container-low text-on-surface-variant hover:text-on-surface-variant transition-colors"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-          <Button onClick={() => setSheetOpen(true)} className="shadow-sm">
-            <Plus className="h-4 w-4" /> Add Appointment
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Appointments"
+        description={`${format(weekStart, 'MMM d')} – ${format(addDays(weekStart, 6), 'MMM d, yyyy')}`}
+        actions={
+          <>
+            <div className="flex items-center overflow-hidden rounded-full border border-outline-variant bg-surface-container-lowest">
+              <button
+                onClick={() => setWeekStart((d) => addDays(d, -7))}
+                className="px-3 py-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
+                className="border-x border-outline-variant px-4 py-2 text-sm font-medium text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface"
+              >
+                Today
+              </button>
+              <button
+                onClick={() => setWeekStart((d) => addDays(d, 7))}
+                className="px-3 py-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+            <Button onClick={() => setSheetOpen(true)}>
+              <Plus className="h-4 w-4" /> Add Appointment
+            </Button>
+          </>
+        }
+      />
 
       {/* Calendar */}
-      <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest">
         {/* Day headers */}
         <div className="grid bg-surface-container-low border-b border-outline-variant" style={{ gridTemplateColumns: '4.5rem repeat(7, 1fr)' }}>
           <div className="border-r border-outline-variant" />
@@ -251,11 +249,11 @@ export default function AppointmentsPage() {
                 key={day.toISOString()}
                 className={`border-r border-outline-variant last:border-r-0 px-3 py-4 text-center ${weekend ? 'bg-surface-container-low/80' : ''}`}
               >
-                <p className={`text-[11px] font-semibold uppercase tracking-widest ${isToday ? 'text-teal-600' : 'text-outline'}`}>
+                <p className={`text-xs font-medium ${isToday ? 'text-primary' : 'text-on-surface-variant'}`}>
                   {format(day, 'EEE')}
                 </p>
                 <div className={`mx-auto mt-1 flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold transition-colors ${
-                  isToday ? 'bg-teal-600 text-white shadow-md shadow-teal-200' : 'text-on-surface-variant'
+                  isToday ? 'bg-primary text-on-primary' : 'text-on-surface'
                 }`}>
                   {format(day, 'd')}
                 </div>
@@ -283,7 +281,7 @@ export default function AppointmentsPage() {
               >
                 {/* Time label */}
                 <div className="border-r border-outline-variant flex items-start justify-end pr-3 pt-2">
-                  <span className="text-[11px] font-medium text-outline">
+                  <span className="text-xs font-medium text-on-surface-variant">
                     {format(new Date().setHours(hour, 0, 0), 'h a')}
                   </span>
                 </div>
@@ -296,18 +294,18 @@ export default function AppointmentsPage() {
                     <div
                       key={day.toISOString()}
                       className={`border-r border-outline-variant last:border-r-0 p-1.5 ${
-                        isToday ? 'bg-teal-50/30' : weekend ? 'bg-surface-container-low/60' : ''
+                        isToday ? 'bg-primary/5' : weekend ? 'bg-surface-container-low/60' : ''
                       }`}
                     >
                       {dayAppts.map((a) => (
                         <div
                           key={a.id}
-                          className="group relative mb-1.5 last:mb-0 rounded-lg border-l-[3px] border-teal-500 bg-teal-50 px-2 py-1.5 text-xs shadow-sm hover:shadow-md hover:bg-teal-100/80 transition-all cursor-default"
+                          className="group relative mb-1.5 last:mb-0 rounded-xl border-l-[3px] border-primary bg-primary/10 px-2 py-1.5 text-xs transition-colors hover:bg-primary/15 cursor-default"
                         >
-                          <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5 bg-surface rounded-md shadow-sm border border-outline-variant p-0.5">
+                          <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5 rounded-md border border-outline-variant bg-surface-container-lowest p-0.5 shadow-sm">
                             <button
                               onClick={(e) => { e.stopPropagation(); openEdit(a) }}
-                              className="rounded p-0.5 hover:bg-teal-50 text-teal-600"
+                              className="rounded p-0.5 text-primary hover:bg-primary/10"
                               title="Edit"
                             >
                               <Pencil className="h-3 w-3" />
@@ -320,21 +318,21 @@ export default function AppointmentsPage() {
                               <Trash2 className="h-3 w-3" />
                             </button>
                           </div>
-                          <p className="font-semibold text-teal-900 truncate pr-12 leading-tight">{a.title}</p>
+                          <p className="truncate pr-12 font-semibold leading-tight text-on-surface">{a.title}</p>
                           {a.customers && (
-                            <p className="text-teal-600 truncate text-[11px] mt-0.5">
+                            <p className="mt-0.5 truncate text-[11px] text-on-surface-variant">
                               {a.customers.first_name} {a.customers.last_name ?? ''}
                             </p>
                           )}
                           <div className="mt-1">
                             <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
                               a.status === 'confirmed' || a.status === 'completed'
-                                ? 'bg-emerald-100 text-emerald-700'
+                                ? 'bg-emerald-500/10 text-emerald-600'
                                 : a.status === 'cancelled'
-                                ? 'bg-red-100 text-red-600'
+                                ? 'bg-red-500/10 text-red-600'
                                 : a.status === 'no_show'
-                                ? 'bg-amber-100 text-amber-700'
-                                : 'bg-teal-100 text-teal-700'
+                                ? 'bg-amber-500/10 text-amber-700'
+                                : 'bg-primary/10 text-primary'
                             }`}>
                               {a.status}
                             </span>
@@ -371,14 +369,14 @@ export default function AppointmentsPage() {
       <InlineFormSheet open={editSheetOpen} onClose={() => { setEditSheetOpen(false); setEditError(null) }} title="Edit Appointment">
         <form onSubmit={handleSubmitEdit(onEdit)} className="space-y-4">
           {editError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{editError}</div>
+            <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-3.5 py-2 text-sm text-red-600">{editError}</div>
           )}
           <Input label="Title" placeholder="Repair Consultation" required error={editErrors.title?.message} {...registerEdit('title')} />
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface-variant">Customer (optional)</label>
             <select
               {...registerEdit('customer_id')}
-              className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none"
             >
               <option value="">No customer</option>
               {customers.map((c) => (
@@ -390,7 +388,7 @@ export default function AppointmentsPage() {
             <label className="mb-1 block text-sm font-medium text-on-surface-variant">Assigned To (optional)</label>
             <select
               {...registerEdit('employee_id')}
-              className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none"
             >
               <option value="">Unassigned</option>
               {employees.map((e) => (
@@ -404,7 +402,7 @@ export default function AppointmentsPage() {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes</label>
-            <textarea rows={2} className="w-full rounded-lg border border-outline px-3 py-2 text-sm" {...registerEdit('notes')} />
+            <textarea rows={2} className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-sm focus:border-primary focus:outline-none" {...registerEdit('notes')} />
           </div>
           <Button type="submit" className="w-full" loading={isEditSubmitting}>Save Changes</Button>
         </form>
@@ -413,14 +411,14 @@ export default function AppointmentsPage() {
       <InlineFormSheet open={sheetOpen} onClose={() => { setSheetOpen(false); setCreateError(null) }} title="Add Appointment">
         <form onSubmit={handleSubmit(onCreate)} className="space-y-4">
           {createError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{createError}</div>
+            <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-3.5 py-2 text-sm text-red-600">{createError}</div>
           )}
           <Input label="Title" placeholder="Repair Consultation" required error={errors.title?.message} {...register('title')} />
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface-variant">Customer (optional)</label>
             <select
               {...register('customer_id')}
-              className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none"
             >
               <option value="">No customer</option>
               {customers.map((c) => (
@@ -432,7 +430,7 @@ export default function AppointmentsPage() {
             <label className="mb-1 block text-sm font-medium text-on-surface-variant">Assigned To (optional)</label>
             <select
               {...register('employee_id')}
-              className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none"
             >
               <option value="">Unassigned</option>
               {employees.map((e) => (
@@ -446,7 +444,7 @@ export default function AppointmentsPage() {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes</label>
-            <textarea rows={2} className="w-full rounded-lg border border-outline px-3 py-2 text-sm" {...register('notes')} />
+            <textarea rows={2} className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-sm focus:border-primary focus:outline-none" {...register('notes')} />
           </div>
           <Button type="submit" className="w-full" loading={isSubmitting}>Add Appointment</Button>
         </form>

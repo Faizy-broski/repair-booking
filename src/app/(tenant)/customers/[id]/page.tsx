@@ -14,6 +14,7 @@ import { formatCurrency, formatDateTime } from '@/lib/utils'
 import { toast } from 'sonner'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
 import { useAuthStore } from '@/store/auth.store'
+import { UnderlineTabs, EmptyState as KitEmptyState } from '@/components/shared/ui-kit'
 
 type Tab = 'overview' | 'repairs' | 'sales' | 'invoices' | 'assets' | 'credits' | 'vehicles'
 
@@ -62,9 +63,9 @@ interface CustomerDetail {
 }
 
 const INVOICE_STATUS_COLOR: Record<string, string> = {
-  unpaid:   'bg-red-100 text-red-700',
-  partial:  'bg-yellow-100 text-yellow-700',
-  paid:     'bg-green-100 text-green-700',
+  unpaid:   'bg-red-500/10 text-red-600',
+  partial:  'bg-amber-500/10 text-amber-700',
+  paid:     'bg-emerald-500/10 text-emerald-600',
   refunded: 'bg-surface-container text-on-surface-variant',
 }
 
@@ -89,8 +90,8 @@ const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {
   invoice: 'Invoice',
 }
 const DOCUMENT_KIND_COLOR: Record<DocumentKind, string> = {
-  repair:  'bg-purple-100 text-purple-700',
-  sale:    'bg-blue-100 text-blue-700',
+  repair:  'bg-primary/10 text-primary',
+  sale:    'bg-blue-500/10 text-blue-600',
   invoice: 'bg-surface-container text-on-surface-variant',
 }
 
@@ -472,47 +473,34 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-on-surface-variant hover:text-on-surface">
-          <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
-        </Button>
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100">
-          <User className="h-5 w-5 text-blue-600" />
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <Button variant="outline" size="icon" onClick={() => router.back()} className="h-9 w-9 shrink-0 rounded-full text-on-surface-variant hover:text-on-surface">
+              <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
+            </Button>
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <User className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold tracking-tight text-on-surface">
+                {customer.first_name} {customer.last_name ?? ''}
+              </h1>
+              <p className="mt-1 text-sm text-on-surface-variant">Customer since {new Date(customer.created_at).toLocaleDateString()}</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-on-surface-variant">Total spend</p>
+            <p className="text-2xl font-semibold tabular-nums tracking-tight text-on-surface">{formatCurrency(customer.stats.total_spend)}</p>
+          </div>
         </div>
-        <div className="flex-1">
-          <h1 className="text-xl font-bold text-on-surface">
-            {customer.first_name} {customer.last_name ?? ''}
-          </h1>
-          <p className="text-sm text-on-surface-variant">Customer since {new Date(customer.created_at).toLocaleDateString()}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-outline">Total spend</p>
-          <p className="text-lg font-bold text-on-surface">{formatCurrency(customer.stats.total_spend)}</p>
-        </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-outline-variant">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              tab === t.id
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-on-surface-variant hover:text-on-surface-variant'
-            }`}
-          >
-            {t.label}
-            {t.count !== undefined && t.count > 0 && (
-              <span className={`rounded-full px-1.5 py-0.5 text-xs ${
-                tab === t.id ? 'bg-blue-100 text-blue-700' : 'bg-surface-container text-on-surface-variant'
-              }`}>
-                {t.count}
-              </span>
-            )}
-          </button>
-        ))}
+        {/* Tabs */}
+        <UnderlineTabs
+          items={TABS.map((t) => ({ value: t.id, label: t.label, count: t.count !== undefined && t.count > 0 ? t.count : undefined }))}
+          value={tab}
+          onChange={(v) => setTab(v)}
+        />
       </div>
 
       {/* Overview */}
@@ -520,7 +508,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
         <div className="grid gap-4 sm:grid-cols-2">
           <Card>
             <CardContent className="pt-4 space-y-3">
-              <h3 className="text-sm font-semibold text-on-surface-variant">Contact</h3>
+              <h3 className="text-base font-semibold text-on-surface">Contact</h3>
               {customer.phone && (
                 <div className="flex items-center gap-2 text-sm text-on-surface-variant">
                   <Phone className="h-4 w-4 text-outline" />
@@ -544,7 +532,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
           <Card>
             <CardContent className="pt-4">
-              <h3 className="mb-3 text-sm font-semibold text-on-surface-variant">Activity</h3>
+              <h3 className="mb-3 text-base font-semibold text-on-surface">Activity</h3>
               <div className="grid grid-cols-2 gap-3">
                 {!isRetailStore && <Stat label="Repairs" value={customer.stats.repair_count} icon={<Wrench className="h-4 w-4" />} />}
                 <Stat label="Sales" value={customer.stats.sale_count} icon={<ShoppingBag className="h-4 w-4" />} />
@@ -566,10 +554,10 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
               <button
                 key={r.id}
                 onClick={() => router.push(`/repairs/${r.id}`)}
-                className="flex w-full items-center gap-3 rounded-lg border border-outline-variant bg-surface p-3 text-left hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                className="flex w-full items-center gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 text-left transition-colors hover:bg-surface-container-low"
               >
                 <div className="flex-1 min-w-0">
-                  <p className="font-mono text-sm font-semibold text-blue-600">{r.job_number}</p>
+                  <p className="font-mono text-sm font-semibold text-primary">{r.job_number}</p>
                   <p className="truncate text-xs text-on-surface-variant">
                     {[r.device_brand, r.device_model].filter(Boolean).join(' ') || '—'}
                   </p>
@@ -585,7 +573,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                       ? `~${formatCurrency(Math.max(0, r.estimated_cost - (r.discount_amount ?? 0)))}`
                       : '—'}
                   </p>
-                  <p className="text-xs text-outline">{new Date(r.created_at).toLocaleDateString()}</p>
+                  <p className="text-xs text-on-surface-variant">{new Date(r.created_at).toLocaleDateString()}</p>
                 </div>
               </button>
             ))
@@ -600,12 +588,12 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
             <EmptyState message="No sales yet" />
           ) : (
             customer.sales.map((s) => (
-              <div key={s.id} className="flex items-center justify-between rounded-lg border border-outline-variant bg-surface p-3">
+              <div key={s.id} className="flex items-center justify-between rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
                 <div>
                   <p className="text-sm font-medium text-on-surface">{formatCurrency(s.total)}</p>
-                  <p className="text-xs text-outline">{s.payment_method.replace('_', ' ')}</p>
+                  <p className="text-xs text-on-surface-variant">{s.payment_method.replace('_', ' ')}</p>
                 </div>
-                <p className="text-xs text-outline">{formatDateTime(s.created_at)}</p>
+                <p className="text-xs text-on-surface-variant">{formatDateTime(s.created_at)}</p>
               </div>
             ))
           )}
@@ -621,19 +609,19 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
             <EmptyState message="No invoices, sales, or repairs yet" />
           ) : (
             documents.map((doc) => (
-              <div key={`${doc.kind}-${doc.id}`} className="flex items-center justify-between gap-3 rounded-lg border border-outline-variant bg-surface p-3">
+              <div key={`${doc.kind}-${doc.id}`} className="flex items-center justify-between gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
                 <div className="flex min-w-0 items-center gap-3">
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${DOCUMENT_KIND_COLOR[doc.kind]}`}>
+                  <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${DOCUMENT_KIND_COLOR[doc.kind]}`}>
                     {DOCUMENT_KIND_LABEL[doc.kind]}
                   </span>
                   <div className="min-w-0">
-                    <p className="truncate font-mono text-sm font-semibold text-on-surface-variant">{doc.number}</p>
-                    <p className="text-xs text-outline">{formatDateTime(doc.date)}</p>
+                    <p className="truncate font-mono text-sm font-semibold text-primary">{doc.number}</p>
+                    <p className="text-xs text-on-surface-variant">{formatDateTime(doc.date)}</p>
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   {doc.status && (
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${INVOICE_STATUS_COLOR[doc.status] ?? 'bg-surface-container text-on-surface-variant'}`}>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${INVOICE_STATUS_COLOR[doc.status] ?? 'bg-surface-container text-on-surface-variant'}`}>
                       {doc.status.replace('_', ' ')}
                     </span>
                   )}
@@ -667,16 +655,16 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           {assets.length === 0 ? (
             <EmptyState message="No devices registered" />
           ) : (
-            <div className="divide-y rounded-xl border border-outline-variant bg-surface">
+            <div className="divide-y divide-outline-variant overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest">
               {assets.map((a) => (
                 <div key={a.id} className="flex items-center justify-between px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-container">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full border border-outline-variant">
                       <Cpu className="h-4 w-4 text-on-surface-variant" />
                     </div>
                     <div>
                       <p className="font-medium text-on-surface">{a.name}</p>
-                      <p className="text-xs text-outline">
+                      <p className="text-xs text-on-surface-variant">
                         {[a.brand, a.model].filter(Boolean).join(' ')}
                         {a.serial_number ? ` · S/N: ${a.serial_number}` : ''}
                         {a.imei ? ` · IMEI: ${a.imei}` : ''}
@@ -685,7 +673,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                         <button
                           type="button"
                           onClick={() => setTab('repairs')}
-                          className="mt-0.5 text-xs font-medium text-blue-600 hover:underline"
+                          className="mt-0.5 text-xs font-medium text-primary hover:underline"
                         >
                           {a.repairs!.length} repair{a.repairs!.length !== 1 ? 's' : ''}
                         </button>
@@ -725,16 +713,16 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           {customer.vehicles.length === 0 ? (
             <EmptyState message="No vehicles registered" />
           ) : (
-            <div className="divide-y rounded-xl border border-outline-variant bg-surface">
+            <div className="divide-y divide-outline-variant overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest">
               {customer.vehicles.map((v) => (
                 <div key={v.id} className="flex items-center justify-between px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-surface-container">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full border border-outline-variant">
                       <Car className="h-4 w-4 text-on-surface-variant" />
                     </div>
                     <div>
                       <p className="font-mono font-medium text-on-surface">{v.registration_number}</p>
-                      <p className="text-xs text-outline">
+                      <p className="text-xs text-on-surface-variant">
                         {[v.make, v.model].filter(Boolean).join(' ') || 'No make/model'}
                         {v.tyre_size ? ` · ${v.tyre_size}` : ''}
                         {v.colour ? ` · ${v.colour}` : ''}
@@ -769,133 +757,126 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
       {/* Credits & Points tab */}
       {tab === 'credits' && (
-        <div className="space-y-5">
+        <div className="space-y-6">
 
           {/* ── Top row: Store Credits + Loyalty Points ────────────────────── */}
           <div className="grid gap-4 sm:grid-cols-2">
 
             {/* Store Credits Card */}
-            <div className="relative overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-indigo-50 shadow-sm">
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(99,102,241,0.08),_transparent_60%)]" />
-              <div className="relative p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 shadow-inner">
-                      <CreditCard className="h-4.5 w-4.5 h-[18px] w-[18px] text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-widest text-blue-400">Store Credits</p>
-                      <p className="text-2xl font-extrabold text-blue-700 leading-tight">{formatCurrency(creditBalance)}</p>
-                    </div>
+            <div className="space-y-4 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <CreditCard className="h-[18px] w-[18px]" />
+                  </span>
+                  <div>
+                    <p className="text-sm text-on-surface-variant">Store Credits</p>
+                    <p className="text-2xl font-semibold leading-tight tracking-tight tabular-nums text-on-surface">{formatCurrency(creditBalance)}</p>
                   </div>
-                  <Button size="sm" variant="outline" onClick={() => setAddCreditModal(true)}
-                    className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300 text-xs font-semibold gap-1">
-                    <Plus className="h-3.5 w-3.5" /> Add
-                  </Button>
                 </div>
-                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                  {creditTxns.length === 0
-                    ? <p className="text-xs text-gray-400 italic py-2 text-center">No transactions yet</p>
-                    : creditTxns.map((t) => (
-                      <div key={t.id} className="flex items-center justify-between rounded-lg bg-white/70 px-2.5 py-1.5 text-xs border border-blue-50">
-                        <span className={`font-semibold ${t.amount >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                          {t.amount >= 0 ? '+' : ''}{formatCurrency(t.amount)}
-                        </span>
-                        <span className="truncate max-w-[8rem] mx-2 text-gray-600">{t.note ?? t.type}</span>
-                        <span className="text-gray-400 shrink-0">{new Date(t.created_at).toLocaleDateString()}</span>
-                      </div>
-                    ))
-                  }
-                </div>
+                <Button size="sm" variant="outline" onClick={() => setAddCreditModal(true)} className="gap-1">
+                  <Plus className="h-3.5 w-3.5" /> Add
+                </Button>
+              </div>
+              <div className="max-h-40 space-y-1.5 overflow-y-auto pr-1">
+                {creditTxns.length === 0
+                  ? <p className="py-2 text-center text-xs text-on-surface-variant">No transactions yet</p>
+                  : creditTxns.map((t) => (
+                    <div key={t.id} className="flex items-center justify-between rounded-xl bg-surface-container-low px-3 py-2 text-xs">
+                      <span className={`font-semibold tabular-nums ${t.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {t.amount >= 0 ? '+' : ''}{formatCurrency(t.amount)}
+                      </span>
+                      <span className="mx-2 max-w-[8rem] truncate text-on-surface-variant">{t.note ?? t.type}</span>
+                      <span className="shrink-0 text-on-surface-variant">{new Date(t.created_at).toLocaleDateString()}</span>
+                    </div>
+                  ))
+                }
               </div>
             </div>
 
             {/* Loyalty Points Card */}
-            <div className="relative overflow-hidden rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-orange-50 shadow-sm">
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(251,191,36,0.1),_transparent_60%)]" />
-              <div className="relative p-5 space-y-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 shadow-inner">
-                    <Star className="h-[18px] w-[18px] text-amber-500" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-widest text-amber-400">Loyalty Points</p>
-                    <p className="text-2xl font-extrabold text-amber-700 leading-tight">{loyaltyBalance.toLocaleString()} <span className="text-base font-semibold">pts</span></p>
-                  </div>
+            <div className="space-y-4 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
+                  <Star className="h-[18px] w-[18px]" />
+                </span>
+                <div>
+                  <p className="text-sm text-on-surface-variant">Loyalty Points</p>
+                  <p className="text-2xl font-semibold leading-tight tracking-tight tabular-nums text-on-surface">{loyaltyBalance.toLocaleString()} <span className="text-base font-medium text-on-surface-variant">pts</span></p>
                 </div>
-                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                  {loyaltyTxns.length === 0
-                    ? <p className="text-xs text-gray-400 italic py-2 text-center">No transactions yet</p>
-                    : loyaltyTxns.map((t) => (
-                      <div key={t.id} className="flex items-center justify-between rounded-lg bg-white/70 px-2.5 py-1.5 text-xs border border-amber-50">
-                        <span className={`font-semibold ${t.points >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                          {t.points >= 0 ? '+' : ''}{t.points} pts
-                        </span>
-                        <span className="text-gray-600">{t.type}</span>
-                        <span className="text-gray-400 shrink-0">{new Date(t.created_at).toLocaleDateString()}</span>
-                      </div>
-                    ))
-                  }
-                </div>
+              </div>
+              <div className="max-h-40 space-y-1.5 overflow-y-auto pr-1">
+                {loyaltyTxns.length === 0
+                  ? <p className="py-2 text-center text-xs text-on-surface-variant">No transactions yet</p>
+                  : loyaltyTxns.map((t) => (
+                    <div key={t.id} className="flex items-center justify-between rounded-xl bg-surface-container-low px-3 py-2 text-xs">
+                      <span className={`font-semibold tabular-nums ${t.points >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {t.points >= 0 ? '+' : ''}{t.points} pts
+                      </span>
+                      <span className="text-on-surface-variant">{t.type}</span>
+                      <span className="shrink-0 text-on-surface-variant">{new Date(t.created_at).toLocaleDateString()}</span>
+                    </div>
+                  ))
+                }
               </div>
             </div>
           </div>
 
           {/* ── Customer Credit — full-width tabular ──────────────────────── */}
-          <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface shadow-sm">
+          <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest">
             {/* Section header */}
-            <div className="flex items-center justify-between bg-gradient-to-r from-purple-600 to-violet-700 px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20">
-                  <Banknote className="h-4 w-4 text-white" />
-                </div>
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">
+                  <Banknote className="h-4 w-4" />
+                </span>
                 <div>
-                  <p className="text-xs font-black uppercase tracking-widest text-purple-200">On-Account Sales</p>
-                  <p className="text-lg font-extrabold text-white leading-tight">Customer Credit</p>
+                  <p className="text-sm text-on-surface-variant">On-Account Sales</p>
+                  <p className="text-base font-semibold leading-tight text-on-surface">Customer Credit</p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-[11px] text-purple-200 font-black uppercase tracking-wider">Total Outstanding</p>
-                <p className={`text-2xl font-extrabold ${onAccountOutstanding > 0 ? 'text-red-300' : 'text-emerald-300'}`}>
+                <p className="text-sm text-on-surface-variant">Total Outstanding</p>
+                <p className={`text-2xl font-semibold leading-tight tracking-tight tabular-nums ${onAccountOutstanding > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
                   {formatCurrency(onAccountOutstanding)}
                 </p>
               </div>
             </div>
 
             {/* Filter toolbar */}
-            <div className="border-b border-outline-variant bg-slate-800 px-5 py-3 space-y-2">
+            <div className="space-y-2 border-y border-outline-variant bg-surface-container-low px-5 py-3">
               {/* Row 1: Search + date range */}
               <div className="flex flex-wrap items-center gap-2">
                 {/* Sale # search */}
                 <div className="relative flex items-center">
-                  <svg className="absolute left-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                  <svg className="pointer-events-none absolute left-3 h-3.5 w-3.5 text-on-surface-variant" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                   <input
                     type="text"
                     placeholder="Search sale #..."
                     value={creditSearch}
                     onChange={(e) => setCreditSearch(e.target.value)}
-                    className="h-8 w-44 rounded-lg border border-slate-600 bg-slate-700 pl-7 pr-2.5 text-xs text-white placeholder-slate-400 focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                    className="h-9 w-44 rounded-full border border-outline-variant bg-surface-container-lowest pl-8 pr-3 text-xs text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none"
                   />
                 </div>
 
                 {/* Date range */}
-                <div className="flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-700 px-2.5 h-8">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">From</span>
+                <div className="flex h-9 items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-lowest px-3">
+                  <span className="shrink-0 text-xs text-on-surface-variant">From</span>
                   <input
                     type="date"
                     value={statementFrom}
                     onChange={(e) => setStatementFrom(e.target.value)}
-                    className="w-[118px] border-0 bg-transparent text-xs text-white focus:outline-none [color-scheme:dark]"
+                    className="w-[118px] border-0 bg-transparent text-xs text-on-surface focus:outline-none"
                   />
                 </div>
-                <span className="text-slate-400 text-xs font-bold">→</span>
-                <div className="flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-700 px-2.5 h-8">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">To</span>
+                <span className="text-xs font-medium text-on-surface-variant">→</span>
+                <div className="flex h-9 items-center gap-1.5 rounded-full border border-outline-variant bg-surface-container-lowest px-3">
+                  <span className="shrink-0 text-xs text-on-surface-variant">To</span>
                   <input
                     type="date"
                     value={statementTo}
                     onChange={(e) => setStatementTo(e.target.value)}
-                    className="w-[118px] border-0 bg-transparent text-xs text-white focus:outline-none [color-scheme:dark]"
+                    className="w-[118px] border-0 bg-transparent text-xs text-on-surface focus:outline-none"
                   />
                 </div>
 
@@ -904,7 +885,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                   <button
                     type="button"
                     onClick={() => { setCreditSearch(''); setStatementFrom(''); setStatementTo('') }}
-                    className="flex items-center gap-1 rounded-lg border border-slate-600 bg-slate-700 px-2.5 h-8 text-xs text-slate-300 hover:border-red-400 hover:bg-red-900/40 hover:text-red-300 transition-colors"
+                    className="flex h-9 items-center gap-1 rounded-full border border-outline-variant bg-surface-container-lowest px-3 text-xs text-on-surface-variant transition-colors hover:border-red-400 hover:text-red-600"
                   >
                     <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
                     Clear
@@ -915,18 +896,17 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                 <div className="flex-1" />
 
                 {/* Actions */}
-                <Button size="sm" variant="outline" loading={downloadingStatement} onClick={downloadStatement}
-                  className="border-purple-400 text-purple-300 hover:bg-purple-900/40 text-xs font-semibold h-8 gap-1 bg-transparent">
+                <Button size="sm" variant="outline" loading={downloadingStatement} onClick={downloadStatement} className="h-9 gap-1 text-xs font-medium">
                   <Download className="h-3.5 w-3.5" /> Statement
                 </Button>
-                <Link href="/credits" className="flex h-8 items-center text-xs font-semibold text-slate-300 hover:text-white hover:underline">
+                <Link href="/credits" className="flex h-9 items-center text-xs font-medium text-primary hover:underline">
                   Manage →
                 </Link>
               </div>
 
               {/* Active filter summary */}
               {hasActiveFilters && (
-                <p className="text-[10px] text-purple-300 font-medium">
+                <p className="text-xs text-on-surface-variant">
                   Showing {filteredCreditSales.length} of {creditPaymentSales.length} sales
                   {creditSearch ? ` · matching "${creditSearch}"` : ''}
                   {(statementFrom || statementTo) ? ` · ${statementFrom || '…'} → ${statementTo || '…'}` : ''}
@@ -936,74 +916,74 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
             {/* Table */}
             {filteredCreditSales.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-14 text-outline">
-                <Receipt className="h-10 w-10 mb-3 opacity-30" />
+              <div className="flex flex-col items-center justify-center py-14 text-center text-on-surface-variant">
+                <Receipt className="mb-3 h-10 w-10 opacity-30" />
                 {creditPaymentSales.length === 0
-                  ? <><p className="text-sm font-medium">No on-account sales</p><p className="text-xs mt-1">Sales paid by &quot;On Account&quot; will appear here</p></>
-                  : <><p className="text-sm font-medium">No results match your filters</p><p className="text-xs mt-1">Try adjusting the date range or sale # search</p></>}
+                  ? <><p className="text-sm font-medium">No on-account sales</p><p className="mt-1 text-xs">Sales paid by &quot;On Account&quot; will appear here</p></>
+                  : <><p className="text-sm font-medium">No results match your filters</p><p className="mt-1 text-xs">Try adjusting the date range or sale # search</p></>}
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-800" style={{ backgroundColor: '#1e293b' }}>
+                  <thead className="bg-primary">
                     <tr>
-                      <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-outline-variant" style={{ color: '#cbd5e1' }}>Sale #</th>
-                      <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-outline-variant" style={{ color: '#cbd5e1' }}>Sale Date</th>
-                      <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-outline-variant" style={{ color: '#cbd5e1' }}>Total</th>
-                      <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-outline-variant" style={{ color: '#cbd5e1' }}>Paid</th>
-                      <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-outline-variant" style={{ color: '#cbd5e1' }}>Outstanding</th>
-                      <th className="px-5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-outline-variant" style={{ color: '#cbd5e1' }}>Payments</th>
+                      <th className="whitespace-nowrap px-5 py-3.5 text-left text-[13px] font-medium text-white">Sale #</th>
+                      <th className="whitespace-nowrap px-4 py-3.5 text-left text-[13px] font-medium text-white">Sale Date</th>
+                      <th className="whitespace-nowrap px-4 py-3.5 text-right text-[13px] font-medium text-white">Total</th>
+                      <th className="whitespace-nowrap px-4 py-3.5 text-right text-[13px] font-medium text-white">Paid</th>
+                      <th className="whitespace-nowrap px-4 py-3.5 text-right text-[13px] font-medium text-white">Outstanding</th>
+                      <th className="whitespace-nowrap px-5 py-3.5 text-left text-[13px] font-medium text-white">Payments</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-outline">
+                  <tbody>
                     {filteredCreditSales.map((s) => {
                       const outstanding = Number(s.total) - Number(s.amount_paid ?? 0)
                       const isPaid = outstanding <= 0.01
                       return (
-                        <tr key={s.id} className="border-b border-outline group hover:bg-purple-50/40 transition-colors">
+                        <tr key={s.id} className="group border-t border-outline-variant transition-colors first:border-t-0 hover:bg-surface-container-low">
                           {/* Sale # */}
-                          <td className="px-5 py-3 align-top">
-                            <span className="font-mono text-xs font-semibold text-on-surface-variant">
+                          <td className="px-5 py-4 align-top">
+                            <span className="font-mono text-xs font-semibold text-primary">
                               #{s.sale_number ?? s.id.slice(-8).toUpperCase()}
                             </span>
                           </td>
                           {/* Date */}
-                          <td className="px-4 py-3 align-top text-xs text-on-surface-variant">
+                          <td className="px-4 py-4 align-top text-xs text-on-surface-variant">
                             {new Date(s.created_at).toLocaleDateString()}
                           </td>
                           {/* Total */}
-                          <td className="px-4 py-3 align-top text-right text-xs font-semibold text-on-surface-variant">
+                          <td className="px-4 py-4 text-right align-top text-xs font-semibold tabular-nums text-on-surface">
                             {formatCurrency(Number(s.total))}
                           </td>
                           {/* Paid */}
-                          <td className="px-4 py-3 align-top text-right text-xs font-semibold text-emerald-600">
+                          <td className="px-4 py-4 text-right align-top text-xs font-semibold tabular-nums text-emerald-600">
                             {formatCurrency(Number(s.amount_paid ?? 0))}
                           </td>
                           {/* Outstanding badge */}
-                          <td className="px-4 py-3 align-top text-right">
-                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                          <td className="px-4 py-4 text-right align-top">
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                               isPaid
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : 'bg-red-100 text-red-700'
+                                ? 'bg-emerald-500/10 text-emerald-600'
+                                : 'bg-red-500/10 text-red-600'
                             }`}>
                               {isPaid ? '✓ Cleared' : formatCurrency(outstanding)}
                             </span>
                           </td>
                           {/* Payment sub-rows */}
-                          <td className="px-5 py-3 align-top">
+                          <td className="px-5 py-4 align-top">
                             {s.payments.length === 0 ? (
-                              <span className="text-xs text-outline-variant italic">No payments yet</span>
+                              <span className="text-xs italic text-on-surface-variant">No payments yet</span>
                             ) : (
                               <div className="space-y-1.5">
                                 {s.payments.map((p) => (
-                                  <div key={p.id} className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-[11px] text-on-surface-variant">
+                                  <div key={p.id} className="flex flex-wrap items-center gap-2">
+                                    <span className="text-xs text-on-surface-variant">
                                       {new Date(p.created_at).toLocaleDateString()}
                                     </span>
-                                    <span className="rounded-full bg-surface-container px-2 py-0.5 text-[10px] font-medium capitalize text-on-surface-variant">
+                                    <span className="rounded-full bg-surface-container px-2 py-0.5 text-xs font-medium capitalize text-on-surface-variant">
                                       {p.method}
                                     </span>
-                                    <span className="font-semibold text-[11px] text-emerald-600">
+                                    <span className="text-xs font-semibold tabular-nums text-emerald-600">
                                       +{formatCurrency(Number(p.amount))}
                                     </span>
                                     <button
@@ -1011,7 +991,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                                       disabled={downloadingReceiptId === p.id}
                                       title="Download receipt for this payment"
                                       onClick={() => downloadPaymentReceipt(s.id, p.id, s.sale_number ?? s.id.slice(-8).toUpperCase())}
-                                      className="ml-auto flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-600 hover:bg-purple-100 hover:border-purple-300 transition-colors disabled:opacity-50 disabled:cursor-wait"
+                                      className="ml-auto flex items-center gap-1 rounded-full border border-outline-variant bg-surface-container-lowest px-2.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10 disabled:cursor-wait disabled:opacity-50"
                                     >
                                       {downloadingReceiptId === p.id
                                         ? <svg className="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
@@ -1078,7 +1058,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes</label>
-            <textarea rows={2} className="w-full rounded-lg border border-outline px-3 py-2 text-sm" value={vehicleForm.notes} onChange={(e) => setVehicleForm((f) => ({ ...f, notes: e.target.value }))} />
+            <textarea rows={2} className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-sm focus:border-primary focus:outline-none" value={vehicleForm.notes} onChange={(e) => setVehicleForm((f) => ({ ...f, notes: e.target.value }))} />
           </div>
           <Button className="w-full" onClick={saveVehicle} loading={savingVehicle} disabled={!vehicleForm.registration_number.trim()}>
             Save Vehicle
@@ -1107,7 +1087,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
             <input
               value={creditNote}
               onChange={(e) => setCreditNote(e.target.value)}
-              className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
+              className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none"
               placeholder="e.g. Refund, Goodwill gesture..."
             />
           </div>
@@ -1147,9 +1127,9 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 function Stat({ label, value, icon }: { label: string; value: string | number; icon?: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2">
-      {icon && <span className="text-outline">{icon}</span>}
+      {icon && <span className="text-on-surface-variant">{icon}</span>}
       <div>
-        <p className="text-xs text-outline">{label}</p>
+        <p className="text-xs text-on-surface-variant">{label}</p>
         <p className="text-sm font-semibold text-on-surface">{value}</p>
       </div>
     </div>
@@ -1157,9 +1137,5 @@ function Stat({ label, value, icon }: { label: string; value: string | number; i
 }
 
 function EmptyState({ message }: { message: string }) {
-  return (
-    <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-outline-variant text-sm text-outline">
-      {message}
-    </div>
-  )
+  return <KitEmptyState title={message} />
 }

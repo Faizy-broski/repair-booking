@@ -7,6 +7,8 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ConfirmModal } from '@/components/ui/confirm-modal'
+import { PageHeader } from '@/components/shared/page-header'
+import { UnderlineTabs } from '@/components/shared/ui-kit'
 
 type Tab = 'status' | 'faults'
 
@@ -238,44 +240,34 @@ export default function RepairSettingsPage() {
   return (
     <div className="space-y-0">
       {/* Header */}
-      <div className="flex items-center gap-2 pb-1">
+      <div className="space-y-2">
         <button
           onClick={() => router.push('/repairs')}
-          className="flex items-center gap-1.5 text-lg font-bold text-on-surface hover:text-blue-600 transition-colors"
+          className="flex items-center gap-1 text-sm text-on-surface-variant transition-colors hover:text-on-surface"
         >
           <ArrowLeft className="h-4 w-4" />
           Repairs
         </button>
-        <span className="text-outline">/</span>
-        <span className="text-lg font-bold text-on-surface-variant">Settings</span>
+        <PageHeader title="Settings" />
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-outline-variant mt-2">
-        {[
-          { id: 'status' as Tab, label: 'Status' },
-          { id: 'faults' as Tab, label: 'Faults' },
-        ].map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              tab === t.id
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-on-surface-variant hover:text-on-surface-variant'
-            }`}
-          >
-            {tab === t.id && <span className="h-2 w-2 rounded-full bg-blue-600 inline-block" />}
-            {t.label}
-          </button>
-        ))}
+      <div className="mt-4">
+        <UnderlineTabs
+          items={[
+            { value: 'status' as Tab, label: 'Status' },
+            { value: 'faults' as Tab, label: 'Faults' },
+          ]}
+          value={tab}
+          onChange={(v) => setTab(v as Tab)}
+        />
       </div>
 
       {/* ── Status Tab ── */}
       {tab === 'status' && (
         <div className="mt-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-on-surface flex items-center gap-2">
+            <h2 className="flex items-center gap-2 text-base font-semibold text-on-surface">
               Manage Statuses
               {statusLoading && <Loader2 className="h-4 w-4 animate-spin text-outline" />}
             </h2>
@@ -293,8 +285,8 @@ export default function RepairSettingsPage() {
 
           {/* Add form */}
           {addingStatus && (
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-3">
-              <p className="text-sm font-semibold text-blue-800">New Status</p>
+            <div className="rounded-xl border border-outline-variant bg-surface-container-low p-4 space-y-3">
+              <p className="text-sm font-semibold text-on-surface">New Status</p>
               <Input
                 label="Status Name"
                 placeholder="e.g. Warranty, Booked..."
@@ -327,15 +319,15 @@ export default function RepairSettingsPage() {
           )}
 
           {/* Table */}
-          <div className="overflow-x-auto rounded-xl border border-outline-variant bg-surface shadow-sm">
+          <div className="overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-lowest">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-outline-variant bg-surface-container-low">
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant w-16">Sr#</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Status Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Color</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant w-32">Job Finished?</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant w-40">Action</th>
+                <tr className="bg-primary">
+                  <th className="px-4 py-3.5 text-left text-[13px] font-medium text-white whitespace-nowrap w-16">Sr#</th>
+                  <th className="px-4 py-3.5 text-left text-[13px] font-medium text-white whitespace-nowrap">Status Name</th>
+                  <th className="px-4 py-3.5 text-left text-[13px] font-medium text-white whitespace-nowrap">Color</th>
+                  <th className="px-4 py-3.5 text-left text-[13px] font-medium text-white whitespace-nowrap w-32">Job Finished?</th>
+                  <th className="px-4 py-3.5 text-left text-[13px] font-medium text-white whitespace-nowrap w-40">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -357,7 +349,7 @@ export default function RepairSettingsPage() {
                   </tr>
                 ) : (
                   statuses.map((s, i) => (
-                    <tr key={s.id} className={`border-t border-outline-variant ${i % 2 === 0 ? 'bg-surface' : 'bg-surface-container-low/60'}`}>
+                    <tr key={s.id} className="border-t border-outline-variant transition-colors first:border-t-0 hover:bg-surface-container-low">
                       <td className="px-4 py-3 text-on-surface-variant">{i + 1}</td>
                       <td className="px-4 py-3">
                         {editingStatus?.id === s.id ? (
@@ -365,7 +357,7 @@ export default function RepairSettingsPage() {
                             autoFocus
                             value={editStatusName}
                             onChange={(e) => setEditStatusName(e.target.value)}
-                            className="h-8 w-full rounded-lg border border-blue-300 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                            className="h-8 w-full rounded-xl border border-outline-variant px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                           />
                         ) : (
                           <span className="font-medium text-on-surface">{s.name}</span>
@@ -392,7 +384,7 @@ export default function RepairSettingsPage() {
                             className="h-4 w-4 rounded border-outline"
                           />
                         ) : s.is_terminal ? (
-                          <span className="inline-flex items-center rounded-full bg-green-50 border border-green-200 px-2.5 py-1 text-xs font-medium text-green-600">
+                          <span className="inline-flex items-center rounded-full bg-emerald-500/5 border border-emerald-500/20 px-2.5 py-1 text-xs font-medium text-green-600">
                             Yes
                           </span>
                         ) : (
@@ -407,7 +399,7 @@ export default function RepairSettingsPage() {
                             <button
                               onClick={updateStatus}
                               disabled={statusSaving}
-                              className="flex items-center gap-1 rounded-md bg-green-50 border border-green-200 px-2 py-1 text-xs font-medium text-green-600 hover:bg-green-100 transition-colors"
+                              className="flex items-center gap-1 rounded-md bg-emerald-500/5 border border-emerald-500/20 px-2 py-1 text-xs font-medium text-green-600 hover:bg-emerald-500/10 transition-colors"
                             >
                               <Check className="h-3 w-3" /> Save
                             </button>
@@ -422,13 +414,13 @@ export default function RepairSettingsPage() {
                           <div className="flex gap-1">
                             <button
                               onClick={() => startEditStatus(s)}
-                              className="flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors"
+                              className="flex items-center gap-1 rounded-xl border border-outline-variant bg-surface-container-low px-2.5 py-1 text-xs font-medium text-primary hover:bg-surface-container transition-colors"
                             >
                               <Pencil className="h-3 w-3" /> Edit
                             </button>
                             <button
                               onClick={() => deleteStatus(s.id, s.name)}
-                              className="flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-100 transition-colors"
+                              className="flex items-center gap-1 rounded-md border border-red-500/20 bg-red-500/5 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-500/10 transition-colors"
                             >
                               <Trash2 className="h-3 w-3" /> Delete
                             </button>
@@ -451,7 +443,7 @@ export default function RepairSettingsPage() {
       {tab === 'faults' && (
         <div className="mt-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-on-surface flex items-center gap-2">
+            <h2 className="flex items-center gap-2 text-base font-semibold text-on-surface">
               Manage Faults
               {faultLoading && <Loader2 className="h-4 w-4 animate-spin text-outline" />}
             </h2>
@@ -469,8 +461,8 @@ export default function RepairSettingsPage() {
 
           {/* Add form */}
           {addingFault && (
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-3">
-              <p className="text-sm font-semibold text-blue-800">New Fault</p>
+            <div className="rounded-xl border border-outline-variant bg-surface-container-low p-4 space-y-3">
+              <p className="text-sm font-semibold text-on-surface">New Fault</p>
               <Input
                 label="Fault Name"
                 placeholder="e.g. Screen Crack, Battery Issue..."
@@ -490,13 +482,13 @@ export default function RepairSettingsPage() {
           )}
 
           {/* Table */}
-          <div className="overflow-x-auto rounded-xl border border-outline-variant bg-surface shadow-sm">
+          <div className="overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-lowest">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-outline-variant bg-surface-container-low">
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant w-16">Sr#</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">Fault Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant w-40">Action</th>
+                <tr className="bg-primary">
+                  <th className="px-4 py-3.5 text-left text-[13px] font-medium text-white whitespace-nowrap w-16">Sr#</th>
+                  <th className="px-4 py-3.5 text-left text-[13px] font-medium text-white whitespace-nowrap">Fault Name</th>
+                  <th className="px-4 py-3.5 text-left text-[13px] font-medium text-white whitespace-nowrap w-40">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -518,7 +510,7 @@ export default function RepairSettingsPage() {
                   </tr>
                 ) : (
                   faults.map((f, i) => (
-                    <tr key={f.id} className={`border-t border-outline-variant ${i % 2 === 0 ? 'bg-surface' : 'bg-surface-container-low/60'}`}>
+                    <tr key={f.id} className="border-t border-outline-variant transition-colors first:border-t-0 hover:bg-surface-container-low">
                       <td className="px-4 py-3 text-on-surface-variant">{i + 1}</td>
                       <td className="px-4 py-3">
                         {editingFault?.id === f.id ? (
@@ -526,7 +518,7 @@ export default function RepairSettingsPage() {
                             autoFocus
                             value={editFaultName}
                             onChange={(e) => setEditFaultName(e.target.value)}
-                            className="h-8 w-full max-w-sm rounded-lg border border-blue-300 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                            className="h-8 w-full max-w-sm rounded-xl border border-outline-variant px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                           />
                         ) : (
                           <span className="font-medium text-on-surface">{f.name}</span>
@@ -538,7 +530,7 @@ export default function RepairSettingsPage() {
                             <button
                               onClick={updateFault}
                               disabled={faultSaving}
-                              className="flex items-center gap-1 rounded-md bg-green-50 border border-green-200 px-2 py-1 text-xs font-medium text-green-600 hover:bg-green-100 transition-colors"
+                              className="flex items-center gap-1 rounded-md bg-emerald-500/5 border border-emerald-500/20 px-2 py-1 text-xs font-medium text-green-600 hover:bg-emerald-500/10 transition-colors"
                             >
                               <Check className="h-3 w-3" /> Save
                             </button>
@@ -553,13 +545,13 @@ export default function RepairSettingsPage() {
                           <div className="flex gap-1">
                             <button
                               onClick={() => startEditFault(f)}
-                              className="flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-100 transition-colors"
+                              className="flex items-center gap-1 rounded-xl border border-outline-variant bg-surface-container-low px-2.5 py-1 text-xs font-medium text-primary hover:bg-surface-container transition-colors"
                             >
                               <Pencil className="h-3 w-3" /> Edit
                             </button>
                             <button
                               onClick={() => deleteFault(f.id, f.name)}
-                              className="flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-100 transition-colors"
+                              className="flex items-center gap-1 rounded-md border border-red-500/20 bg-red-500/5 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-500/10 transition-colors"
                             >
                               <Trash2 className="h-3 w-3" /> Delete
                             </button>

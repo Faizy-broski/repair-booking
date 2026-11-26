@@ -75,24 +75,24 @@ export function usePinPrompt(options?: { verifyUrl?: string }) {
     if (!open) return null
 
     // Derive a slightly darker shade for hover states
-    const hex = brandColor ?? '#008080'
+    const hex = !brandColor || brandColor.toLowerCase() === '#008080' ? '#009C9C' : brandColor
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-        <div className="w-full max-w-xs rounded-2xl bg-white shadow-2xl">
+        <div className="w-full max-w-xs rounded-2xl bg-surface-container-lowest shadow-2xl">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <div className="flex items-center justify-between border-b border-outline-variant px-5 py-4">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5" style={{ color: hex }} />
-              <span className="font-semibold text-gray-900">PIN Required</span>
+              <span className="font-semibold text-on-surface">PIN Required</span>
             </div>
-            <button onClick={handleCancel} className="text-gray-400 hover:text-gray-600">
+            <button onClick={handleCancel} className="text-outline hover:text-on-surface">
               <X className="h-4 w-4" />
             </button>
           </div>
 
           <div className="p-5 space-y-4">
-            <p className="text-sm text-gray-600 text-center">{message}</p>
+            <p className="text-sm text-on-surface-variant text-center">{message}</p>
 
             {/* PIN dots */}
             <div className="flex justify-center gap-3">
@@ -120,8 +120,8 @@ export function usePinPrompt(options?: { verifyUrl?: string }) {
                     onClick={() => handleDigit(d)}
                     className={`h-12 rounded-xl text-lg font-semibold transition-colors ${
                       d === '⌫'
-                        ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        : 'bg-gray-50 text-gray-900'
+                        ? 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
+                        : 'bg-surface-container-low text-on-surface'
                     }`}
                     style={d !== '⌫' ? { ['--hover-bg' as string]: hex + '18' } : undefined}
                     onMouseEnter={e => { if (d !== '⌫') (e.currentTarget as HTMLButtonElement).style.backgroundColor = hex + '18' }}
@@ -136,7 +136,7 @@ export function usePinPrompt(options?: { verifyUrl?: string }) {
             <button
               onClick={handleSubmit}
               disabled={pin.length < 4 || loading}
-              className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              className="w-full flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
               style={{ backgroundColor: hex }}
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm'}

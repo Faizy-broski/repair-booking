@@ -388,7 +388,7 @@ export function WebcamScanner({ onResult, active }: Props) {
         <select
           value={selectedDeviceId ?? ''}
           onChange={e => setSelectedDeviceId(e.target.value || undefined)}
-          className="w-full rounded-lg border border-outline bg-surface px-3 py-2 text-sm focus:border-brand-teal focus:outline-none"
+          className="w-full rounded-xl border border-outline-variant bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-none"
         >
           {cameras.map(c => (
             <option key={c.deviceId} value={c.deviceId}>
@@ -405,11 +405,11 @@ export function WebcamScanner({ onResult, active }: Props) {
 
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="relative h-52 w-64">
-            <span className="absolute left-0 top-0 h-6 w-6 border-l-[3px] border-t-[3px] border-brand-teal rounded-tl" />
-            <span className="absolute right-0 top-0 h-6 w-6 border-r-[3px] border-t-[3px] border-brand-teal rounded-tr" />
-            <span className="absolute left-0 bottom-0 h-6 w-6 border-l-[3px] border-b-[3px] border-brand-teal rounded-bl" />
-            <span className="absolute right-0 bottom-0 h-6 w-6 border-r-[3px] border-b-[3px] border-brand-teal rounded-br" />
-            <div className="absolute left-2 right-2 top-0 h-0.5 bg-brand-teal/80 shadow-[0_0_6px_2px_rgba(20,184,166,0.4)] animate-scan-line" />
+            <span className="absolute left-0 top-0 h-6 w-6 border-l-[3px] border-t-[3px] border-primary rounded-tl" />
+            <span className="absolute right-0 top-0 h-6 w-6 border-r-[3px] border-t-[3px] border-primary rounded-tr" />
+            <span className="absolute left-0 bottom-0 h-6 w-6 border-l-[3px] border-b-[3px] border-primary rounded-bl" />
+            <span className="absolute right-0 bottom-0 h-6 w-6 border-r-[3px] border-b-[3px] border-primary rounded-br" />
+            <div className="absolute left-2 right-2 top-0 h-0.5 bg-primary/80 shadow-[0_0_6px_2px_rgba(20,184,166,0.4)] animate-scan-line" />
           </div>
         </div>
 
@@ -417,7 +417,7 @@ export function WebcamScanner({ onResult, active }: Props) {
           <div className="absolute top-2 right-2">
             <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
               engine === 'native' ? 'bg-green-500/90 text-white'
-              : engine === 'dual' ? 'bg-blue-500/90 text-white'
+              : engine === 'dual' ? 'bg-primary/90 text-white'
               : 'bg-gray-700/80 text-gray-200'
             }`}>
               <Zap className="h-2.5 w-2.5" />
@@ -436,7 +436,7 @@ export function WebcamScanner({ onResult, active }: Props) {
 
       {permission === 'initialising' && (
         <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-surface-container-low border border-outline-variant px-6 py-10 text-center">
-          <svg className="h-8 w-8 animate-spin text-brand-teal" fill="none" viewBox="0 0 24 24">
+          <svg className="h-8 w-8 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
@@ -453,7 +453,7 @@ export function WebcamScanner({ onResult, active }: Props) {
             <p className="font-semibold text-on-surface">Camera access denied</p>
             <p className="mt-1 text-sm text-on-surface-variant">Click the camera icon in your address bar and allow access.</p>
           </div>
-          <button onClick={retry} className="flex items-center gap-1.5 rounded-lg border border-outline bg-surface px-4 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low">
+          <button onClick={retry} className="flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface px-4 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low">
             <RefreshCw className="h-4 w-4" /> Try again
           </button>
         </div>

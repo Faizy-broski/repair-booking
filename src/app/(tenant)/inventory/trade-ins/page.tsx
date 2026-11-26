@@ -131,7 +131,7 @@ export default function TradeInsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-on-surface">Trade-In Items</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-on-surface">Trade-In Items</h1>
           <p className="text-sm text-on-surface-variant">{total} transactions</p>
         </div>
         <Button onClick={() => setModalOpen(true)}>
@@ -159,19 +159,19 @@ export default function TradeInsPage() {
               <button
                 type="button"
                 onClick={() => setPickerOpen(true)}
-                className="flex h-9 w-full items-center justify-between rounded-lg border border-brand-teal/30 bg-brand-teal-light/10 px-3 text-sm text-left"
+                className="flex h-9 w-full items-center justify-between rounded-xl border border-primary/20 bg-primary/10 px-3 text-sm text-left"
               >
                 <span className="truncate">
                   {form.product_name}
                   {form.variant_name && <span className="text-on-surface-variant"> – {form.variant_name}</span>}
                 </span>
-                <span className="shrink-0 text-xs text-brand-teal">Change</span>
+                <span className="shrink-0 text-xs text-primary">Change</span>
               </button>
             ) : (
               <button
                 type="button"
                 onClick={() => setPickerOpen(true)}
-                className="flex h-9 w-full items-center rounded-lg border border-dashed border-outline px-3 text-sm text-outline hover:border-brand-teal/40 hover:text-brand-teal"
+                className="flex h-9 w-full items-center rounded-xl border border-dashed border-outline-variant px-3 text-sm text-outline hover:border-primary/20 hover:text-primary"
               >
                 Select product…
               </button>
@@ -200,7 +200,7 @@ export default function TradeInsPage() {
               <select
                 value={form.condition_grade}
                 onChange={(e) => setForm((f) => ({ ...f, condition_grade: e.target.value }))}
-                className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
+                className="h-9 w-full rounded-xl border border-outline-variant px-3 text-sm"
               >
                 {['A','B','C','D','faulty'].map((g) => (
                   <option key={g} value={g}>Grade {g}{g === 'A' ? ' (Like New)' : g === 'faulty' ? ' (Faulty)' : ''}</option>
@@ -213,7 +213,7 @@ export default function TradeInsPage() {
                 type="number" min="0" step="0.01"
                 value={form.trade_in_value}
                 onChange={(e) => setForm((f) => ({ ...f, trade_in_value: Number(e.target.value) }))}
-                className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
+                className="h-9 w-full rounded-xl border border-outline-variant px-3 text-sm"
               />
             </div>
           </div>
@@ -224,7 +224,7 @@ export default function TradeInsPage() {
               <input
                 value={form.serial_number}
                 onChange={(e) => setForm((f) => ({ ...f, serial_number: e.target.value }))}
-                className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
+                className="h-9 w-full rounded-xl border border-outline-variant px-3 text-sm"
               />
             </div>
             <div>
@@ -232,7 +232,7 @@ export default function TradeInsPage() {
               <input
                 value={form.imei}
                 onChange={(e) => setForm((f) => ({ ...f, imei: e.target.value }))}
-                className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
+                className="h-9 w-full rounded-xl border border-outline-variant px-3 text-sm"
               />
             </div>
           </div>
@@ -243,7 +243,7 @@ export default function TradeInsPage() {
               rows={2}
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              className="w-full rounded-lg border border-outline px-3 py-2 text-sm"
+              className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm"
             />
           </div>
 

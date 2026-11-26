@@ -4,9 +4,10 @@ import { UploadCloud, Download, CheckCircle2, AlertCircle, FileSpreadsheet, X, C
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useAuthStore } from '@/store/auth.store'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { PageHeader, FilterPills } from '@/components/shared/page-header'
+import { InventoryNav } from '@/components/inventory/inventory-nav'
 import { useQueryClient } from '@tanstack/react-query'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -358,85 +359,70 @@ export default function BulkUploadPage() {
   const progressPct  = totalChunks > 0 ? Math.round((chunksDone / totalChunks) * 100) : 0
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-on-surface">Bulk Upload</h1>
-          <p className="text-sm text-on-surface-variant mt-0.5">{useSimpleCatalog ? 'Import products in bulk from a CSV file' : 'Import products or parts in bulk from a CSV file'}</p>
-        </div>
-        <Link href="/inventory">
-          <Button size="sm">Back to Inventory</Button>
-        </Link>
+    <div className="space-y-5">
+      <PageHeader
+        back={{ href: '/inventory', label: 'Back to Inventory' }}
+        title="Bulk Upload"
+        description={useSimpleCatalog ? 'Import products in bulk from a CSV file.' : 'Import products or parts in bulk from a CSV file.'}
+      />
+
+      <InventoryNav />
+
+      {/* Product / Part + template */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <FilterPills
+          options={(useSimpleCatalog ? ['product'] : ['product', 'part'] as ItemType[]).map((t) => ({
+            value: t as ItemType,
+            label: t === 'product' ? 'Products' : 'Parts',
+          }))}
+          value={itemType}
+          onChange={(t) => { setItemType(t); clearFile() }}
+        />
+        <Button variant="outline" onClick={() => downloadTemplate(itemType)}>
+          <Download className="h-4 w-4" />
+          Download Template
+        </Button>
       </div>
 
-      {/* Tab: Product / Part */}
-      <div className="flex gap-1 bg-surface-container-low p-1 rounded-xl w-fit">
-        {(useSimpleCatalog ? ['product'] : ['product', 'part'] as ItemType[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => { setItemType(t as ItemType); clearFile() }}
-            className={cn(
-              'px-5 py-1.5 rounded-lg text-sm font-medium transition-all',
-              itemType === t
-                ? 'bg-brand-teal text-on-primary shadow-sm'
-                : 'text-on-surface-variant hover:text-on-surface'
-            )}
-          >
-            {t === 'product' ? 'Products' : 'Parts'}
-          </button>
-        ))}
-      </div>
-
-      {/* Column guide + template */}
-      <div className="border border-outline-variant rounded-xl overflow-hidden">
+      {/* Column guide */}
+      <div className="border-y border-outline-variant">
         <button
           onClick={() => setShowColumns((v) => !v)}
-          className="w-full flex items-center justify-between px-4 py-3 bg-surface-container-low hover:bg-surface-container transition-colors text-sm font-medium text-on-surface-variant"
+          className="flex w-full items-center justify-between px-1 py-4 text-[15px] font-medium text-on-surface transition-colors hover:text-primary"
         >
           <span className="flex items-center gap-2">
-            <FileSpreadsheet className="h-4 w-4 text-on-surface-variant" />
+            <FileSpreadsheet className="h-4 w-4 text-primary" />
             CSV Column Reference
           </span>
           {showColumns ? <ChevronUp className="h-4 w-4 text-on-surface-variant" /> : <ChevronDown className="h-4 w-4 text-on-surface-variant" />}
         </button>
 
         {showColumns && (
-          <div className="overflow-x-auto">
+          <div className="mb-4 overflow-x-auto rounded-2xl border border-outline-variant">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-t border-b border-outline-variant bg-surface-container-low">
-                  <th className="px-4 py-2 text-left font-semibold text-on-surface-variant">Column</th>
-                  <th className="px-4 py-2 text-left font-semibold text-on-surface-variant">Required</th>
-                  <th className="px-4 py-2 text-left font-semibold text-on-surface-variant">Notes</th>
+                <tr className="bg-primary">
+                  <th className="px-4 py-3 text-left text-[13px] font-medium text-white">Column</th>
+                  <th className="px-4 py-3 text-left text-[13px] font-medium text-white">Required</th>
+                  <th className="px-4 py-3 text-left text-[13px] font-medium text-white">Notes</th>
                 </tr>
               </thead>
               <tbody>
                 {columns.map((c) => (
-                  <tr key={c.key} className="border-b border-surface-container-high last:border-0">
-                    <td className="px-4 py-2 font-mono text-on-surface">{c.key}</td>
-                    <td className="px-4 py-2">
+                  <tr key={c.key} className="border-b border-outline-variant last:border-0">
+                    <td className="px-4 py-2.5 font-mono text-on-surface">{c.key}</td>
+                    <td className="px-4 py-2.5">
                       {c.required
-                        ? <Badge className="bg-error-container text-on-error-container text-[10px]">Required</Badge>
+                        ? <Badge variant="destructive" className="text-[10px]">Required</Badge>
                         : <span className="text-on-surface-variant">Optional</span>}
                     </td>
-                    <td className="px-4 py-2 text-on-surface-variant">{c.note || '—'}</td>
+                    <td className="px-4 py-2.5 text-on-surface-variant">{c.note || '—'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-
-        <div className="px-4 py-3 border-t border-outline-variant flex justify-end">
-          <Button
-            size="sm"
-            onClick={() => downloadTemplate(itemType)}
-          >
-            <Download className="h-4 w-4" />
-            Download Template
-          </Button>
-        </div>
       </div>
 
       {/* Drop zone */}
@@ -447,16 +433,18 @@ export default function BulkUploadPage() {
           onDrop={onDrop}
           onClick={() => fileInputRef.current?.click()}
           className={cn(
-            'border-2 border-dashed rounded-xl p-12 flex flex-col items-center gap-3 cursor-pointer transition-colors select-none',
+            'flex cursor-pointer select-none flex-col items-center gap-4 rounded-2xl border px-6 py-20 transition-colors',
             dragging
               ? 'border-brand-teal bg-brand-teal/5'
-              : 'border-outline-variant hover:border-outline bg-surface-container-low'
+              : 'border-outline-variant bg-surface-container-lowest hover:border-outline'
           )}
         >
-          <UploadCloud className={cn('h-10 w-10', dragging ? 'text-brand-teal' : 'text-on-surface-variant')} />
+          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <UploadCloud className="h-6 w-6" />
+          </span>
           <div className="text-center">
-            <p className="text-sm font-medium text-on-surface">Drop your CSV here or click to browse</p>
-            <p className="text-xs text-on-surface-variant mt-1">Only .csv files are supported · Up to 50 000 rows</p>
+            <p className="text-[15px] font-medium text-on-surface">Drag &amp; drop or click to upload</p>
+            <p className="mt-1 text-xs text-on-surface-variant">CSV only · up to 50 000 rows</p>
           </div>
           <input
             ref={fileInputRef}

@@ -3,10 +3,11 @@ import { useState, use } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Truck, Phone, Mail, MapPin, Banknote, FileText, Download, Receipt, Search, X, Loader2, RefreshCw, Plus } from 'lucide-react'
+import { Truck, Phone, Mail, MapPin, Banknote, FileText, Download, Receipt, Search, X, Loader2, RefreshCw, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { BrandSpinner } from '@/components/ui/brand-spinner'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/shared/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
@@ -41,7 +42,7 @@ interface PayablePO {
 const STATUS_COLORS: Record<string, string> = {
   paid: 'bg-green-100 text-green-800',
   partial: 'bg-orange-100 text-orange-700',
-  unpaid: 'bg-purple-100 text-purple-700',
+  unpaid: 'bg-primary/10 text-primary',
 }
 
 export default function SupplierDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -168,26 +169,23 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="space-y-5">
-      <button onClick={() => router.push('/inventory/suppliers')} className="flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-on-surface-variant">
-        <ArrowLeft className="h-4 w-4" /> Back to Suppliers
-      </button>
-
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100">
-            <Truck className="h-6 w-6 text-blue-600" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-on-surface">{supplier.name}</h1>
-            <p className="text-sm text-on-surface-variant">
-              {[supplier.contact_person, supplier.city, supplier.country].filter(Boolean).join(' · ') || 'No contact details'}
-            </p>
-          </div>
-        </div>
-        <Button onClick={() => router.push(`/inventory/purchase-orders?new=1&supplier_id=${id}`)}>
-          <Plus className="h-4 w-4" /> New Purchase Order
-        </Button>
-      </div>
+      <PageHeader
+        title={
+          <span className="flex items-center gap-3">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+              <Truck className="h-6 w-6 text-primary" />
+            </span>
+            {supplier.name}
+          </span>
+        }
+        description={[supplier.contact_person, supplier.city, supplier.country].filter(Boolean).join(' · ') || 'No contact details'}
+        back={{ href: '/inventory/suppliers', label: 'Back to Suppliers' }}
+        actions={
+          <Button onClick={() => router.push(`/inventory/purchase-orders?new=1&supplier_id=${id}`)}>
+            <Plus className="h-4 w-4" /> New Purchase Order
+          </Button>
+        }
+      />
 
       <div className="flex gap-1 border-b border-outline-variant">
         {TABS.map((t) => (
@@ -195,7 +193,7 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-              tab === t.id ? 'border-brand-teal text-brand-teal' : 'border-transparent text-on-surface-variant hover:text-on-surface-variant'
+              tab === t.id ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant hover:text-on-surface-variant'
             }`}
           >
             {t.label}
@@ -218,7 +216,7 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
             <CardContent className="pt-4 space-y-2">
               <h3 className="mb-2 text-sm font-semibold text-on-surface-variant">Outstanding Balance</h3>
               <p className={`text-2xl font-bold ${outstanding > 0 ? 'text-red-600' : 'text-on-surface'}`}>{formatCurrency(outstanding)}</p>
-              <Link href="/inventory/suppliers?view=credit" className="inline-block text-xs font-medium text-purple-600 hover:underline">
+              <Link href="/inventory/suppliers?view=credit" className="inline-block text-xs font-medium text-primary hover:underline">
                 Manage in Supplier Credit →
               </Link>
             </CardContent>
@@ -227,7 +225,7 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
       )}
 
       {tab === 'purchase_orders' && (
-        <div className="rounded-xl border border-outline-variant bg-surface shadow-sm overflow-hidden">
+        <div className="rounded-xl border border-outline-variant bg-surface overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-surface-container-low text-xs uppercase text-on-surface-variant">
               <tr>
@@ -263,20 +261,20 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
       )}
 
       {tab === 'payments' && (
-        <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest">
           {/* Section header */}
-          <div className="flex items-center justify-between bg-gradient-to-r from-purple-600 to-violet-700 px-5 py-4">
+          <div className="flex items-center justify-between border-b border-outline-variant bg-violet-500/5 px-5 py-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/20">
-                <Banknote className="h-4 w-4 text-white" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-500/10">
+                <Banknote className="h-4 w-4 text-violet-600" />
               </div>
               <div>
-                <p className="text-xs font-black uppercase tracking-widest text-purple-200">Received Purchase Orders</p>
-                <p className="text-lg font-extrabold text-white leading-tight">Supplier Credit</p>
+                <p className="text-xs font-black uppercase tracking-widest text-primary">Received Purchase Orders</p>
+                <p className="text-lg font-semibold text-on-surface leading-tight">Supplier Credit</p>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-[11px] text-purple-200 font-black uppercase tracking-wider">Total Outstanding</p>
+              <p className="text-[11px] text-primary font-black uppercase tracking-wider">Total Outstanding</p>
               <p className={`text-2xl font-extrabold ${outstanding > 0 ? 'text-red-300' : 'text-emerald-300'}`}>
                 {formatCurrency(outstanding)}
               </p>
@@ -284,36 +282,36 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
           </div>
 
           {/* Filter toolbar */}
-          <div className="border-b border-outline-variant bg-slate-800 px-5 py-3 space-y-2">
+          <div className="border-b border-outline-variant bg-surface-container-low px-5 py-3 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative flex items-center">
-                <Search className="absolute left-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                <Search className="absolute left-2.5 h-3.5 w-3.5 text-on-surface-variant pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Search PO #..."
                   value={poSearch}
                   onChange={(e) => setPoSearch(e.target.value)}
-                  className="h-8 w-44 rounded-lg border border-slate-600 bg-slate-700 pl-7 pr-2.5 text-xs text-white placeholder-slate-400 focus:border-purple-400 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  className="h-8 w-44 rounded-xl border border-outline-variant bg-surface-container-lowest pl-7 pr-2.5 text-xs text-on-surface placeholder:text-outline focus:border-primary focus:outline-none focus:border-primary"
                 />
               </div>
 
-              <div className="flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-700 px-2.5 h-8">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">From</span>
+              <div className="flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container-lowest px-2.5 h-8">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant shrink-0">From</span>
                 <input
                   type="date"
                   value={statementFrom}
                   onChange={(e) => setStatementFrom(e.target.value)}
-                  className="w-[118px] border-0 bg-transparent text-xs text-white focus:outline-none [color-scheme:dark]"
+                  className="w-[118px] border-0 bg-transparent text-xs text-on-surface focus:outline-none"
                 />
               </div>
-              <span className="text-slate-400 text-xs font-bold">→</span>
-              <div className="flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-700 px-2.5 h-8">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">To</span>
+              <span className="text-on-surface-variant text-xs font-bold">→</span>
+              <div className="flex items-center gap-1.5 rounded-xl border border-outline-variant bg-surface-container-lowest px-2.5 h-8">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant shrink-0">To</span>
                 <input
                   type="date"
                   value={statementTo}
                   onChange={(e) => setStatementTo(e.target.value)}
-                  className="w-[118px] border-0 bg-transparent text-xs text-white focus:outline-none [color-scheme:dark]"
+                  className="w-[118px] border-0 bg-transparent text-xs text-on-surface focus:outline-none"
                 />
               </div>
 
@@ -321,7 +319,7 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
                 <button
                   type="button"
                   onClick={() => { setPoSearch(''); setStatementFrom(''); setStatementTo('') }}
-                  className="flex items-center gap-1 rounded-lg border border-slate-600 bg-slate-700 px-2.5 h-8 text-xs text-slate-300 hover:border-red-400 hover:bg-red-900/40 hover:text-red-300 transition-colors"
+                  className="flex items-center gap-1 rounded-xl border border-outline-variant bg-surface-container-lowest px-2.5 h-8 text-xs text-on-surface-variant hover:border-red-400 hover:bg-red-500/10 hover:text-red-600 transition-colors"
                 >
                   <X className="h-3 w-3" /> Clear
                 </button>
@@ -330,20 +328,20 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
               <div className="flex-1" />
 
               <Button size="sm" variant="outline" onClick={() => refetchPayablePOs()}
-                className="border-slate-500 text-slate-300 hover:bg-slate-700 text-xs font-semibold h-8 gap-1 bg-transparent">
+                className="border-outline-variant text-on-surface-variant hover:bg-surface-container text-xs font-semibold h-8 gap-1 bg-transparent">
                 <RefreshCw className={`h-3.5 w-3.5 ${isRefreshingPayablePOs ? 'animate-spin' : ''}`} /> Refresh
               </Button>
               <Button size="sm" variant="outline" loading={downloadingStatement} onClick={downloadStatement}
-                className="border-purple-400 text-purple-300 hover:bg-purple-900/40 text-xs font-semibold h-8 gap-1 bg-transparent">
+                className="border-primary text-primary hover:bg-primary/10/40 text-xs font-semibold h-8 gap-1 bg-transparent">
                 <FileText className="h-3.5 w-3.5" /> Statement
               </Button>
-              <Link href="/inventory/suppliers?view=credit" className="flex h-8 items-center text-xs font-semibold text-slate-300 hover:text-white hover:underline">
+              <Link href="/inventory/suppliers?view=credit" className="flex h-8 items-center text-xs font-semibold text-primary hover:underline">
                 Manage →
               </Link>
             </div>
 
             {hasActiveFilters && (
-              <p className="text-[10px] text-purple-300 font-medium">
+              <p className="text-[10px] text-primary font-medium">
                 Showing {filteredPayablePOs.length} of {payablePOs.length} purchase orders
                 {poSearch ? ` · matching "${poSearch}"` : ''}
                 {(statementFrom || statementTo) ? ` · ${statementFrom || '…'} → ${statementTo || '…'}` : ''}
@@ -377,7 +375,7 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
                     const owed = Number(po.total) - Number(po.amount_paid)
                     const isPaid = owed <= 0.01
                     return (
-                      <tr key={po.id} className="border-b border-outline group hover:bg-purple-50/40 transition-colors">
+                      <tr key={po.id} className="border-b border-outline-variant group hover:bg-primary/5/40 transition-colors">
                         <td className="px-5 py-3 align-top">
                           <span className="font-mono text-xs font-semibold text-on-surface-variant">{po.po_number}</span>
                         </td>
@@ -414,7 +412,7 @@ export default function SupplierDetailPage({ params }: { params: Promise<{ id: s
                                     disabled={downloadingReceiptId === p.id}
                                     title="Download receipt for this payment"
                                     onClick={() => downloadReceipt(po.id, p.id, po.po_number)}
-                                    className="ml-auto flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-2 py-0.5 text-[10px] font-semibold text-purple-600 hover:bg-purple-100 hover:border-purple-300 transition-colors disabled:opacity-50 disabled:cursor-wait"
+                                    className="ml-auto flex items-center gap-1 rounded-xl border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/10 hover:border-primary transition-colors disabled:opacity-50 disabled:cursor-wait"
                                   >
                                     {downloadingReceiptId === p.id
                                       ? <Loader2 className="h-3 w-3 animate-spin" />

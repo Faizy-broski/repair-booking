@@ -25,7 +25,7 @@ function InitialsBadge({ name, className }: { name?: string | null; className?: 
   return (
     <span
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-lg bg-brand-teal font-bold tracking-tight text-white',
+        'flex shrink-0 items-center justify-center rounded-xl bg-brand-teal/20 font-bold tracking-tight text-brand-teal ring-1 ring-inset ring-brand-teal/30',
         className
       )}
       aria-hidden
@@ -48,9 +48,9 @@ function BranchCard({
 }) {
   const branchRow = (
     <span className="flex min-w-0 items-center gap-1.5">
-      <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" />
-      <span className="truncate text-[13px] font-semibold text-white/75">{branchLabel(branchName)}</span>
-      {showChevron && <ChevronDown className="h-4 w-4 shrink-0 text-white/50" />}
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+      <span className="truncate text-[12px] font-medium text-white/60">{branchLabel(branchName)}</span>
+      {showChevron && <ChevronDown className="h-3.5 w-3.5 shrink-0 text-white/45" />}
     </span>
   )
 
@@ -72,10 +72,10 @@ function BranchCard({
 
   // No logo: a single compact row — initials badge + name — so the menu gets the space.
   return (
-    <div className="flex w-full items-center gap-2.5 px-3 py-3">
-      <InitialsBadge name={businessName ?? branchName} className="h-9 w-9 text-sm" />
+    <div className="flex w-full items-center gap-3 px-4 pb-3 pt-5">
+      <InitialsBadge name={businessName ?? branchName} className="h-9 w-9 text-xs" />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[15px] font-extrabold leading-tight tracking-tight text-white" title={businessName ?? undefined}>
+        <p className="truncate text-[14px] font-semibold leading-tight text-white" title={businessName ?? undefined}>
           {businessName ?? branchLabel(branchName)}
         </p>
         <div className="mt-0.5">{branchRow}</div>
@@ -117,7 +117,7 @@ export function BranchSwitcher({ collapsed = false }: { collapsed?: boolean }) {
   if (!canAccessAllBranches()) {
     if (!activeBranch) return null
     return (
-      <div className="w-full border-b border-white/8">
+      <div className="w-full">
         <BranchCard
           logoUrl={activeBranch.logo_url}
           businessName={businessName}
@@ -130,7 +130,7 @@ export function BranchSwitcher({ collapsed = false }: { collapsed?: boolean }) {
   /* ── Owners: full-width dropdown ── */
   return (
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger className="w-full border-b border-white/8 text-left transition-opacity hover:opacity-90 focus:outline-none">
+      <DropdownMenu.Trigger className="w-full text-left transition-opacity hover:opacity-90 focus:outline-none">
         <BranchCard
           logoUrl={activeBranch?.logo_url}
           businessName={businessName}
@@ -141,7 +141,7 @@ export function BranchSwitcher({ collapsed = false }: { collapsed?: boolean }) {
 
       <DropdownMenu.Portal>
         <DropdownMenu.Content
-          className="z-[100] w-[var(--radix-dropdown-menu-trigger-width)] max-h-[60vh] overflow-y-auto rounded-xl border border-gray-700 bg-gray-900 p-1 shadow-2xl"
+          className="z-[100] w-[var(--radix-dropdown-menu-trigger-width)] max-h-[60vh] overflow-y-auto rounded-xl border border-white/10 bg-[#0c1626] p-1 shadow-2xl"
           sideOffset={0}
           side="bottom"
           align="start"

@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { Plus, Search, AlertTriangle, Upload, Download, CheckCircle2, Package, Boxes, TrendingDown, ShoppingCart, Edit2, Trash2, Layers, X, ExternalLink, Filter, ChevronDown, RefreshCw, Barcode, MoreVertical, Copy, ShoppingBag, Percent, Loader2, Archive, Undo2 } from 'lucide-react'
+import { Plus, Search, AlertTriangle, Upload, Download, CheckCircle2, Package, Boxes, TrendingDown, ShoppingCart, Edit2, Trash2, Layers, X, ExternalLink, Filter, ChevronDown, RefreshCw, Barcode, MoreVertical, Copy, ShoppingBag, Percent, Loader2, Archive, Undo2, Wrench } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/ui/modal'
@@ -19,6 +19,7 @@ import { ScannerModal } from '@/components/scanner/scanner-modal'
 import { BarcodeModal } from '@/components/inventory/barcode-modal'
 import { BulkBarcodeModal } from '@/components/inventory/bulk-barcode-modal'
 import { InventoryNav } from '@/components/inventory/inventory-nav'
+import { PageHeader } from '@/components/shared/page-header'
 
 interface ProductRow {
   id: string
@@ -875,21 +876,31 @@ export default function InventoryPage() {
     {
       accessorKey: 'name',
       header: 'Product',
-      cell: ({ row }) => (
-        <div>
-          <div className="flex items-center gap-2">
-            <Link href={`/inventory/${row.original.id}`} className="font-medium text-on-surface text-sm hover:text-blue-600 transition-colors">
-              {row.original.name}
-            </Link>
-            {row.original.is_draft && <Badge variant="warning" className="text-xs">Draft</Badge>}
+      cell: ({ row }) => {
+        const isPart = (row.original.item_type ?? (row.original.is_service ? 'part' : 'product')) === 'part'
+        const hasVariants = (row.original.variant_count ?? 0) > 0 || row.original.has_variants
+        const RowIcon = isPart ? Wrench : hasVariants ? Layers : Package
+        return (
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-outline-variant text-on-surface-variant">
+              <RowIcon className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <Link href={`/inventory/${row.original.id}`} className="text-sm font-medium text-on-surface transition-colors hover:text-primary">
+                  {row.original.name}
+                </Link>
+                {row.original.is_draft && <Badge variant="warning" className="text-xs">Draft</Badge>}
+              </div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-x-2">
+                {row.original.sku && <span className="font-mono text-[11px] text-outline">{row.original.sku}</span>}
+                {row.original.barcode && <span className="font-mono text-[11px] text-outline">· {row.original.barcode}</span>}
+                {row.original.imei && <span className="text-[11px] text-outline">· IMEI: {row.original.imei}</span>}
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2 mt-0.5">
-            {row.original.sku && <span className="text-xs text-outline">SKU: {row.original.sku}</span>}
-            {row.original.barcode && <span className="text-xs text-outline">· {row.original.barcode}</span>}
-            {row.original.imei && <span className="text-xs text-outline">· IMEI: {row.original.imei}</span>}
-          </div>
-        </div>
-      ),
+        )
+      },
     },
     {
       id: 'category',
@@ -920,7 +931,7 @@ export default function InventoryPage() {
           const t = row.original.item_type ?? (row.original.is_service ? 'part' : 'product')
           return (
             <div className="flex flex-col gap-1 items-start">
-              <Badge variant={t === 'part' ? 'warning' : 'secondary'}>
+              <Badge variant={t === 'part' ? 'default' : 'secondary'}>
                 {t === 'part' ? 'Part' : 'Product'}
               </Badge>
               {row.original.part_type && (
@@ -966,7 +977,7 @@ export default function InventoryPage() {
           return (
             <button
               onClick={() => openVariantDrawer(p)}
-              className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-200 transition-colors"
+              className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/15"
             >
               <Layers className="h-3 w-3" />
               {p.variant_count ?? 0} Variants
@@ -1015,31 +1026,30 @@ export default function InventoryPage() {
   ]
 
   return (
-    <div className="space-y-4">
-      <InventoryNav />
+    <div className="space-y-5">
+      <PageHeader
+        title="Inventory"
+        description={`${total} products found`}
+        actions={
+          <>
+            <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => window.open(`/api/products/export`, '_blank')}>
+              <Download className="h-4 w-4" /> Export
+            </Button>
+            <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => router.push('/inventory/bulk-upload')}>
+              <Upload className="h-4 w-4" /> Import
+            </Button>
+            <Button className="flex-1 sm:flex-none" onClick={() => router.push('/inventory/new')}>
+              <Plus className="h-4 w-4" /> Add Item
+            </Button>
+            <ScanButton onClick={() => setScannerOpen(true)} label="Scan" />
+            <Button variant="outline" size="icon" onClick={() => { queryClient.invalidateQueries({ queryKey: ['inventory'] }); queryClient.invalidateQueries({ queryKey: ['inventory-stats'] }) }} title="Refresh data">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </>
+        }
+      />
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-on-surface">Inventory</h1>
-          <p className="text-sm text-on-surface-variant">{total} products found</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={() => window.open(`/api/products/export`, '_blank')}>
-            <Download className="h-4 w-4" /> Export
-          </Button>
-          <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={() => router.push('/inventory/bulk-upload')}>
-            <Upload className="h-4 w-4" /> Import
-          </Button>
-          <Button size="sm" className="flex-1 sm:flex-none" onClick={() => router.push('/inventory/new')}>
-            <Plus className="h-4 w-4" /> Add Item
-          </Button>
-          <ScanButton onClick={() => setScannerOpen(true)} label="Scan" />
-          <Button variant="outline" size="sm" onClick={() => { queryClient.invalidateQueries({ queryKey: ['inventory'] }); queryClient.invalidateQueries({ queryKey: ['inventory-stats'] }) }} title="Refresh data">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+      <InventoryNav />
 
       {/* Stats from API */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
@@ -1048,18 +1058,16 @@ export default function InventoryPage() {
             label: 'Stock Retail Value',
             value: stats ? formatCurrency(stats.stockRetailValue) : null,
             icon: Boxes,
-            iconColor: 'text-blue-600',
-            iconBg: 'bg-blue-100',
-            borderColor: 'bg-blue-600',
+            iconColor: 'text-primary',
+            iconBg: 'bg-primary/10',
             subtitle: 'potential revenue',
           },
           {
             label: 'Stock Cost Value',
             value: stats ? formatCurrency(stats.stockCostValue) : null,
             icon: Package,
-            iconColor: 'text-indigo-600',
-            iconBg: 'bg-indigo-100',
-            borderColor: 'bg-indigo-600',
+            iconColor: 'text-blue-600',
+            iconBg: 'bg-blue-500/10',
             subtitle: 'invested capital',
           },
           {
@@ -1067,8 +1075,7 @@ export default function InventoryPage() {
             value: stats?.lowStockCount ?? null,
             icon: AlertTriangle,
             iconColor: 'text-amber-600',
-            iconBg: 'bg-amber-100',
-            borderColor: 'bg-amber-500',
+            iconBg: 'bg-amber-500/10',
             subtitle: 'needs reordering',
             onClick: () => {
               setLowStockOnly((prev: boolean) => !prev);
@@ -1080,18 +1087,16 @@ export default function InventoryPage() {
             label: 'In Purchase Order',
             value: stats?.inPoCount ?? null,
             icon: ShoppingCart,
-            iconColor: 'text-emerald-600',
-            iconBg: 'bg-emerald-100',
-            borderColor: 'bg-emerald-500',
+            iconColor: 'text-on-surface-variant',
+            iconBg: 'bg-surface-container',
             subtitle: 'incoming stock',
           },
           {
             label: 'Customer Bought',
             value: stats?.customerBoughtCount ?? null,
             icon: ShoppingBag,
-            iconColor: 'text-purple-600',
-            iconBg: 'bg-purple-100',
-            borderColor: 'bg-purple-500',
+            iconColor: 'text-emerald-600',
+            iconBg: 'bg-emerald-500/10',
             subtitle: 'sourced from customers',
           },
         ].map((s: any) => {
@@ -1100,42 +1105,37 @@ export default function InventoryPage() {
             <div 
               key={s.label} 
               onClick={s.onClick}
-              className={`relative overflow-hidden rounded-xl border bg-surface pb-4 pt-4 sm:pt-5 px-4 sm:px-5 shadow-sm ${s.onClick ? 'cursor-pointer hover:shadow-md transition-all' : ''} ${s.isActive ? 'border-amber-500 ring-1 ring-amber-500' : 'border-outline-variant'}`}
+              className={`min-w-0 rounded-2xl border bg-surface-container-lowest p-4 sm:p-5 ${s.onClick ? 'cursor-pointer transition-colors hover:bg-surface-container-low' : ''} ${s.isActive ? 'border-amber-500 ring-1 ring-amber-500' : 'border-outline-variant'}`}
             >
               <div className="flex items-start justify-between gap-2 sm:gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant truncate">{s.label}</p>
-                  {s.value !== null ? (
-                    <p className="mt-2 text-sm sm:text-base lg:text-lg font-bold text-on-surface leading-tight tracking-tight tabular-nums whitespace-nowrap" title={String(s.value)}>{s.value}</p>
-                  ) : (
-                    <div className="mt-2 h-8 w-24 rounded bg-surface-container animate-pulse" />
-                  )}
-                </div>
-                <div className={`flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl ${s.iconBg}`}>
-                  <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${s.iconColor}`} />
+                <p className="truncate pt-1 text-sm text-on-surface-variant">{s.label}</p>
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${s.iconBg}`}>
+                  <Icon className={`h-[18px] w-[18px] ${s.iconColor}`} />
                 </div>
               </div>
               {s.value !== null ? (
-                <p className={`mt-2 sm:mt-3 text-[10px] sm:text-xs font-medium truncate ${s.iconColor}`}>
-                  {s.subtitle}
-                </p>
+                <p className="mt-3 whitespace-nowrap text-lg font-semibold leading-tight tracking-tight text-on-surface tabular-nums sm:text-xl lg:text-2xl" title={String(s.value)}>{s.value}</p>
               ) : (
-                <div className="mt-3 h-4 w-24 rounded bg-surface-container animate-pulse" />
+                <div className="mt-3 h-8 w-24 rounded bg-surface-container animate-pulse" />
               )}
-              <div className={`absolute bottom-0 left-0 right-0 h-1 ${s.borderColor}`} />
+              {s.value !== null ? (
+                <p className="mt-1.5 truncate text-xs text-on-surface-variant">{s.subtitle}</p>
+              ) : (
+                <div className="mt-2 h-4 w-24 rounded bg-surface-container animate-pulse" />
+              )}
             </div>
           )
         })}
       </div>
 
       {/* Filter Bar */}
-      <div className="rounded-xl border border-outline-variant bg-surface p-3 space-y-3">
+      <div className="space-y-3">
         {/* Simplified-catalog verticals (Retail, Tyre Fitting): category quick-filter pills */}
         {useSimpleCatalog && categories.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap pb-1 border-b border-outline-variant">
             <button
               onClick={() => { setCategoryFilter(''); setPage(0) }}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${!categoryFilter ? 'bg-brand-teal text-white' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}`}
+              className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${!categoryFilter ? 'bg-primary/10 text-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
             >
               All
             </button>
@@ -1143,7 +1143,7 @@ export default function InventoryPage() {
               <button
                 key={c.id}
                 onClick={() => { setCategoryFilter(categoryFilter === c.id ? '' : c.id); setPage(0) }}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${categoryFilter === c.id ? 'bg-brand-teal text-white' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}`}
+                className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${categoryFilter === c.id ? 'bg-primary/10 text-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
               >
                 {c.name}
               </button>
@@ -1153,23 +1153,23 @@ export default function InventoryPage() {
 
         {/* Row 1: search + type tabs + advanced toggle */}
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative flex-1 min-w-[200px] max-w-xs">
-            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
+          <div className="relative min-w-[200px] flex-1">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
             <input
               type="search"
               placeholder={useSimpleCatalog ? 'Search by name, SKU, barcode...' : 'Search by name, SKU, barcode, IMEI...'}
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(0) }}
-              className="h-9 w-full rounded-lg border border-outline bg-surface pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
+              className="h-10 w-full rounded-full border border-outline-variant bg-surface-container-lowest pl-10 pr-4 text-sm focus:border-primary focus:outline-none"
             />
           </div>
           {!useSimpleCatalog && (
-            <div className="flex rounded-lg border border-outline-variant bg-surface-container-low p-0.5 gap-0.5">
+            <div className="flex gap-1">
               {(['all', 'product', 'part'] as const).map((f) => (
                 <button
                   key={f}
                   onClick={() => { setTypeFilter(f); setPage(0) }}
-                  className={`rounded px-3 py-1 text-xs font-medium transition-colors ${typeFilter === f ? 'bg-surface shadow-sm text-on-surface' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
+                  className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${typeFilter === f ? 'bg-primary/10 text-primary' : 'text-on-surface-variant hover:text-on-surface'}`}
                 >
                   {f === 'all' ? 'All' : f === 'product' ? 'Products' : 'Parts'}
                 </button>
@@ -1178,12 +1178,12 @@ export default function InventoryPage() {
           )}
           <button
             onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors ${showAdvancedFilters ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-outline-variant text-on-surface-variant hover:bg-surface-container-low'}`}
+            className={`flex h-10 items-center gap-1.5 rounded-full border px-4 text-sm font-medium transition-colors ${showAdvancedFilters ? 'border-primary/40 bg-primary/5 text-primary' : 'border-outline-variant text-on-surface hover:bg-surface-container-low'}`}
           >
             <Filter className="h-4 w-4" />
             Filters
             <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`} />
-            {hasActiveFilters && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-blue-500" />}
+            {hasActiveFilters && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-primary" />}
           </button>
           {hasActiveFilters && (
             <button onClick={clearFilters} className="text-xs text-outline hover:text-on-surface-variant underline">
@@ -1194,7 +1194,7 @@ export default function InventoryPage() {
 
         {/* Row 2: advanced filters */}
         {showAdvancedFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-outline-variant">
+          <div className="grid grid-cols-1 gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <label className="block text-xs font-medium text-on-surface-variant mb-1">{useSimpleCatalog ? 'Category' : 'Device Type / Category'}</label>
               <Select
@@ -1284,6 +1284,7 @@ export default function InventoryPage() {
         onPageChange={setPage}
         onPageSizeChange={(s) => { setPageSize(s); setPage(0) }}
         emptyMessage="No products yet. Click Add Product to get started!"
+        emptyIcon={<Package />}
       />
 
       {/* Bulk Delete Confirm Modal */}

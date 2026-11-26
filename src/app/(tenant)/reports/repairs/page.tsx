@@ -1,16 +1,16 @@
 'use client'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Download, ArrowLeft } from 'lucide-react'
+import { Download, Wrench, Banknote } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
+import { PageHeader } from '@/components/shared/page-header'
+import { MetricCard } from '@/components/shared/ui-kit'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency } from '@/lib/utils'
 import { exportExcel } from '@/lib/export-excel'
 import { DateRangeBar } from '../_components/date-range-bar'
-import Link from 'next/link'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { chartTooltipStyle } from '@/lib/chart-theme'
 import type { ColumnDef } from '@tanstack/react-table'
 
 interface RepairRow { key: string; name: string; count: number; total_value: number }
@@ -25,26 +25,32 @@ function toLabel(s: string) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-// Deterministic color palette — cycles for unknown statuses
+// Tooltip chrome shared with the dashboard: 12px rounded hairline border.
+const TOOLTIP_PROPS = {
+  contentStyle: { background: 'var(--surface-container-lowest)', border: '1px solid var(--hairline)', borderRadius: 12 },
+  itemStyle: { color: 'var(--on-surface)' },
+  labelStyle: { color: 'var(--on-surface-variant)' },
+}
+
+// Deterministic colour palette — navy, brand teal, cyan, then semantic colours; cycles for unknown statuses
 const PALETTE = [
-  '#14b8a6', '#3b82f6', '#f59e0b', '#22c55e',
-  '#8b5cf6', '#ef4444', '#ec4899', '#64748b',
-  '#06b6d4', '#a3e635', '#fb923c', '#a78bfa',
+  'var(--navy)', 'var(--primary)', 'var(--primary-light)', 'var(--success)',
+  'var(--warning)', 'var(--error)', 'var(--outline)', 'var(--on-surface-variant)',
 ]
 
 const STATUS_COLOR_MAP: Record<string, string> = {
-  pending:         '#f59e0b',
-  booked:          '#06b6d4',
-  received:        '#3b82f6',
-  in_progress:     '#8b5cf6',
-  waiting_for_parts:'#ec4899',
-  complete:        '#22c55e',
-  completed:       '#22c55e',
-  repaired:        '#14b8a6',
-  collected:       '#14b8a6',
-  unrepairable:    '#64748b',
-  refunded:        '#ef4444',
-  cancelled:       '#ef4444',
+  pending:         'var(--outline)',
+  booked:          'var(--primary-light)',
+  received:        'var(--navy)',
+  in_progress:     'var(--primary)',
+  waiting_for_parts:'var(--warning)',
+  complete:        'var(--success)',
+  completed:       'var(--success)',
+  repaired:        'var(--primary)',
+  collected:       'var(--primary)',
+  unrepairable:    'var(--on-surface-variant)',
+  refunded:        'var(--error)',
+  cancelled:       'var(--error)',
 }
 
 function getColor(key: string, index: number) {
@@ -119,46 +125,34 @@ export default function RepairsReportPage() {
   ]
 
   return (
-    <div className="p-6 space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/reports">
-            <button className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container transition-colors">
-              <ArrowLeft className="h-5 w-5" strokeWidth={3} />
-            </button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-on-surface">Repairs Report</h1>
-            <p className="text-sm text-on-surface-variant mt-0.5">Repair job status and revenue breakdown, by booking date — open jobs counted at deposit only</p>
-          </div>
-        </div>
-        <Button
-          size="sm"
-          className="w-full sm:w-auto"
-          onClick={() => exportExcel(
-            data.map((r) => ({ Status: r.name, Count: r.count, 'Total Value': r.total_value })),
-            `repairs-${dateFrom}-${dateTo}.xlsx`,
-          )}
-        >
-          <Download className="h-4 w-4" /> Export Excel
-        </Button>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="Repairs Report"
+        description="Repair job status and revenue breakdown, by booking date — open jobs counted at deposit only"
+        back={{ href: '/reports', label: 'Back to Reports' }}
+        actions={
+          <Button
+            size="sm"
+            className="w-full sm:w-auto"
+            onClick={() => exportExcel(
+              data.map((r) => ({ Status: r.name, Count: r.count, 'Total Value': r.total_value })),
+              `repairs-${dateFrom}-${dateTo}.xlsx`,
+            )}
+          >
+            <Download className="h-4 w-4" /> Export Excel
+          </Button>
+        }
+      />
 
       <DateRangeBar dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} onApply={refetch} />
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-xl border border-outline-variant bg-surface p-4">
-          <p className="text-sm text-on-surface-variant">Total Repairs</p>
-          <p className="mt-1 text-2xl font-bold text-on-surface sm:text-3xl">{totalRepairs}</p>
-        </div>
-        <div className="rounded-xl border border-outline-variant bg-surface p-4">
-          <p className="text-sm text-on-surface-variant">Total Revenue (Booked, Deposit-Weighted)</p>
-          <p className="mt-1 text-2xl font-bold text-green-600 sm:text-3xl">{formatCurrency(totalValue)}</p>
-        </div>
+      <div className="grid grid-cols-2 gap-4">
+        <MetricCard label="Total Repairs" value={totalRepairs} icon={Wrench} tone="bg-primary/10 text-primary" />
+        <MetricCard label="Total Revenue (Booked, Deposit-Weighted)" value={formatCurrency(totalValue)} icon={Banknote} tone="bg-emerald-500/10 text-emerald-600" />
       </div>
 
       {data.length > 0 && (
-        <div className="rounded-xl border border-outline-variant bg-surface p-4">
+        <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
           <h3 className="mb-4 text-base font-semibold text-on-surface">Status Distribution</h3>
           <ResponsiveContainer width="100%" height={280}>
             <PieChart>
@@ -179,7 +173,7 @@ export default function RepairsReportPage() {
               </Pie>
               <Tooltip
                 formatter={(value: number, _: unknown, props: { payload?: RepairRow }) => [value, props.payload?.name ?? '']}
-                {...chartTooltipStyle}
+                {...TOOLTIP_PROPS}
               />
               <Legend
                 payload={data.map((row, i) => ({

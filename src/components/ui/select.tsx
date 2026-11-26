@@ -52,7 +52,7 @@ export function Select({
         <RadixSelect.Trigger
           id={id}
           className={cn(
-            'flex h-9 w-full items-center justify-between rounded-lg border border-outline bg-surface px-3 py-2 text-sm text-on-surface',
+            'flex h-10 w-full items-center justify-between rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-sm text-on-surface',
             'data-[placeholder]:text-outline',
             'focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20',
             'disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-on-surface-variant',
@@ -72,7 +72,7 @@ export function Select({
           <RadixSelect.Content
             position="popper"
             sideOffset={4}
-            className="z-50 max-h-60 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-outline-variant bg-surface shadow-lg"
+            className="z-50 max-h-60 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest shadow-lg"
           >
             <RadixSelect.Viewport className="p-1">
               {mappedOptions.map((option) => (

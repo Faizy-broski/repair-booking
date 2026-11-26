@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import Link from 'next/link'
-import { Plus, Eye, X, CheckCircle, Copy, Banknote, Loader2, Pencil, Trash2, ArrowLeft, MoreVertical } from 'lucide-react'
+import { Plus, Eye, X, CheckCircle, Copy, Banknote, Loader2, Pencil, Trash2, MoreVertical, ClipboardList } from 'lucide-react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/ui/modal'
 import { ProductVariantPicker } from '@/components/inventory/product-variant-picker'
 import { InventoryNav } from '@/components/inventory/inventory-nav'
+import { PageHeader, FilterPills } from '@/components/shared/page-header'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
 import { DataTable } from '@/components/shared/data-table'
 import { useAuthStore } from '@/store/auth.store'
@@ -278,7 +279,7 @@ export default function PurchaseOrdersPage() {
         <Link
           href={`/inventory/purchase-orders/${row.original.id}`}
           onClick={(e) => e.stopPropagation()}
-          className="font-mono font-semibold text-blue-600 hover:underline"
+          className="font-mono font-medium text-primary hover:underline"
         >
           {getValue() as string}
         </Link>
@@ -406,40 +407,29 @@ export default function PurchaseOrdersPage() {
   const poTotal = lineItems.reduce((s, i) => s + i.quantity_ordered * i.unit_cost, 0)
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <PageHeader
+        back={{ href: '/inventory', label: 'Back to Inventory' }}
+        title="Purchase Orders"
+        description={`${total} orders`}
+        actions={
+          <Button onClick={() => setSheetOpen(true)}>
+            <Plus className="h-4 w-4" /> New PO
+          </Button>
+        }
+      />
+
       <InventoryNav />
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-on-surface-variant hover:text-on-surface">
-            <ArrowLeft className="h-5 w-5" strokeWidth={3} />
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold text-on-surface">Purchase Orders</h1>
-            <p className="text-sm text-on-surface-variant">{total} orders</p>
-          </div>
-        </div>
-        <Button onClick={() => setSheetOpen(true)}>
-          <Plus className="h-4 w-4" /> New PO
-        </Button>
-      </div>
-
       {/* Status filter */}
-      <div className="flex gap-2 flex-wrap">
-        {['', 'draft', 'pending', 'in_progress', 'received', 'cancelled'].map((s) => (
-          <button
-            key={s}
-            onClick={() => setStatusFilter(s)}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              statusFilter === s
-                ? 'bg-blue-600 text-white'
-                : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-            }`}
-          >
-            {s ? s.replace('_', ' ') : 'All'}
-          </button>
-        ))}
-      </div>
+      <FilterPills
+        options={['', 'draft', 'pending', 'in_progress', 'received', 'cancelled'].map((s) => ({
+          value: s,
+          label: s ? s.replace('_', ' ').replace(/^./, (c) => c.toUpperCase()).replace(/ (.)/, (_m, c: string) => ' ' + c.toUpperCase()) : 'All',
+        }))}
+        value={statusFilter}
+        onChange={setStatusFilter}
+      />
 
       <DataTable
         data={orders}
@@ -451,6 +441,7 @@ export default function PurchaseOrdersPage() {
         onPageChange={setPage}
         onPageSizeChange={(s) => { setPageSize(s); setPage(0) }}
         emptyMessage="No purchase orders yet."
+        emptyIcon={<ClipboardList />}
         onRowClick={(po) => router.push(`/inventory/purchase-orders/${po.id}`)}
       />
 

@@ -90,14 +90,14 @@ export function ProductVariantPicker({ open, onClose, onSelect, branchId, title 
             <p className="text-sm font-semibold">{variantFor.name} — Select variant</p>
           </div>
           {variantsLoading ? (
-            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-brand-teal" /></div>
+            <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
           ) : (
             <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto">
               {variants.map(v => (
                 <button
                   key={v.id}
                   onClick={() => pick(variantFor, v)}
-                  className="flex flex-col items-start rounded-lg border p-2.5 text-left text-sm hover:border-brand-teal hover:bg-brand-teal-light/20 transition-colors"
+                  className="flex flex-col items-start rounded-xl border p-2.5 text-left text-sm hover:border-primary hover:bg-primary/10 transition-colors"
                 >
                   <span className="font-medium">{v.name}</span>
                   <span className="text-xs text-on-surface-variant">Cost: {formatCurrency(v.cost_price ?? variantFor.next_batch_cost ?? variantFor.cost_price ?? 0)}</span>
@@ -113,7 +113,7 @@ export function ProductVariantPicker({ open, onClose, onSelect, branchId, title 
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-outline" />
             <input
-              className="w-full rounded-md border py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal"
+              className="w-full rounded-xl border py-2 pl-9 pr-3 text-sm focus:outline-none focus:border-primary"
               placeholder="Search products by name or SKU…"
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -128,11 +128,11 @@ export function ProductVariantPicker({ open, onClose, onSelect, branchId, title 
                 <button
                   key={p.id}
                   onClick={() => { if (p.has_variants) loadVariants(p); else pick(p, null) }}
-                  className="flex flex-col items-start rounded-lg border p-2.5 text-left text-sm hover:border-brand-teal hover:bg-brand-teal-light/20 transition-colors"
+                  className="flex flex-col items-start rounded-xl border p-2.5 text-left text-sm hover:border-primary hover:bg-primary/10 transition-colors"
                 >
                   <span className="font-medium truncate w-full">{p.name}</span>
                   <span className="text-xs text-on-surface-variant">Cost: {formatCurrency(p.next_batch_cost ?? p.cost_price ?? 0)}</span>
-                  {p.has_variants && <span className="text-[10px] text-brand-teal">Select variant →</span>}
+                  {p.has_variants && <span className="text-[10px] text-primary">Select variant →</span>}
                 </button>
               ))}
             </div>

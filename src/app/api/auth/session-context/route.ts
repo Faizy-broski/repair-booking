@@ -103,7 +103,7 @@ async function getSessionContext(
       branches: branchRows ?? [],
       subscriptionStatus,
       currency: bizData?.currency ?? 'GBP',
-      brandColor: bizData?.brand_color ?? '#008080',
+      brandColor: bizData?.brand_color ?? '#009C9C',
       businessName: bizData?.name ?? null,
     })
   } catch (err) {

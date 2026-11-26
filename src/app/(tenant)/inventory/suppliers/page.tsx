@@ -7,7 +7,7 @@ import { confirmToast } from '@/lib/confirm-toast'
 import {
   Plus, Pencil, Trash2, Truck, Search, Loader2, CreditCard,
   RefreshCw, Banknote, CheckCircle2, AlertCircle,
-  Mail, Phone, MapPin, Users, ArrowLeft,
+  Mail, Phone, MapPin,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/shared/data-table'
 import { InventoryNav } from '@/components/inventory/inventory-nav'
+import { PageHeader, FilterPills } from '@/components/shared/page-header'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -242,80 +243,51 @@ export default function SuppliersPage() {
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-4">
-      <InventoryNav />
-
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-on-surface-variant hover:text-on-surface">
-            <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold text-on-surface">Suppliers</h1>
-            <p className="text-sm text-on-surface-variant">
-              {view === 'suppliers' ? `${suppliers.length} suppliers` : 'Received purchase orders and outstanding balances owed to suppliers'}
-            </p>
-          </div>
-        </div>
-        {view === 'suppliers' ? (
+    <div className="space-y-5">
+      <PageHeader
+        back={{ href: '/inventory', label: 'Back to Inventory' }}
+        title="Suppliers"
+        description={view === 'suppliers' ? `${suppliers.length} suppliers` : 'Received purchase orders and outstanding balances owed to suppliers'}
+        actions={view === 'suppliers' ? (
           <Button onClick={() => openModal()}>
             <Plus className="h-4 w-4" /> Add Supplier
           </Button>
         ) : (
-          <button
-            onClick={() => refetchCredit()}
-            disabled={creditFetching}
-            className="flex items-center gap-2 rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm font-medium text-on-surface-variant shadow-sm hover:bg-surface-container-low disabled:opacity-50"
-          >
+          <Button variant="outline" onClick={() => refetchCredit()} disabled={creditFetching}>
             <RefreshCw className={`h-4 w-4 ${creditFetching ? 'animate-spin' : ''}`} />
             Refresh
-          </button>
+          </Button>
         )}
-      </div>
+      />
+
+      <InventoryNav />
 
       {/* View toggle */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => setView('suppliers')}
-          className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-            view === 'suppliers'
-              ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
-              : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-          }`}
-        >
-          <Users className="h-4 w-4" /> Suppliers
-        </button>
-        <button
-          onClick={() => setView('credit')}
-          className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-            view === 'credit'
-              ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/30'
-              : 'bg-purple-50 text-purple-700 hover:bg-purple-100'
-          }`}
-        >
-          <CreditCard className="h-4 w-4" /> Supplier Credit
-        </button>
-      </div>
+      <FilterPills
+        options={[{ value: 'suppliers', label: 'Suppliers' }, { value: 'credit', label: 'Supplier Credit' }]}
+        value={view}
+        onChange={setView}
+      />
 
       {view === 'suppliers' && (
         <>
           <div className="relative max-w-xs">
-            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search suppliers..."
-              className="h-9 w-full rounded-lg border border-outline pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
+              className="h-10 w-full rounded-full border border-outline-variant pl-10 pr-4 text-sm focus:border-primary focus:outline-none"
             />
           </div>
 
           {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant bg-surface py-16">
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-lowest py-16">
               <Truck className="mb-3 h-10 w-10 text-outline-variant" />
               <p className="text-sm font-medium text-on-surface-variant">No suppliers found.</p>
             </div>
           ) : (
-            <div className="w-full overflow-x-auto rounded-xl border border-outline-variant/50 bg-surface shadow-sm">
+            <div className="w-full overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-lowest">
               <table className="w-full min-w-[980px] table-fixed text-sm">
                 <colgroup>
                   <col className="w-[16%]" />
@@ -330,29 +302,32 @@ export default function SuppliersPage() {
                 </colgroup>
                 <thead>
                   <tr className="bg-primary">
-                    <th className="px-4 py-3 text-left text-[13px] font-bold uppercase tracking-wider text-white">Supplier</th>
-                    <th className="px-4 py-3 text-left text-[13px] font-bold uppercase tracking-wider text-white">Name</th>
-                    <th className="px-4 py-3 text-left text-[13px] font-bold uppercase tracking-wider text-white">Email</th>
-                    <th className="px-4 py-3 text-left text-[13px] font-bold uppercase tracking-wider text-white">Phone</th>
-                    <th className="px-4 py-3 text-left text-[13px] font-bold uppercase tracking-wider text-white">City</th>
-                    <th className="px-4 py-3 text-left text-[13px] font-bold uppercase tracking-wider text-white">Country</th>
-                    <th className="px-4 py-3 text-left text-[13px] font-bold uppercase tracking-wider text-white">Terms</th>
-                    <th className="px-4 py-3 text-left text-[13px] font-bold uppercase tracking-wider text-white">Currency</th>
-                    <th className="px-4 py-3 text-right text-[13px] font-bold uppercase tracking-wider text-white">Actions</th>
+                    <th className="px-4 py-3.5 text-left text-[13px] font-medium text-white">Supplier</th>
+                    <th className="px-4 py-3.5 text-left text-[13px] font-medium text-white">Name</th>
+                    <th className="px-4 py-3.5 text-left text-[13px] font-medium text-white">Email</th>
+                    <th className="px-4 py-3.5 text-left text-[13px] font-medium text-white">Phone</th>
+                    <th className="px-4 py-3.5 text-left text-[13px] font-medium text-white">City</th>
+                    <th className="px-4 py-3.5 text-left text-[13px] font-medium text-white">Country</th>
+                    <th className="px-4 py-3.5 text-left text-[13px] font-medium text-white">Terms</th>
+                    <th className="px-4 py-3.5 text-left text-[13px] font-medium text-white">Currency</th>
+                    <th className="px-4 py-3.5 text-right text-[13px] font-medium text-white">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((s, i) => (
+                  {filtered.map((s) => (
                     <tr
                       key={s.id}
                       onClick={() => router.push(`/inventory/suppliers/${s.id}?tab=payments`)}
-                      className={`group cursor-pointer border-t border-outline-variant transition-colors hover:bg-blue-50 ${i % 2 === 0 ? 'bg-surface' : 'bg-surface-container-low'}`}
+                      className="group cursor-pointer border-t border-outline-variant transition-colors first:border-t-0 hover:bg-surface-container-low"
                     >
-                      <td className="px-4 py-3 align-middle">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                            <span className="truncate font-bold text-on-surface group-hover:text-blue-600 transition-colors">{s.name}</span>
-                            {!s.is_active && <Badge variant="default">Inactive</Badge>}
+                      <td className="px-4 py-4 align-middle">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <Truck className="h-4 w-4" />
+                          </span>
+                          <div className="min-w-0">
+                            <span className="block truncate font-medium text-on-surface transition-colors group-hover:text-primary">{s.name}</span>
+                            {!s.is_active && <Badge variant="secondary" className="mt-1">Inactive</Badge>}
                           </div>
                         </div>
                       </td>
@@ -467,7 +442,7 @@ export default function SuppliersPage() {
               <Loader2 className="h-6 w-6 animate-spin text-outline" />
             </div>
           ) : purchaseOrders.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-outline-variant bg-surface py-16">
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-lowest py-16">
               <CreditCard className="mb-3 h-10 w-10 text-outline-variant" />
               <p className="text-sm font-medium text-on-surface-variant">
                 {showAll ? 'No received purchase orders found' : 'No outstanding supplier balances'}

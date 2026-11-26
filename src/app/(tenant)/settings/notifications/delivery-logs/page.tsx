@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query'
 import { Bell, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { PageHeader } from '@/components/shared/page-header'
+import { EmptyState } from '@/components/shared/ui-kit'
 
 interface NotificationLogEntry {
   id: string
@@ -48,54 +50,44 @@ export default function DeliveryLogsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-100">
-            <Bell className="h-5 w-5 text-purple-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-on-surface">Delivery Logs</h1>
-            <p className="text-sm text-on-surface-variant">History of all notifications sent to customers</p>
-          </div>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} loading={loading}>
-          <RefreshCw className="h-4 w-4" /> Refresh
-        </Button>
-      </div>
+      <PageHeader
+        title="Delivery Logs"
+        description="History of all notifications sent to customers"
+        actions={
+          <Button variant="outline" size="sm" onClick={() => refetch()} loading={loading}>
+            <RefreshCw className="h-4 w-4" /> Refresh
+          </Button>
+        }
+      />
 
       {logEntries.length === 0 && !loading ? (
-        <div className="rounded-lg border border-dashed border-outline p-12 text-center">
-          <Bell className="mx-auto mb-3 h-10 w-10 text-outline-variant" />
-          <p className="text-on-surface-variant">No notifications sent yet.</p>
-          <p className="text-sm text-outline mt-1">Logs will appear here once notifications are triggered.</p>
-        </div>
+        <EmptyState icon={Bell} title="No notifications sent yet." hint="Logs will appear here once notifications are triggered." />
       ) : (
         <>
-          <div className="overflow-hidden rounded-lg border border-outline-variant shadow-sm">
+          <div className="overflow-x-auto rounded-2xl border border-outline-variant bg-surface-container-lowest">
             <table className="min-w-full divide-y divide-outline-variant">
-              <thead className="bg-surface-container-low">
+              <thead className="bg-primary">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">Event</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">Channel</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">Recipient</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-on-surface-variant uppercase tracking-wider">Date</th>
+                  <th className="whitespace-nowrap px-4 py-3.5 text-left text-[13px] font-medium text-white">Event</th>
+                  <th className="whitespace-nowrap px-4 py-3.5 text-left text-[13px] font-medium text-white">Channel</th>
+                  <th className="whitespace-nowrap px-4 py-3.5 text-left text-[13px] font-medium text-white">Recipient</th>
+                  <th className="whitespace-nowrap px-4 py-3.5 text-left text-[13px] font-medium text-white">Status</th>
+                  <th className="whitespace-nowrap px-4 py-3.5 text-left text-[13px] font-medium text-white">Date</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-outline-variant bg-surface">
+              <tbody className="divide-y divide-outline-variant">
                 {loading
                   ? Array.from({ length: 5 }).map((_, i) => (
                       <tr key={i}>
                         {Array.from({ length: 5 }).map((__, j) => (
                           <td key={j} className="px-4 py-3">
-                            <div className="h-4 bg-surface-container rounded animate-pulse w-24" />
+                            <div className="h-4 w-24 animate-pulse rounded bg-surface-container" />
                           </td>
                         ))}
                       </tr>
                     ))
                   : logEntries.map((entry) => (
-                      <tr key={entry.id} className="hover:bg-surface-container-low transition-colors">
+                      <tr key={entry.id} className="transition-colors hover:bg-surface-container-low">
                         <td className="px-4 py-3 text-sm text-on-surface">
                           {TRIGGER_LABELS[entry.trigger_event] ?? entry.trigger_event}
                         </td>

@@ -1,13 +1,15 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Save, Plus, Lock, Trash2, RefreshCw, Layers } from 'lucide-react'
+import { Save, Plus, Lock, Trash2, RefreshCw, Layers } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { CreatableCombobox } from '@/components/ui/creatable-combobox'
 import { ImageUpload } from '@/components/ui/image-upload'
 import { SectionCard } from '@/components/ui/section-card'
+import { PageHeader } from '@/components/shared/page-header'
+import { InventoryNav } from '@/components/inventory/inventory-nav'
 import { Toggle } from '@/components/ui/toggle'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/store/auth.store'
@@ -423,51 +425,50 @@ export default function NewInventoryPage() {
   const partTypeOptions = partTypesForModel.map(p => ({ value: p.name, label: p.name }))
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <div className="sticky top-0 z-30 flex items-center justify-between border-b border-outline-variant bg-surface px-6 py-3">
-        <div className="flex items-center gap-3">
-          <Link href="/inventory" className="flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-on-surface">
-            <ChevronLeft className="h-4 w-4" /> Back to Inventory
-          </Link>
-          <span className="text-outline-variant">/</span>
-          <span className="text-sm font-medium text-on-surface">Add New {itemType === 'part' ? 'Part' : 'Product'}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => handleSave(true)} loading={saving && saveAndNew} disabled={hasConflict}>
-            <Plus className="h-4 w-4" /> Save &amp; Add New
-          </Button>
-          <Button onClick={() => handleSave(false)} loading={saving && !saveAndNew} disabled={hasConflict}>
-            <Save className="h-4 w-4" /> Save {itemType === 'part' ? 'Part' : 'Product'}
-          </Button>
-        </div>
-      </div>
+    <div className="flex flex-col space-y-5">
+      <PageHeader
+        back={{ href: '/inventory', label: 'Back to Inventory' }}
+        title={`Add New ${itemType === 'part' ? 'Part' : 'Product'}`}
+        actions={
+          <>
+            <Button variant="outline" onClick={() => handleSave(true)} loading={saving && saveAndNew} disabled={hasConflict}>
+              <Plus className="h-4 w-4" /> Save &amp; Add New
+            </Button>
+            <Button onClick={() => handleSave(false)} loading={saving && !saveAndNew} disabled={hasConflict}>
+              <Save className="h-4 w-4" /> Save {itemType === 'part' ? 'Part' : 'Product'}
+            </Button>
+          </>
+        }
+      />
+
+      <InventoryNav />
 
       {saveError && (
-        <div className="mx-6 mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{saveError}</div>
+        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{saveError}</div>
       )}
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl px-6 py-6 space-y-6">
+      <div className="flex-1">
+        <div className="space-y-6">
 
           {/* Type Toggle + Bought from Customer — compact, stacked */}
           <div className="max-w-xl space-y-4">
             {hasRepairs && (
-              <div className="flex items-center gap-3 rounded-lg border border-outline-variant bg-surface px-4 py-3">
+              <div className="flex items-center gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest px-4 py-3">
                 <span className="text-sm font-medium text-on-surface-variant shrink-0">Item Type</span>
-                <div className="flex rounded-lg border border-outline-variant p-0.5 ml-auto">
+                <div className="flex rounded-full border border-outline-variant p-0.5 ml-auto">
                   <button type="button" onClick={() => setItemType('product')}
-                    className={`rounded px-4 py-1.5 text-sm font-medium transition-colors ${itemType === 'product' ? 'bg-brand-teal text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}>
+                    className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${itemType === 'product' ? 'bg-brand-teal text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}>
                     Product
                   </button>
                   <button type="button" onClick={() => setItemType('part')}
-                    className={`rounded px-4 py-1.5 text-sm font-medium transition-colors ${itemType === 'part' ? 'bg-brand-teal text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}>
+                    className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${itemType === 'part' ? 'bg-brand-teal text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}>
                     Part
                   </button>
                 </div>
               </div>
             )}
 
-            <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-lg border-2 px-4 py-3 transition-colors ${isTradeIn ? 'border-purple-500 bg-purple-50' : 'border-outline-variant hover:border-outline'}`}>
+            <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-2xl border px-5 py-4 transition-colors ${isTradeIn ? 'border-purple-500 bg-purple-50' : 'border-outline-variant bg-surface-container-lowest hover:border-outline'}`}>
               <div className="flex items-center gap-3 min-w-0">
                 <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isTradeIn ? 'bg-purple-100' : 'bg-surface-container'}`}>
                   <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isTradeIn ? 'text-purple-600' : 'text-outline'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
@@ -802,7 +803,7 @@ export default function NewInventoryPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-end gap-3 py-6 border-t border-outline-variant">
-            <Link href="/inventory" className="w-full sm:w-auto"><Button variant="outline" className="w-full">Cancel</Button></Link>
+            <Link href="/inventory" className="w-full sm:mr-auto sm:w-auto"><Button variant="ghost" className="w-full">Cancel</Button></Link>
             <Button variant="outline" className="w-full sm:w-auto" onClick={() => handleSave(true)} loading={saving && saveAndNew} disabled={hasConflict}>
               <Plus className="h-4 w-4" /> Save &amp; New
             </Button>
@@ -812,7 +813,7 @@ export default function NewInventoryPage() {
           </div>
 
         </div>
-      </main>
+      </div>
     </div>
   )
 }

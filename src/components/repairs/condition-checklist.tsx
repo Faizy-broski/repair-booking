@@ -12,9 +12,9 @@ interface ConditionItem {
 }
 
 const STATUS_CONFIG = {
-  ok:      { label: 'OK',      color: 'bg-green-100 text-green-700 border-green-300' },
-  damaged: { label: 'Damaged', color: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
-  missing: { label: 'Missing', color: 'bg-red-100 text-red-700 border-red-300' },
+  ok:      { label: 'OK',      color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' },
+  damaged: { label: 'Damaged', color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' },
+  missing: { label: 'Missing', color: 'bg-red-500/10 text-red-600 border-red-300' },
 }
 
 const DEFAULT_LABELS = [
@@ -123,7 +123,7 @@ export function ConditionChecklist({ repairId, stage, title }: ConditionChecklis
                     value={item.label}
                     onChange={(e) => updateItem(idx, { label: e.target.value })}
                     placeholder="Component name"
-                    className="h-8 flex-1 rounded border border-outline-variant px-2 text-sm focus:border-blue-400 focus:outline-none"
+                    className="h-8 flex-1 rounded border border-outline-variant px-2 text-sm focus:border-primary focus:outline-none"
                   />
                   {/* Status toggle */}
                   <div className="flex rounded-md border border-outline-variant overflow-hidden">
@@ -148,7 +148,7 @@ export function ConditionChecklist({ repairId, stage, title }: ConditionChecklis
               <div className="flex items-center gap-2 pt-1">
                 <button
                   onClick={addItem}
-                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                  className="flex items-center gap-1 text-xs text-primary hover:text-primary"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   Add item

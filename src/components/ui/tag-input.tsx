@@ -46,19 +46,19 @@ export const TagInput = React.forwardRef<HTMLInputElement, TagInputProps>(
     return (
       <div className="w-full">
         {label && (
-          <label className="mb-1 block text-sm font-medium text-gray-700">
+          <label className="mb-1 block text-sm font-medium text-on-surface-variant">
             {label}
           </label>
         )}
         <div
           onClick={focusInput}
           className={cn(
-            "flex min-h-[38px] w-full flex-wrap items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm transition-colors focus-within:border-blue-500 focus-within:outline-none focus-within:ring-1 focus-within:ring-blue-500 cursor-text",
+            "flex min-h-10 w-full flex-wrap items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-1.5 text-sm transition-colors focus-within:border-primary focus-within:outline-none focus-within:ring-2 focus-within:ring-primary/20 cursor-text",
             className
           )}
         >
           {value ? (
-            <div className="flex h-[26px] items-center gap-1 rounded bg-[#3b82f6] px-2 text-xs font-medium text-white">
+            <div className="flex h-[26px] items-center gap-1 rounded-full bg-primary/10 px-2.5 text-xs font-medium text-primary">
               <button
                 type="button"
                 onClick={(e) => {
@@ -66,7 +66,7 @@ export const TagInput = React.forwardRef<HTMLInputElement, TagInputProps>(
                   onChange?.("")
                   setTimeout(() => inputRef.current?.focus(), 0)
                 }}
-                className="flex items-center justify-center rounded hover:bg-blue-600 focus:outline-none"
+                className="flex items-center justify-center rounded-full hover:bg-primary/15 focus:outline-none"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -78,7 +78,7 @@ export const TagInput = React.forwardRef<HTMLInputElement, TagInputProps>(
               {...props}
               ref={inputRef}
               type="text"
-              className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 min-w-[120px]"
+              className="flex-1 bg-transparent text-sm text-on-surface placeholder:text-outline focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 min-w-[120px]"
               placeholder={placeholder}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}

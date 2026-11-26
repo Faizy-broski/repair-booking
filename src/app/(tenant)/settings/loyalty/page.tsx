@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { Save, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PageHeader } from '@/components/shared/page-header'
 import { useAuthStore } from '@/store/auth.store'
 
 interface LoyaltySettings {
@@ -40,28 +41,27 @@ export default function LoyaltySettingsPage() {
   const exampleRedeem = (settings.min_redeem_points * settings.redeem_rate).toFixed(2)
 
   return (
-    <div className="space-y-6 max-w-lg">
-      <div>
-        <h1 className="text-xl font-bold text-on-surface">Loyalty Programme</h1>
-        <p className="text-sm text-on-surface-variant mt-0.5">Reward customers with points for purchases.</p>
-      </div>
+    <div className="max-w-4xl space-y-6">
+      <PageHeader title="Loyalty Programme" description="Reward customers with points for purchases." />
 
-      <div className="rounded-xl border border-outline-variant bg-surface p-6 space-y-4">
-        <label className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Star className="h-4 w-4 text-yellow-500" />
-            <span className="font-medium text-on-surface">Enable Loyalty Programme</span>
+      <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 space-y-5">
+        <label className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Star className="h-4 w-4" />
+            </span>
+            <span className="text-base font-semibold text-on-surface">Enable Loyalty Programme</span>
           </div>
           <input
             type="checkbox"
             checked={settings.is_enabled}
             onChange={(e) => setSettings((s) => ({ ...s, is_enabled: e.target.checked }))}
-            className="h-4 w-4 rounded"
+            className="h-4 w-4 rounded accent-primary"
           />
         </label>
 
         <div className={`space-y-4 transition-opacity ${settings.is_enabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <Input
                 label="Earn Rate (points per £1)"
@@ -71,7 +71,7 @@ export default function LoyaltySettingsPage() {
                 value={settings.earn_rate}
                 onChange={(e) => setSettings((s) => ({ ...s, earn_rate: Number(e.target.value) }))}
               />
-              <p className="mt-1 text-xs text-outline">A £100 sale earns {exampleEarn} points</p>
+              <p className="mt-1.5 text-xs text-on-surface-variant">A £100 sale earns {exampleEarn} points</p>
             </div>
             <div>
               <Input
@@ -82,7 +82,7 @@ export default function LoyaltySettingsPage() {
                 value={settings.redeem_rate}
                 onChange={(e) => setSettings((s) => ({ ...s, redeem_rate: Number(e.target.value) }))}
               />
-              <p className="mt-1 text-xs text-outline">{settings.min_redeem_points} pts = £{exampleRedeem}</p>
+              <p className="mt-1.5 text-xs text-on-surface-variant">{settings.min_redeem_points} pts = £{exampleRedeem}</p>
             </div>
           </div>
 
@@ -94,9 +94,9 @@ export default function LoyaltySettingsPage() {
             onChange={(e) => setSettings((s) => ({ ...s, min_redeem_points: Number(e.target.value) }))}
           />
 
-          <div className="rounded-lg bg-blue-50 p-3 text-xs text-blue-700">
-            <p className="font-medium mb-1">How it works:</p>
-            <ul className="space-y-0.5 list-disc list-inside text-blue-600">
+          <div className="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-xs text-on-surface-variant">
+            <p className="font-medium text-on-surface mb-1">How it works:</p>
+            <ul className="space-y-0.5 list-disc list-inside">
               <li>Customer spends £100 → earns {exampleEarn} points</li>
               <li>Customer redeems {settings.min_redeem_points} points → £{exampleRedeem} credit</li>
               <li>Points are awarded automatically on completed sales</li>

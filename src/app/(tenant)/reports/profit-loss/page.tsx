@@ -1,13 +1,14 @@
 'use client'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Download, ArrowLeft, Info } from 'lucide-react'
+import { Download, Info, Receipt, TrendingUp, TrendingDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/shared/page-header'
+import { MetricCard } from '@/components/shared/ui-kit'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency } from '@/lib/utils'
 import { exportExcel } from '@/lib/export-excel'
 import { DateRangeBar } from '../_components/date-range-bar'
-import Link from 'next/link'
 import { ProfitLossCharts, type DailyPoint, type CategoryAmount } from './_components/pl-charts'
 
 interface TopSellerRow { name: string; quantity: number; revenue: number }
@@ -75,32 +76,26 @@ export default function ProfitLossReportPage() {
   })
 
   return (
-    <div className="p-6 space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/reports">
-            <button className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container transition-colors">
-              <ArrowLeft className="h-5 w-5" strokeWidth={3} />
-            </button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-on-surface">Profit & Loss</h1>
-            <p className="text-sm text-on-surface-variant mt-0.5">Revenue, costs and net profit analysis — completed jobs only, by completion date</p>
-          </div>
-        </div>
-        <Button size="sm" className="w-full sm:w-auto" onClick={() => data && exportPL(data, `pl-${dateFrom}-${dateTo}.xlsx`)} disabled={!data}>
-          <Download className="h-4 w-4" /> Export Excel
-        </Button>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="Profit & Loss"
+        description="Revenue, costs and net profit analysis — completed jobs only, by completion date"
+        back={{ href: '/reports', label: 'Back to Reports' }}
+        actions={
+          <Button size="sm" className="w-full sm:w-auto" onClick={() => data && exportPL(data, `pl-${dateFrom}-${dateTo}.xlsx`)} disabled={!data}>
+            <Download className="h-4 w-4" /> Export Excel
+          </Button>
+        }
+      />
 
       <DateRangeBar dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} onApply={refetch} />
 
       {loading && (
-        <div className="rounded-xl border border-outline-variant bg-surface p-8 text-center text-sm text-on-surface-variant">Loading…</div>
+        <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-8 text-center text-sm text-on-surface-variant">Loading…</div>
       )}
 
       {!loading && !data && (
-        <div className="flex h-32 items-center justify-center rounded-xl border border-outline-variant bg-surface text-sm text-on-surface-variant">
+        <div className="flex h-32 items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-lowest text-sm text-on-surface-variant">
           No profit/loss data for this period.
         </div>
       )}
@@ -108,18 +103,15 @@ export default function ProfitLossReportPage() {
       {data && (
         <>
           {/* KPI cards */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {[
-              { label: 'Total Revenue', value: data.total_revenue, color: 'text-blue-600', bg: 'bg-blue-50' },
-              { label: 'Total Costs',   value: data.total_costs,   color: 'text-red-600',  bg: 'bg-red-50' },
-              { label: 'Net Profit',    value: data.net_profit,    color: data.net_profit >= 0 ? 'text-green-600' : 'text-red-600', bg: data.net_profit >= 0 ? 'bg-green-50' : 'bg-red-50' },
-            ].map(({ label, value, color, bg }) => (
-              <div key={label} className="rounded-xl border border-outline-variant bg-surface p-4">
-                <div className={`inline-flex rounded-lg p-2 ${bg} mb-2`} />
-                <p className="text-sm text-on-surface-variant">{label}</p>
-                <p className={`mt-1 text-2xl font-bold sm:text-3xl ${color}`}>{formatCurrency(value)}</p>
-              </div>
-            ))}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <MetricCard label="Total Revenue" value={formatCurrency(data.total_revenue)} icon={Receipt} tone="bg-primary/10 text-primary" />
+            <MetricCard label="Total Costs" value={formatCurrency(data.total_costs)} icon={TrendingDown} tone="bg-red-500/10 text-red-600" />
+            <MetricCard
+              label="Net Profit"
+              value={formatCurrency(data.net_profit)}
+              icon={data.net_profit >= 0 ? TrendingUp : TrendingDown}
+              tone={data.net_profit >= 0 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-red-500/10 text-red-600'}
+            />
           </div>
 
           <ProfitLossCharts
@@ -134,7 +126,7 @@ export default function ProfitLossReportPage() {
           />
 
           {/* Breakdown */}
-          <div className="rounded-xl border border-outline-variant bg-surface p-5">
+          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
             <h3 className="mb-4 text-base font-semibold text-on-surface">Breakdown</h3>
             <div className="space-y-0 text-base divide-y divide-outline-variant/50">
               {([
@@ -157,14 +149,14 @@ export default function ProfitLossReportPage() {
                   <span className={indent === 2 ? 'pl-8 text-on-surface-variant text-sm' : indent === 1 ? 'pl-4 text-on-surface-variant' : 'text-on-surface'}>
                     {indent > 0 ? `— ${label}` : label}
                   </span>
-                  <span className={value < 0 ? 'text-red-600' : value > 0 ? 'text-green-700' : 'text-on-surface-variant'}>
+                  <span className={value < 0 ? 'text-red-600' : value > 0 ? 'text-emerald-600' : 'text-on-surface-variant'}>
                     {value < 0 ? `(${formatCurrency(Math.abs(value))})` : formatCurrency(value)}
                   </span>
                 </div>
               ))}
             </div>
             {!!data.expenses_excluded && (
-              <div className="mt-4 rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-3 text-xs text-on-surface-variant">
+              <div className="mt-4 rounded-xl border border-outline-variant bg-surface-container-low px-3 py-3 text-xs text-on-surface-variant">
                 <div className="flex items-start gap-2">
                   <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   <span>
@@ -184,7 +176,7 @@ export default function ProfitLossReportPage() {
               </div>
             )}
             {!!data.repair_lab_fees && (
-              <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+              <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2.5 text-xs text-amber-700">
                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
                 <span>
                   <strong>{formatCurrency(data.repair_lab_fees)}</strong> of this period&apos;s repair costs were paid to outside third-party labs (data recovery, chip-level repair, etc.) — a pass-through cost, not shop profit, already deducted from Gross/Net Profit above.
@@ -192,7 +184,7 @@ export default function ProfitLossReportPage() {
               </div>
             )}
             {data.repair_revenue_booked !== undefined && (
-              <div className="mt-4 flex items-start gap-2 rounded-lg bg-surface-container-lowest px-3 py-2.5 text-xs text-on-surface-variant">
+              <div className="mt-4 flex items-start gap-2 rounded-xl bg-surface-container-low px-3 py-2.5 text-xs text-on-surface-variant">
                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>
                   For reference — the Repairs module&apos;s own &quot;Revenue&quot; card for this same range (jobs <em>booked</em> in this window, including deposits on still-open jobs):{' '}
@@ -213,7 +205,7 @@ export default function ProfitLossReportPage() {
 
           {/* Loss detail */}
           {data.loss_breakdown && (
-            <div className="rounded-xl border border-outline-variant bg-surface p-5">
+            <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
               <h3 className="mb-4 text-base font-semibold text-on-surface">Loss Detail</h3>
               <div className="space-y-0 text-base divide-y divide-outline-variant/50">
                 {[
@@ -255,14 +247,14 @@ export default function ProfitLossReportPage() {
 
 function TopSellerTable({ title, rows }: { title: string; rows: TopSellerRow[] }) {
   return (
-    <div className="rounded-xl border border-outline-variant bg-surface p-5">
+    <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
       <h3 className="mb-4 text-base font-semibold text-on-surface">{title}</h3>
       {rows.length === 0 ? (
         <p className="py-6 text-center text-sm text-on-surface-variant">No sales in this period.</p>
       ) : (
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-xs uppercase text-on-surface-variant">
+            <tr className="text-left text-xs font-medium text-on-surface-variant">
               <th className="pb-2 font-medium">#</th>
               <th className="pb-2 font-medium">Name</th>
               <th className="pb-2 text-right font-medium">Qty Sold</th>
@@ -275,7 +267,7 @@ function TopSellerTable({ title, rows }: { title: string; rows: TopSellerRow[] }
                 <td className="py-2 text-on-surface-variant">{i + 1}</td>
                 <td className="py-2 text-on-surface">{row.name}</td>
                 <td className="py-2 text-right text-on-surface-variant">{row.quantity}</td>
-                <td className="py-2 text-right font-medium text-green-700">{formatCurrency(row.revenue)}</td>
+                <td className="py-2 text-right font-medium text-emerald-600">{formatCurrency(row.revenue)}</td>
               </tr>
             ))}
           </tbody>

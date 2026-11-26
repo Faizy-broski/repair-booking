@@ -1,14 +1,15 @@
 'use client'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Download, ArrowLeft } from 'lucide-react'
+import { Download, Receipt } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
+import { PageHeader } from '@/components/shared/page-header'
+import { MetricCard } from '@/components/shared/ui-kit'
 import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency } from '@/lib/utils'
 import { exportExcel } from '@/lib/export-excel'
 import { DateRangeBar } from '../_components/date-range-bar'
-import Link from 'next/link'
 import type { ColumnDef } from '@tanstack/react-table'
 
 interface TaxRow { tax_class: string; total_tax: number }
@@ -38,35 +39,28 @@ export default function TaxReportPage() {
   ]
 
   return (
-    <div className="p-6 space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/reports">
-            <button className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container transition-colors">
-              <ArrowLeft className="h-5 w-5" strokeWidth={3} />
-            </button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold text-on-surface">Tax Report</h1>
-            <p className="text-sm text-on-surface-variant mt-0.5">Tax collected by class for the selected period</p>
-          </div>
-        </div>
-        <Button size="sm" className="w-full sm:w-auto" onClick={() => data && exportExcel(data.rows as unknown as Record<string, unknown>[], `tax-${dateFrom}-${dateTo}.xlsx`)} disabled={!data}>
-          <Download className="h-4 w-4" /> Export Excel
-        </Button>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="Tax Report"
+        description="Tax collected by class for the selected period"
+        back={{ href: '/reports', label: 'Back to Reports' }}
+        actions={
+          <Button size="sm" className="w-full sm:w-auto" onClick={() => data && exportExcel(data.rows as unknown as Record<string, unknown>[], `tax-${dateFrom}-${dateTo}.xlsx`)} disabled={!data}>
+            <Download className="h-4 w-4" /> Export Excel
+          </Button>
+        }
+      />
 
       <DateRangeBar dateFrom={dateFrom} dateTo={dateTo} onFrom={setDateFrom} onTo={setDateTo} onApply={refetch} />
 
       {data && (
-        <div className="rounded-xl border border-outline-variant bg-surface p-4">
-          <p className="text-sm text-on-surface-variant">Total Tax Collected</p>
-          <p className="mt-1 text-2xl font-bold text-orange-600 sm:text-3xl">{formatCurrency(data.grand_total)}</p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <MetricCard label="Total Tax Collected" value={formatCurrency(data.grand_total)} icon={Receipt} tone="bg-primary/10 text-primary" />
         </div>
       )}
 
       {!loading && !data && (
-        <div className="flex h-32 items-center justify-center rounded-xl border border-outline-variant bg-surface text-sm text-on-surface-variant">
+        <div className="flex h-32 items-center justify-center rounded-2xl border border-outline-variant bg-surface-container-lowest text-sm text-on-surface-variant">
           No tax data for this period.
         </div>
       )}
@@ -74,7 +68,7 @@ export default function TaxReportPage() {
       {data && (
         <>
           <DataTable data={data.rows} columns={columns} isLoading={loading} emptyMessage="No tax data." />
-          <div className="flex justify-end rounded-xl border border-outline-variant bg-surface px-4 py-3">
+          <div className="flex justify-end rounded-2xl border border-outline-variant bg-surface-container-lowest px-5 py-3.5">
             <span className="text-base font-semibold text-on-surface">Grand Total: {formatCurrency(data.grand_total)}</span>
           </div>
         </>

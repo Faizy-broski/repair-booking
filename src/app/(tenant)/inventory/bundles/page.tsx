@@ -113,7 +113,7 @@ export default function BundlesPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-on-surface">Product Bundles</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-on-surface">Product Bundles</h1>
           <p className="text-sm text-on-surface-variant">{bundles.length} bundles</p>
         </div>
         <Button onClick={() => openModal()}>
@@ -123,7 +123,7 @@ export default function BundlesPage() {
 
       <div className="divide-y rounded-xl border border-outline-variant bg-surface">
         {loading ? (
-          [1,2,3].map((i) => <div key={i} className="h-16 animate-pulse bg-surface-container-low m-2 rounded-lg" />)
+          [1,2,3].map((i) => <div key={i} className="h-16 animate-pulse bg-surface-container-low m-2 rounded-xl" />)
         ) : bundles.length === 0 ? (
           <div className="py-16 text-center">
             <Package2 className="mx-auto h-8 w-8 text-outline-variant" />
@@ -142,7 +142,7 @@ export default function BundlesPage() {
                   {b.description && <p className="text-xs text-outline mt-0.5">{b.description}</p>}
                   <div className="mt-1 flex flex-wrap gap-1">
                     {b.product_bundle_items.map((item) => (
-                      <span key={item.id} className="rounded bg-surface-container px-2 py-0.5 text-xs text-on-surface-variant">
+                      <span key={item.id} className="rounded-xl bg-surface-container px-2 py-0.5 text-xs text-on-surface-variant">
                         {item.products?.name} ×{item.quantity}
                       </span>
                     ))}
@@ -177,7 +177,7 @@ export default function BundlesPage() {
             <input
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
+              className="h-9 w-full rounded-xl border border-outline-variant px-3 text-sm"
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -187,7 +187,7 @@ export default function BundlesPage() {
                 type="number" min="0" step="0.01"
                 value={form.bundle_price}
                 onChange={(e) => setForm((f) => ({ ...f, bundle_price: Number(e.target.value) }))}
-                className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
+                className="h-9 w-full rounded-xl border border-outline-variant px-3 text-sm"
               />
             </div>
             <div>
@@ -195,7 +195,7 @@ export default function BundlesPage() {
               <input
                 value={form.sku}
                 onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
-                className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
+                className="h-9 w-full rounded-xl border border-outline-variant px-3 text-sm"
               />
             </div>
           </div>
@@ -206,7 +206,7 @@ export default function BundlesPage() {
               <button
                 type="button"
                 onClick={() => setForm((f) => ({ ...f, items: [...f.items, { product_id: '', quantity: 1 }] }))}
-                className="text-xs text-blue-600 hover:underline"
+                className="text-xs text-primary hover:underline"
               >+ Add item</button>
             </div>
             <div className="space-y-2">
@@ -218,7 +218,7 @@ export default function BundlesPage() {
                       const u = [...form.items]; u[idx] = { ...u[idx], product_id: e.target.value }
                       setForm((f) => ({ ...f, items: u }))
                     }}
-                    className="h-8 flex-1 rounded-md border border-outline px-2 text-sm"
+                    className="h-8 flex-1 rounded-xl border border-outline-variant px-2 text-sm"
                   >
                     <option value="">Select product…</option>
                     {products.map((p) => (
@@ -232,7 +232,7 @@ export default function BundlesPage() {
                       const u = [...form.items]; u[idx] = { ...u[idx], quantity: Number(e.target.value) }
                       setForm((f) => ({ ...f, items: u }))
                     }}
-                    className="h-8 w-16 rounded-md border border-outline px-2 text-sm"
+                    className="h-8 w-16 rounded-xl border border-outline-variant px-2 text-sm"
                   />
                   {form.items.length > 1 && (
                     <button onClick={() => setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== idx) }))} className="text-outline hover:text-red-500">×</button>
@@ -243,14 +243,14 @@ export default function BundlesPage() {
           </div>
 
           {estimatedCost > 0 && (
-            <div className="rounded-lg bg-surface-container-low p-2 flex justify-between text-xs">
+            <div className="rounded-xl bg-surface-container-low p-2 flex justify-between text-xs">
               <span className="text-on-surface-variant">Individual total</span>
               <span className="text-on-surface-variant">{formatCurrency(estimatedCost)}</span>
             </div>
           )}
 
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))} className="rounded" />
+            <input type="checkbox" checked={form.is_active} onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))} className="rounded-xl" />
             Active
           </label>
           <Button className="w-full" onClick={save} loading={saving} disabled={!form.name || form.bundle_price <= 0 || !form.items.some((i) => i.product_id)}>

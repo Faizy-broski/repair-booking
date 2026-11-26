@@ -15,7 +15,7 @@ export default function TenantNotFound() {
       </div>
       <Link
         href="/dashboard"
-        className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-on-primary hover:bg-primary-dim"
       >
         Go to Dashboard
       </Link>

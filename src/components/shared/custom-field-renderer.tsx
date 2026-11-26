@@ -100,7 +100,7 @@ export function CustomFieldRenderer({
                     value={String(val ?? '')}
                     disabled={readOnly}
                     onChange={e => set(field.field_key, e.target.value)}
-                    className="h-9 w-full rounded-lg border border-outline bg-surface px-3 text-sm text-on-surface focus:border-brand-teal focus:outline-none disabled:bg-surface-container-low disabled:text-on-surface-variant"
+                    className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm text-on-surface focus:border-brand-teal focus:outline-none disabled:bg-surface-container-low disabled:text-on-surface-variant"
                   >
                     <option value="">� Select �</option>
                     {choices.map(c => (
@@ -114,7 +114,7 @@ export function CustomFieldRenderer({
                     disabled={readOnly}
                     onChange={e => set(field.field_key, e.target.value)}
                     required={field.is_required}
-                    className="w-full rounded-lg border border-outline px-3 py-2 text-sm text-on-surface focus:border-brand-teal focus:outline-none disabled:bg-surface-container-low disabled:text-on-surface-variant"
+                    className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-sm text-on-surface focus:border-brand-teal focus:outline-none disabled:bg-surface-container-low disabled:text-on-surface-variant"
                   />
                 ) : (
                   <input
@@ -129,7 +129,7 @@ export function CustomFieldRenderer({
                     disabled={readOnly}
                     onChange={e => set(field.field_key, e.target.value)}
                     required={field.is_required}
-                    className="h-9 w-full rounded-lg border border-outline px-3 text-sm text-on-surface focus:border-brand-teal focus:outline-none disabled:bg-surface-container-low disabled:text-on-surface-variant"
+                    className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm text-on-surface focus:border-brand-teal focus:outline-none disabled:bg-surface-container-low disabled:text-on-surface-variant"
                   />
                 )}
               </>

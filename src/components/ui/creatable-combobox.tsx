@@ -160,11 +160,11 @@ export function CreatableCombobox({
         onClick={openDropdown}
         disabled={disabled}
         className={cn(
-          'flex h-9 w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm transition-colors',
+          'flex h-10 w-full items-center justify-between rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-sm text-on-surface transition-colors',
           'focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20',
-          'disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400',
+          'disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-outline',
           open && 'border-brand-teal ring-2 ring-brand-teal/20',
-          !value && 'text-gray-400',
+          !value && 'text-outline',
         )}
       >
         <span className="truncate">{value ? selectedLabel : placeholder}</span>
@@ -173,7 +173,7 @@ export function CreatableCombobox({
             <span
               role="button"
               onClick={clearValue}
-              className="flex h-4 w-4 items-center justify-center rounded-full bg-gray-200 text-gray-500 transition-colors hover:bg-red-500 hover:text-white"
+              className="flex h-4 w-4 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant transition-colors hover:bg-red-500 hover:text-white"
             >
               <X className="h-2.5 w-2.5" />
             </span>
@@ -196,13 +196,13 @@ export function CreatableCombobox({
           onMouseDown={(e) => e.stopPropagation()}
           className={cn(
             inline
-              ? 'mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-md'
-              : 'absolute top-full left-0 z-50 mt-1 w-full min-w-[220px] rounded-lg border border-gray-200 bg-white shadow-xl',
+              ? 'mt-1 w-full rounded-xl border border-outline-variant bg-surface-container-lowest shadow-md'
+              : 'absolute top-full left-0 z-50 mt-1 w-full min-w-[220px] rounded-xl border border-outline-variant bg-surface-container-lowest shadow-xl',
           )}
         >
 
           {/* Search input */}
-          <div className="border-b border-gray-100 p-2">
+          <div className="border-b border-outline-variant p-2">
             <input
               ref={searchRef}
               type="text"
@@ -210,7 +210,7 @@ export function CreatableCombobox({
               onChange={e => setQuery(e.target.value)}
               onKeyDown={onSearchKey}
               placeholder="Search or type to create..."
-              className="w-full rounded-md border border-gray-200 px-2.5 py-1.5 text-sm outline-none focus:border-brand-teal focus:ring-1 focus:ring-brand-teal/20"
+              className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-2.5 py-1.5 text-sm text-on-surface outline-none focus:border-brand-teal focus:ring-1 focus:ring-brand-teal/20"
             />
           </div>
 
@@ -218,7 +218,7 @@ export function CreatableCombobox({
           <ul className="max-h-52 overflow-y-auto p-1" role="listbox">
 
             {filtered.length === 0 && !showCreate && (
-              <li className="py-3 text-center text-xs text-gray-400">No options found</li>
+              <li className="py-3 text-center text-xs text-outline">No options found</li>
             )}
 
             {filtered.map(opt => {
@@ -237,7 +237,7 @@ export function CreatableCombobox({
 
               /* Delete confirm row */
               if (deleteId === opt.value) return (
-                <li key={opt.value} className="flex items-center gap-2 rounded-md bg-red-50 px-3 py-2">
+                <li key={opt.value} className="flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2">
                   <span className="min-w-0 flex-1 truncate text-sm text-red-700">Delete "{opt.label}"?</span>
                   <button
                     type="button"
@@ -250,7 +250,7 @@ export function CreatableCombobox({
                   <button
                     type="button"
                     onClick={cancelDelete}
-                    className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                    className="shrink-0 rounded p-1 text-outline hover:bg-surface-container hover:text-on-surface"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -259,13 +259,13 @@ export function CreatableCombobox({
 
               /* Normal row */
               return (
-                <li key={opt.value} className="group flex items-center rounded-md hover:bg-gray-50">
+                <li key={opt.value} className="group flex items-center rounded-lg hover:bg-surface-container-low">
                   <button
                     type="button"
                     role="option"
                     aria-selected={opt.value === value}
                     onClick={() => select(opt)}
-                    className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-sm text-gray-700"
+                    className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-sm text-on-surface"
                   >
                     <Check className={cn('h-3.5 w-3.5 shrink-0 text-brand-teal', opt.value !== value && 'invisible')} />
                     <span className="truncate">{opt.label}</span>
@@ -278,7 +278,7 @@ export function CreatableCombobox({
                           type="button"
                           title="Rename"
                           onClick={e => beginEdit(e, opt)}
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-500 transition-colors hover:bg-blue-100 hover:text-blue-700"
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary transition-colors hover:bg-primary/15"
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
@@ -288,7 +288,7 @@ export function CreatableCombobox({
                           type="button"
                           title="Delete"
                           onClick={e => beginDelete(e, opt)}
-                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-red-50 text-red-500 transition-colors hover:bg-red-100 hover:text-red-700"
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-red-500/10 text-red-500 transition-colors hover:bg-red-500/15 hover:text-red-600"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -301,12 +301,12 @@ export function CreatableCombobox({
 
             {/* Create option */}
             {showCreate && (
-              <li className="mt-1 border-t border-gray-100 pt-1">
+              <li className="mt-1 border-t border-outline-variant pt-1">
                 <button
                   type="button"
                   onClick={handleCreate}
                   disabled={creating}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-brand-teal transition-colors hover:bg-brand-teal/5 disabled:opacity-60"
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-brand-teal transition-colors hover:bg-brand-teal/5 disabled:opacity-60"
                 >
                   {creating
                     ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
@@ -351,7 +351,7 @@ function EditRow({
   }
 
   return (
-    <li className="flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1.5">
+    <li className="flex items-center gap-1 rounded-lg bg-primary/5 px-2 py-1.5">
       <input
         ref={inputRef}
         type="text"
@@ -362,14 +362,14 @@ function EditRow({
           if (e.key === 'Enter') { e.preventDefault(); handleSave() }
           if (e.key === 'Escape') { e.stopPropagation(); onCancel(e as any) }
         }}
-        className="min-w-0 flex-1 rounded border border-blue-300 px-2 py-0.5 text-sm outline-none focus:ring-1 focus:ring-blue-400"
+        className="min-w-0 flex-1 rounded border border-primary/40 bg-surface-container-lowest px-2 py-0.5 text-sm text-on-surface outline-none focus:ring-1 focus:ring-primary/40"
       />
       <button
         type="button"
         title="Save"
         onClick={handleSave}
         disabled={busy || !label.trim()}
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary text-on-primary transition-colors hover:bg-primary-dim disabled:opacity-50"
       >
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
       </button>
@@ -377,7 +377,7 @@ function EditRow({
         type="button"
         title="Cancel"
         onClick={onCancel}
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-700"
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-outline transition-colors hover:bg-surface-container hover:text-on-surface"
       >
         <X className="h-3.5 w-3.5" />
       </button>

@@ -5,6 +5,8 @@ import { Plus, Clock, LogIn, LogOut, DollarSign, CalendarDays, TrendingUp, Penci
 import * as Tabs from '@radix-ui/react-tabs'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/shared/page-header'
+import { EmptyState } from '@/components/shared/ui-kit'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/data-table'
@@ -493,15 +495,15 @@ function EmployeesPageInner() {
       return (
         <div className="flex items-center gap-2">
           {/* Status dot */}
-          <span className={`inline-block h-2 w-2 rounded-full shrink-0 ${isClockedIn ? 'bg-green-500' : 'bg-surface-container-highest'}`} />
+          <span className={`inline-block h-2 w-2 rounded-full shrink-0 ${isClockedIn ? 'bg-emerald-500' : 'bg-surface-container-highest'}`} />
           {/* Clock In */}
           <button
             onClick={() => !isClockedIn && !isLoading && handleClock(row.original.id, 'in')}
             disabled={isClockedIn || isLoading}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-all ${
               isClockedIn
-                ? 'bg-surface-container text-outline cursor-not-allowed opacity-50'
-                : 'bg-green-500 text-white hover:bg-green-600 shadow-sm'
+                ? 'bg-surface-container text-on-surface-variant cursor-not-allowed opacity-50'
+                : 'bg-emerald-600 text-white hover:bg-emerald-700'
             }`}
           >
             <LogIn className="h-3 w-3" /> In
@@ -510,10 +512,10 @@ function EmployeesPageInner() {
           <button
             onClick={() => isClockedIn && !isLoading && handleClock(row.original.id, 'out')}
             disabled={!isClockedIn || isLoading}
-            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-all ${
               !isClockedIn
-                ? 'bg-surface-container text-outline cursor-not-allowed opacity-50'
-                : 'bg-red-500 text-white hover:bg-red-600 shadow-sm'
+                ? 'bg-surface-container text-on-surface-variant cursor-not-allowed opacity-50'
+                : 'bg-red-600 text-white hover:bg-red-700'
             }`}
           >
             <LogOut className="h-3 w-3" /> Out
@@ -546,7 +548,7 @@ function EmployeesPageInner() {
     }},
     { id: 'hours', header: 'Hours Worked', cell: ({ row }) => {
       const duration = formatDuration(row.original.clock_in, row.original.clock_out, row.original.break_minutes)
-      return duration ?? <span className="text-outline">—</span>
+      return duration ?? <span className="text-on-surface-variant">—</span>
     }},
   ]
 
@@ -613,7 +615,7 @@ function EmployeesPageInner() {
       const gross = row.original.gross_pay ?? 0
       const deductions = row.original.purchase_deductions ?? 0
       const net = Math.max(0, gross - deductions)
-      return <span className="font-bold text-teal-700">{formatCurrency(net)}</span>
+      return <span className="font-semibold tabular-nums text-primary">{formatCurrency(net)}</span>
     }},
     { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => (
       <Badge variant={statusVariant(getValue() as string)}>{getValue() as string}</Badge>
@@ -646,7 +648,7 @@ function EmployeesPageInner() {
     )},
     { id: 'sale_customer', header: 'Customer', cell: ({ row }) => {
       const c = row.original.sale?.customers
-      return c ? `${c.first_name} ${c.last_name ?? ''}` : <span className="text-outline">Walk-in</span>
+      return c ? `${c.first_name} ${c.last_name ?? ''}` : <span className="text-on-surface-variant">Walk-in</span>
     }},
     { id: 'sale_items', header: 'Items Sold', cell: ({ row }) => {
       const items = row.original.sale?.sale_items
@@ -659,7 +661,7 @@ function EmployeesPageInner() {
       return sale ? formatCurrency(sale.total) : '—'
     }},
     { accessorKey: 'amount', header: 'Commission', cell: ({ getValue }) => (
-      <span className="font-semibold text-green-700">{formatCurrency(getValue() as number)}</span>
+      <span className="font-semibold tabular-nums text-emerald-600">{formatCurrency(getValue() as number)}</span>
     )},
     { accessorKey: 'status', header: 'Status', cell: ({ getValue }) => (
       <Badge variant={(getValue() as string) === 'paid' ? 'success' : 'warning'}>{getValue() as string}</Badge>
@@ -672,7 +674,7 @@ function EmployeesPageInner() {
           setCommEditStatus(row.original.status)
           setCommEditAmount(String(row.original.amount))
         }}
-        className="rounded-md p-1.5 text-outline hover:bg-surface-container hover:text-on-surface-variant transition-colors"
+        className="rounded-full p-1.5 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
         title="Edit commission"
       >
         <Pencil className="h-3.5 w-3.5" />
@@ -717,21 +719,20 @@ function EmployeesPageInner() {
   ] as const
 
   return (
-    <div className="space-y-0">
-      {/* ── Page header ── */}
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-on-surface">Employees</h1>
-          <p className="text-sm text-on-surface-variant mt-0.5">{totalEmployees} {totalEmployees === 1 ? 'employee' : 'employees'} across all roles</p>
-        </div>
-        <Button onClick={openCreateSheet} size="default">
-          <Plus className="h-4 w-4" /> Add Employee
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Employees"
+        description={`${totalEmployees} ${totalEmployees === 1 ? 'employee' : 'employees'} across all roles`}
+        actions={
+          <Button onClick={openCreateSheet} size="default">
+            <Plus className="h-4 w-4" /> Add Employee
+          </Button>
+        }
+      />
 
       <Tabs.Root value={activeTab} onValueChange={handleTabChange}>
         {/* ── Tab bar ── */}
-        <div className="border-b border-outline-variant mb-6">
+        <div className="mb-6 border-b border-outline-variant">
           <Tabs.List className="flex gap-0 overflow-x-auto no-scrollbar -mb-px">
             {TAB_DEFS.map(({ value, label, icon: Icon }) => (
               <Tabs.Trigger
@@ -740,8 +741,8 @@ function EmployeesPageInner() {
                 className={[
                   'group relative flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors outline-none',
                   'border-b-2 -mb-px',
-                  'data-[state=active]:border-brand-teal data-[state=active]:text-brand-teal',
-                  'data-[state=inactive]:border-transparent data-[state=inactive]:text-on-surface-variant data-[state=inactive]:hover:text-on-surface data-[state=inactive]:hover:border-outline',
+                  'data-[state=active]:border-primary data-[state=active]:text-primary',
+                  'data-[state=inactive]:border-transparent data-[state=inactive]:text-on-surface-variant data-[state=inactive]:hover:text-on-surface data-[state=inactive]:hover:border-outline-variant',
                 ].join(' ')}
               >
                 <Icon className="h-4 w-4 shrink-0" />
@@ -775,7 +776,7 @@ function EmployeesPageInner() {
               <select
                 value={clockMonthFilter}
                 onChange={e => setClockMonthFilter(e.target.value)}
-                className="h-9 rounded-lg border border-outline-variant px-3 text-sm focus:border-brand-teal focus:outline-none"
+                className="h-10 rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none"
               >
                 <option value="">All months</option>
                 {MONTH_NAMES.map((m, i) => (
@@ -788,7 +789,7 @@ function EmployeesPageInner() {
               <select
                 value={clockYearFilter}
                 onChange={e => setClockYearFilter(e.target.value)}
-                className="h-9 rounded-lg border border-outline-variant px-3 text-sm focus:border-brand-teal focus:outline-none"
+                className="h-10 rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none"
               >
                 <option value="">All years</option>
                 {[currentYear, currentYear - 1, currentYear - 2].map(y => (
@@ -802,9 +803,9 @@ function EmployeesPageInner() {
               </Button>
             )}
           </div>
-          <div className="mb-3 rounded-lg bg-blue-50 border border-blue-100 px-4 py-2 text-sm inline-block">
+          <div className="mb-3 inline-block rounded-xl bg-surface-container-low px-4 py-2 text-sm">
             <span className="text-on-surface-variant">Total hours worked (filtered): </span>
-            <span className="font-bold text-blue-700">{clockHistoryTotalLabel}</span>
+            <span className="font-semibold tabular-nums text-on-surface">{clockHistoryTotalLabel}</span>
           </div>
           <DataTable data={clockHistory} columns={clockColumns} isLoading={loadingClockHistory} emptyMessage="No attendance records found for this filter." />
         </Tabs.Content>
@@ -848,7 +849,7 @@ function EmployeesPageInner() {
               <select
                 value={commMonthFilter}
                 onChange={e => setCommMonthFilter(e.target.value)}
-                className="h-9 rounded-lg border border-outline-variant px-3 text-sm focus:border-brand-teal focus:outline-none"
+                className="h-10 rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none"
               >
                 <option value="">All months</option>
                 {MONTH_NAMES.map((m, i) => (
@@ -861,7 +862,7 @@ function EmployeesPageInner() {
               <select
                 value={commYearFilter}
                 onChange={e => setCommYearFilter(e.target.value)}
-                className="h-9 rounded-lg border border-outline-variant px-3 text-sm focus:border-brand-teal focus:outline-none"
+                className="h-10 rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none"
               >
                 <option value="">All years</option>
                 {[currentYear, currentYear - 1, currentYear - 2].map(y => (
@@ -874,9 +875,9 @@ function EmployeesPageInner() {
                 Clear Filters
               </Button>
             )}
-            <div className="ml-auto rounded-lg bg-green-50 border border-green-100 px-4 py-2 text-sm">
+            <div className="ml-auto rounded-xl bg-emerald-500/10 px-4 py-2 text-sm">
               <span className="text-on-surface-variant">Total commission: </span>
-              <span className="font-bold text-green-700">{formatCurrency(commissionsTotal)}</span>
+              <span className="font-semibold tabular-nums text-emerald-600">{formatCurrency(commissionsTotal)}</span>
             </div>
           </div>
           <DataTable data={commissions} columns={commColumns} isLoading={loadingCommissions} emptyMessage="No commissions recorded." />
@@ -899,45 +900,43 @@ function EmployeesPageInner() {
             {purchaseEmployeeFilter && (
               <Button size="sm" variant="outline" onClick={() => setPurchaseEmployeeFilter('')}>Clear</Button>
             )}
-            <div className="ml-auto rounded-lg bg-red-50 border border-red-100 px-4 py-2 text-sm">
+            <div className="ml-auto rounded-xl bg-red-500/10 px-4 py-2 text-sm">
               <span className="text-on-surface-variant">Total outstanding: </span>
-              <span className="font-bold text-red-700">
+              <span className="font-semibold tabular-nums text-red-600">
                 {formatCurrency(employeePurchases.filter(p => getPurchaseSettlementStatus(p) === 'pending').reduce((s, p) => s + Math.max(0, p.total - (p.amount_paid ?? 0)), 0))}
               </span>
             </div>
           </div>
 
-          <div className="mb-3 rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 text-xs text-blue-700">
+          <div className="mb-3 rounded-xl border border-outline-variant bg-surface-container-low px-3.5 py-2.5 text-xs text-on-surface-variant">
             Outstanding purchases are automatically deducted when a payroll period is marked <strong>Paid</strong>. Use <strong>Settle Directly</strong> only for out-of-payroll cash/card payments.
           </div>
 
           {loadingPurchases ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-outline" /></div>
+            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-on-surface-variant" /></div>
           ) : employeePurchases.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-outline-variant py-12 text-center text-sm text-outline">
-              No employee purchases found
-            </div>
+            <EmptyState title="No employee purchases found" />
           ) : (
-            <div className="divide-y divide-outline-variant rounded-xl border border-outline-variant overflow-hidden">
+            <div className="divide-y divide-outline-variant overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest">
               {employeePurchases.map(p => {
                 const outstanding = Math.max(0, p.total - (p.amount_paid ?? 0))
                 const settlementStatus = getPurchaseSettlementStatus(p)
                 const method = settleMethod[p.id] ?? 'cash'
                 return (
-                  <div key={p.id} className={`flex items-center gap-4 px-4 py-3 bg-surface hover:bg-surface-container-low/50 ${settlementStatus !== 'pending' ? 'opacity-60' : ''}`}>
+                  <div key={p.id} className={`flex items-center gap-4 px-4 py-3.5 hover:bg-surface-container-low ${settlementStatus !== 'pending' ? 'opacity-60' : ''}`}>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-semibold text-on-surface">
                           {p.employees ? `${p.employees.first_name} ${p.employees.last_name ?? ''}` : '—'}
                         </span>
                         {settlementStatus === 'payroll' && (
-                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700 font-medium">Settled via Payroll</span>
+                          <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-600">Settled via Payroll</span>
                         )}
                         {settlementStatus === 'direct' && (
-                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 font-medium">Settled Directly</span>
+                          <span className="rounded-full bg-blue-500/10 px-2.5 py-0.5 text-xs font-medium text-blue-600">Settled Directly</span>
                         )}
                         {settlementStatus === 'pending' && (
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 font-medium">Pending</span>
+                          <span className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-700">Pending</span>
                         )}
                       </div>
                       <p className="mt-0.5 text-xs text-on-surface-variant">
@@ -956,7 +955,7 @@ function EmployeesPageInner() {
                         <select
                           value={method}
                           onChange={e => setSettleMethod(prev => ({ ...prev, [p.id]: e.target.value as 'cash' | 'card' }))}
-                          className="h-7 rounded border border-outline-variant px-1.5 text-xs text-on-surface-variant focus:outline-none"
+                          className="h-8 rounded-full border border-outline-variant bg-surface-container-lowest px-3 text-xs text-on-surface-variant focus:border-primary focus:outline-none"
                         >
                           <option value="cash">Cash</option>
                           <option value="card">Card</option>
@@ -964,7 +963,7 @@ function EmployeesPageInner() {
                         <button
                           onClick={() => settlePurchase(p.id, outstanding, method)}
                           disabled={settlingPurchase === p.id}
-                          className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                          className="flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-on-primary transition-opacity hover:opacity-90 disabled:opacity-50"
                         >
                           {settlingPurchase === p.id
                             ? <Loader2 className="h-3 w-3 animate-spin" />
@@ -994,7 +993,7 @@ function EmployeesPageInner() {
       >
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {createError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{createError}</div>
+            <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-3.5 py-2 text-sm text-red-600">{createError}</div>
           )}
           <div className="grid grid-cols-2 gap-3">
             <Input label="First Name" required error={errors.first_name?.message} {...register('first_name')} />
@@ -1012,7 +1011,7 @@ function EmployeesPageInner() {
             <Input label="Monthly Base Salary" type="number" step="0.01" min="0" placeholder="0.00" {...register('base_salary')} />
             <Input label="Hourly Rate" type="number" step="0.01" min="0" placeholder="0.00" {...register('hourly_rate')} />
           </div>
-          <p className="text-xs text-outline -mt-2">Set one or both. Base salary is pro-rated for partial months.</p>
+          <p className="text-xs text-on-surface-variant -mt-2">Set one or both. Base salary is pro-rated for partial months.</p>
           <Button type="submit" className="w-full" loading={isSubmitting}>
             {editingEmployee ? 'Save Changes' : 'Add Employee'}
           </Button>
@@ -1042,8 +1041,8 @@ function EmployeesPageInner() {
                   onClick={() => setSelectedDays((prev) => prev.includes(i) ? prev.filter((d) => d !== i) : [...prev, i])}
                   className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                     selectedDays.includes(i)
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-surface text-on-surface-variant border-outline hover:border-blue-500'
+                      ? 'bg-primary text-on-primary border-primary'
+                      : 'bg-surface-container-lowest text-on-surface-variant border-outline-variant hover:border-primary'
                   }`}
                 >{day}</button>
               ))}
@@ -1095,7 +1094,7 @@ function EmployeesPageInner() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-1">Amount</label>
+            <label className="block text-sm font-medium text-on-surface-variant mb-1">Amount</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-on-surface-variant">{currency}</span>
               <input
@@ -1104,16 +1103,16 @@ function EmployeesPageInner() {
                 step="0.01"
                 value={commEditAmount}
                 onChange={(e) => setCommEditAmount(e.target.value)}
-                className="w-full rounded-lg border border-outline-variant bg-surface pl-10 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest pl-10 pr-3.5 text-sm focus:border-primary focus:outline-none"
               />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-on-surface-variant uppercase tracking-wide mb-1">Status</label>
+            <label className="block text-sm font-medium text-on-surface-variant mb-1">Status</label>
             <select
               value={commEditStatus}
               onChange={(e) => setCommEditStatus(e.target.value)}
-              className="w-full rounded-lg border border-outline-variant bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none"
             >
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>

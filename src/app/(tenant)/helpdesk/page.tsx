@@ -6,6 +6,7 @@ import { Eye, Pencil, Plus, Search, X, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
+import { PageHeader, FilterPills } from '@/components/shared/page-header'
 import { RichTextEditor } from '@/components/ui/rich-text-editor'
 import { useAuthStore } from '@/store/auth.store'
 import { cn } from '@/lib/utils'
@@ -53,19 +54,19 @@ const STATUSES = [
 
 /* ── Badge helpers ───────────────────────────────────────────── */
 const STATUS_STYLES: Record<string, string> = {
-  open:        'bg-blue-50 text-blue-700 ring-1 ring-blue-200',
-  in_progress: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200',
-  resolved:    'bg-green-50 text-green-700 ring-1 ring-green-200',
-  closed:      'bg-surface-container text-on-surface-variant ring-1 ring-outline-variant',
+  open:        'bg-blue-500/10 text-blue-600',
+  in_progress: 'bg-amber-500/10 text-amber-700',
+  resolved:    'bg-emerald-500/10 text-emerald-600',
+  closed:      'bg-surface-container text-on-surface-variant',
 }
 const STATUS_LABELS: Record<string, string> = {
   open: 'open', in_progress: 'in progress', resolved: 'resolved', closed: 'closed',
 }
 const PRIORITY_STYLES: Record<string, string> = {
-  low:    'bg-green-50 text-green-700 ring-1 ring-green-200',
-  medium: 'bg-yellow-50 text-yellow-700 ring-1 ring-yellow-200',
-  high:   'bg-orange-50 text-orange-700 ring-1 ring-orange-200',
-  urgent: 'bg-red-50 text-red-700 ring-1 ring-red-200',
+  low:    'bg-emerald-500/10 text-emerald-600',
+  medium: 'bg-amber-500/10 text-amber-700',
+  high:   'bg-orange-500/10 text-orange-600',
+  urgent: 'bg-red-500/10 text-red-600',
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -217,61 +218,50 @@ export default function HelpdeskPage() {
 
   /* ── Render ─────────────────────────────────────────────────── */
   return (
-    <div className="space-y-5 p-6">
+    <div className="space-y-6">
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-on-surface">Helpdesk Tickets</h1>
-          <p className="mt-0.5 text-sm text-on-surface-variant">Raise and track support requests with the platform team</p>
-        </div>
-        <Button onClick={() => { reset(); setDescription(''); setCreateOpen(true) }} className="bg-brand-teal hover:bg-brand-teal-dark">
-          <Plus className="h-4 w-4" /> New Ticket
-        </Button>
-      </div>
+      <PageHeader
+        title="Helpdesk Tickets"
+        description="Raise and track support requests with the platform team"
+        actions={
+          <Button onClick={() => { reset(); setDescription(''); setCreateOpen(true) }}>
+            <Plus className="h-4 w-4" /> New Ticket
+          </Button>
+        }
+      />
 
       {/* Filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-outline" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-on-surface-variant" />
           <input
             type="text"
             placeholder="Search tickets…"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(0) }}
-            className="w-full rounded-lg border border-outline-variant bg-surface py-2 pl-9 pr-3 text-sm focus:border-brand-teal focus:outline-none"
+            className="h-10 w-full rounded-full border border-outline-variant bg-surface-container-lowest pl-10 pr-4 text-sm focus:border-primary focus:outline-none"
           />
           {search && (
             <button onClick={() => { setSearch(''); setPage(0) }} className="absolute right-3 top-1/2 -translate-y-1/2">
-              <X className="h-3.5 w-3.5 text-outline" />
+              <X className="h-3.5 w-3.5 text-on-surface-variant" />
             </button>
           )}
         </div>
-        <div className="flex items-center gap-1 rounded-lg border border-outline-variant bg-surface p-1">
-          {STATUSES.map(({ value, label }) => (
-            <button
-              key={value}
-              onClick={() => { setStatusFilter(value); setPage(0) }}
-              className={cn(
-                'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-                statusFilter === value
-                  ? 'bg-brand-teal text-white shadow-sm'
-                  : 'text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface-variant'
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <FilterPills<string>
+          options={STATUSES.map((s) => ({ value: s.value, label: s.label }))}
+          value={statusFilter}
+          onChange={(v) => { setStatusFilter(v); setPage(0) }}
+        />
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface shadow-sm">
-        <table className="min-w-full divide-y divide-outline-variant">
-          <thead className="bg-surface-container-low">
+      <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest">
+        <table className="min-w-full">
+          <thead className="bg-primary">
             <tr>
               {['Ticket ID', 'Title', 'Category', 'Status', 'Priority', 'Created By', 'Actions'].map((h) => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-on-surface-variant">{h}</th>
+                <th key={h} className="whitespace-nowrap px-4 py-3.5 text-left text-[13px] font-medium text-white">{h}</th>
               ))}
             </tr>
           </thead>
@@ -286,15 +276,15 @@ export default function HelpdeskPage() {
               ))
             ) : tickets.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-sm text-outline">
+                <td colSpan={7} className="px-4 py-12 text-center text-sm text-on-surface-variant">
                   No tickets found. Raise a new ticket to get support.
                 </td>
               </tr>
             ) : (
               tickets.map((t) => (
-                <tr key={t.id} className="hover:bg-surface-container-low transition-colors">
+                <tr key={t.id} className="transition-colors hover:bg-surface-container-low">
                   <td className="px-4 py-3">
-                    <button onClick={() => setViewTicket(t)} className="font-mono text-sm font-semibold text-brand-teal hover:underline">
+                    <button onClick={() => setViewTicket(t)} className="font-mono text-sm font-semibold text-primary hover:underline">
                       #{String(t.ticket_number).padStart(8, '0')}
                     </button>
                   </td>
@@ -307,10 +297,10 @@ export default function HelpdeskPage() {
                   <td className="px-4 py-3 text-sm text-on-surface-variant">{t.profiles?.full_name ?? 'You'}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <button onClick={() => setViewTicket(t)} title="View" className="text-brand-teal hover:text-brand-teal-dark">
+                      <button onClick={() => setViewTicket(t)} title="View" className="text-primary hover:text-primary">
                         <Eye className="h-4 w-4" />
                       </button>
-                      <button onClick={() => openEdit(t)} title="Edit" className="text-blue-500 hover:text-blue-700">
+                      <button onClick={() => openEdit(t)} title="Edit" className="text-on-surface-variant hover:text-primary">
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button onClick={() => setDeleteTarget(t)} title="Delete" className="text-red-400 hover:text-red-600">
@@ -345,7 +335,7 @@ export default function HelpdeskPage() {
             <input
               {...register('title', { required: 'Title is required' })}
               placeholder="Enter ticket title"
-              className={cn('w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:border-brand-teal', errors.title ? 'border-red-400' : 'border-outline-variant')}
+              className={cn('h-10 w-full rounded-xl border px-3.5 text-sm focus:outline-none focus:border-primary', errors.title ? 'border-red-400' : 'border-outline-variant')}
             />
             {errors.title && <p className="mt-1 text-xs text-red-500">{errors.title.message}</p>}
           </div>
@@ -353,20 +343,20 @@ export default function HelpdeskPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-on-surface-variant">Category</label>
-              <select {...register('category')} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-brand-teal focus:outline-none">
+              <select {...register('category')} className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none">
                 {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-on-surface-variant">Priority</label>
-              <select {...register('priority')} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-brand-teal focus:outline-none">
+              <select {...register('priority')} className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none">
                 {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button type="submit" loading={submitting} className="bg-brand-teal hover:bg-brand-teal-dark">Create</Button>
+            <Button type="submit" loading={submitting}>Create</Button>
           </div>
         </form>
       </Modal>
@@ -378,15 +368,15 @@ export default function HelpdeskPage() {
             <div className="flex items-center gap-2 flex-wrap">
               <StatusBadge status={viewTicket.status} />
               <PriorityBadge priority={viewTicket.priority} />
-              <span className="text-xs text-outline">{viewTicket.category}</span>
+              <span className="text-xs text-on-surface-variant">{viewTicket.category}</span>
             </div>
             <h3 className="text-base font-semibold text-on-surface">{viewTicket.title}</h3>
             {viewTicket.description ? (
-              <div className="helpdesk-body rounded-lg bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant" dangerouslySetInnerHTML={{ __html: viewTicket.description }} />
+              <div className="helpdesk-body rounded-xl bg-surface-container-low px-4 py-3 text-sm text-on-surface-variant" dangerouslySetInnerHTML={{ __html: viewTicket.description }} />
             ) : (
-              <p className="text-sm text-outline italic">No description provided.</p>
+              <p className="text-sm italic text-on-surface-variant">No description provided.</p>
             )}
-            <div className="flex items-center justify-between text-xs text-outline border-t border-outline-variant pt-3">
+            <div className="flex items-center justify-between text-xs text-on-surface-variant border-t border-outline-variant pt-3">
               <span>Raised by {viewTicket.profiles?.full_name ?? 'You'}</span>
               <span>{new Date(viewTicket.created_at).toLocaleString()}</span>
             </div>
@@ -411,7 +401,7 @@ export default function HelpdeskPage() {
               <label className="mb-1 block text-sm font-medium text-on-surface-variant">Title <span className="text-red-500">*</span></label>
               <input
                 {...regEdit('title', { required: 'Title is required' })}
-                className={cn('w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:border-brand-teal', editErrors.title ? 'border-red-400' : 'border-outline-variant')}
+                className={cn('h-10 w-full rounded-xl border px-3.5 text-sm focus:outline-none focus:border-primary', editErrors.title ? 'border-red-400' : 'border-outline-variant')}
               />
               {editErrors.title && <p className="mt-1 text-xs text-red-500">{editErrors.title.message}</p>}
             </div>
@@ -419,19 +409,19 @@ export default function HelpdeskPage() {
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="mb-1 block text-sm font-medium text-on-surface-variant">Category</label>
-                <select {...regEdit('category')} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-brand-teal focus:outline-none">
+                <select {...regEdit('category')} className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none">
                   {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-on-surface-variant">Priority</label>
-                <select {...regEdit('priority')} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-brand-teal focus:outline-none">
+                <select {...regEdit('priority')} className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none">
                   {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                 </select>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-on-surface-variant">Status</label>
-                <select value={editStatus} onChange={(e) => setEditStatus(e.target.value as Ticket['status'])} className="w-full rounded-lg border border-outline-variant px-3 py-2 text-sm focus:border-brand-teal focus:outline-none">
+                <select value={editStatus} onChange={(e) => setEditStatus(e.target.value as Ticket['status'])} className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none">
                   <option value="open">Open</option>
                   <option value="in_progress">In Progress</option>
                   <option value="resolved">Resolved</option>
@@ -441,7 +431,7 @@ export default function HelpdeskPage() {
             </div>
             <div className="flex justify-end gap-2 pt-1">
               <Button type="button" variant="outline" onClick={() => setEditTicket(null)}>Cancel</Button>
-              <Button type="submit" loading={submitting} className="bg-brand-teal hover:bg-brand-teal-dark">Save Changes</Button>
+              <Button type="submit" loading={submitting}>Save Changes</Button>
             </div>
           </form>
         </Modal>

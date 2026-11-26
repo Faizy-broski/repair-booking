@@ -19,6 +19,8 @@ import { RepairSlipModal } from '@/components/repairs/slip-modal'
 import { CustomFieldRenderer, useCustomFieldDefs } from '@/components/shared/custom-field-renderer'
 import { PatternLock } from '@/components/ui/pattern-lock'
 import { toast } from 'sonner'
+import { PageHeader } from '@/components/shared/page-header'
+import { repairStatusChip } from '@/components/repairs/repair-status-chip'
 
 
 interface Technician {
@@ -348,40 +350,40 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 shrink-0 text-on-surface-variant hover:text-on-surface">
-            <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
-          </Button>
-          <div className="flex-1 min-w-0">
-            <h1 className="truncate text-lg font-bold text-on-surface sm:text-xl">Job #{repair.job_number}</h1>
-            <p className="text-xs text-on-surface-variant sm:text-sm">{formatDateTime(repair.created_at)}</p>
-          </div>
-          {(() => {
-            const sc = customStatuses.find((cs) => cs.name === repair.status)
-            return (
-              <span
-                className="shrink-0 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold text-white sm:px-3 sm:text-xs"
-                style={{ backgroundColor: sc?.color ?? '#9ca3af' }}
-              >
-                {repair.status}
-              </span>
-            )
-          })()}
-          <Button variant="outline" onClick={() => setInvoiceModalOpen(true)} size="sm" className="shrink-0">
-            <Receipt className="h-4 w-4" />
-            <span className="hidden sm:inline">Invoice</span>
-          </Button>
-          <Button variant="outline" onClick={() => setSlipOpen(true)} size="sm" className="shrink-0">
-            <Printer className="h-4 w-4" />
-            <span className="hidden sm:inline">Print Slip</span>
-          </Button>
-          <Button onClick={() => setStatusModalOpen(true)} size="sm" className="shrink-0">
-            <Edit className="h-4 w-4" />
-            <span className="hidden sm:inline">Update Status</span>
-          </Button>
-        </div>
-        <div className="pl-10">
+      <div className="space-y-3">
+        <PageHeader
+          title={`Job #${repair.job_number}`}
+          description={formatDateTime(repair.created_at)}
+          actions={
+            <>
+              <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 shrink-0 text-on-surface-variant hover:text-on-surface">
+                <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
+              </Button>
+              {(() => {
+                const sc = customStatuses.find((cs) => cs.name === repair.status)
+                return (
+                  <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${repairStatusChip(repair.status)}`}>
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" style={sc?.color ? { backgroundColor: sc.color } : undefined} />
+                    {repair.status}
+                  </span>
+                )
+              })()}
+              <Button variant="outline" onClick={() => setInvoiceModalOpen(true)} size="sm" className="shrink-0">
+                <Receipt className="h-4 w-4" />
+                <span className="hidden sm:inline">Invoice</span>
+              </Button>
+              <Button variant="outline" onClick={() => setSlipOpen(true)} size="sm" className="shrink-0">
+                <Printer className="h-4 w-4" />
+                <span className="hidden sm:inline">Print Slip</span>
+              </Button>
+              <Button onClick={() => setStatusModalOpen(true)} size="sm" className="shrink-0">
+                <Edit className="h-4 w-4" />
+                <span className="hidden sm:inline">Update Status</span>
+              </Button>
+            </>
+          }
+        />
+        <div>
           <LabelPicker repairId={repair.id} selectedIds={labelIds} onChange={setLabelIds} />
         </div>
       </div>
@@ -483,9 +485,9 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
               return <InfoRow label="Balance due" value={formatCurrency(balanceDue)} />
             })()}
             {repair.lab_fee > 0 && (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs">
+              <div className="flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs">
                 <FlaskConical className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-                <span className="text-amber-900">
+                <span className="text-amber-700">
                   <span className="font-semibold">{isTyreShop ? 'Outsourced Cost' : 'Lab / 3rd-Party Fee'}: {formatCurrency(repair.lab_fee)}</span>
                   <br />
                   Paid to an outsourced {isTyreShop ? 'job' : 'lab'} — deducted from business revenue/profit in reports, not part of the customer&apos;s balance above.
@@ -516,7 +518,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
             {repair.profiles?.full_name && (
               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                 <span className="w-24 shrink-0 text-outline">Booked by</span>
-                <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
+                <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
                   {repair.profiles.full_name}
                 </span>
               </div>
@@ -529,7 +531,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
                   value={repair.assigned_to ?? ''}
                   onChange={(e) => assignTechnician(e.target.value || null)}
                   disabled={assigningTech}
-                  className="h-8 min-w-0 flex-1 rounded-md border border-outline-variant bg-surface px-2 text-sm text-on-surface-variant focus:border-blue-500 focus:outline-none disabled:opacity-50"
+                  className="h-8 min-w-0 flex-1 rounded-md border border-outline-variant bg-surface px-2 text-sm text-on-surface-variant focus:border-primary focus:outline-none disabled:opacity-50"
                 >
                   <option value="">— Unassigned —</option>
                   {technicians.map((t) => (
@@ -555,7 +557,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
                   setStaffNoteDraft((repair.custom_fields?.staff_note as string | null) ?? '')
                   setEditingNotes(true)
                 }}
-                className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                className="flex items-center gap-1 text-xs text-primary hover:underline"
               >
                 <Edit className="h-3 w-3" /> Edit
               </button>
@@ -565,23 +567,23 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
             {editingNotes ? (
               <>
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-outline">Customer Note (Public)</label>
+                  <label className="text-xs font-medium text-on-surface-variant">Customer Note (Public)</label>
                   <textarea
                     rows={2}
                     value={customerNoteDraft}
                     onChange={(e) => setCustomerNoteDraft(e.target.value)}
                     placeholder="Visible to customer…"
-                    className="mt-1 w-full resize-none rounded-md border border-blue-200 bg-surface px-2.5 py-1.5 text-sm text-on-surface placeholder:text-outline transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400/20"
+                    className="mt-1 w-full resize-none rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm text-on-surface placeholder:text-outline transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-outline">Staff Note (Internal)</label>
+                  <label className="text-xs font-medium text-on-surface-variant">Staff Note (Internal)</label>
                   <textarea
                     rows={2}
                     value={staffNoteDraft}
                     onChange={(e) => setStaffNoteDraft(e.target.value)}
                     placeholder="Internal only…"
-                    className="mt-1 w-full resize-none rounded-md border border-amber-200 bg-surface px-2.5 py-1.5 text-sm text-on-surface placeholder:text-outline transition focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20"
+                    className="mt-1 w-full resize-none rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm text-on-surface placeholder:text-outline transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
                 <div className="flex justify-end gap-2">
@@ -593,14 +595,14 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
               <>
                 {repair.custom_fields?.customer_note && (
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-outline">Customer Note (Public)</label>
-                    <p className="mt-1 rounded-lg border border-blue-100 bg-blue-50/50 p-2 text-on-surface">{repair.custom_fields.customer_note}</p>
+                    <label className="text-xs font-medium text-on-surface-variant">Customer Note (Public)</label>
+                    <p className="mt-1 rounded-xl bg-surface-container-low p-3 text-on-surface">{repair.custom_fields.customer_note}</p>
                   </div>
                 )}
                 {repair.custom_fields?.staff_note && (
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-outline">Staff Note (Internal)</label>
-                    <p className="mt-1 rounded-lg border border-amber-100 bg-amber-50/50 p-2 text-on-surface">{repair.custom_fields.staff_note}</p>
+                    <label className="text-xs font-medium text-on-surface-variant">Staff Note (Internal)</label>
+                    <p className="mt-1 rounded-xl bg-surface-container-low p-3 text-on-surface">{repair.custom_fields.staff_note}</p>
                   </div>
                 )}
               </>
@@ -677,16 +679,14 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
           <div className="space-y-3">
             {repair.repair_status_history.map((h) => (
               <div key={h.id} className="flex items-start gap-3 text-sm">
-                <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+                <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     {(() => {
                       const sc = customStatuses.find((cs) => cs.name === h.new_status)
                       return (
-                        <span
-                          className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold text-white"
-                          style={{ backgroundColor: sc?.color ?? '#9ca3af' }}
-                        >
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${repairStatusChip(h.new_status)}`}>
+                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" style={sc?.color ? { backgroundColor: sc.color } : undefined} />
                           {h.new_status}
                         </span>
                       )
@@ -731,7 +731,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
                       <span className={`text-xs font-medium ${
                         daysLeft === null ? 'text-outline' :
                         daysLeft > 30 ? 'text-green-600' :
-                        daysLeft > 0 ? 'text-yellow-600' : 'text-red-600'
+                        daysLeft > 0 ? 'text-amber-600' : 'text-red-600'
                       }`}>
                         {daysLeft === null
                           ? `${item.warranty_days}d (starts on collection)`
@@ -791,7 +791,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
                   <button
                     type="button"
                     onClick={() => setShowCannedPicker((v) => !v)}
-                    className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                    className="flex items-center gap-1 text-xs text-primary hover:underline"
                   >
                     <BookOpen className="h-3 w-3" /> Use template
                   </button>
@@ -820,7 +820,7 @@ export default function RepairDetailPage({ params }: { params: Promise<{ id: str
               value={statusNote}
               onChange={(e) => setStatusNote(e.target.value)}
               placeholder="Describe the update..."
-              className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-primary focus:outline-none"
             />
           </div>
           <Button className="w-full" loading={updating} onClick={updateStatus}>

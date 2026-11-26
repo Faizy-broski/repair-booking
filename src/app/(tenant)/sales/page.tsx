@@ -3,7 +3,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Mail } from 'lucide-react'
 import { WhatsAppIcon, sendWhatsAppFromUrl, sendEmailFromUrl, SendDocumentActions } from '@/components/shared/send-document-actions'
-import { Eye, X, Download, Printer, Loader2, Trash2, RotateCcw, RefreshCw, Pencil, MoreVertical, Package, DollarSign, ArrowLeftRight, Search, Plus, Minus, ChevronRight, ChevronLeft } from 'lucide-react'
+import { Eye, X, Download, Printer, Loader2, Trash2, RotateCcw, RefreshCw, Pencil, MoreVertical, Package, DollarSign, ArrowLeftRight, Search, Plus, Minus, ChevronRight, ChevronLeft, Hash, TrendingUp, ArrowDownLeft, ArrowUpRight, CreditCard, Receipt } from 'lucide-react'
+import { PageHeader } from '@/components/shared/page-header'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/shared/data-table'
@@ -80,14 +81,14 @@ const PURPOSE_LABELS: Record<string, string> = {
   plain: 'Plain', expense: 'Expense', buyback: 'Buyback', trade_in: 'Trade-In', gift_card_sale: 'Gift Card Sale',
 }
 const STATUS_COLORS: Record<string, string> = {
-  paid: 'bg-green-100 text-green-800',
-  refunded: 'bg-red-100 text-red-800',
-  partial: 'bg-orange-100 text-orange-700',
-  on_account: 'bg-purple-100 text-purple-700',
-  exchange: 'bg-indigo-100 text-indigo-700',
-  exchange_return: 'bg-orange-100 text-orange-700',
-  cash_in: 'bg-teal-100 text-teal-800',
-  cash_out: 'bg-rose-100 text-rose-700',
+  paid: 'bg-emerald-500/10 text-emerald-600',
+  refunded: 'bg-red-500/10 text-red-600',
+  partial: 'bg-amber-500/10 text-amber-600',
+  on_account: 'bg-violet-500/10 text-violet-600',
+  exchange: 'bg-blue-500/10 text-primary',
+  exchange_return: 'bg-amber-500/10 text-amber-600',
+  cash_in: 'bg-primary/10 text-primary',
+  cash_out: 'bg-amber-500/10 text-amber-600',
 }
 
 function getRowBadge(row: SaleRow): { label: string; cls: string } {
@@ -812,7 +813,7 @@ export default function SalesPage() {
         return (
           <button
             onClick={() => viewDetail(sale)}
-            className="cursor-pointer font-mono text-xs text-teal-700 underline-offset-2 hover:underline"
+            className="cursor-pointer font-mono text-xs text-primary underline-offset-2 hover:underline"
           >
             {label}
           </button>
@@ -851,7 +852,7 @@ export default function SalesPage() {
       cell: ({ row }) => {
         const rt = row.original.record_type
         const isNegative = row.original.is_refund || rt === 'cash_out'
-        const colorCls = rt === 'cash_in' ? 'text-teal-700' : isNegative ? 'text-red-600' : ''
+        const colorCls = rt === 'cash_in' ? 'text-primary' : isNegative ? 'text-red-600' : ''
         return (
           <span className={colorCls}>
             {isNegative ? '-' : ''}{formatCurrency(Math.abs(Number(row.original.total)))}
@@ -865,7 +866,8 @@ export default function SalesPage() {
       cell: ({ row }) => {
         const badge = getRowBadge(row.original)
         return (
-          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${badge.cls}`}>
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${badge.cls}`}>
+            <span className="h-1.5 w-1.5 rounded-full bg-current" />
             {badge.label}
           </span>
         )
@@ -910,7 +912,7 @@ export default function SalesPage() {
                       onSelect={() => handleDeleteSale(sale.id)}
                       className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-red-50"
                     >
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-red-100 transition-colors group-hover:bg-red-200">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-red-500/10 transition-colors group-hover:bg-red-500/15">
                         <Trash2 className="h-3.5 w-3.5 text-red-600" />
                       </span>
                       <span className="font-medium text-red-600">Delete</span>
@@ -924,12 +926,12 @@ export default function SalesPage() {
                 {!isCash && canDelete && !sale.is_refund && (
                   <DropdownMenu.Item
                     onSelect={() => { setDetailId(sale.id); setPendingEdit(true) }}
-                    className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-blue-50"
+                    className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-primary/5"
                   >
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-blue-100 transition-colors group-hover:bg-blue-200">
-                      <Pencil className="h-3.5 w-3.5 text-blue-600" />
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 transition-colors group-hover:bg-primary/15">
+                      <Pencil className="h-3.5 w-3.5 text-primary" />
                     </span>
-                    <span className="font-medium text-blue-700">Edit Sale</span>
+                    <span className="font-medium text-primary">Edit Sale</span>
                   </DropdownMenu.Item>
                 )}
 
@@ -939,7 +941,7 @@ export default function SalesPage() {
                     onSelect={() => { setDetailId(sale.id); setPendingRefund(true) }}
                     className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-amber-50"
                   >
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-100 transition-colors group-hover:bg-amber-200">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-500/10 transition-colors group-hover:bg-amber-500/15">
                       <RotateCcw className="h-3.5 w-3.5 text-amber-600" />
                     </span>
                     <span className="font-medium text-amber-700">Process Refund</span>
@@ -950,24 +952,24 @@ export default function SalesPage() {
                 {!isCash && canDelete && !sale.is_refund && !sale.is_exchange && sale.payment_status !== 'refunded' && (
                   <DropdownMenu.Item
                     onSelect={() => { setDetailId(sale.id); setPendingExchange(true) }}
-                    className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-indigo-50"
+                    className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-primary/5"
                   >
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-indigo-100 transition-colors group-hover:bg-indigo-200">
-                      <ArrowLeftRight className="h-3.5 w-3.5 text-indigo-600" />
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 transition-colors group-hover:bg-primary/15">
+                      <ArrowLeftRight className="h-3.5 w-3.5 text-primary" />
                     </span>
-                    <span className="font-medium text-indigo-700">Exchange Items</span>
+                    <span className="font-medium text-primary">Exchange Items</span>
                   </DropdownMenu.Item>
                 )}
                 {/* Exchange sale row — shortcut back to original sale */}
                 {!isCash && canDelete && sale.is_exchange && sale.exchange_original_id && (
                   <DropdownMenu.Item
                     onSelect={() => { setDetailId(sale.exchange_original_id!); setPendingExchange(true) }}
-                    className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-indigo-50"
+                    className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-primary/5"
                   >
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-indigo-100 transition-colors group-hover:bg-indigo-200">
-                      <ArrowLeftRight className="h-3.5 w-3.5 text-indigo-600" />
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 transition-colors group-hover:bg-primary/15">
+                      <ArrowLeftRight className="h-3.5 w-3.5 text-primary" />
                     </span>
-                    <span className="font-medium text-indigo-700">Exchange More Items</span>
+                    <span className="font-medium text-primary">Exchange More Items</span>
                   </DropdownMenu.Item>
                 )}
 
@@ -1009,7 +1011,7 @@ export default function SalesPage() {
                     className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-on-surface-variant outline-none transition-colors hover:bg-surface-container-low"
                   >
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-surface-container transition-colors group-hover:bg-surface-container-high">
-                      <Mail className="h-3.5 w-3.5 text-blue-600" />
+                      <Mail className="h-3.5 w-3.5 text-primary" />
                     </span>
                     <span className="font-medium">Send via Email</span>
                   </DropdownMenu.Item>
@@ -1023,7 +1025,7 @@ export default function SalesPage() {
                       onSelect={() => handleDeleteSale(sale.id)}
                       className="group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-red-50"
                     >
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-red-100 transition-colors group-hover:bg-red-200">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-red-500/10 transition-colors group-hover:bg-red-500/15">
                         <Trash2 className="h-3.5 w-3.5 text-red-600" />
                       </span>
                       <span className="font-medium text-red-600">Delete Sale</span>
@@ -1043,35 +1045,37 @@ export default function SalesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Sales</h1>
-          <p className="text-sm text-on-surface-variant">View all POS transactions</p>
-        </div>
-        <Button variant="outline" size="sm" onClick={refreshSales} disabled={isFetching}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-          {isFetching ? 'Refreshing…' : 'Refresh'}
-        </Button>
-      </div>
+      <PageHeader
+        title="Sales"
+        description="View all POS transactions"
+        actions={
+          <Button variant="outline" onClick={refreshSales} disabled={isFetching}>
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+            {isFetching ? 'Refreshing…' : 'Refresh'}
+          </Button>
+        }
+      />
 
       {/* Summary cards */}
       <div className={`grid grid-cols-2 gap-4 ${isRetailTemplate ? 'sm:grid-cols-4 lg:grid-cols-8' : 'sm:grid-cols-3 lg:grid-cols-6'}`}>
-        <SummaryCard label="Total Sales" value={String(summary.totalSales)} />
-        <SummaryCard label="Revenue" value={formatCurrency(summary.totalRevenue)} className="text-green-600" />
-        <SummaryCard label="Refunds" value={String(summary.refundCount)} />
-        <SummaryCard label="Refund Amount" value={formatCurrency(summary.totalRefunds)} className="text-red-600" />
-        <SummaryCard label="Cash In" value={formatCurrency(summary.cashInTotal)} className="text-teal-700" />
-        <SummaryCard label="Cash Out" value={formatCurrency(summary.cashOutTotal)} className="text-rose-600" />
+        <SummaryCard label="Total Sales" value={String(summary.totalSales)} icon={<Hash />} tone="bg-primary/10 text-primary" />
+        <SummaryCard label="Revenue" value={formatCurrency(summary.totalRevenue)} icon={<TrendingUp />} tone="bg-emerald-500/10 text-emerald-600" />
+        <SummaryCard label="Refunds" value={String(summary.refundCount)} icon={<RotateCcw />} tone="bg-red-500/10 text-red-600" />
+        <SummaryCard label="Refund Amount" value={formatCurrency(summary.totalRefunds)} icon={<RotateCcw />} tone="bg-red-500/10 text-red-600" />
+        <SummaryCard label="Cash In" value={formatCurrency(summary.cashInTotal)} icon={<ArrowDownLeft />} tone="bg-blue-500/10 text-primary" />
+        <SummaryCard label="Cash Out" value={formatCurrency(summary.cashOutTotal)} icon={<ArrowUpRight />} tone="bg-amber-500/10 text-amber-600" />
         {isRetailTemplate && (
           <>
-            <SummaryCard label="Cash Sales" value={formatCurrency(summary.cashTotal)} />
-            <SummaryCard label="Card Sales" value={formatCurrency(summary.cardTotal)} />
+            <SummaryCard label="Cash Sales" value={formatCurrency(summary.cashTotal)} icon={<DollarSign />} tone="bg-emerald-500/10 text-emerald-600" />
+            <SummaryCard label="Card Sales" value={formatCurrency(summary.cardTotal)} icon={<CreditCard />} tone="bg-blue-500/10 text-primary" />
           </>
         )}
       </div>
 
+      <div className="space-y-4 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 sm:p-5">
+
       {/* Quick date range */}
-      <div className="flex gap-1 rounded-full border p-1 w-fit">
+      <div className="flex w-fit flex-wrap gap-1 rounded-full bg-surface-container-low p-1">
         {([
           { label: 'Today',      days: -2 },
           { label: 'This Month', days: 0 },
@@ -1094,7 +1098,7 @@ export default function SalesPage() {
             <button
               key={label}
               onClick={() => { setDateFrom(range.from); setDateTo(range.to); setPage(0) }}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${active ? 'bg-teal-700 text-white' : 'text-on-surface-variant hover:bg-surface-container'}`}
+              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${active ? 'bg-surface-container-lowest text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
             >
               {label}
             </button>
@@ -1107,15 +1111,16 @@ export default function SalesPage() {
         <div className="flex-1 min-w-[220px]">
           <label className="mb-1 block text-xs font-medium text-on-surface-variant">Search</label>
           <div className="relative">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
             <input
               type="text"
               placeholder="Invoice # or customer name…"
-              className="w-full rounded-md border px-3 py-1.5 text-sm pr-7 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="h-10 w-full rounded-full border border-outline-variant pl-10 pr-8 text-sm focus:border-primary focus:outline-none"
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
             />
             {searchInput && (
-              <button className="absolute right-2 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface-variant" onClick={() => { setSearchInput(''); setSearch('') }}>
+              <button className="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface-variant" onClick={() => { setSearchInput(''); setSearch('') }}>
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
@@ -1123,15 +1128,15 @@ export default function SalesPage() {
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-on-surface-variant">From</label>
-          <input type="date" className="rounded-md border px-3 py-1.5 text-sm" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(0) }} />
+          <input type="date" className="h-10 rounded-full border border-outline-variant px-4 text-sm focus:border-primary focus:outline-none" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(0) }} />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-on-surface-variant">To</label>
-          <input type="date" className="rounded-md border px-3 py-1.5 text-sm" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(0) }} />
+          <input type="date" className="h-10 rounded-full border border-outline-variant px-4 text-sm focus:border-primary focus:outline-none" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(0) }} />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-on-surface-variant">Status</label>
-          <select className="rounded-md border px-3 py-1.5 text-sm" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0) }}>
+          <select className="h-10 rounded-full border border-outline-variant px-4 text-sm focus:border-primary focus:outline-none" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(0) }}>
             <option value="">All</option>
             <option value="paid">Paid</option>
             <option value="partial">Partial Refund</option>
@@ -1141,7 +1146,7 @@ export default function SalesPage() {
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-on-surface-variant">Type</label>
-          <select className="rounded-md border px-3 py-1.5 text-sm" value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(0) }}>
+          <select className="h-10 rounded-full border border-outline-variant px-4 text-sm focus:border-primary focus:outline-none" value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(0) }}>
             <option value="">All</option>
             <option value="sale">Sale</option>
             <option value="refund">Refund</option>
@@ -1156,6 +1161,7 @@ export default function SalesPage() {
           </Button>
         )}
       </div>
+      </div>
 
       {/* Table */}
       <DataTable
@@ -1168,12 +1174,13 @@ export default function SalesPage() {
         onPageChange={setPage}
         onPageSizeChange={(s) => { setPageSize(s); setPage(0) }}
         emptyMessage="No sales found"
+        emptyIcon={<Receipt />}
       />
 
       {/* Detail Modal */}
       <Modal open={detailOpen} onClose={() => { setDetailOpen(false) }} title="Sale Details" size="lg">
         {detailLoading ? (
-          <div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" /></div>
+          <div className="flex justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" /></div>
         ) : detail ? (
           <div className="space-y-4">
             {/* Sale info */}
@@ -1191,7 +1198,7 @@ export default function SalesPage() {
 
             {/* Partial refund notice */}
             {!detail.is_refund && detail.payment_status === 'partial' && (
-              <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-700">
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-sm text-amber-700">
                 Some items have been refunded. Remaining items can still be refunded below.
               </div>
             )}
@@ -1199,7 +1206,7 @@ export default function SalesPage() {
             {/* Refunded-on date(s) — a refund can be processed days after the
                 sale date shown above, so surface exactly when it happened. */}
             {!detail.is_refund && (detail.refund_records?.length ?? 0) > 0 && (
-              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2 text-sm text-red-700">
                 {detail.refund_records!.length === 1
                   ? <>Refunded on {formatDateTime(detail.refund_records![0].created_at)}</>
                   : (
@@ -1212,7 +1219,7 @@ export default function SalesPage() {
 
             {/* Split payment details */}
             {detail.payment_method === 'split' && detail.payment_splits?.length ? (
-              <div className="rounded-md bg-surface-container-low p-3">
+              <div className="rounded-xl bg-surface-container-low p-3">
                 <p className="mb-1 text-xs font-medium text-on-surface-variant">Payment Split</p>
                 {detail.payment_splits.map((s, i) => (
                   <div key={i} className="flex justify-between text-sm">
@@ -1225,11 +1232,11 @@ export default function SalesPage() {
 
             {/* Exchange info */}
             {detail.is_exchange && (
-              <div className="rounded-md border border-indigo-200 bg-indigo-50 p-3 text-sm space-y-1">
-                <p className="font-medium text-indigo-700">Exchange Transaction</p>
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm space-y-1">
+                <p className="font-medium text-primary">Exchange Transaction</p>
                 {detail.exchange_original_id && (
                   <button
-                    className="flex items-center gap-1 text-xs font-medium text-indigo-700 underline underline-offset-2 hover:text-indigo-900"
+                    className="flex items-center gap-1 text-xs font-medium text-primary underline underline-offset-2 hover:text-primary/80"
                     onClick={() => { setDetailId(detail.exchange_original_id!) }}
                   >
                     <ArrowLeftRight className="h-3 w-3" />
@@ -1241,7 +1248,7 @@ export default function SalesPage() {
 
             {/* Refund info + navigate to original sale */}
             {detail.is_refund && (
-              <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm space-y-2">
+              <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-sm space-y-2">
                 <p className="font-medium text-red-700">Refund Record</p>
                 {detail.refund_reason && <p className="text-red-600">{detail.refund_reason}</p>}
                 {detail.original_sale_id && (
@@ -1286,10 +1293,10 @@ export default function SalesPage() {
             </div>
 
             {/* Totals */}
-            <div className="rounded-md bg-surface-container-low p-3 text-sm">
+            <div className="rounded-xl bg-surface-container-low p-3 text-sm">
               <div className="flex justify-between"><span className="text-on-surface-variant">Subtotal</span><span>{detail.is_refund ? '-' : ''}{formatCurrency(Math.abs(Number(detail.subtotal)))}</span></div>
               {Number(detail.discount) > 0 && (
-                <div className="flex justify-between text-green-600"><span>Discount</span><span>-{formatCurrency(Math.abs(Number(detail.discount)))}</span></div>
+                <div className="flex justify-between text-emerald-600"><span>Discount</span><span>-{formatCurrency(Math.abs(Number(detail.discount)))}</span></div>
               )}
               {Number(detail.tax) > 0 && (
                 <div className="flex justify-between"><span className="text-on-surface-variant">Tax</span><span>{formatCurrency(Math.abs(Number(detail.tax)))}</span></div>
@@ -1313,19 +1320,19 @@ export default function SalesPage() {
             )}
 
             {canDelete && !detail.is_refund && (
-              <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={openEdit}>
+              <Button className="w-full" onClick={openEdit}>
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit Sale
               </Button>
             )}
             {canDelete && !detail.is_refund && !detail.is_exchange && detail.payment_status !== 'refunded' && (
-              <Button className="w-full bg-orange-500 hover:bg-orange-600 text-white" onClick={openRefund}>
+              <Button className="w-full" onClick={openRefund}>
                 <RotateCcw className="mr-2 h-4 w-4" />
                 Process Refund
               </Button>
             )}
             {canDelete && !detail.is_refund && !detail.is_exchange && detail.payment_status !== 'refunded' && (
-              <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white" onClick={openExchange}>
+              <Button className="w-full" onClick={openExchange}>
                 <ArrowLeftRight className="mr-2 h-4 w-4" />
                 Exchange Items
               </Button>
@@ -1333,7 +1340,7 @@ export default function SalesPage() {
             {/* Exchange sale — let cashier exchange more items from the original sale */}
             {canDelete && detail.is_exchange && detail.exchange_original_id && (
               <Button
-                className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200"
+                className="w-full bg-primary/5 hover:bg-primary/10 text-primary border border-primary/20"
                 onClick={() => {
                   setDetailId(detail.exchange_original_id!)
                   setPendingExchange(true)
@@ -1343,7 +1350,7 @@ export default function SalesPage() {
                 Exchange More Items from Original Sale
               </Button>
             )}
-            <Button className="w-full bg-teal-700 hover:bg-teal-800 text-white" onClick={() => downloadReceipt(detail, true)} disabled={downloadingDetail}>
+            <Button className="w-full" onClick={() => downloadReceipt(detail, true)} disabled={downloadingDetail}>
               {downloadingDetail
                 ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 : <Printer className="mr-2 h-4 w-4" />}
@@ -1387,13 +1394,13 @@ export default function SalesPage() {
               <div className="flex rounded-lg border border-outline-variant bg-surface-container-low p-0.5 text-sm">
                 <button
                   onClick={() => setRefundMode('items')}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 font-semibold transition-all ${refundMode === 'items' ? 'bg-orange-500 text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 font-semibold transition-all ${refundMode === 'items' ? 'bg-surface-container-lowest text-on-surface shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
                 >
                   <Package className="h-3.5 w-3.5" /> Return Items
                 </button>
                 <button
                   onClick={() => setRefundMode('amount')}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 font-semibold transition-all ${refundMode === 'amount' ? 'bg-blue-600 text-white shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 font-semibold transition-all ${refundMode === 'amount' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
                 >
                   <DollarSign className="h-3.5 w-3.5" /> Refund Amount
                 </button>
@@ -1403,7 +1410,7 @@ export default function SalesPage() {
                 <>
                   <p className="text-sm text-on-surface-variant">Select items and quantities to return. Inventory will be restocked.</p>
                   {/* Item qty selectors */}
-                  <div className="divide-y rounded-md border">
+                  <div className="divide-y rounded-xl border">
                     {(detail.sale_items ?? []).map(item => {
                       const alreadyRefunded = getAlreadyRefunded(item)
                       const alreadyRefundedAmt = getAlreadyRefundedAmount(item)
@@ -1430,7 +1437,7 @@ export default function SalesPage() {
                             <p className="text-sm font-medium truncate">{item.name}</p>
                             <p className="text-xs text-on-surface-variant">
                               {formatCurrency(Number(item.total) / item.quantity)} × {item.quantity}
-                              {Number(item.discount) > 0 && <span className="ml-1 text-green-600">(-{formatCurrency(Number(item.discount))} disc)</span>}
+                              {Number(item.discount) > 0 && <span className="ml-1 text-emerald-600">(-{formatCurrency(Number(item.discount))} disc)</span>}
                             </p>
                           </div>
                           <div className="ml-3 flex items-center gap-2">
@@ -1454,15 +1461,15 @@ export default function SalesPage() {
                     })}
                   </div>
                   {/* Refund total */}
-                  <div className="flex justify-between rounded-md bg-orange-50 px-3 py-2 text-sm font-semibold">
+                  <div className="flex justify-between rounded-xl bg-amber-500/5 px-3 py-2 text-sm font-semibold">
                     <span>Refund Total</span>
-                    <span className="text-orange-700">{formatCurrency(itemsRefundTotal)}</span>
+                    <span className="text-amber-700">{formatCurrency(itemsRefundTotal)}</span>
                   </div>
                 </>
               ) : (
                 <>
                   <p className="text-sm text-on-surface-variant">Enter the amount to refund per item. Stock will <strong>not</strong> be restocked.</p>
-                  <div className="divide-y rounded-md border">
+                  <div className="divide-y rounded-xl border">
                     {(detail.sale_items ?? []).map(item => {
                       const alreadyRefundedAmt = getAlreadyRefundedAmount(item)
                       const itemMax = Math.max(0, Number(item.total) - alreadyRefundedAmt)
@@ -1483,7 +1490,7 @@ export default function SalesPage() {
                             <p className="text-xs text-on-surface-variant">
                               {formatCurrency(Number(item.unit_price))} × {item.quantity}
                               {' · '}<span className="text-outline">max {formatCurrency(itemMax)}</span>
-                              {alreadyRefundedAmt > 0 && <span className="ml-1 text-orange-500">({formatCurrency(alreadyRefundedAmt)} already refunded)</span>}
+                              {alreadyRefundedAmt > 0 && <span className="ml-1 text-amber-700">({formatCurrency(alreadyRefundedAmt)} already refunded)</span>}
                             </p>
                           </div>
                           <div className="relative w-28 shrink-0">
@@ -1493,7 +1500,7 @@ export default function SalesPage() {
                               min={0}
                               max={itemMax}
                               step={0.01}
-                              className={`w-full rounded-md border py-1.5 pl-6 pr-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 ${itemAmt > itemMax ? 'border-red-400' : ''}`}
+                              className={`w-full rounded-xl border border-outline-variant py-1.5 pl-6 pr-2 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 ${itemAmt > itemMax ? 'border-red-400' : ''}`}
                               placeholder="0.00"
                               value={itemAmt || ''}
                               onChange={e => {
@@ -1502,7 +1509,7 @@ export default function SalesPage() {
                               }}
                             />
                           </div>
-                          <div className="w-16 shrink-0 text-right text-sm font-semibold text-blue-700">
+                          <div className="w-16 shrink-0 text-right text-sm font-semibold text-primary">
                             {itemAmt > 0 ? formatCurrency(itemAmt) : <span className="text-outline-variant">—</span>}
                           </div>
                         </div>
@@ -1512,9 +1519,9 @@ export default function SalesPage() {
                   {(() => {
                     const amountTotal = Object.values(refundItemAmounts).reduce((s, v) => s + (v || 0), 0)
                     return (
-                      <div className="flex justify-between rounded-md bg-orange-50 px-3 py-2 text-sm font-semibold">
+                      <div className="flex justify-between rounded-xl bg-amber-500/5 px-3 py-2 text-sm font-semibold">
                         <span>Refund Total</span>
-                        <span className={amountTotal > maxRefundableAmount ? 'text-red-600' : 'text-orange-700'}>
+                        <span className={amountTotal > maxRefundableAmount ? 'text-red-600' : 'text-amber-700'}>
                           {formatCurrency(amountTotal)}
                           {amountTotal > maxRefundableAmount && <span className="ml-1 text-xs font-normal">exceeds max</span>}
                         </span>
@@ -1528,7 +1535,7 @@ export default function SalesPage() {
               <div>
                 <label className="mb-1 block text-xs font-medium text-on-surface-variant">Reason (optional)</label>
                 <input
-                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
                   placeholder="e.g. Customer changed mind, defective item…"
                   value={refundReason}
                   onChange={e => setRefundReason(e.target.value)}
@@ -1551,12 +1558,12 @@ export default function SalesPage() {
                           type="number" min={0} step={0.01} placeholder="0.00"
                           value={refundSplits[m] ?? ''}
                           onChange={e => setRefundSplits(r => ({ ...r, [m]: e.target.value }))}
-                          className="h-9 flex-1 rounded-md border border-outline-variant px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="h-9 flex-1 rounded-xl border border-outline-variant px-3 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
                         />
                       </div>
                     ))}
-                    <div className={`flex justify-between rounded-md px-3 py-2 text-sm font-medium ${
-                      Math.abs(splitRemaining) > 0.005 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'
+                    <div className={`flex justify-between rounded-xl px-3 py-2 text-sm font-medium ${
+                      Math.abs(splitRemaining) > 0.005 ? 'bg-red-500/10 text-red-600' : 'bg-emerald-500/10 text-emerald-600'
                     }`}>
                       <span>Remaining</span><span>{formatCurrency(splitRemaining)}</span>
                     </div>
@@ -1566,7 +1573,7 @@ export default function SalesPage() {
                 <div>
                   <label className="mb-1 block text-xs font-medium text-on-surface-variant">Return Via</label>
                   <select
-                    className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
                     value={refundPaymentMethod}
                     onChange={e => setRefundPaymentMethod(e.target.value as 'cash' | 'card' | 'store_credit')}
                   >
@@ -1582,7 +1589,6 @@ export default function SalesPage() {
                   Cancel
                 </Button>
                 <Button
-                  className="bg-orange-500 hover:bg-orange-600 text-white"
                   onClick={() => refundMutation.mutate()}
                   disabled={refundMutation.isPending || isItemsDisabled || isAmountDisabled || isSplitInvalid}
                 >
@@ -1603,7 +1609,7 @@ export default function SalesPage() {
           <div className="space-y-5">
             {/* Warning for partially refunded sales (not credit) */}
             {detail.payment_status === 'partial' && detail.payment_method !== 'on_account' && (
-              <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-700">
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-sm text-amber-700">
                 This sale has partial refunds. Editing quantities will adjust inventory; already-refunded quantities cannot be reduced below what was refunded.
               </div>
             )}
@@ -1612,14 +1618,14 @@ export default function SalesPage() {
             <div>
               <label className="mb-1 block text-xs font-medium text-on-surface-variant">Customer</label>
               {editForm.customer_id ? (
-                <div className="flex items-center justify-between rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-sm">
-                  <span className="font-medium text-blue-800">
+                <div className="flex items-center justify-between rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+                  <span className="font-medium text-primary">
                     {editSelectedCustomerName
                       ?? (customerName(detail?.customers) !== '—' ? customerName(detail?.customers) : editForm.customer_id?.slice(-8).toUpperCase())}
                   </span>
                   <button
                     type="button"
-                    className="ml-2 text-blue-400 hover:text-red-500 transition-colors"
+                    className="ml-2 text-primary hover:text-red-500 transition-colors"
                     onClick={() => {
                       setEditForm(f => f ? { ...f, customer_id: null } : f)
                       setEditSelectedCustomerName(null)
@@ -1635,7 +1641,7 @@ export default function SalesPage() {
                   <input
                     ref={customerInputRef}
                     type="text"
-                    className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
                     placeholder="Search customer by name or phone…"
                     value={editCustomerSearch}
                     onFocus={() => setEditDropdownOpen(true)}
@@ -1663,7 +1669,7 @@ export default function SalesPage() {
                     if (!listToShow.length) return null
                     return (
                       <ul
-                        className="mt-1 w-full rounded-md border border-outline-variant bg-surface shadow-lg max-h-48 overflow-y-auto"
+                        className="mt-1 w-full rounded-xl border border-outline-variant bg-surface shadow-lg max-h-48 overflow-y-auto"
                         onMouseDown={e => e.preventDefault()}
                       >
                         {!editCustomerSearch.trim() && (
@@ -1675,7 +1681,7 @@ export default function SalesPage() {
                           <li key={c.id}>
                             <button
                               type="button"
-                              className="flex w-full flex-col px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
+                              className="flex w-full flex-col px-3 py-2 text-left text-sm hover:bg-primary/5 transition-colors"
                               onClick={() => {
                                 const name = `${c.first_name} ${c.last_name ?? ''}`.trim()
                                 setEditForm(f => f ? { ...f, customer_id: c.id } : f)
@@ -1702,7 +1708,7 @@ export default function SalesPage() {
               <div>
                 <label className="mb-1 block text-xs font-medium text-on-surface-variant">Payment Method</label>
                 <select
-                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
                   value={editForm.payment_method}
                   onChange={e => setEditForm(f => f ? { ...f, payment_method: e.target.value } : f)}
                 >
@@ -1715,7 +1721,7 @@ export default function SalesPage() {
               <div>
                 <label className="mb-1 block text-xs font-medium text-on-surface-variant">Payment Status</label>
                 <select
-                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
                   value={editForm.payment_status}
                   onChange={e => setEditForm(f => f ? { ...f, payment_status: e.target.value } : f)}
                 >
@@ -1735,7 +1741,7 @@ export default function SalesPage() {
             <div>
               <label className="mb-1 block text-xs font-medium text-on-surface-variant">Notes</label>
               <textarea
-                className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
                 rows={2}
                 placeholder="Optional notes…"
                 value={editForm.notes}
@@ -1746,7 +1752,7 @@ export default function SalesPage() {
             {/* Items */}
             <div>
               <p className="mb-2 text-sm font-semibold text-on-surface-variant">Items</p>
-              <div className="rounded-md border divide-y">
+              <div className="rounded-xl border divide-y">
                 {editForm.items.map(item => {
                   const alreadyRefunded = getAlreadyRefunded({ id: item.id, name: item.name, quantity: item.quantity, unit_price: item.unit_price, discount: item.discount, total: item.total })
                   const minQty = Math.max(1, alreadyRefunded)
@@ -1770,7 +1776,7 @@ export default function SalesPage() {
                             <input
                               type="number"
                               min={minQty}
-                              className="w-12 rounded border px-1 py-1 text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              className="w-12 rounded-lg border border-outline-variant px-1 py-1 text-center text-sm focus:outline-none focus:ring-1 focus:ring-primary/30"
                               value={item.quantity}
                               onChange={e => editItemField(item.id, 'quantity', Math.max(minQty, Number(e.target.value) || 1))}
                             />
@@ -1786,7 +1792,7 @@ export default function SalesPage() {
                             type="number"
                             min={0}
                             step={0.01}
-                            className="w-full rounded border px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full rounded-lg border border-outline-variant px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary/30"
                             value={item.unit_price}
                             onChange={e => editItemField(item.id, 'unit_price', Math.max(0, Number(e.target.value) || 0))}
                           />
@@ -1797,7 +1803,7 @@ export default function SalesPage() {
                             type="number"
                             min={0}
                             step={0.01}
-                            className="w-full rounded border px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full rounded-lg border border-outline-variant px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary/30"
                             value={item.discount}
                             onChange={e => editItemField(item.id, 'discount', Math.max(0, Number(e.target.value) || 0))}
                           />
@@ -1808,7 +1814,7 @@ export default function SalesPage() {
                         </div>
                       </div>
                       {alreadyRefunded > 0 && (
-                        <p className="text-xs text-orange-500">{alreadyRefunded} unit(s) already refunded — minimum qty is {minQty}</p>
+                        <p className="text-xs text-amber-700">{alreadyRefunded} unit(s) already refunded — minimum qty is {minQty}</p>
                       )}
                     </div>
                   )
@@ -1824,7 +1830,7 @@ export default function SalesPage() {
                   type="number"
                   min={0}
                   step={0.01}
-                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
                   value={editForm.discount}
                   onChange={e => setEditForm(f => f ? { ...f, discount: Math.max(0, Number(e.target.value) || 0) } : f)}
                 />
@@ -1835,7 +1841,7 @@ export default function SalesPage() {
                   type="number"
                   min={0}
                   step={0.01}
-                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30"
                   value={editForm.tax}
                   onChange={e => setEditForm(f => f ? { ...f, tax: Math.max(0, Number(e.target.value) || 0) } : f)}
                 />
@@ -1843,12 +1849,12 @@ export default function SalesPage() {
             </div>
 
             {/* Totals preview */}
-            <div className="rounded-md bg-surface-container-low p-3 text-sm space-y-1">
+            <div className="rounded-xl bg-surface-container-low p-3 text-sm space-y-1">
               <div className="flex justify-between text-on-surface-variant">
                 <span>Subtotal</span><span>{formatCurrency(editSubtotal())}</span>
               </div>
               {editForm.discount > 0 && (
-                <div className="flex justify-between text-green-600">
+                <div className="flex justify-between text-emerald-600">
                   <span>Discount</span><span>-{formatCurrency(editForm.discount)}</span>
                 </div>
               )}
@@ -1867,7 +1873,6 @@ export default function SalesPage() {
                 Cancel
               </Button>
               <Button
-                className="bg-blue-600 hover:bg-blue-700 text-white"
                 onClick={() => editMutation.mutate()}
                 disabled={editMutation.isPending}
               >
@@ -1891,11 +1896,11 @@ export default function SalesPage() {
         {cashDetailRow && (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${cashDetailRow.record_type === 'cash_in' ? 'bg-teal-100 text-teal-700' : 'bg-rose-100 text-rose-600'}`}>
+              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${cashDetailRow.record_type === 'cash_in' ? 'bg-primary/10 text-primary' : 'bg-red-500/10 text-red-600'}`}>
                 <DollarSign className="h-5 w-5" />
               </span>
               <div>
-                <p className={`text-xl font-bold ${cashDetailRow.record_type === 'cash_in' ? 'text-teal-700' : 'text-rose-600'}`}>
+                <p className={`text-xl font-bold ${cashDetailRow.record_type === 'cash_in' ? 'text-primary' : 'text-red-600'}`}>
                   {cashDetailRow.record_type === 'cash_out' ? '-' : ''}{formatCurrency(Math.abs(Number(cashDetailRow.total)))}
                 </p>
                 <p className="text-xs text-on-surface-variant font-mono">{cashDetailRow.reference}</p>
@@ -1917,7 +1922,7 @@ export default function SalesPage() {
               )}
             </div>
             {cashDetailRow.notes && (
-              <div className="rounded-md bg-surface-container-low p-3 text-sm">
+              <div className="rounded-xl bg-surface-container-low p-3 text-sm">
                 <p className="mb-1 text-xs font-medium text-on-surface-variant">Notes</p>
                 <p className="text-on-surface-variant">{cashDetailRow.notes}</p>
               </div>
@@ -1939,7 +1944,7 @@ export default function SalesPage() {
                   This will permanently delete this {row?.record_type === 'cash_in' ? 'Cash In' : 'Cash Out'} record. This action cannot be undone.
                 </p>
               ) : row?.payment_status === 'partial' ? (
-                <div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800">
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-sm text-amber-700">
                   <p className="font-semibold mb-1">This sale has partial refunds.</p>
                   <p>Deleting it will also delete all associated refund records. Only the unrefunded inventory will be restored. This cannot be undone.</p>
                 </div>
@@ -1992,12 +1997,12 @@ export default function SalesPage() {
                     <div key={label} className="flex flex-1 items-center">
                       <button
                         className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 font-semibold transition-all
-                          ${active ? 'bg-indigo-600 text-white shadow-sm' : done ? 'text-indigo-600' : 'text-outline'}`}
+                          ${active ? 'bg-primary text-on-primary shadow-sm' : done ? 'text-primary' : 'text-outline'}`}
                         onClick={() => { if (done || active) setExchangeStep(step) }}
                         disabled={step === 2 && !hasReturns || step === 3 && !hasNew}
                       >
                         <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold
-                          ${active ? 'bg-white/20' : done ? 'bg-indigo-100' : 'bg-surface-container-high'}`}>
+                          ${active ? 'bg-white/20' : done ? 'bg-primary/10' : 'bg-surface-container-high'}`}>
                           {step}
                         </span>
                         {label}
@@ -2012,7 +2017,7 @@ export default function SalesPage() {
               {exchangeStep === 1 && (
                 <>
                   <p className="text-sm text-on-surface-variant">Select items and quantities to return. Inventory will be restocked.</p>
-                  <div className="divide-y rounded-md border max-h-72 overflow-y-auto">
+                  <div className="divide-y rounded-xl border max-h-72 overflow-y-auto">
                     {(detail.sale_items ?? []).map(item => {
                       const alreadyRefunded = getAlreadyRefunded(item)
                       const alreadyRefundedAmt = getAlreadyRefundedAmount(item)
@@ -2039,14 +2044,14 @@ export default function SalesPage() {
                             <div className="flex items-center gap-1.5">
                               <p className="text-sm font-medium truncate">{item.name}</p>
                               {item.variant_id && !item.name.includes('–') && (
-                                <span className="shrink-0 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-mono text-indigo-500 border border-indigo-100">
+                                <span className="shrink-0 rounded bg-primary/5 px-1.5 py-0.5 text-[10px] font-mono text-primary border border-primary/20">
                                   VAR-{item.variant_id.slice(-6).toUpperCase()}
                                 </span>
                               )}
                             </div>
                             <p className="text-xs text-on-surface-variant">
                               {formatCurrency(unitPrice)} × {item.quantity}
-                              {alreadyRefunded > 0 && <span className="ml-1 text-orange-500">({alreadyRefunded} already returned)</span>}
+                              {alreadyRefunded > 0 && <span className="ml-1 text-amber-700">({alreadyRefunded} already returned)</span>}
                             </p>
                           </div>
                           <div className="flex items-center gap-1.5">
@@ -2062,19 +2067,19 @@ export default function SalesPage() {
                               <Plus className="h-3 w-3" />
                             </button>
                           </div>
-                          <span className="w-16 text-right text-sm font-semibold text-indigo-700">
+                          <span className="w-16 text-right text-sm font-semibold text-primary">
                             {qty > 0 ? formatCurrency(unitPrice * qty) : <span className="text-outline-variant">—</span>}
                           </span>
                         </div>
                       )
                     })}
                   </div>
-                  <div className="flex items-center justify-between rounded-md bg-indigo-50 px-3 py-2 text-sm font-semibold">
+                  <div className="flex items-center justify-between rounded-xl bg-primary/5 px-3 py-2 text-sm font-semibold">
                     <span>Credit from return</span>
-                    <span className="text-indigo-700">{formatCurrency(returnedTotal)}</span>
+                    <span className="text-primary">{formatCurrency(returnedTotal)}</span>
                   </div>
                   <div className="flex justify-end">
-                    <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => setExchangeStep(2)} disabled={!hasReturns}>
+                    <Button onClick={() => setExchangeStep(2)} disabled={!hasReturns}>
                       Next <ChevronRight className="ml-1 h-4 w-4" />
                     </Button>
                   </div>
@@ -2094,12 +2099,12 @@ export default function SalesPage() {
                         <p className="text-sm font-semibold">{exchangeVariantFor.name} — Select variant</p>
                       </div>
                       {exchangeVariantsLoading ? (
-                        <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-indigo-500" /></div>
+                        <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
                       ) : (
                         <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto">
                           {exchangeVariants.map((v: any) => (
                             <button key={v.id} onClick={() => addExchangeNewItem(exchangeVariantFor, v)}
-                              className="flex flex-col items-start rounded-lg border p-2.5 text-left text-sm hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
+                              className="flex flex-col items-start rounded-lg border p-2.5 text-left text-sm hover:border-primary hover:bg-primary/5 transition-colors">
                               <span className="font-medium">{v.name}</span>
                               <span className="text-xs text-on-surface-variant">{formatCurrency(v.selling_price ?? exchangeVariantFor.selling_price)}</span>
                               {v.stock != null && <span className={`text-[10px] ${v.stock <= 0 ? 'text-red-500' : 'text-outline'}`}>{v.stock <= 0 ? 'Out of stock' : `${v.stock} in stock`}</span>}
@@ -2114,7 +2119,7 @@ export default function SalesPage() {
                       <div className="relative">
                         <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-outline" />
                         <input
-                          className="w-full rounded-md border py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                          className="w-full rounded-xl border border-outline-variant py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                           placeholder="Search products to add as replacement…"
                           value={exchangeProductSearch}
                           onChange={e => setExchangeProductSearch(e.target.value)}
@@ -2132,10 +2137,10 @@ export default function SalesPage() {
                                 if (p.has_variants) { loadVariants(p) }
                                 else addExchangeNewItem(p)
                               }}
-                              className="flex flex-col items-start rounded-lg border p-2.5 text-left text-sm hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
+                              className="flex flex-col items-start rounded-lg border p-2.5 text-left text-sm hover:border-primary hover:bg-primary/5 transition-colors">
                               <span className="font-medium truncate w-full">{p.name}</span>
                               <span className="text-xs text-on-surface-variant">{formatCurrency(p.selling_price ?? 0)}</span>
-                              {p.has_variants && <span className="text-[10px] text-indigo-500">Select variant →</span>}
+                              {p.has_variants && <span className="text-[10px] text-primary">Select variant →</span>}
                             </button>
                           ))}
                         </div>
@@ -2149,7 +2154,7 @@ export default function SalesPage() {
                         <>
                           <div className="border-t pt-3">
                             <p className="mb-2 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Selected replacements</p>
-                            <div className="divide-y rounded-md border">
+                            <div className="divide-y rounded-xl border">
                               {exchangeNewItems.map((item, idx) => (
                                 <div key={idx} className="flex items-center gap-2 px-3 py-2">
                                   <div className="flex-1 min-w-0">
@@ -2177,9 +2182,9 @@ export default function SalesPage() {
                               ))}
                             </div>
                           </div>
-                          <div className="flex items-center justify-between rounded-md bg-indigo-50 px-3 py-2 text-sm font-semibold">
+                          <div className="flex items-center justify-between rounded-xl bg-primary/5 px-3 py-2 text-sm font-semibold">
                             <span>New items total</span>
-                            <span className="text-indigo-700">{formatCurrency(newTotal)}</span>
+                            <span className="text-primary">{formatCurrency(newTotal)}</span>
                           </div>
                         </>
                       )}
@@ -2190,7 +2195,7 @@ export default function SalesPage() {
                     <Button variant="outline" onClick={() => setExchangeStep(1)}>
                       <ChevronLeft className="mr-1 h-4 w-4" /> Back
                     </Button>
-                    <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => setExchangeStep(3)} disabled={!hasNew}>
+                    <Button onClick={() => setExchangeStep(3)} disabled={!hasNew}>
                       Next <ChevronRight className="ml-1 h-4 w-4" />
                     </Button>
                   </div>
@@ -2204,15 +2209,15 @@ export default function SalesPage() {
                   <div className="rounded-xl border border-outline-variant bg-surface-container-low p-4 space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-on-surface-variant">Return credit</span>
-                      <span className="font-semibold text-green-700">− {formatCurrency(returnedTotal)}</span>
+                      <span className="font-semibold text-emerald-600">− {formatCurrency(returnedTotal)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-on-surface-variant">New items</span>
-                      <span className="font-semibold text-blue-700">+ {formatCurrency(newTotal)}</span>
+                      <span className="font-semibold text-primary">+ {formatCurrency(newTotal)}</span>
                     </div>
                     <div className="border-t pt-2 mt-1 flex justify-between text-base font-bold">
                       <span>{net > 0 ? 'Customer pays' : net < 0 ? 'Customer receives' : 'No payment needed'}</span>
-                      <span className={net > 0 ? 'text-red-600' : net < 0 ? 'text-green-700' : 'text-on-surface-variant'}>
+                      <span className={net > 0 ? 'text-red-600' : net < 0 ? 'text-emerald-600' : 'text-on-surface-variant'}>
                         {net === 0 ? '—' : formatCurrency(Math.abs(net))}
                       </span>
                     </div>
@@ -2227,7 +2232,7 @@ export default function SalesPage() {
                           <button key={m}
                             onClick={() => setExchangePayMethod(m)}
                             className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-all
-                              ${exchangePayMethod === m ? m === 'on_account' ? 'bg-purple-600 text-white border-purple-600' : 'bg-indigo-600 text-white border-indigo-600' : 'text-on-surface-variant hover:bg-surface-container-low'}`}>
+                              ${exchangePayMethod === m ? m === 'on_account' ? 'bg-purple-600 text-white border-purple-600' : 'bg-primary text-on-primary border-primary' : 'text-on-surface-variant hover:bg-surface-container-low'}`}>
                             {m === 'cash' ? 'Cash' : m === 'card' ? 'Card' : 'Credit'}
                           </button>
                         ))}
@@ -2296,7 +2301,7 @@ export default function SalesPage() {
                           <button key={m}
                             onClick={() => setExchangeRefundMethod(m)}
                             className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-all
-                              ${exchangeRefundMethod === m ? 'bg-green-600 text-white border-green-600' : 'text-on-surface-variant hover:bg-surface-container-low'}`}>
+                              ${exchangeRefundMethod === m ? 'bg-emerald-600 text-white border-emerald-600' : 'text-on-surface-variant hover:bg-surface-container-low'}`}>
                             {m === 'cash' ? 'Cash' : m === 'card' ? 'Card' : 'Store Credit'}
                           </button>
                         ))}
@@ -2305,7 +2310,7 @@ export default function SalesPage() {
                   )}
 
                   {net === 0 && (
-                    <div className="flex items-center justify-center gap-2 rounded-lg bg-green-50 border border-green-200 py-2.5 text-sm font-semibold text-green-700">
+                    <div className="flex items-center justify-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 py-2.5 text-sm font-semibold text-emerald-600">
                       No payment required — straight exchange
                     </div>
                   )}
@@ -2315,7 +2320,7 @@ export default function SalesPage() {
                       <ChevronLeft className="mr-1 h-4 w-4" /> Back
                     </Button>
                     <Button
-                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white"
+                      className="flex-1"
                       onClick={() => exchangeMutation.mutate()}
                       disabled={exchangeMutation.isPending}
                     >
@@ -2334,11 +2339,18 @@ export default function SalesPage() {
   )
 }
 
-function SummaryCard({ label, value, className }: { label: string; value: string; className?: string }) {
+function SummaryCard({ label, value, icon, tone }: { label: string; value: string; icon?: React.ReactNode; tone?: string }) {
   return (
-    <div className="rounded-lg border bg-surface p-4">
-      <p className="text-xs text-on-surface-variant">{label}</p>
-      <p className={`mt-1 text-xl font-bold ${className ?? ''}`}>{value}</p>
+    <div className="min-w-0 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
+      <div className="flex items-start justify-between gap-2">
+        <p className="truncate text-xs text-on-surface-variant">{label}</p>
+        {icon && (
+          <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full [&_svg]:h-3.5 [&_svg]:w-3.5 ${tone ?? 'bg-surface-container text-on-surface-variant'}`}>
+            {icon}
+          </span>
+        )}
+      </div>
+      <p className="mt-3 truncate text-xl font-semibold tabular-nums text-on-surface" title={value}>{value}</p>
     </div>
   )
 }

@@ -119,7 +119,7 @@ export function LabelPicker({ repairId, selectedIds, onChange }: LabelPickerProp
                     style={{ backgroundColor: label.color }}
                   />
                   <span className="flex-1 text-on-surface">{label.name}</span>
-                  {selected && <Check className="h-3 w-3 text-blue-600" />}
+                  {selected && <Check className="h-3 w-3 text-primary" />}
                 </button>
               )
             })}
@@ -142,13 +142,13 @@ export function LabelPicker({ repairId, selectedIds, onChange }: LabelPickerProp
                     onChange={(e) => setNewLabelName(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && createLabel()}
                     placeholder="Label name"
-                    className="h-7 flex-1 rounded border border-outline-variant px-2 text-xs focus:border-blue-400 focus:outline-none"
+                    className="h-7 flex-1 rounded border border-outline-variant px-2 text-xs focus:border-primary focus:outline-none"
                   />
                 </div>
                 <div className="flex gap-1">
                   <button
                     onClick={createLabel}
-                    className="flex-1 rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
+                    className="flex-1 rounded bg-primary px-2 py-1 text-xs text-white hover:bg-blue-700"
                   >
                     Create
                   </button>
@@ -163,7 +163,7 @@ export function LabelPicker({ repairId, selectedIds, onChange }: LabelPickerProp
             ) : (
               <button
                 onClick={() => setCreating(true)}
-                className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-blue-600 hover:bg-blue-50"
+                className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-primary hover:bg-surface-container-low"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Create new label

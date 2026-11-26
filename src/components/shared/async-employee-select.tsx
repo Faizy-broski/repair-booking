@@ -186,7 +186,7 @@ export function AsyncEmployeeSelect({
       )}
 
       {selected ? (
-        <div className="flex h-9 items-center justify-between overflow-hidden rounded-lg border border-outline-variant bg-surface px-3 text-sm text-on-surface">
+        <div className="flex h-10 items-center justify-between overflow-hidden rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm text-on-surface">
           <span className="min-w-0 truncate whitespace-nowrap">
             {selected.first_name} {selected.last_name ?? ''}
             {isPendingId(selected.id)
@@ -209,7 +209,7 @@ export function AsyncEmployeeSelect({
             onFocus={() => setOpen(true)}
             onKeyDown={handleKeyDown}
             className={[
-              'h-9 w-full rounded-lg border bg-surface pl-9 pr-8 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-brand-teal/20 transition-colors',
+              'h-10 w-full rounded-xl border bg-surface-container-lowest pl-9 pr-8 text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-brand-teal/20 transition-colors',
               error
                 ? 'border-error focus:border-error'
                 : 'border-outline-variant focus:border-brand-teal',
@@ -224,7 +224,7 @@ export function AsyncEmployeeSelect({
       )}
 
       {open && !selected && (
-        <div className={`absolute z-50 w-full rounded-lg border border-outline-variant bg-surface shadow-lg max-h-52 overflow-y-auto ${openUpward ? 'bottom-full mb-1' : 'mt-1'}`}>
+        <div className={`absolute z-50 w-full rounded-xl border border-outline-variant bg-surface-container-lowest shadow-lg max-h-52 overflow-y-auto ${openUpward ? 'bottom-full mb-1' : 'mt-1'}`}>
           {results.length === 0 && !isFetching ? (
             <p className="px-3 py-2.5 text-sm text-on-surface-variant">
               {query.length === 0 ? 'Type to search employees' : 'No employees found'}

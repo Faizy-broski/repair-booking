@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { cn } from '@/lib/utils'
+import { PageHeader } from '@/components/shared/page-header'
 
 const SETTINGS_TABS = [
   { id: 'general',        label: 'Business',      href: '/settings/general',        icon: Store,     color: 'bg-teal-500   hover:bg-teal-600',   soft: 'hover:bg-teal-50   hover:text-teal-700'   },
@@ -29,12 +30,9 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
     <div className="space-y-6">
       {showTabs && (
         <>
-          <div>
-            <h1 className="text-xl font-bold text-on-surface">Settings</h1>
-            <p className="text-sm text-on-surface-variant">Manage your business configuration</p>
-          </div>
+          <PageHeader title="Settings" description="Manage your business configuration" />
 
-          <div className="flex gap-1.5 flex-wrap">
+          <div className="no-scrollbar flex gap-1 overflow-x-auto border-b border-outline-variant">
             {tabs.map((tab) => {
               const isActive = pathname.startsWith(tab.href)
               const TabIcon = tab.icon
@@ -43,10 +41,10 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
                   key={tab.id}
                   href={tab.href}
                   className={cn(
-                    'flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-150',
+                    '-mb-px flex items-center gap-2 whitespace-nowrap rounded-t-lg border-b-2 px-3.5 py-2.5 text-sm transition-colors',
                     isActive
-                      ? `${tab.color} text-white shadow-sm`
-                      : `text-on-surface-variant bg-surface-container-low ${tab.soft}`
+                      ? 'border-primary bg-primary/5 font-semibold text-primary'
+                      : 'border-transparent font-medium text-on-surface-variant hover:text-on-surface'
                   )}
                 >
                   <TabIcon className="h-4 w-4 shrink-0" />

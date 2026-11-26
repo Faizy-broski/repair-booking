@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { ShoppingCart, Info, Loader2 } from 'lucide-react'
+import { Timer, Info, Loader2 } from 'lucide-react'
+import { PageHeader } from '@/components/shared/page-header'
 import { useAuthStore } from '@/store/auth.store'
 import type { Branch } from '@/types/database'
 
@@ -92,83 +93,80 @@ export default function PosSettingsPage() {
   const canEdit = isOwner()
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="space-y-6">
 
-      {/* Page title */}
-      <div>
-        <h1 className="text-2xl font-bold text-on-surface">POS Settings</h1>
-        <p className="mt-1 text-sm text-on-surface-variant">Configure point of sale behaviour per branch</p>
-      </div>
+      <PageHeader title="POS Settings" description="Configure point of sale behaviour per branch" />
 
-      {/* Shift System card */}
-      <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface shadow-sm">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,300px)_1fr]">
 
-        {/* Card header */}
-        <div className="flex items-center gap-4 border-b border-outline-variant px-6 py-5">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-teal-light">
-            <ShoppingCart className="h-5 w-5 text-brand-teal" />
-          </div>
-          <div>
-            <h2 className="font-semibold text-on-surface">Shift System</h2>
-            <p className="mt-0.5 text-xs text-on-surface-variant">
-              When enabled, staff must open a cash drawer shift before processing sales
+        {/* Shift System explainer */}
+        <div className="space-y-3 lg:pt-2">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Timer className="h-5 w-5" />
+          </span>
+          <h2 className="text-lg font-semibold text-on-surface">Shift System</h2>
+          <p className="text-sm leading-relaxed text-on-surface-variant">
+            When enabled, staff must open a cash drawer shift before processing sales.
+          </p>
+          <div className="flex gap-2.5 rounded-2xl border border-outline-variant bg-surface-container-low px-4 py-3">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-on-surface-variant" />
+            <p className="text-xs leading-relaxed text-on-surface-variant">
+              Toggle per branch. Disabling lets staff open POS instantly without counting the cash drawer.
             </p>
           </div>
+          {!canEdit && (
+            <p className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-700">
+              Only business owners can modify these settings.
+            </p>
+          )}
         </div>
 
-        {/* Info strip */}
-        <div className="flex items-center gap-2 border-b border-blue-100/60 bg-blue-50/50 px-6 py-2.5">
-          <Info className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-          <p className="text-xs text-blue-600">
-            Toggle per branch. Disabling lets staff open POS instantly without counting the cash drawer.
-          </p>
-        </div>
-
-        {/* Branch rows */}
-        <div className="divide-y divide-outline-variant">
+        {/* Branch cards */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {branches.length === 0 && (
-            <p className="px-6 py-10 text-center text-sm text-outline">No branches found.</p>
+            <p className="col-span-full rounded-2xl border border-outline-variant py-10 text-center text-sm text-on-surface-variant">No branches found.</p>
           )}
 
-          {branches.map((branch) => {
+          {branches.map((branch, i) => {
             const enabled = branch.pos_require_shift !== false
             const isSaving = saving === branch.id
             const fb = feedback?.id === branch.id ? feedback : null
 
             return (
-              <div key={branch.id} className="flex items-center justify-between gap-4 px-6 py-4 transition-colors hover:bg-surface-container-low/50">
-
-                {/* Avatar + info */}
-                <div className="flex items-center gap-3.5">
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold uppercase tracking-wide transition-colors
-                    ${enabled ? 'bg-brand-teal/10 text-brand-teal' : 'bg-surface-container text-outline'}`}
-                  >
+              <div
+                key={branch.id}
+                className={`flex flex-col rounded-2xl border bg-surface-container-lowest p-5 transition-colors ${enabled ? 'border-primary/50 ring-1 ring-primary/10' : 'border-outline-variant'}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <span className={`flex h-11 w-11 items-center justify-center rounded-full text-base font-semibold uppercase transition-colors ${enabled ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface'}`}>
                     {branch.name.charAt(0)}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-on-surface">{branch.name}</span>
-                      {branch.is_main && (
-                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold leading-none text-blue-600">
-                          Main
-                        </span>
-                      )}
-                    </div>
-                    {fb ? (
-                      <p className={`mt-0.5 text-xs font-medium ${fb.ok ? 'text-green-600' : 'text-red-500'}`}>
-                        {fb.ok ? '✓ Saved' : '✗ Failed to save'}
-                      </p>
-                    ) : (
-                      <p className={`mt-0.5 text-xs font-medium transition-colors ${enabled ? 'text-brand-teal' : 'text-outline'}`}>
-                        {enabled ? 'Shift required to open POS' : 'Shift system disabled'}
-                      </p>
-                    )}
-                  </div>
+                  </span>
+                  <span className="font-mono text-[11px] text-on-surface-variant">
+                    Branch {String(i + 1).padStart(2, '0')}
+                  </span>
                 </div>
 
-                {/* Toggle + label */}
-                <div className="flex shrink-0 items-center gap-3">
-                  <span className={`w-10 text-right text-xs font-semibold transition-colors ${enabled ? 'text-brand-teal' : 'text-outline'}`}>
+                <div className="mt-4 min-h-[56px]">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-on-surface">{branch.name}</span>
+                    {branch.is_main && (
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Main</span>
+                    )}
+                  </div>
+                  {fb ? (
+                    <p className={`mt-1 text-sm ${fb.ok ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {fb.ok ? '✓ Saved' : '✗ Failed to save'}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-sm text-on-surface-variant">
+                      {enabled ? 'Shift required to open POS' : 'Shift system disabled'}
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-5 flex items-center justify-between border-t border-outline-variant pt-4">
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${enabled ? 'bg-emerald-500/10 text-emerald-600' : 'bg-surface-container text-on-surface-variant'}`}>
+                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
                     {enabled ? 'On' : 'Off'}
                   </span>
                   <Toggle
@@ -178,17 +176,10 @@ export default function PosSettingsPage() {
                     onChange={() => toggleShift(branch.id, branch.pos_require_shift)}
                   />
                 </div>
-
               </div>
             )
           })}
         </div>
-
-        {!canEdit && (
-          <div className="border-t border-outline-variant bg-amber-50/50 px-6 py-3">
-            <p className="text-xs text-amber-700">Only business owners can modify these settings.</p>
-          </div>
-        )}
       </div>
     </div>
   )

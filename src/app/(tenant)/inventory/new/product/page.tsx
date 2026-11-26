@@ -1,13 +1,15 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Save, Plus, Lock, Trash2, RefreshCw, Layers } from 'lucide-react'
+import { Save, Plus, Lock, Trash2, RefreshCw, Layers } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { CreatableCombobox } from '@/components/ui/creatable-combobox'
 import { ImageUpload } from '@/components/ui/image-upload'
 import { SectionCard } from '@/components/ui/section-card'
+import { PageHeader } from '@/components/shared/page-header'
+import { InventoryNav } from '@/components/inventory/inventory-nav'
 import { Toggle } from '@/components/ui/toggle'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/store/auth.store'
@@ -385,35 +387,34 @@ export default function NewProductPage() {
   const hasConflict = skuConflict || barcodeConflict
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <div className="sticky top-0 z-30 flex flex-col sm:flex-row sm:items-center justify-between border-b border-outline-variant bg-surface px-4 sm:px-6 py-3 gap-3 sm:gap-0">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <Link href="/inventory" className="flex shrink-0 items-center gap-1.5 text-sm text-on-surface-variant hover:text-on-surface">
-            <ChevronLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back to Inventory</span><span className="sm:hidden">Back</span>
-          </Link>
-          <span className="text-outline-variant shrink-0">/</span>
-          <span className="text-sm font-medium text-on-surface truncate">Add New Product</span>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" onClick={() => handleSave(true)} loading={saving && saveAndNew} disabled={hasConflict} className="px-3 sm:px-4">
-            <Plus className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Save &amp; Add New</span><span className="sm:hidden">Save &amp; New</span>
-          </Button>
-          <Button onClick={() => handleSave(false)} loading={saving && !saveAndNew} disabled={hasConflict} className="px-3 sm:px-4">
-            <Save className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Save Product</span><span className="sm:hidden">Save</span>
-          </Button>
-        </div>
-      </div>
+    <div className="flex flex-col space-y-5">
+      <PageHeader
+        back={{ href: '/inventory', label: 'Back to Inventory' }}
+        title="Add New Product"
+        actions={
+          <>
+            <Button variant="outline" onClick={() => handleSave(true)} loading={saving && saveAndNew} disabled={hasConflict}>
+              <Plus className="h-4 w-4" /> Save &amp; Add New
+            </Button>
+            <Button onClick={() => handleSave(false)} loading={saving && !saveAndNew} disabled={hasConflict}>
+              <Save className="h-4 w-4" /> Save Product
+            </Button>
+          </>
+        }
+      />
+
+      <InventoryNav />
 
       {saveError && (
-        <div className="mx-6 mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{saveError}</div>
+        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{saveError}</div>
       )}
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl px-6 py-6 space-y-6">
+      <div className="flex-1">
+        <div className="space-y-6">
 
           {/* Bought from Customer — compact */}
-          <div className="max-w-xl">
-            <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-lg border-2 px-4 py-3 transition-colors ${isTradeIn ? 'border-purple-500 bg-purple-50' : 'border-outline-variant hover:border-outline'}`}>
+          <div>
+            <label className={`flex cursor-pointer items-center justify-between gap-4 rounded-2xl border px-5 py-4 transition-colors ${isTradeIn ? 'border-purple-500 bg-purple-50' : 'border-outline-variant bg-surface-container-lowest hover:border-outline'}`}>
               <div className="flex items-center gap-3 min-w-0">
                 <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isTradeIn ? 'bg-purple-100' : 'bg-surface-container'}`}>
                   <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isTradeIn ? 'text-purple-600' : 'text-outline'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
@@ -723,7 +724,7 @@ export default function NewProductPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-end gap-3 py-6 border-t border-outline-variant">
-            <Link href="/inventory" className="w-full sm:w-auto"><Button variant="outline" className="w-full">Cancel</Button></Link>
+            <Link href="/inventory" className="w-full sm:mr-auto sm:w-auto"><Button variant="ghost" className="w-full">Cancel</Button></Link>
             <Button variant="outline" className="w-full sm:w-auto" onClick={() => handleSave(true)} loading={saving && saveAndNew} disabled={hasConflict}>
               <Plus className="h-4 w-4" /> Save &amp; New
             </Button>
@@ -733,7 +734,7 @@ export default function NewProductPage() {
           </div>
 
         </div>
-      </main>
+      </div>
     </div>
   )
 }

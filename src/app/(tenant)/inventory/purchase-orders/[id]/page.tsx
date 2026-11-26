@@ -217,12 +217,12 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-on-surface-variant hover:text-on-surface">
+        <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-10 w-10 rounded-full border border-outline-variant text-on-surface-variant hover:text-on-surface">
           <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-on-surface font-mono">{po.po_number}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-on-surface font-mono">{po.po_number}</h1>
             <Badge variant={PO_STATUS_VARIANT[po.status] ?? 'default'}>{po.status.replace('_', ' ')}</Badge>
           </div>
           <p className="text-sm text-on-surface-variant">{po.suppliers?.name} · Created {formatDate(po.created_at)}</p>
@@ -269,7 +269,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
           { label: 'Supplier', value: po.suppliers?.name ?? '—' },
           { label: 'Payment', value: po.payment_status, className: 'capitalize' },
         ].map((card) => (
-          <div key={card.label} className="rounded-lg border border-outline-variant bg-surface p-3">
+          <div key={card.label} className="rounded-xl border border-outline-variant bg-surface p-3">
             <p className="text-xs text-outline">{card.label}</p>
             <p className={`font-semibold ${card.className ?? 'text-on-surface'}`}>{card.value}</p>
           </div>
@@ -302,7 +302,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
                   </td>
                   <td className="px-4 py-3 text-right text-on-surface-variant">{item.quantity_ordered}</td>
                   <td className="px-4 py-3 text-right">
-                    <span className={fullyReceived ? 'text-green-600 font-medium' : 'text-on-surface-variant'}>
+                    <span className={fullyReceived ? 'text-emerald-700 font-medium' : 'text-on-surface-variant'}>
                       {item.quantity_received}
                       {fullyReceived && <CheckCircle2 className="inline h-3.5 w-3.5 ml-1" />}
                     </span>
@@ -325,7 +325,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
       </div>
 
       {po.notes && (
-        <div className="rounded-lg border border-outline-variant bg-surface p-4">
+        <div className="rounded-xl border border-outline-variant bg-surface p-4">
           <p className="text-sm font-medium text-on-surface-variant mb-1">Notes</p>
           <p className="text-sm text-on-surface-variant">{po.notes}</p>
         </div>
@@ -355,7 +355,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
                     max={remaining}
                     value={grnQtys[item.id] ?? 0}
                     onChange={(e) => setGrnQtys((q) => ({ ...q, [item.id]: Number(e.target.value) }))}
-                    className="h-8 w-20 rounded-md border border-outline px-2 text-right text-sm"
+                    className="h-8 w-20 rounded-xl border border-outline-variant px-2 text-right text-sm"
                   />
                 </div>
               )
@@ -363,7 +363,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes</label>
-            <textarea rows={2} value={grnNote} onChange={(e) => setGrnNote(e.target.value)} className="w-full rounded-lg border border-outline px-3 py-2 text-sm" />
+            <textarea rows={2} value={grnNote} onChange={(e) => setGrnNote(e.target.value)} className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm" />
           </div>
           <Button
             className="w-full"
@@ -404,7 +404,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
                       const val = Math.min(Number(e.target.value), item.quantity_received)
                       setReturnQtys((q) => ({ ...q, [item.id]: isNaN(val) ? 0 : val }))
                     }}
-                    className="h-8 w-20 rounded-md border border-outline px-2 text-right text-sm"
+                    className="h-8 w-20 rounded-xl border border-outline-variant px-2 text-right text-sm"
                   />
                 </div>
                 <input
@@ -412,7 +412,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
                   placeholder="Reason (e.g. screen cracked)"
                   value={returnReasons[item.id] ?? ''}
                   onChange={(e) => setReturnReasons((r) => ({ ...r, [item.id]: e.target.value }))}
-                  className="h-8 w-full rounded-md border border-outline px-2 text-sm"
+                  className="h-8 w-full rounded-xl border border-outline-variant px-2 text-sm"
                 />
               </div>
             ))}
@@ -444,7 +444,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
             <select
               value={editSupplier}
               onChange={(e) => setEditSupplier(e.target.value)}
-              className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
+              className="h-9 w-full rounded-xl border border-outline-variant px-3 text-sm"
             >
               <option value="">Select supplier…</option>
               {suppliers.map((s) => (
@@ -464,13 +464,13 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
             <div className="mb-2 flex items-center justify-between">
               <label className="text-sm font-medium text-on-surface-variant">Line Items</label>
               <div className="flex gap-3">
-                <button type="button" onClick={() => setEditPickerOpen(true)} className="text-xs font-medium text-brand-teal hover:underline">
+                <button type="button" onClick={() => setEditPickerOpen(true)} className="text-xs font-medium text-primary hover:underline">
                   + Add product
                 </button>
                 <button
                   type="button"
                   onClick={() => setEditItems((l) => [...l, { name: '', sku: '', quantity_ordered: 1, unit_cost: 0 }])}
-                  className="text-xs text-blue-600 hover:underline"
+                  className="text-xs text-primary hover:underline"
                 >
                   + Add misc item
                 </button>
@@ -480,7 +480,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
               {editItems.map((item, idx) => (
                 <div key={idx} className="grid grid-cols-[1fr,3rem,4.5rem,1.5rem] gap-1.5 items-end">
                   {item.product_id ? (
-                    <div className="flex h-8 items-center gap-1.5 rounded-md border border-brand-teal/30 bg-brand-teal-light/10 px-2 text-sm">
+                    <div className="flex h-8 items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/10 px-2 text-sm">
                       <span className="truncate">{item.name}</span>
                     </div>
                   ) : (
@@ -490,7 +490,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
                       onChange={(e) => {
                         const u = [...editItems]; u[idx] = { ...u[idx], name: e.target.value }; setEditItems(u)
                       }}
-                      className="h-8 rounded-md border border-outline px-2 text-sm"
+                      className="h-8 rounded-xl border border-outline-variant px-2 text-sm"
                     />
                   )}
                   <input
@@ -499,7 +499,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
                     onChange={(e) => {
                       const u = [...editItems]; u[idx] = { ...u[idx], quantity_ordered: Number(e.target.value) }; setEditItems(u)
                     }}
-                    className="h-8 rounded-md border border-outline px-2 text-sm"
+                    className="h-8 rounded-xl border border-outline-variant px-2 text-sm"
                   />
                   <input
                     type="number" min="0" step="0.01" placeholder="Cost"
@@ -507,7 +507,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
                     onChange={(e) => {
                       const u = [...editItems]; u[idx] = { ...u[idx], unit_cost: Number(e.target.value) }; setEditItems(u)
                     }}
-                    className="h-8 rounded-md border border-outline px-2 text-sm"
+                    className="h-8 rounded-xl border border-outline-variant px-2 text-sm"
                   />
                   <button
                     onClick={() => setEditItems((l) => l.filter((_, i) => i !== idx))}
@@ -540,7 +540,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
             />
           </div>
 
-          <div className="rounded-lg bg-surface-container-low p-3 flex justify-between text-sm">
+          <div className="rounded-xl bg-surface-container-low p-3 flex justify-between text-sm">
             <span className="text-on-surface-variant">Total</span>
             <span className="font-semibold text-on-surface">
               {formatCurrency(editItems.reduce((s, i) => s + i.quantity_ordered * i.unit_cost, 0))}
@@ -549,7 +549,7 @@ export default function PODetailPage({ params }: { params: Promise<{ id: string 
 
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface-variant">Notes</label>
-            <textarea rows={2} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} className="w-full rounded-lg border border-outline px-3 py-2 text-sm" />
+            <textarea rows={2} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm" />
           </div>
 
           <Button className="w-full" onClick={savePO} loading={saving} disabled={!editItems.some((i) => i.name.trim())}>

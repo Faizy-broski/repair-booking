@@ -73,8 +73,8 @@ export function AssetPicker({ customerId, selected, onSelect }: AssetPickerProps
   // Device selected — show chip
   if (selected) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
-        <Cpu className="h-4 w-4 shrink-0 text-indigo-500" />
+      <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+        <Cpu className="h-4 w-4 shrink-0 text-primary" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-on-surface truncate">
             {[selected.brand, selected.model].filter(Boolean).join(' ') || selected.name}
@@ -100,7 +100,7 @@ export function AssetPicker({ customerId, selected, onSelect }: AssetPickerProps
       <button
         type="button"
         onClick={() => { setShowDropdown((v) => !v); setShowAddForm(false) }}
-        className="flex w-full items-center gap-2 rounded-lg border border-outline bg-surface px-3 py-2 text-sm text-left hover:border-outline focus:outline-none focus:border-blue-500"
+        className="flex w-full items-center gap-2 rounded-lg border border-outline bg-surface px-3 py-2 text-sm text-left hover:border-outline focus:outline-none focus:border-primary"
       >
         <Cpu className="h-4 w-4 text-outline shrink-0" />
         <span className="flex-1 text-outline">
@@ -121,7 +121,7 @@ export function AssetPicker({ customerId, selected, onSelect }: AssetPickerProps
                     onClick={() => { onSelect(a); setShowDropdown(false) }}
                     className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-surface-container-low"
                   >
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-indigo-100 text-indigo-600">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                       <Cpu className="h-3.5 w-3.5" />
                     </div>
                     <div className="min-w-0">
@@ -143,7 +143,7 @@ export function AssetPicker({ customerId, selected, onSelect }: AssetPickerProps
             <button
               type="button"
               onClick={() => { setShowAddForm(true); setShowDropdown(false) }}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-blue-600 hover:bg-blue-50"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-primary hover:bg-surface-container-low"
             >
               <Plus className="h-4 w-4" />
               Save new device to customer

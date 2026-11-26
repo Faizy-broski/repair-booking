@@ -1,7 +1,9 @@
 'use client'
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, Tag, Package, Smartphone, Cpu, Check, X, ChevronRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, Tag, Package, Smartphone, Cpu, Check, X, ChevronRight, Layers, Wrench } from 'lucide-react'
+import { PageHeader } from '@/components/shared/page-header'
+import { InventoryNav } from '@/components/inventory/inventory-nav'
 import { ImageUpload } from '@/components/ui/image-upload'
 
 interface CatCategory { id: string; name: string; image_url?: string | null }
@@ -157,18 +159,18 @@ export default function CataloguePage() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Page header */}
-      <div>
-        <h1 className="text-xl font-bold text-on-surface">Device Catalogue</h1>
-        <p className="text-sm text-on-surface-variant mt-0.5">
-          Manage device types, brands, models and part types used in repairs and parts inventory.
-        </p>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        back={{ href: '/inventory', label: 'Back to Inventory' }}
+        title="Device Catalogue"
+        description="Manage device types, brands, models and part types used in repairs and parts inventory."
+      />
 
-      <div className="rounded-xl border border-outline-variant bg-surface overflow-hidden">
+      <InventoryNav />
+
+      <div>
         {/* Mobile breadcrumb stepper */}
-        <div className="lg:hidden border-b border-outline-variant px-4 py-2 bg-surface-container-low flex items-center gap-1 flex-wrap">
+        <div className="lg:hidden mb-3 rounded-2xl border border-outline-variant px-4 py-2 bg-surface-container-low flex items-center gap-1 flex-wrap">
           <button onClick={() => setMobileStep(0)} className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${mobileStep === 0 ? 'bg-brand-teal text-white' : 'text-on-surface-variant hover:text-on-surface-variant'}`}>Types</button>
           {selectedTypeId && (<>
             <ChevronRight className="h-3 w-3 text-outline-variant shrink-0" />
@@ -189,13 +191,13 @@ export default function CataloguePage() {
         </div>
 
         {/* 4-column explorer */}
-        <div className="lg:grid lg:grid-cols-4 lg:divide-x lg:divide-outline-variant" style={{ minHeight: 520 }}>
+        <div className="lg:grid lg:grid-cols-4 lg:gap-4" style={{ minHeight: 520 }}>
 
           {/* ── Col 1: Device Types ── */}
-          <div className={`flex flex-col border-b lg:border-b-0 border-outline-variant ${mobileStep !== 0 ? 'hidden lg:flex' : 'flex'}`}>
-            <div className="flex items-center justify-between px-4 py-2 bg-surface-container-low border-b border-outline-variant">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-outline">Device Types</span>
-              <span className="text-xs text-outline bg-surface-container rounded-full px-1.5">{categories.length}</span>
+          <div className={`flex-col overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest ${mobileStep !== 0 ? 'hidden lg:flex' : 'flex'}`}>
+            <div className="flex items-center justify-between gap-2 px-4 py-3.5 bg-primary">
+              <span className="flex items-center gap-2 text-sm font-semibold text-white"><Smartphone className="h-4 w-4" />Device Types</span>
+              <span className="text-xs font-medium text-white bg-white/20 rounded-full px-2 py-0.5">{categories.length}</span>
             </div>
             <div className="px-3 py-2 border-b border-outline-variant">
               <div className="flex gap-2 items-center">
@@ -203,9 +205,9 @@ export default function CataloguePage() {
                 <input type="text" placeholder="e.g. Phones, Laptops…" value={newTypeName}
                   onChange={e => setNewTypeName(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addDeviceType()}
-                  className="h-10 flex-1 min-w-0 rounded-md border border-outline-variant px-3 text-[15px] focus:border-brand-teal focus:outline-none" />
+                  className="h-10 flex-1 min-w-0 rounded-xl border border-outline-variant px-3 text-[15px] focus:border-brand-teal focus:outline-none" />
                 <button onClick={addDeviceType} disabled={saving || !newTypeName.trim()}
-                  className="h-10 px-4 rounded-md bg-brand-teal text-white text-[13px] font-medium hover:bg-brand-teal/90 disabled:opacity-40 flex items-center gap-1.5 shrink-0">
+                  className="h-10 px-4 rounded-full bg-brand-teal text-white text-[13px] font-medium hover:bg-brand-teal/90 disabled:opacity-40 flex items-center gap-1.5 shrink-0">
                   <Plus className="h-4 w-4" /> Add
                 </button>
               </div>
@@ -218,7 +220,7 @@ export default function CataloguePage() {
                 return (
                   <div key={dt.id}
                     onClick={() => { if (!isEditing) { setSelectedTypeId(dt.id); setSelectedBrandId(null); setSelectedModelId(null); setMobileStep(1) } }}
-                    className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer border-b border-outline-variant last:border-b-0 transition-colors ${isSelected ? 'bg-teal-50 border-l-[3px] border-l-brand-teal' : 'hover:bg-surface-container-low border-l-[3px] border-l-transparent'}`}>
+                    className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer border-b border-outline-variant last:border-b-0 transition-colors ${isSelected ? 'bg-primary/5 border-l-[3px] border-l-brand-teal' : 'hover:bg-surface-container-low border-l-[3px] border-l-transparent'}`}>
                     {dt.image_url
                       ? <img src={dt.image_url} alt={dt.name} className="h-8 w-8 rounded-lg object-cover border border-outline-variant shrink-0 bg-surface" />
                       : <div className="h-8 w-8 rounded-lg bg-teal-100 flex items-center justify-center shrink-0 border border-teal-200"><Smartphone className="h-4 w-4 text-brand-teal" /></div>}
@@ -251,10 +253,10 @@ export default function CataloguePage() {
           </div>
 
           {/* ── Col 2: Brands ── */}
-          <div className={`flex flex-col border-b lg:border-b-0 border-outline-variant ${mobileStep !== 1 ? 'hidden lg:flex' : 'flex'}`}>
-            <div className="flex items-center justify-between px-4 py-2 bg-surface-container-low border-b border-outline-variant">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-outline">Brands</span>
-              {selectedTypeId && <span className="text-xs text-outline bg-surface-container rounded-full px-1.5">{brands.filter(b => b.category_id === selectedTypeId).length}</span>}
+          <div className={`flex-col overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest ${mobileStep !== 1 ? 'hidden lg:flex' : 'flex'}`}>
+            <div className="flex items-center justify-between gap-2 px-4 py-3.5 bg-primary">
+              <span className="flex items-center gap-2 text-sm font-semibold text-white"><Tag className="h-4 w-4" />Brands</span>
+              {selectedTypeId && <span className="text-xs font-medium text-white bg-white/20 rounded-full px-2 py-0.5">{brands.filter(b => b.category_id === selectedTypeId).length}</span>}
             </div>
             {!selectedTypeId ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center px-6 py-10">
@@ -269,9 +271,9 @@ export default function CataloguePage() {
                     <input type="text" placeholder="e.g. Apple, Samsung…" value={newBrandName}
                       onChange={e => setNewBrandName(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && addBrand(selectedTypeId)}
-                      className="h-10 flex-1 min-w-0 rounded-md border border-outline-variant px-3 text-[15px] focus:border-brand-teal focus:outline-none" />
+                      className="h-10 flex-1 min-w-0 rounded-xl border border-outline-variant px-3 text-[15px] focus:border-brand-teal focus:outline-none" />
                     <button onClick={() => addBrand(selectedTypeId)} disabled={saving || !newBrandName.trim()}
-                      className="h-10 px-4 rounded-md bg-brand-teal text-white text-[13px] font-medium hover:bg-brand-teal/90 disabled:opacity-40 flex items-center gap-1.5 shrink-0">
+                      className="h-10 px-4 rounded-full bg-brand-teal text-white text-[13px] font-medium hover:bg-brand-teal/90 disabled:opacity-40 flex items-center gap-1.5 shrink-0">
                       <Plus className="h-4 w-4" /> Add
                     </button>
                   </div>
@@ -284,7 +286,7 @@ export default function CataloguePage() {
                     return (
                       <div key={brand.id}
                         onClick={() => { if (!isEditing) { setSelectedBrandId(brand.id); setSelectedModelId(null); setMobileStep(2) } }}
-                        className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer border-b border-outline-variant last:border-b-0 transition-colors ${isSelected ? 'bg-teal-50 border-l-[3px] border-l-brand-teal' : 'hover:bg-surface-container-low border-l-[3px] border-l-transparent'}`}>
+                        className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer border-b border-outline-variant last:border-b-0 transition-colors ${isSelected ? 'bg-primary/5 border-l-[3px] border-l-brand-teal' : 'hover:bg-surface-container-low border-l-[3px] border-l-transparent'}`}>
                         {brand.image_url
                           ? <img src={brand.image_url} alt={brand.name} className="h-8 w-8 rounded-lg object-contain border border-outline-variant shrink-0 bg-surface" />
                           : <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100"><Tag className="h-4 w-4 text-blue-500" /></div>}
@@ -319,10 +321,10 @@ export default function CataloguePage() {
           </div>
 
           {/* ── Col 3: Models ── */}
-          <div className={`flex flex-col border-b lg:border-b-0 border-outline-variant ${mobileStep !== 2 ? 'hidden lg:flex' : 'flex'}`}>
-            <div className="flex items-center justify-between px-4 py-2 bg-surface-container-low border-b border-outline-variant">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-outline">Models</span>
-              {selectedBrandId && <span className="text-xs text-outline bg-surface-container rounded-full px-1.5">{models.filter(m => m.brand_id === selectedBrandId).length}</span>}
+          <div className={`flex-col overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest ${mobileStep !== 2 ? 'hidden lg:flex' : 'flex'}`}>
+            <div className="flex items-center justify-between gap-2 px-4 py-3.5 bg-primary">
+              <span className="flex items-center gap-2 text-sm font-semibold text-white"><Layers className="h-4 w-4" />Models</span>
+              {selectedBrandId && <span className="text-xs font-medium text-white bg-white/20 rounded-full px-2 py-0.5">{models.filter(m => m.brand_id === selectedBrandId).length}</span>}
             </div>
             {!selectedBrandId ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center px-6 py-10">
@@ -337,9 +339,9 @@ export default function CataloguePage() {
                     <input type="text" placeholder="e.g. iPhone 15, Galaxy S24…" value={newModelName}
                       onChange={e => setNewModelName(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && addModel(selectedBrandId)}
-                      className="h-10 flex-1 min-w-0 rounded-md border border-outline-variant px-3 text-[15px] focus:border-brand-teal focus:outline-none" />
+                      className="h-10 flex-1 min-w-0 rounded-xl border border-outline-variant px-3 text-[15px] focus:border-brand-teal focus:outline-none" />
                     <button onClick={() => addModel(selectedBrandId)} disabled={saving || !newModelName.trim()}
-                      className="h-10 px-4 rounded-md bg-brand-teal text-white text-[13px] font-medium hover:bg-brand-teal/90 disabled:opacity-40 flex items-center gap-1.5 shrink-0">
+                      className="h-10 px-4 rounded-full bg-brand-teal text-white text-[13px] font-medium hover:bg-brand-teal/90 disabled:opacity-40 flex items-center gap-1.5 shrink-0">
                       <Plus className="h-4 w-4" /> Add
                     </button>
                   </div>
@@ -353,7 +355,7 @@ export default function CataloguePage() {
                     return (
                       <div key={model.id}
                         onClick={() => { if (!isEditing) { setSelectedModelId(model.id); setMobileStep(3) } }}
-                        className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer border-b border-outline-variant last:border-b-0 transition-colors ${isSelected ? 'bg-teal-50 border-l-[3px] border-l-brand-teal' : 'hover:bg-surface-container-low border-l-[3px] border-l-transparent'}`}>
+                        className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer border-b border-outline-variant last:border-b-0 transition-colors ${isSelected ? 'bg-primary/5 border-l-[3px] border-l-brand-teal' : 'hover:bg-surface-container-low border-l-[3px] border-l-transparent'}`}>
                         {model.image_url
                           ? <img src={model.image_url} alt={model.name} className="h-8 w-8 rounded-lg object-cover border border-outline-variant shrink-0 bg-surface" />
                           : <div className="h-8 w-8 rounded-lg bg-surface-container flex items-center justify-center shrink-0 border border-outline-variant"><Package className="h-4 w-4 text-on-surface-variant" /></div>}
@@ -388,13 +390,12 @@ export default function CataloguePage() {
           </div>
 
           {/* ── Col 4: Part Types ── */}
-          <div className={`flex flex-col ${mobileStep !== 3 ? 'hidden lg:flex' : 'flex'}`}>
-            <div className="flex items-center justify-between px-4 py-2 bg-surface-container-low border-b border-outline-variant">
+          <div className={`flex-col overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest ${mobileStep !== 3 ? 'hidden lg:flex' : 'flex'}`}>
+            <div className="flex items-center justify-between gap-2 px-4 py-3.5 bg-primary">
               <div className="flex items-center gap-1.5">
-                <Cpu className="h-3.5 w-3.5 text-purple-500" />
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-outline">Part Types</span>
+                <span className="flex items-center gap-2 text-sm font-semibold text-white"><Wrench className="h-4 w-4" />Part Types</span>
               </div>
-              {selectedModelId && <span className="text-xs text-outline bg-surface-container rounded-full px-1.5">{partTypes.filter(p => p.device_id === selectedModelId).length}</span>}
+              {selectedModelId && <span className="text-xs font-medium text-white bg-white/20 rounded-full px-2 py-0.5">{partTypes.filter(p => p.device_id === selectedModelId).length}</span>}
             </div>
             {!selectedModelId ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center px-6 py-10">

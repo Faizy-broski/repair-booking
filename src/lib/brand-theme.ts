@@ -1,6 +1,9 @@
 import type { CSSProperties } from 'react'
 
-const DEFAULT_BRAND = '#008080'
+const DEFAULT_BRAND = '#009C9C'
+// The old default teal. Businesses that never picked their own colour have it
+// saved, so it maps to the current design teal instead.
+const LEGACY_DEFAULT_BRAND = '#008080'
 const HEX_RE = /^#([0-9a-fA-F]{6})$/
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -69,7 +72,8 @@ export type ThemeMode = 'light' | 'dark'
  * gets lighter (not darker) than the light-mode formula.
  */
 export function getBrandStyle(brandColor: string | null | undefined, mode: ThemeMode = 'light'): CSSProperties {
-  const hex = brandColor && HEX_RE.test(brandColor) ? brandColor : DEFAULT_BRAND
+  const raw = brandColor && HEX_RE.test(brandColor) ? brandColor : DEFAULT_BRAND
+  const hex = raw.toLowerCase() === LEGACY_DEFAULT_BRAND ? DEFAULT_BRAND : raw
   const [h, s, l] = hexToHsl(hex)
   const isLight = relativeLuminance(hexToRgb(hex)) > 0.45
 
@@ -82,7 +86,6 @@ export function getBrandStyle(brandColor: string | null | undefined, mode: Theme
     const fixedDim  = hslToHex(h, Math.max(0, s - 0.1), Math.max(0.18, l - 0.25))
     const onPrimary = relativeLuminance(hexToRgb(primary)) > 0.45 ? '#0d0d0d' : '#ffffff'
     const onContainer = hslToHex(h, s, Math.min(0.92, l + 0.45))
-    const sidebarBg = hslToHex(h, Math.min(0.6, s * 0.9), 0.08)
 
     return {
       '--brand-primary':            hex,
@@ -100,7 +103,6 @@ export function getBrandStyle(brandColor: string | null | undefined, mode: Theme
       '--on-primary-container':     onContainer,
       '--on-primary-fixed':         onContainer,
       '--on-primary-fixed-variant': onContainer,
-      '--sidebar-bg':               sidebarBg,
     } as CSSProperties
   }
 
@@ -109,9 +111,6 @@ export function getBrandStyle(brandColor: string | null | undefined, mode: Theme
   const fixedDim  = hslToHex(h, Math.max(0, s - 0.05), Math.min(0.92, l + 0.45))
   const onPrimary = isLight ? '#1a1a1a' : '#ffffff'
   const onContainer = hslToHex(h, s, Math.max(0.05, l - 0.35))
-
-  // Dark sidebar background: same hue, moderate saturation, very low lightness
-  const sidebarBg = hslToHex(h, Math.min(0.6, s * 0.9), 0.13)
 
   return {
     '--brand-primary':            hex,
@@ -129,6 +128,5 @@ export function getBrandStyle(brandColor: string | null | undefined, mode: Theme
     '--on-primary-container':     onContainer,
     '--on-primary-fixed':         onContainer,
     '--on-primary-fixed-variant': onContainer,
-    '--sidebar-bg':               sidebarBg,
   } as CSSProperties
 }

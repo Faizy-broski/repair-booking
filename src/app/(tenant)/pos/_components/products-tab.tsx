@@ -62,11 +62,11 @@ const ProductCard = memo(function ProductCard({
       onClick={(e) => hasVariants ? onVariantSelect(product, e) : hasDiscount ? onDiscountSelect?.(product) : onAdd(product)}
       className={`relative flex w-full flex-col overflow-hidden rounded-xl border bg-surface p-3 text-left transition-all ${outOfStock
           ? 'border-outline-variant opacity-50 cursor-not-allowed'
-          : 'border-outline-variant hover:border-brand-teal hover:shadow-sm cursor-pointer'
+          : 'border-outline-variant hover:border-primary cursor-pointer'
         }`}
     >
       {showSaleBadge && (
-        <span className="absolute right-2 top-2 z-10 rounded-full bg-brand-teal px-2 py-0.5 text-[10px] font-semibold text-white shadow">
+        <span className="absolute right-2 top-2 z-10 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-on-primary shadow">
           SALE
         </span>
       )}
@@ -100,11 +100,11 @@ const ProductCard = memo(function ProductCard({
         <div className="space-y-1">
           {hasDiscount ? (
             <span className="flex items-center gap-1.5">
-              <span className="text-sm font-bold text-brand-teal">{formatCurrency(product.active_discount!.discount_price)}</span>
+              <span className="text-sm font-bold text-primary">{formatCurrency(product.active_discount!.discount_price)}</span>
               <span className="text-xs text-outline line-through">{formatCurrency(product.selling_price)}</span>
             </span>
           ) : (
-            <span className="text-sm font-bold text-brand-teal">{formatCurrency(product.selling_price)}</span>
+            <span className="text-sm font-bold text-primary">{formatCurrency(product.selling_price)}</span>
           )}
           {product.on_hand !== undefined && !product.is_service && !hasVariants && (
             <span className={`block text-xs font-medium ${(product.on_hand ?? 0) > 0 ? 'text-outline' : 'text-red-500'}`}>
@@ -112,7 +112,7 @@ const ProductCard = memo(function ProductCard({
             </span>
           )}
           {hasVariants && (
-            <span className="block text-xs font-medium text-indigo-500">
+            <span className="block text-xs font-medium text-primary">
               {product.has_variant_discount ? 'Select variant · some on sale' : 'Select variant'}
             </span>
           )}
@@ -156,16 +156,16 @@ const VariantPopover = memo(function VariantPopover({
         onClick={e => e.stopPropagation()}
       >
         {/* Brand accent bar */}
-        <div className="h-1.5 w-full bg-brand-teal shrink-0" />
+        <div className="h-1.5 w-full bg-primary shrink-0" />
 
         {/* Header */}
         <div className="flex items-center justify-between border-b border-outline-variant bg-surface px-5 pt-4 pb-4 shrink-0">
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-brand-teal mb-0.5">Select variant</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-0.5">Select variant</p>
             <p className="truncate text-lg font-bold text-on-surface">{product.name}</p>
           </div>
           <div className="ml-3 flex items-center gap-2 shrink-0">
-            {fetching && variants.length > 0 && <Loader2 className="h-4 w-4 animate-spin text-brand-teal/50" />}
+            {fetching && variants.length > 0 && <Loader2 className="h-4 w-4 animate-spin text-primary/50" />}
             <button
               onClick={onClose}
               className="flex h-8 w-8 items-center justify-center rounded-full text-outline hover:bg-surface-container hover:text-on-surface-variant transition-colors"
@@ -203,11 +203,11 @@ const VariantPopover = memo(function VariantPopover({
                 <img
                   src={v.image_url}
                   alt={v.name}
-                  className="h-12 w-12 shrink-0 rounded-lg border border-outline-variant object-cover shadow-sm"
+                  className="h-12 w-12 shrink-0 rounded-xl border border-outline-variant object-cover"
                 />
               ) : (
-                <div className="h-12 w-12 shrink-0 rounded-lg bg-brand-teal-light/50 border border-brand-teal/10 flex items-center justify-center">
-                  <span className="text-xs font-bold text-brand-teal/60 uppercase leading-none text-center px-1 break-all line-clamp-2">
+                <div className="h-12 w-12 shrink-0 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+                  <span className="text-xs font-bold text-primary/60 uppercase leading-none text-center px-1 break-all line-clamp-2">
                     {v.name.slice(0, 3)}
                   </span>
                 </div>
@@ -218,7 +218,7 @@ const VariantPopover = memo(function VariantPopover({
                   {Object.entries(v.attributes).map(([k, val]) => (
                     <span
                       key={k}
-                      className="rounded-md bg-surface-container-high/50 px-2 py-0.5 text-[10px] font-semibold text-on-surface-variant"
+                      className="rounded-xl bg-surface-container-high/50 px-2 py-0.5 text-[10px] font-semibold text-on-surface-variant"
                     >
                       {k}: {val}
                     </span>
@@ -229,7 +229,7 @@ const VariantPopover = memo(function VariantPopover({
               // ── Discounted variant ──────────────────────────────────────────
               if (hasDiscount) {
                 return (
-                  <div key={v.id} className="rounded-xl border border-brand-teal/30 bg-surface shadow-sm overflow-hidden">
+                  <div key={v.id} className="rounded-xl border border-primary/20 bg-surface overflow-hidden">
                     {/* Variant identity row */}
                     <div className="flex items-start gap-3 px-4 pt-4 pb-3">
                       {variantImage}
@@ -237,24 +237,24 @@ const VariantPopover = memo(function VariantPopover({
                         <p className="truncate text-base font-bold text-on-surface">{v.name}</p>
                         {attrPills}
                       </div>
-                      <span className="shrink-0 rounded-full bg-brand-teal px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm mt-1">Sale</span>
+                      <span className="shrink-0 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-on-primary mt-1">Sale</span>
                     </div>
                     {/* Price choice buttons */}
                     <div className="grid grid-cols-2 gap-2 px-4 pb-4">
                       <button
                         onClick={() => onAdd(v, true)}
-                        className="flex flex-col items-start rounded-xl border-2 border-brand-teal/60 bg-brand-teal-light/20 px-3.5 py-2.5 text-left transition-all hover:border-brand-teal hover:bg-brand-teal-light/40 active:scale-[0.98]"
+                        className="flex flex-col items-start rounded-xl border-2 border-primary/20 bg-primary/10 px-3.5 py-2.5 text-left transition-all hover:border-primary hover:bg-primary/10 active:scale-[0.98]"
                       >
-                        <span className="text-[10px] font-bold text-brand-teal uppercase tracking-wide">Sale price</span>
-                        <span className="text-lg font-extrabold text-brand-teal leading-tight mt-0.5">{formatCurrency(v.active_discount!.discount_price)}</span>
+                        <span className="text-[10px] font-bold text-primary uppercase tracking-wide">Sale price</span>
+                        <span className="text-lg font-extrabold text-primary leading-tight mt-0.5">{formatCurrency(v.active_discount!.discount_price)}</span>
                         <div className="flex items-center gap-2 mt-1 w-full justify-between">
                           <span className="text-[10px] text-outline line-through">{formatCurrency(v.selling_price)}</span>
-                          <span className="text-[10px] font-bold text-brand-teal/70">{v.active_discount!.quantity_remaining} left</span>
+                          <span className="text-[10px] font-bold text-primary/70">{v.active_discount!.quantity_remaining} left</span>
                         </div>
                       </button>
                       <button
                         onClick={() => onAdd(v, false)}
-                        className="flex flex-col items-start justify-center rounded-xl border border-outline-variant bg-surface px-3.5 py-2.5 text-left transition-all hover:border-outline hover:bg-surface-container-low active:scale-[0.98]"
+                        className="flex flex-col items-start justify-center rounded-xl border border-outline-variant bg-surface px-3.5 py-2.5 text-left transition-all hover:border-outline-variant hover:bg-surface-container-low active:scale-[0.98]"
                       >
                         <span className="text-[10px] font-bold text-outline uppercase tracking-wide">Regular</span>
                         <span className="text-lg font-bold text-on-surface leading-tight mt-0.5">{formatCurrency(v.selling_price)}</span>
@@ -272,7 +272,7 @@ const VariantPopover = memo(function VariantPopover({
                   className={`flex w-full items-center gap-4 rounded-xl border p-3.5 text-left transition-all ${
                     oos
                       ? 'pointer-events-none border-dashed border-outline-variant bg-surface-container-low opacity-50'
-                      : 'border-outline-variant bg-surface hover:border-brand-teal/40 hover:bg-brand-teal-light/20 hover:shadow-sm cursor-pointer active:scale-[0.99]'
+                      : 'border-outline-variant bg-surface hover:border-primary/20 hover:bg-primary/10 cursor-pointer active:scale-[0.99]'
                   }`}
                 >
                   {variantImage}
@@ -347,9 +347,9 @@ const DiscountPricePopover = memo(function DiscountPricePopover({
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between rounded-t-2xl border-b border-outline-variant bg-brand-teal-light/30 px-4 pt-4 pb-3">
+        <div className="flex items-center justify-between rounded-t-2xl border-b border-outline-variant bg-primary/10 px-4 pt-4 pb-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-brand-teal mb-0.5">This item is on sale</p>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-primary mb-0.5">This item is on sale</p>
             <p className="truncate text-base font-bold text-on-surface">{product.name}</p>
           </div>
           <button
@@ -365,22 +365,22 @@ const DiscountPricePopover = memo(function DiscountPricePopover({
           {/* Sale price row */}
           <button
             onClick={() => onPick(true)}
-            className="group flex w-full items-center justify-between rounded-xl border-2 border-brand-teal/50 bg-brand-teal-light/40 p-4 text-left transition-all hover:border-brand-teal/70 hover:bg-brand-teal-light/60 active:scale-[0.99]"
+            className="group flex w-full items-center justify-between rounded-xl border-2 border-primary/20 bg-primary/10 p-4 text-left transition-all hover:border-primary/20 hover:bg-primary/10 active:scale-[0.99]"
           >
             <div className="min-w-0">
               <div className="mb-1.5 flex items-center gap-2">
-                <span className="rounded-full bg-brand-teal px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Sale</span>
-                <span className="text-xs font-semibold text-brand-teal">{discount.quantity_remaining} left at this price</span>
+                <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-on-primary">Sale</span>
+                <span className="text-xs font-semibold text-primary">{discount.quantity_remaining} left at this price</span>
               </div>
               <p className="text-[11px] text-outline line-through">{formatCurrency(product.selling_price)}</p>
             </div>
-            <p className="shrink-0 ml-3 text-2xl font-extrabold text-brand-teal">{formatCurrency(discount.discount_price)}</p>
+            <p className="shrink-0 ml-3 text-2xl font-extrabold text-primary">{formatCurrency(discount.discount_price)}</p>
           </button>
 
           {/* Regular price row */}
           <button
             onClick={() => onPick(false)}
-            className="flex w-full items-center justify-between rounded-xl border border-outline-variant bg-surface-container-low/60 p-4 text-left transition-all hover:border-outline hover:bg-surface active:scale-[0.99]"
+            className="flex w-full items-center justify-between rounded-xl border border-outline-variant bg-surface-container-low/60 p-4 text-left transition-all hover:border-outline-variant hover:bg-surface active:scale-[0.99]"
           >
             <p className="text-sm font-semibold text-on-surface-variant">Regular Price</p>
             <p className="text-lg font-bold text-on-surface">{formatCurrency(product.selling_price)}</p>
@@ -843,7 +843,7 @@ export function ProductsTab() {
       {/* Toggle bar */}
       <div className="flex shrink-0 items-center gap-2 border-b border-outline-variant bg-surface px-3 py-2">
         <div className="flex min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div className="flex overflow-hidden rounded-lg border border-outline-variant">
+          <div className="flex overflow-hidden rounded-xl border border-outline-variant">
             {(
               useSimpleCatalog
                 ? (['all_products', 'by_category', 'custom_item'] as const)
@@ -864,7 +864,7 @@ export function ProductsTab() {
                     if (view === 'by_products' && catBreadcrumb.length === 0) loadCatLevel('device_types')
                     if (view === 'by_parts' && partBreadcrumb.length === 0) loadPartLevel('device_types')
                   }}
-                  className={`shrink-0 px-3 py-2 text-xs font-medium transition-colors sm:px-5 sm:text-sm ${i > 0 ? 'border-l border-outline-variant' : ''} ${productsView === view ? 'bg-surface text-brand-teal font-semibold border-b-2 border-brand-teal' : 'text-on-surface-variant hover:bg-surface-container-low'
+                  className={`shrink-0 px-3 py-2 text-xs font-medium transition-colors sm:px-5 sm:text-sm ${i > 0 ? 'border-l border-outline-variant' : ''} ${productsView === view ? 'bg-surface text-primary font-semibold border-b-2 border-primary' : 'text-on-surface-variant hover:bg-surface-container-low'
                     }`}
                 >
                   {label}
@@ -875,10 +875,10 @@ export function ProductsTab() {
         </div>
         <button
           onClick={openAdvSearch}
-          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-outline-variant bg-surface px-2 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-container-low sm:px-3"
+          className="flex shrink-0 items-center gap-1.5 rounded-xl border border-outline-variant bg-surface px-2 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-container-low sm:px-3"
         >
           <Search className="h-3.5 w-3.5" />
-          <span className="hidden rounded bg-surface-container px-1 text-[10px] font-mono text-on-surface-variant sm:inline">Ctrl S</span>
+          <span className="hidden rounded-xl bg-surface-container px-1 text-[10px] font-mono text-on-surface-variant sm:inline">Ctrl S</span>
           <span className="hidden sm:inline">Advance Search</span>
         </button>
         <ScanButton onClick={() => setScannerOpen(true)} className="text-xs py-1.5" />
@@ -890,7 +890,7 @@ export function ProductsTab() {
         {productsView === 'all_products' && (
           <div className="space-y-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-outline pointer-events-none" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-outline pointer-events-none" />
               <input
                 type="text" value={allProductsSearch} onChange={e => setAllProductsSearch(e.target.value)}
                 onKeyDown={async (e) => {
@@ -927,7 +927,7 @@ export function ProductsTab() {
                   }
                 }}
                 placeholder="Search by name, SKU or barcode…" autoFocus
-                className="w-full rounded-lg border border-outline-variant bg-surface pl-9 pr-9 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal"
+                className="h-11 w-full rounded-full border border-outline-variant bg-surface pl-10 pr-10 text-base focus:border-primary focus:outline-none"
               />
               {allProductsSearch && (
                 <button onClick={() => setAllProductsSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface-variant">
@@ -940,13 +940,13 @@ export function ProductsTab() {
                 <button
                   key={t}
                   onClick={() => setAllProductsItemType(t)}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${allProductsItemType === t ? 'bg-brand-teal text-white shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}`}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${allProductsItemType === t ? 'bg-primary text-on-primary shadow-sm' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}`}
                 >
                   {t === 'all' ? 'All' : t === 'product' ? 'Products' : 'Parts'}
                 </button>
               ))}
               {allCats.length > 0 && (
-                <select value={allProductsCategoryId} onChange={e => setAllProductsCategoryId(e.target.value)} className="rounded-lg border border-outline-variant bg-surface px-3 py-1.5 text-sm text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-brand-teal/30 focus:border-brand-teal">
+                <select value={allProductsCategoryId} onChange={e => setAllProductsCategoryId(e.target.value)} className="rounded-xl border border-outline-variant bg-surface px-3 py-1.5 text-sm text-on-surface-variant focus:outline-none focus:border-primary focus:border-primary">
                   <option value="">All Categories</option>
                   {allCats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -972,7 +972,7 @@ export function ProductsTab() {
                     <button
                       onClick={() => fetchNextPage()}
                       disabled={isFetchingNextPage}
-                      className="flex items-center gap-2 rounded-lg border border-outline-variant bg-surface px-5 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50 transition-colors"
+                      className="flex items-center gap-2 rounded-xl border border-outline-variant bg-surface px-5 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50 transition-colors"
                     >
                       {isFetchingNextPage
                         ? <><Loader2 className="h-4 w-4 animate-spin" /> Loading…</>
@@ -996,13 +996,13 @@ export function ProductsTab() {
           <>
             {catBreadcrumb.length > 0 && (
               <div className="flex items-center gap-1 text-xs flex-wrap">
-                <button onClick={resetCatBrowse} className="text-blue-500 hover:underline">Device Types</button>
+                <button onClick={resetCatBrowse} className="text-primary hover:underline">Device Types</button>
                 {catBreadcrumb.map((crumb, i) => (
                   <span key={crumb.id} className="flex items-center gap-1">
                     <ChevronRight className="h-3 w-3 text-outline" />
                     {i === catBreadcrumb.length - 1
                       ? <span className="font-semibold text-on-surface">{crumb.name}</span>
-                      : <button onClick={() => navigateCatBreadcrumb(i)} className="text-blue-500 hover:underline">{crumb.name}</button>
+                      : <button onClick={() => navigateCatBreadcrumb(i)} className="text-primary hover:underline">{crumb.name}</button>
                     }
                   </span>
                 ))}
@@ -1014,7 +1014,7 @@ export function ProductsTab() {
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
                   {catItems.map(item => (
-                    <button key={item.id} onClick={() => selectCatItem(item)} className="flex flex-col w-full overflow-hidden rounded-xl border border-outline-variant bg-surface hover:border-brand-teal hover:shadow-sm transition-all text-center min-h-[140px]">
+                    <button key={item.id} onClick={() => selectCatItem(item)} className="flex flex-col w-full overflow-hidden rounded-xl border border-outline-variant bg-surface hover:border-primary transition-all text-center min-h-[140px]">
                       {item.image_url ? (
                         <div className="relative w-full h-24 border-b border-outline-variant bg-surface">
                           <Image src={item.image_url} alt={item.name} fill sizes="(max-width: 640px) 50vw, 33vw" className="object-contain" />
@@ -1022,8 +1022,8 @@ export function ProductsTab() {
                       ) : (
                         <div className="flex w-full h-24 items-center justify-center bg-surface-container-low border-b border-outline-variant">
                           {catLevel === 'device_types' && <Layers className="h-8 w-8 text-outline" />}
-                          {catLevel === 'brands' && <Tag className="h-8 w-8 text-blue-400" />}
-                          {catLevel === 'models' && <Phone className="h-8 w-8 text-purple-400" />}
+                          {catLevel === 'brands' && <Tag className="h-8 w-8 text-primary" />}
+                          {catLevel === 'models' && <Phone className="h-8 w-8 text-primary" />}
                         </div>
                       )}
                       <div className="w-full p-3 flex-1 flex items-center justify-center">
@@ -1061,13 +1061,13 @@ export function ProductsTab() {
           <>
             {partBreadcrumb.length > 0 && (
               <div className="flex items-center gap-1 text-xs flex-wrap">
-                <button onClick={resetPartBrowse} className="text-blue-500 hover:underline">Device Types</button>
+                <button onClick={resetPartBrowse} className="text-primary hover:underline">Device Types</button>
                 {partBreadcrumb.map((crumb, i) => (
                   <span key={crumb.id} className="flex items-center gap-1">
                     <ChevronRight className="h-3 w-3 text-outline" />
                     {i === partBreadcrumb.length - 1
                       ? <span className="font-semibold text-on-surface">{crumb.name}</span>
-                      : <button onClick={() => navigatePartBreadcrumb(i)} className="text-blue-500 hover:underline">{crumb.name}</button>
+                      : <button onClick={() => navigatePartBreadcrumb(i)} className="text-primary hover:underline">{crumb.name}</button>
                     }
                   </span>
                 ))}
@@ -1085,21 +1085,21 @@ export function ProductsTab() {
                     const oos = !hasVariants && typeof product.on_hand === 'number' && product.on_hand <= 0
                     return (
                       <button key={product.id} disabled={oos} onClick={(e) => handleProductClick(product, e)}
-                        className={`relative flex flex-col items-center rounded-xl border bg-surface p-3 text-center transition-all w-full overflow-hidden ${oos ? 'border-outline-variant opacity-50 cursor-not-allowed' : 'border-outline-variant hover:border-brand-teal hover:shadow-sm cursor-pointer'}`}>
+                        className={`relative flex flex-col items-center rounded-xl border bg-surface p-3 text-center transition-all w-full overflow-hidden ${oos ? 'border-outline-variant opacity-50 cursor-not-allowed' : 'border-outline-variant hover:border-primary cursor-pointer'}`}>
                         {oos && (
                           <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-surface/60">
                             <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-600">Out of Stock</span>
                           </div>
                         )}
                         {product.image_url ? (
-                          <div className="relative mb-2 w-full h-28 rounded-lg bg-surface-container-low overflow-hidden">
+                          <div className="relative mb-2 w-full h-28 rounded-xl bg-surface-container-low overflow-hidden">
                             <Image src={product.image_url} alt={product.name} fill sizes="(max-width: 640px) 50vw, 33vw" className="object-contain" />
                           </div>
                         ) : (
-                          <div className="mb-2 flex h-28 w-full items-center justify-center rounded-lg bg-surface-container"><Package className="h-8 w-8 text-outline-variant" /></div>
+                          <div className="mb-2 flex h-28 w-full items-center justify-center rounded-xl bg-surface-container"><Package className="h-8 w-8 text-outline-variant" /></div>
                         )}
                         <span className="text-sm font-semibold text-on-surface line-clamp-2 leading-tight w-full">{product.name}</span>
-                        <span className="text-sm font-bold text-brand-teal mt-1">{formatCurrency(Number(product.selling_price))}</span>
+                        <span className="text-sm font-bold text-primary mt-1">{formatCurrency(Number(product.selling_price))}</span>
                         {typeof product.on_hand === 'number' && (
                           <span className={`text-xs mt-0.5 ${product.on_hand > 0 ? 'text-outline' : 'text-red-500 font-medium'}`}>
                             {product.on_hand > 0 ? `${product.on_hand} in stock` : 'Out of stock'}
@@ -1115,7 +1115,7 @@ export function ProductsTab() {
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 animate-in fade-in duration-300">
                 {partItems.map(item => (
-                  <button key={item.id} onClick={() => selectPartItem(item)} className="flex flex-col w-full overflow-hidden rounded-xl border border-outline-variant bg-surface hover:border-brand-teal hover:shadow-sm transition-all cursor-pointer text-center min-h-[140px]">
+                  <button key={item.id} onClick={() => selectPartItem(item)} className="flex flex-col w-full overflow-hidden rounded-xl border border-outline-variant bg-surface hover:border-primary transition-all cursor-pointer text-center min-h-[140px]">
                     {item.image_url ? (
                       <div className="relative w-full h-24 border-b border-outline-variant bg-surface">
                         <Image src={item.image_url} alt={item.name} fill sizes="(max-width: 640px) 50vw, 33vw" className="object-contain" />
@@ -1123,9 +1123,9 @@ export function ProductsTab() {
                     ) : (
                       <div className="flex w-full h-24 items-center justify-center bg-surface-container-low border-b border-outline-variant">
                         {partLevel === 'device_types' && <Layers className="h-8 w-8 text-outline" />}
-                        {partLevel === 'brands' && <Tag className="h-8 w-8 text-blue-400" />}
-                        {partLevel === 'models' && <Phone className="h-8 w-8 text-purple-400" />}
-                        {partLevel === 'part_types' && <Package className="h-8 w-8 text-purple-500" />}
+                        {partLevel === 'brands' && <Tag className="h-8 w-8 text-primary" />}
+                        {partLevel === 'models' && <Phone className="h-8 w-8 text-primary" />}
+                        {partLevel === 'part_types' && <Package className="h-8 w-8 text-primary" />}
                       </div>
                     )}
                     <div className="w-full p-3 flex-1 flex items-center justify-center">
@@ -1158,7 +1158,7 @@ export function ProductsTab() {
                     <button
                       key={cat.id}
                       onClick={() => setAllProductsCategoryId(cat.id)}
-                      className="flex flex-col w-full overflow-hidden rounded-xl border border-outline-variant bg-surface hover:border-brand-teal hover:shadow-sm transition-all text-center min-h-[100px] items-center justify-center p-4"
+                      className="flex flex-col w-full overflow-hidden rounded-xl border border-outline-variant bg-surface hover:border-primary transition-all text-center min-h-[100px] items-center justify-center p-4"
                     >
                       <Layers className="h-8 w-8 text-outline mb-2" />
                       <span className="text-sm font-semibold text-on-surface line-clamp-2 leading-tight">{cat.name}</span>
@@ -1169,7 +1169,7 @@ export function ProductsTab() {
             ) : (
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-xs">
-                  <button onClick={() => setAllProductsCategoryId('')} className="text-blue-500 hover:underline">
+                  <button onClick={() => setAllProductsCategoryId('')} className="text-primary hover:underline">
                     All Categories
                   </button>
                   <ChevronRight className="h-3 w-3 text-outline" />
@@ -1189,7 +1189,7 @@ export function ProductsTab() {
                         <button
                           onClick={() => fetchNextPage()}
                           disabled={isFetchingNextPage}
-                          className="flex items-center gap-2 rounded-lg border border-outline-variant bg-surface px-5 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50 transition-colors"
+                          className="flex items-center gap-2 rounded-xl border border-outline-variant bg-surface px-5 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-low disabled:opacity-50 transition-colors"
                         >
                           {isFetchingNextPage
                             ? <><Loader2 className="h-4 w-4 animate-spin" /> Loading…</>
@@ -1211,11 +1211,11 @@ export function ProductsTab() {
 
         {/* CUSTOM ITEM VIEW */}
         {productsView === 'custom_item' && (
-          <div className="max-w-md rounded-xl border border-outline-variant bg-surface p-5 shadow-sm space-y-3">
+          <div className="max-w-md rounded-xl border border-outline-variant bg-surface p-5 space-y-3">
             <h3 className="font-semibold text-on-surface">Add Custom Item</h3>
             <Input label="Item Name" placeholder="Enter item description..." value={miscName} onChange={e => setMiscName(e.target.value)} />
             <Input label="Price (£)" type="number" min="0" step="0.01" placeholder="0.00" value={miscPrice} onChange={e => setMiscPrice(e.target.value)} />
-            <Button className="w-full bg-brand-teal hover:bg-brand-teal-dark" disabled={!miscName.trim() || !miscPrice} onClick={addMiscItem}>
+            <Button className="w-full bg-primary hover:bg-primary/90" disabled={!miscName.trim() || !miscPrice} onClick={addMiscItem}>
               <Plus className="h-4 w-4" /> Add to Cart
             </Button>
           </div>
@@ -1254,8 +1254,8 @@ export function ProductsTab() {
               </div>
               <div className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
                 {allCats.map(cat => (
-                  <label key={cat.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-surface-container-low">
-                    <input type="checkbox" checked={advSearchCatIds.has(cat.id)} onChange={() => toggleAdvCat(cat.id)} className="h-3.5 w-3.5 rounded border-outline text-brand-teal accent-[var(--brand-teal)]" />
+                  <label key={cat.id} className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-surface-container-low">
+                    <input type="checkbox" checked={advSearchCatIds.has(cat.id)} onChange={() => toggleAdvCat(cat.id)} className="h-3.5 w-3.5 rounded-xl border-outline-variant text-primary accent-[var(--primary)]" />
                     <span className="text-xs text-on-surface-variant">{cat.name}</span>
                   </label>
                 ))}
@@ -1271,11 +1271,11 @@ export function ProductsTab() {
               <div className="flex gap-3 border-b border-outline-variant px-5 py-3">
                 <div className="flex-1">
                   <p className="mb-1 text-xs font-medium text-on-surface-variant">Item Name</p>
-                  <input type="text" placeholder="Enter item name" value={advSearchName} onChange={e => setAdvSearchName(e.target.value)} onKeyDown={e => e.key === 'Enter' && runAdvSearch()} className="h-8 w-full rounded border border-outline-variant px-3 text-sm focus:border-brand-teal focus:outline-none" />
+                  <input type="text" placeholder="Enter item name" value={advSearchName} onChange={e => setAdvSearchName(e.target.value)} onKeyDown={e => e.key === 'Enter' && runAdvSearch()} className="h-8 w-full rounded-xl border border-outline-variant px-3 text-sm focus:border-primary focus:outline-none" />
                 </div>
                 <div className="flex-1">
                   <p className="mb-1 text-xs font-medium text-on-surface-variant">Item Identifier</p>
-                  <input type="text" placeholder="Item ID/SKU/UPC/IMEI/Serial" value={advSearchSku} onChange={e => setAdvSearchSku(e.target.value)} onKeyDown={e => e.key === 'Enter' && runAdvSearch()} className="h-8 w-full rounded border border-outline-variant px-3 text-sm focus:border-brand-teal focus:outline-none" />
+                  <input type="text" placeholder="Item ID/SKU/UPC/IMEI/Serial" value={advSearchSku} onChange={e => setAdvSearchSku(e.target.value)} onKeyDown={e => e.key === 'Enter' && runAdvSearch()} className="h-8 w-full rounded-xl border border-outline-variant px-3 text-sm focus:border-primary focus:outline-none" />
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto px-5 py-3">
@@ -1284,7 +1284,7 @@ export function ProductsTab() {
                   <p className="mb-2 text-xs text-amber-600">Showing first 100 results — refine your search to narrow results.</p>
                 )}
                 {advSearching ? (
-                  <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-12 animate-pulse rounded bg-surface-container" />)}</div>
+                  <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-12 animate-pulse rounded-xl bg-surface-container" />)}</div>
                 ) : advSearchResults.length === 0 ? (
                   <p className="py-8 text-center text-sm text-outline">No results. Try searching above.</p>
                 ) : (
@@ -1303,21 +1303,21 @@ export function ProductsTab() {
                         <tr key={p.id} className="hover:bg-surface-container-low">
                           <td className="py-2">
                             <div className="flex items-center gap-2">
-                              {p.image_url ? <div className="relative h-9 w-9 shrink-0 rounded border border-outline-variant overflow-hidden"><Image src={p.image_url} alt={p.name} fill sizes="36px" className="object-contain" /></div> : <div className="flex h-9 w-9 items-center justify-center rounded bg-surface-container"><ShoppingBag className="h-4 w-4 text-outline-variant" /></div>}
+                              {p.image_url ? <div className="relative h-9 w-9 shrink-0 rounded-xl border border-outline-variant overflow-hidden"><Image src={p.image_url} alt={p.name} fill sizes="36px" className="object-contain" /></div> : <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-surface-container"><ShoppingBag className="h-4 w-4 text-outline-variant" /></div>}
                               <div className="min-w-0">
                                 <p className="line-clamp-1 text-xs font-medium text-on-surface">{p.name}</p>
-                                {p.is_serialized && <span className="inline-block rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-600">Serialized</span>}
+                                {p.is_serialized && <span className="inline-block rounded-xl bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">Serialized</span>}
                               </div>
                             </div>
                           </td>
                           <td className="py-2 text-xs text-on-surface-variant">{p.sku ?? '—'}</td>
                           <td className="py-2 text-center">
                             {p.on_hand !== undefined
-                              ? <span className={`inline-flex h-6 w-8 items-center justify-center rounded-full text-xs font-medium ${(p.on_hand ?? 0) > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>{p.on_hand ?? 0}</span>
+                              ? <span className={`inline-flex h-6 w-8 items-center justify-center rounded-full text-xs font-medium ${(p.on_hand ?? 0) > 0 ? 'bg-green-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>{p.on_hand ?? 0}</span>
                               : <span className="text-xs text-outline">—</span>
                             }
                           </td>
-                          <td className="py-2 text-right text-xs font-semibold text-brand-teal">{formatCurrency(p.selling_price)}</td>
+                          <td className="py-2 text-right text-xs font-semibold text-primary">{formatCurrency(p.selling_price)}</td>
                           <td className="py-2 pl-2">
                             {(() => {
                               const advOos = !p.is_service && !(p.has_variants || (p.variant_count ?? 0) > 0) && p.on_hand !== undefined && (p.on_hand ?? 0) <= 0
@@ -1326,7 +1326,7 @@ export function ProductsTab() {
                                   disabled={advOos}
                                   title={advOos ? 'Out of stock' : undefined}
                                   onClick={() => { setAdvSearchOpen(false); handleProductClick(p) }}
-                                  className={`flex h-7 w-7 items-center justify-center rounded border text-on-surface-variant ${advOos ? 'border-outline-variant opacity-40 cursor-not-allowed' : 'border-outline-variant hover:border-brand-teal hover:text-brand-teal'}`}
+                                  className={`flex h-7 w-7 items-center justify-center rounded-xl border text-on-surface-variant ${advOos ? 'border-outline-variant opacity-40 cursor-not-allowed' : 'border-outline-variant hover:border-primary hover:text-primary'}`}
                                 >
                                   <Plus className="h-3.5 w-3.5" />
                                 </button>
@@ -1343,7 +1343,7 @@ export function ProductsTab() {
                 <button onClick={() => { setAdvSearchName(''); setAdvSearchSku(''); setAdvSearchCatIds(new Set()); setAdvSearchResults([]) }} className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface-variant">
                   <X className="h-3.5 w-3.5" /> Reset
                 </button>
-                <button onClick={runAdvSearch} disabled={advSearching} className="flex items-center gap-1.5 rounded-lg bg-brand-teal px-4 py-1.5 text-xs font-medium text-white hover:bg-brand-teal-dark disabled:opacity-50">
+                <button onClick={runAdvSearch} disabled={advSearching} className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-1.5 text-xs font-medium text-on-primary hover:bg-primary/90 disabled:opacity-50">
                   <Search className="h-3.5 w-3.5" /> Search
                 </button>
               </div>
@@ -1358,7 +1358,7 @@ export function ProductsTab() {
           <div className="flex w-[880px] max-h-[88vh] flex-col rounded-2xl bg-surface shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-brand-teal" />
+                <ShieldCheck className="h-5 w-5 text-primary" />
                 <h3 className="text-base font-bold text-on-surface">Warranty Claim — Check Device / Item History</h3>
               </div>
               <button onClick={() => setWarrantyOpen(false)} className="text-outline hover:text-on-surface-variant"><X className="h-5 w-5" /></button>
@@ -1379,12 +1379,12 @@ export function ProductsTab() {
                       value={(warrantyForm as any)[field.key]}
                       onChange={e => setWarrantyForm(f => ({ ...f, [field.key]: e.target.value }))}
                       onKeyDown={e => e.key === 'Enter' && runWarrantySearch()}
-                      className="h-8 w-full rounded border border-outline-variant px-3 text-sm focus:border-brand-teal focus:outline-none"
+                      className="h-8 w-full rounded-xl border border-outline-variant px-3 text-sm focus:border-primary focus:outline-none"
                     />
                   </div>
                 ))}
                 <div className="flex items-end">
-                  <button onClick={runWarrantySearch} disabled={warrantySearching} className="flex h-8 w-full items-center justify-center gap-2 rounded-lg bg-brand-teal px-4 text-sm font-medium text-white hover:bg-brand-teal-dark disabled:opacity-50">
+                  <button onClick={runWarrantySearch} disabled={warrantySearching} className="flex h-8 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-medium text-on-primary hover:bg-primary/90 disabled:opacity-50">
                     <Search className="h-3.5 w-3.5" /> {warrantySearching ? 'Searching…' : 'Search'}
                   </button>
                 </div>
@@ -1392,7 +1392,7 @@ export function ProductsTab() {
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {warrantySearching ? (
-                <div className="space-y-3">{[1, 2].map(i => <div key={i} className="h-24 animate-pulse rounded-lg bg-surface-container" />)}</div>
+                <div className="space-y-3">{[1, 2].map(i => <div key={i} className="h-24 animate-pulse rounded-xl bg-surface-container" />)}</div>
               ) : warrantyResults.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-outline">
                   <ShieldCheck className="h-12 w-12 mb-3 opacity-30" />
@@ -1403,7 +1403,7 @@ export function ProductsTab() {
                   {warrantyResults.map((repair: any) => {
                     const customer = repair.customers
                     const items: any[] = repair.repair_items ?? []
-                    const statusColors: Record<string, string> = { repaired: 'bg-green-100 text-green-700', in_progress: 'bg-blue-100 text-blue-700', waiting_for_parts: 'bg-yellow-100 text-yellow-700', waiting_for_inspection: 'bg-orange-100 text-orange-700', picked_up: 'bg-surface-container text-on-surface-variant' }
+                    const statusColors: Record<string, string> = { repaired: 'bg-green-100 text-emerald-700', in_progress: 'bg-primary/10 text-primary', waiting_for_parts: 'bg-yellow-100 text-yellow-700', waiting_for_inspection: 'bg-orange-100 text-orange-700', picked_up: 'bg-surface-container text-on-surface-variant' }
                     const statusLabel = repair.status.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
                     return (
                       <div key={repair.id} className="rounded-xl border border-outline-variant overflow-hidden">
@@ -1417,11 +1417,11 @@ export function ProductsTab() {
                           <div className="flex items-center gap-2">
                             <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusColors[repair.status] ?? 'bg-surface-container text-on-surface-variant'}`}>{statusLabel}</span>
                             <div className="relative">
-                              <button onClick={() => setWarrantyActionsOpen(warrantyActionsOpen === repair.id ? null : repair.id)} className="flex items-center gap-1 rounded-lg border border-outline-variant bg-surface px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-container-low">
+                              <button onClick={() => setWarrantyActionsOpen(warrantyActionsOpen === repair.id ? null : repair.id)} className="flex items-center gap-1 rounded-xl border border-outline-variant bg-surface px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-container-low">
                                 Actions <ChevronRight className="h-3 w-3 rotate-90" />
                               </button>
                               {warrantyActionsOpen === repair.id && (
-                                <div className="absolute right-0 top-full z-10 mt-1 w-48 rounded-lg border border-outline-variant bg-surface shadow-lg">
+                                <div className="absolute right-0 top-full z-10 mt-1 w-48 rounded-xl border border-outline-variant bg-surface shadow-lg">
                                   <button onClick={() => { setWarrantyActionsOpen(null); router.push(`/repairs/${repair.id}`) }} className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-on-surface-variant hover:bg-surface-container-low"><ExternalLink className="h-3.5 w-3.5" /> View Ticket</button>
                                   <button onClick={() => { setWarrantyActionsOpen(null); router.push(`/pos/refund?sale_id=${repair.id}`) }} className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-on-surface-variant hover:bg-surface-container-low"><ArrowLeft className="h-3.5 w-3.5" /> Issue Refund</button>
                                   <button onClick={() => setWarrantyActionsOpen(null)} className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"><X className="h-3.5 w-3.5" /> Out Of Warranty</button>
@@ -1437,10 +1437,10 @@ export function ProductsTab() {
                               {items.map((item: any) => (
                                 <tr key={item.id} className="hover:bg-surface-container-low">
                                   <td className="px-4 py-2.5 font-medium text-on-surface">{item.name}</td>
-                                  <td className="px-4 py-2.5 text-center">{item.warranty_days ? <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">{item.warranty_days}d</span> : <span className="text-xs text-outline">None</span>}</td>
+                                  <td className="px-4 py-2.5 text-center">{item.warranty_days ? <span className="rounded-xl bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{item.warranty_days}d</span> : <span className="text-xs text-outline">None</span>}</td>
                                   <td className="px-4 py-2.5 text-center text-xs text-on-surface-variant">{item.warrantyExpiry ? new Date(item.warrantyExpiry).toLocaleDateString() : '—'}</td>
-                                  <td className="px-4 py-2.5 text-center">{item.warranty_days ? (item.inWarranty ? <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">In Warranty</span> : <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-600">Expired</span>) : <span className="text-xs text-outline">—</span>}</td>
-                                  <td className="px-4 py-2.5 text-right">{item.inWarranty && <button onClick={() => setWarrantyClaimModal({ repairId: repair.id, item })} className="rounded border border-brand-teal-light bg-brand-teal-light px-3 py-1 text-xs font-medium text-brand-teal hover:bg-brand-teal-light">Warranty Claim</button>}</td>
+                                  <td className="px-4 py-2.5 text-center">{item.warranty_days ? (item.inWarranty ? <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">In Warranty</span> : <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-600">Expired</span>) : <span className="text-xs text-outline">—</span>}</td>
+                                  <td className="px-4 py-2.5 text-right">{item.inWarranty && <button onClick={() => setWarrantyClaimModal({ repairId: repair.id, item })} className="rounded-xl border border-primary/10 bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/10">Warranty Claim</button>}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -1461,18 +1461,18 @@ export function ProductsTab() {
       <Modal open={!!warrantyClaimModal} onClose={() => { setWarrantyClaimModal(null); setWarrantyClaimReason('') }} title="Part Warranty Claim" size="sm">
         {warrantyClaimModal && (
           <div className="space-y-4">
-            <div className="rounded-lg bg-brand-teal-light border border-brand-teal-light px-4 py-3">
-              <p className="text-xs text-brand-teal font-medium">Part</p>
+            <div className="rounded-xl bg-primary/10 border border-primary/10 px-4 py-3">
+              <p className="text-xs text-primary font-medium">Part</p>
               <p className="text-sm font-semibold text-on-surface">{warrantyClaimModal.item.name}</p>
               <p className="text-xs text-on-surface-variant mt-0.5">Warranty expires: {warrantyClaimModal.item.warrantyExpiry ? new Date(warrantyClaimModal.item.warrantyExpiry).toLocaleDateString() : '—'}</p>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-on-surface-variant">Fault Description / Reason <span className="text-red-500">*</span></label>
-              <textarea rows={3} placeholder="Describe the fault or reason for warranty claim…" value={warrantyClaimReason} onChange={e => setWarrantyClaimReason(e.target.value)} className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-brand-teal focus:outline-none" />
+              <textarea rows={3} placeholder="Describe the fault or reason for warranty claim…" value={warrantyClaimReason} onChange={e => setWarrantyClaimReason(e.target.value)} className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm focus:border-primary focus:outline-none" />
             </div>
             <div className="flex gap-2 pt-1">
               <Button variant="outline" className="flex-1" onClick={() => { setWarrantyClaimModal(null); setWarrantyClaimReason('') }}>Cancel</Button>
-              <Button className="flex-1 bg-brand-teal hover:bg-brand-teal-dark" loading={warrantyClaimSubmitting} disabled={!warrantyClaimReason.trim()} onClick={submitWarrantyClaim}>Submit Claim</Button>
+              <Button className="flex-1 bg-primary hover:bg-primary/90" loading={warrantyClaimSubmitting} disabled={!warrantyClaimReason.trim()} onClick={submitWarrantyClaim}>Submit Claim</Button>
             </div>
           </div>
         )}

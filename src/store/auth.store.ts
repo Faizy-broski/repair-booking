@@ -74,7 +74,7 @@ export const useAuthStore = create<AuthState>()(
       businessName: null,
       isLoading: true,
       currency: 'GBP',
-      brandColor: '#008080',
+      brandColor: '#009C9C',
       subscriptionStatus: null,
       verticalTemplateSlug: null,
 
@@ -87,7 +87,7 @@ export const useAuthStore = create<AuthState>()(
       setBrandColor: (brandColor) => set({ brandColor }),
       setSubscriptionStatus: (subscriptionStatus) => set({ subscriptionStatus }),
       setVerticalTemplateSlug: (verticalTemplateSlug) => set({ verticalTemplateSlug }),
-      clear: () => set({ profile: null, activeBranch: null, branches: [], businessName: null, currency: 'GBP', brandColor: '#008080', subscriptionStatus: null, verticalTemplateSlug: null }),
+      clear: () => set({ profile: null, activeBranch: null, branches: [], businessName: null, currency: 'GBP', brandColor: '#009C9C', subscriptionStatus: null, verticalTemplateSlug: null }),
 
       isOwner: () => {
         const role = get().profile?.role

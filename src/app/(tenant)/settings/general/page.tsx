@@ -168,14 +168,14 @@ export default function GeneralSettingsPage() {
     <div className="space-y-4">
       {/* POS on/off — tyre template only. First on the page so it's seen without scrolling. */}
       {isTyreShop && canEdit && configs !== null && (
-        <div className="flex items-center justify-between gap-4 rounded-xl border border-primary/30 bg-primary/5 px-6 py-4">
+        <div className="flex items-center justify-between gap-4 rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
           <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
               <ShoppingCart className="h-4 w-4" />
             </span>
             <div>
               <p className="text-sm font-semibold text-on-surface">Point of Sale</p>
-              <p className="text-xs text-on-surface-variant">
+              <p className="mt-0.5 text-sm text-on-surface-variant">
                 Show POS, Sales and Customer Credit in the menu. Your existing sales are kept when this is off.
               </p>
             </div>
@@ -189,15 +189,23 @@ export default function GeneralSettingsPage() {
         </div>
       )}
 
-      <div className="rounded-xl border border-outline-variant bg-surface p-6">
-        <h3 className="mb-4 font-semibold text-on-surface">Business Information</h3>
-        <form onSubmit={businessForm.handleSubmit(onSaveBusiness)} className="space-y-4 max-w-lg">
+      <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
+        <div className="mb-5 flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Store className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold text-on-surface">Business Information</h3>
+              <p className="mt-0.5 text-sm text-on-surface-variant">Your business name, contact details and location.</p>
+            </div>
+          </div>
+        <form onSubmit={businessForm.handleSubmit(onSaveBusiness)} className="space-y-4 max-w-4xl">
           <Input label="Business Name" required disabled={!canEdit} {...businessForm.register('name')} />
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface-variant">Subdomain</label>
-            <div className="flex items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-sm text-on-surface-variant">
+            <div className="flex h-10 items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-low px-3.5 text-sm text-on-surface-variant">
               <span>{subdomain || '—'}</span>
-              <span className="text-outline">.repairbooking.co.uk</span>
+              <span className="text-on-surface-variant">.repairbooking.co.uk</span>
             </div>
           </div>
           {canEdit ? (
@@ -217,9 +225,9 @@ export default function GeneralSettingsPage() {
               <label className="mb-1 block text-sm font-medium text-on-surface-variant">Business Logo</label>
               {businessForm.watch('logo_url') ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={businessForm.watch('logo_url') ?? ''} alt="Business logo" className="h-16 w-16 rounded-lg object-cover border border-outline-variant" />
+                <img src={businessForm.watch('logo_url') ?? ''} alt="Business logo" className="h-16 w-16 rounded-xl object-cover border border-outline-variant" />
               ) : (
-                <p className="text-sm text-outline">No logo set</p>
+                <p className="text-sm text-on-surface-variant">No logo set</p>
               )}
             </div>
           )}
@@ -231,12 +239,12 @@ export default function GeneralSettingsPage() {
             <div className="relative">
               <label className="mb-1 block text-sm font-medium text-on-surface-variant">Website</label>
               <div className="relative">
-                <Globe className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
+                <Globe className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
                 <input
                   type="text"
                   placeholder="https://yourwebsite.com"
                   disabled={!canEdit}
-                  className="w-full rounded-lg border border-outline px-3 py-2 pl-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-on-surface-variant"
+                  className="w-full h-10 w-full rounded-2xl border border-outline-variant bg-surface-container-lowest px-3.5 pl-9 text-sm focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-on-surface-variant"
                   {...businessForm.register('website')}
                 />
               </div>
@@ -248,7 +256,7 @@ export default function GeneralSettingsPage() {
               <label className="mb-1 block text-sm font-medium text-on-surface-variant">Country</label>
               <select
                 disabled={!canEdit}
-                className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 bg-surface disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-on-surface-variant"
+                className="h-10 w-full rounded-2xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-on-surface-variant"
                 {...businessForm.register('country')}
               >
                 <option value="">Select country</option>
@@ -263,27 +271,27 @@ export default function GeneralSettingsPage() {
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface-variant">Full Address</label>
             <div className="relative">
-              <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
+              <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
               <input
                 type="text"
                 placeholder="123 High Street, London, E1 6RF"
                 disabled={!canEdit}
-                className="w-full rounded-lg border border-outline px-3 py-2 pl-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-on-surface-variant"
+                className="w-full h-10 w-full rounded-2xl border border-outline-variant bg-surface-container-lowest px-3.5 pl-9 text-sm focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-on-surface-variant"
                 {...businessForm.register('address')}
               />
             </div>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface-variant">
-              Google Maps Link <span className="font-normal text-outline">(optional)</span>
+              Google Maps Link <span className="font-normal text-on-surface-variant">(optional)</span>
             </label>
             <div className="relative">
-              <Link2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
+              <Link2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
               <input
                 type="text"
                 placeholder="https://maps.google.com/... or https://maps.app.goo.gl/..."
                 disabled={!canEdit}
-                className="w-full rounded-lg border border-outline px-3 py-2 pl-9 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-on-surface-variant"
+                className="w-full h-10 w-full rounded-2xl border border-outline-variant bg-surface-container-lowest px-3.5 pl-9 text-sm focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:bg-surface-container-low disabled:text-on-surface-variant"
                 {...businessForm.register('mapsUrl')}
               />
             </div>
@@ -350,32 +358,41 @@ export default function GeneralSettingsPage() {
       </div>
 
       {/* ── Business Owner Details (read-only, from your personal profile) ── */}
-      <div className="rounded-xl border border-outline-variant bg-surface p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <User className="h-4 w-4 text-outline" />
-          <h3 className="font-semibold text-on-surface">Business Owner Details</h3>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg">
+      <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
+        <div className="mb-5 flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <User className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold text-on-surface">Business Owner Details</h3>
+              <p className="mt-0.5 text-sm text-on-surface-variant">Read-only, taken from your personal profile.</p>
+            </div>
+          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-4xl">
           <InfoRow label="Full name" value={profile?.full_name ?? '—'} />
           <InfoRow label="Email" value={profile?.email ?? '—'} />
           <InfoRow label="Phone" value={profile?.phone ?? '—'} />
           <InfoRow label="Role" value={profile?.role?.replace(/_/g, ' ') ?? '—'} capitalize />
         </div>
-        <Link href="/account" className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+        <Link href="/account" className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
           Manage your account <ChevronRight className="h-3.5 w-3.5" />
         </Link>
       </div>
 
       {/* ── Delete Protection PIN (retail template only) ── */}
       {isRetailTemplate && (
-        <div className="rounded-xl border border-outline-variant bg-surface p-6 space-y-4">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-red-500" />
-            <h3 className="font-semibold text-on-surface">Delete Protection PIN</h3>
-          </div>
-          <p className="text-sm text-on-surface-variant max-w-md">
+        <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-500/10 text-red-600">
+              <ShieldCheck className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold text-on-surface">Delete Protection PIN</h3>
+              <p className="mt-0.5 text-sm text-on-surface-variant max-w-md">
             When set, this PIN must be entered by any manager before a sale can be deleted. Protects against accidental or unauthorized deletions.
-          </p>
+              </p>
+            </div>
+          </div>
           {hasPinSet ? (
             <div className="flex flex-wrap items-center gap-3">
               <Badge variant="success">PIN active</Badge>
@@ -395,7 +412,7 @@ export default function GeneralSettingsPage() {
           {/* ── PIN set/change modal ── */}
           {pinModalMode && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-              <div className="w-full max-w-sm rounded-2xl bg-surface shadow-2xl">
+              <div className="w-full max-w-sm rounded-2xl bg-surface-container-lowest shadow-2xl">
                 <div className="flex items-center justify-between border-b border-outline-variant px-5 py-4">
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="h-5 w-5 text-red-500" />
@@ -403,7 +420,7 @@ export default function GeneralSettingsPage() {
                       {pinModalMode === 'set' ? 'Set Delete PIN' : 'Change Delete PIN'}
                     </span>
                   </div>
-                  <button onClick={closePinModal} className="text-outline hover:text-on-surface-variant">✕</button>
+                  <button onClick={closePinModal} className="text-on-surface-variant hover:text-on-surface">✕</button>
                 </div>
                 <div className="p-5 space-y-4">
                   <p className="text-sm text-on-surface-variant">
@@ -419,12 +436,12 @@ export default function GeneralSettingsPage() {
                         value={newPin}
                         onChange={e => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                         placeholder="4–6 digits"
-                        className="w-full rounded-lg border border-outline-variant px-3 py-2 pr-10 text-sm tracking-widest focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100"
+                        className="h-10 w-full rounded-2xl border border-outline-variant bg-surface-container-lowest px-3.5 pr-10 text-sm tracking-widest focus:border-red-400 focus:outline-none"
                       />
                       <button
                         type="button"
                         onClick={() => setShowNewPin(v => !v)}
-                        className="absolute right-3 top-7 text-outline hover:text-on-surface-variant"
+                        className="absolute right-3 top-[34px] text-on-surface-variant hover:text-on-surface"
                       >
                         {showNewPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
@@ -438,12 +455,12 @@ export default function GeneralSettingsPage() {
                         value={confirmPin}
                         onChange={e => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
                         placeholder="Re-enter PIN"
-                        className="w-full rounded-lg border border-outline-variant px-3 py-2 pr-10 text-sm tracking-widest focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100"
+                        className="h-10 w-full rounded-2xl border border-outline-variant bg-surface-container-lowest px-3.5 pr-10 text-sm tracking-widest focus:border-red-400 focus:outline-none"
                       />
                       <button
                         type="button"
                         onClick={() => setShowConfirmPin(v => !v)}
-                        className="absolute right-3 top-7 text-outline hover:text-on-surface-variant"
+                        className="absolute right-3 top-[34px] text-on-surface-variant hover:text-on-surface"
                       >
                         {showConfirmPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
@@ -469,22 +486,22 @@ export default function GeneralSettingsPage() {
       )}
 
       {/* Quick links */}
-      <div className="rounded-xl border border-outline-variant bg-surface divide-y">
-        <div className="px-6 py-3">
-          <h3 className="font-semibold text-on-surface text-sm">Configuration</h3>
+      <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest divide-y divide-outline-variant">
+        <div className="px-5 py-3.5">
+          <h3 className="text-sm font-semibold text-on-surface">Configuration</h3>
         </div>
         <Link
           href="/settings/loyalty"
-          className="flex items-center justify-between px-6 py-3 hover:bg-surface-container-low transition-colors group"
+          className="flex items-center justify-between px-5 py-3.5 hover:bg-surface-container-low transition-colors group"
         >
           <div className="flex items-center gap-3">
-            <Star className="h-4 w-4 text-yellow-500" />
+            <Star className="h-4 w-4 text-amber-500" />
             <div>
               <p className="text-sm font-medium text-on-surface">Loyalty Programme</p>
-              <p className="text-xs text-outline">Configure points earn &amp; redeem rates</p>
+              <p className="mt-0.5 text-sm text-on-surface-variant">Configure points earn &amp; redeem rates</p>
             </div>
           </div>
-          <ChevronRight className="h-4 w-4 text-outline group-hover:text-on-surface-variant" />
+          <ChevronRight className="h-4 w-4 text-on-surface-variant group-hover:text-on-surface" />
         </Link>
       </div>
     </div>

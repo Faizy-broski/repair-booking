@@ -143,7 +143,7 @@ export function BarcodeModal({ product, onClose, productId }: Props) {
             </div>
           </>
         ) : (
-          <div className="text-center py-8 w-full border border-dashed border-outline-variant rounded-lg">
+          <div className="text-center py-8 w-full border border-dashed border-outline-variant rounded-xl">
             <Barcode className="h-12 w-12 text-outline-variant mx-auto mb-3" />
             <p className="text-sm text-on-surface-variant mb-4 px-4">This product doesn't have a barcode yet.</p>
             <Button onClick={handleGenerate} loading={generating}>

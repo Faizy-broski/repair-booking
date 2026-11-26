@@ -48,7 +48,7 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
           className={cn(
             size === 'full'
               ? 'fixed left-0 top-0 z-50 w-screen h-screen -translate-x-0 -translate-y-0 rounded-none'
-              : 'fixed left-1/2 top-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 rounded-xl',
+              : 'fixed left-1/2 top-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 rounded-2xl',
             'bg-surface shadow-xl',
             size === 'full' ? 'overflow-auto' : 'max-h-[85vh] overflow-y-auto',
             // Slim, quiet scrollbar — visible enough to signal "this scrolls" without

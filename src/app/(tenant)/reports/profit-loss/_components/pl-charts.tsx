@@ -4,7 +4,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts'
 import { formatCurrency } from '@/lib/utils'
-import { CHART_COLORS, chartAxisTick, chartGridStroke, chartTooltipStyle, chartLegendStyle } from '@/lib/chart-theme'
+import { chartAxisTick, chartLegendStyle } from '@/lib/chart-theme'
 
 export interface DailyPoint { date: string; revenue: number; expenses: number; net: number }
 export interface CategoryAmount { category: string; amount: number }
@@ -21,6 +21,14 @@ interface Props {
 }
 
 const money = (v: unknown) => formatCurrency(Number(v ?? 0))
+// Chart chrome shared with the dashboard: hairline grid, 12px rounded hairline tooltip.
+const TOOLTIP_PROPS = {
+  contentStyle: { background: 'var(--surface-container-lowest)', border: '1px solid var(--hairline)', borderRadius: 12 },
+  itemStyle: { color: 'var(--on-surface)' },
+  labelStyle: { color: 'var(--on-surface-variant)' },
+}
+// Series palette: navy, brand teal, cyan, then semantic emerald / amber / red.
+const REPORT_SERIES = ['var(--navy)', 'var(--primary)', 'var(--primary-light)', 'var(--success)', 'var(--warning)', 'var(--error)']
 const axisMoney = (v: number) => (Math.abs(v) >= 1000 ? `£${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : `£${v}`)
 const shortDate = (d: string) => {
   const dt = new Date(`${d}T00:00:00`)
@@ -29,7 +37,7 @@ const shortDate = (d: string) => {
 
 function ChartCard({ title, subtitle, children, className = '' }: { title: string; subtitle?: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl border border-outline-variant bg-surface p-5 ${className}`}>
+    <div className={`rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 ${className}`}>
       <h3 className="text-base font-semibold text-on-surface">{title}</h3>
       {subtitle && <p className="mt-0.5 mb-4 text-xs text-on-surface-variant">{subtitle}</p>}
       {!subtitle && <div className="mb-4" />}
@@ -45,9 +53,9 @@ function Empty({ text }: { text: string }) {
 export function ProfitLossCharts({ daily, totalRevenue, cogs, expenses, salaries, grossProfit, netProfit, expenseBreakdown }: Props) {
   // Cost composition donut
   const costSlices = [
-    { name: 'Cost of goods', value: Math.max(cogs, 0), color: 'var(--primary)' },
-    { name: 'Operating expenses', value: Math.max(expenses, 0), color: 'var(--tertiary)' },
-    { name: 'Salaries', value: Math.max(salaries, 0), color: 'var(--warning)' },
+    { name: 'Cost of goods', value: Math.max(cogs, 0), color: 'var(--navy)' },
+    { name: 'Operating expenses', value: Math.max(expenses, 0), color: 'var(--primary)' },
+    { name: 'Salaries', value: Math.max(salaries, 0), color: 'var(--primary-light)' },
   ].filter(s => s.value > 0)
   const totalCosts = costSlices.reduce((s, c) => s + c.value, 0)
 
@@ -55,7 +63,7 @@ export function ProfitLossCharts({ daily, totalRevenue, cogs, expenses, salaries
   const afterCogs = totalRevenue - cogs
   const afterExpenses = afterCogs - expenses
   const bridge = [
-    { name: 'Revenue',   base: 0,                                   value: Math.max(totalRevenue, 0), color: 'var(--primary)' },
+    { name: 'Revenue',   base: 0,                                   value: Math.max(totalRevenue, 0), color: 'var(--navy)' },
     { name: 'COGS',      base: Math.max(afterCogs, 0),              value: Math.min(cogs, Math.max(totalRevenue, 0)), color: 'var(--error)' },
     { name: 'Expenses',  base: Math.max(afterExpenses, 0),          value: Math.min(expenses, Math.max(afterCogs, 0)), color: 'var(--error)' },
     { name: 'Salaries',  base: Math.max(netProfit, 0),              value: Math.min(salaries, Math.max(afterExpenses, 0)), color: 'var(--error)' },
@@ -76,10 +84,10 @@ export function ProfitLossCharts({ daily, totalRevenue, cogs, expenses, salaries
                   <stop offset="100%" stopColor="var(--primary)" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
-              <CartesianGrid vertical={false} stroke={chartGridStroke} strokeDasharray="3 3" />
+              <CartesianGrid vertical={false} stroke="var(--hairline)" strokeDasharray="3 3" />
               <XAxis dataKey="date" tickFormatter={shortDate} tick={chartAxisTick} axisLine={false} tickLine={false} minTickGap={24} />
               <YAxis tickFormatter={axisMoney} tick={chartAxisTick} axisLine={false} tickLine={false} width={48} />
-              <Tooltip formatter={(v) => money(v)} labelFormatter={(l) => shortDate(String(l))} {...chartTooltipStyle} />
+              <Tooltip formatter={(v) => money(v)} labelFormatter={(l) => shortDate(String(l))} {...TOOLTIP_PROPS} />
               <Legend {...chartLegendStyle} iconType="circle" />
               <Area type="monotone" dataKey="revenue" name="Sales revenue" stroke="var(--primary)" strokeWidth={2.5} fill="url(#plRevenueFill)" />
               <Bar dataKey="expenses" name="Expenses" fill="var(--error)" fillOpacity={0.75} radius={[4, 4, 0, 0]} maxBarSize={22} />
@@ -98,7 +106,7 @@ export function ProfitLossCharts({ daily, totalRevenue, cogs, expenses, salaries
                   <Pie data={costSlices} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="88%" paddingAngle={3} cornerRadius={6} stroke="none">
                     {costSlices.map(s => <Cell key={s.name} fill={s.color} />)}
                   </Pie>
-                  <Tooltip formatter={(v) => money(v)} {...chartTooltipStyle} />
+                  <Tooltip formatter={(v) => money(v)} {...TOOLTIP_PROPS} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
@@ -126,13 +134,13 @@ export function ProfitLossCharts({ daily, totalRevenue, cogs, expenses, salaries
         {totalRevenue <= 0 ? <Empty text="No revenue in this period." /> : (
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={bridge} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid vertical={false} stroke={chartGridStroke} strokeDasharray="3 3" />
+              <CartesianGrid vertical={false} stroke="var(--hairline)" strokeDasharray="3 3" />
               <XAxis dataKey="name" tick={chartAxisTick} axisLine={false} tickLine={false} />
               <YAxis tickFormatter={axisMoney} tick={chartAxisTick} axisLine={false} tickLine={false} width={48} />
               <Tooltip
                 cursor={{ fill: 'transparent' }}
                 formatter={(v, _n, item) => (item?.dataKey === 'base' ? [null, null] : money(v)) as never}
-                {...chartTooltipStyle}
+                {...TOOLTIP_PROPS}
               />
               <Bar dataKey="base" stackId="a" fill="transparent" legendType="none" isAnimationActive={false} />
               <Bar dataKey="value" stackId="a" name="Amount" radius={[6, 6, 6, 6]} maxBarSize={44}>
@@ -147,12 +155,12 @@ export function ProfitLossCharts({ daily, totalRevenue, cogs, expenses, salaries
         {categories.length === 0 ? <Empty text="No categorised expenses in this period." /> : (
           <ResponsiveContainer width="100%" height={Math.max(180, categories.length * 40)}>
             <BarChart data={categories} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
-              <CartesianGrid horizontal={false} stroke={chartGridStroke} strokeDasharray="3 3" />
+              <CartesianGrid horizontal={false} stroke="var(--hairline)" strokeDasharray="3 3" />
               <XAxis type="number" tickFormatter={axisMoney} tick={chartAxisTick} axisLine={false} tickLine={false} />
               <YAxis type="category" dataKey="category" tick={chartAxisTick} axisLine={false} tickLine={false} width={120} />
-              <Tooltip cursor={{ fill: 'transparent' }} formatter={(v) => money(v)} {...chartTooltipStyle} />
+              <Tooltip cursor={{ fill: 'transparent' }} formatter={(v) => money(v)} {...TOOLTIP_PROPS} />
               <Bar dataKey="amount" name="Amount" radius={[0, 6, 6, 0]} maxBarSize={22}>
-                {categories.map((c, i) => <Cell key={c.category} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                {categories.map((c, i) => <Cell key={c.category} fill={REPORT_SERIES[i % REPORT_SERIES.length]} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>

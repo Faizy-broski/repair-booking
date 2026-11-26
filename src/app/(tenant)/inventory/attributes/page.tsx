@@ -142,11 +142,11 @@ export default function InventoryAttributesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 text-on-surface-variant hover:text-on-surface">
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-10 w-10 rounded-full border border-outline-variant text-on-surface-variant hover:text-on-surface">
             <ArrowLeft className="h-5 w-5" strokeWidth={3} />
           </Button>
           <div>
-            <h1 className="text-xl font-bold text-on-surface">Product Attributes</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-on-surface">Product Attributes</h1>
             <p className="text-sm text-on-surface-variant mt-0.5">Define attributes like Color or Size and assign each to a category.</p>
           </div>
         </div>
@@ -165,8 +165,8 @@ export default function InventoryAttributesPage() {
             <button key={id} onClick={() => changeFilter(id)}
               className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                 filterCatId === id
-                  ? id === '__none__' ? 'border-gray-500 bg-gray-500 text-white' : 'border-brand-teal bg-brand-teal text-white'
-                  : 'border-outline-variant bg-surface text-on-surface-variant hover:border-outline hover:text-on-surface'
+                  ? id === '__none__' ? 'border-gray-500 bg-gray-500 text-white' : 'border-primary bg-primary text-on-primary'
+                  : 'border-outline-variant bg-surface text-on-surface-variant hover:border-outline-variant hover:text-on-surface'
               }`}
             >{label}</button>
           ))}
@@ -178,15 +178,15 @@ export default function InventoryAttributesPage() {
         <div className="rounded-xl border border-outline-variant bg-surface overflow-hidden">
           <div className="grid grid-cols-[2fr_3fr_1.5fr_auto] gap-4 border-b border-outline-variant bg-surface-container-low px-5 py-3">
             {['ATTRIBUTE', 'VALUES', 'CATEGORY', 'ACTIONS'].map(h => (
-              <div key={h} className="h-3 w-20 animate-pulse rounded bg-surface-container-high" />
+              <div key={h} className="h-3 w-20 animate-pulse rounded-xl bg-surface-container-high" />
             ))}
           </div>
           {[1,2,3,4].map(i => (
             <div key={i} className="grid grid-cols-[2fr_3fr_1.5fr_auto] gap-4 border-b border-outline-variant px-5 py-4">
-              <div className="h-4 w-24 animate-pulse rounded bg-surface-container" />
-              <div className="h-4 w-40 animate-pulse rounded bg-surface-container" />
+              <div className="h-4 w-24 animate-pulse rounded-xl bg-surface-container" />
+              <div className="h-4 w-40 animate-pulse rounded-xl bg-surface-container" />
               <div className="h-5 w-20 animate-pulse rounded-full bg-surface-container" />
-              <div className="h-4 w-16 animate-pulse rounded bg-surface-container" />
+              <div className="h-4 w-16 animate-pulse rounded-xl bg-surface-container" />
             </div>
           ))}
         </div>
@@ -221,7 +221,7 @@ export default function InventoryAttributesPage() {
 
                   {/* Attribute name */}
                   <div className="flex items-center gap-2.5 min-h-[32px]">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100">
                       <Tag className="h-4 w-4 text-violet-500" />
                     </div>
                     <div className="flex flex-col">
@@ -239,7 +239,7 @@ export default function InventoryAttributesPage() {
                     )}
                     {vals.map(v => (
                       <span key={v.id}
-                        className="group inline-flex items-center gap-1 rounded-full border border-outline-variant bg-surface px-2.5 py-0.5 text-xs font-medium text-on-surface-variant shadow-sm"
+                        className="group inline-flex items-center gap-1 rounded-full border border-outline-variant bg-surface px-2.5 py-0.5 text-xs font-medium text-on-surface-variant"
                       >
                         {v.value}
                         <button
@@ -271,7 +271,7 @@ export default function InventoryAttributesPage() {
                     ) : (
                       <button
                         onClick={() => { setAddingValueFor(attr.id); setNewValueText('') }}
-                        className="inline-flex items-center gap-0.5 rounded-full border border-dashed border-outline px-2 py-0.5 text-xs text-outline hover:border-brand-teal hover:text-brand-teal transition-colors"
+                        className="inline-flex items-center gap-0.5 rounded-full border border-dashed border-outline-variant px-2 py-0.5 text-xs text-outline hover:border-primary hover:text-primary transition-colors"
                       >
                         <Plus className="h-3 w-3" /> Add
                       </button>
@@ -281,8 +281,8 @@ export default function InventoryAttributesPage() {
                   {/* Category */}
                   <div className="flex items-center min-h-[32px]">
                     {attr.categoryName ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-teal/10 border border-brand-teal/20 px-2.5 py-1 text-xs font-medium text-brand-teal">
-                        <Layers className="h-3 w-3 text-brand-teal" />{attr.categoryName}
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 border border-primary/20 px-2.5 py-1 text-xs font-medium text-primary">
+                        <Layers className="h-3 w-3 text-primary" />{attr.categoryName}
                       </span>
                     ) : (
                       <span className="text-xs text-outline italic">—</span>
@@ -292,11 +292,11 @@ export default function InventoryAttributesPage() {
                   {/* Actions */}
                   <div className="flex items-center justify-end gap-1 min-h-[32px]">
                     <button onClick={() => openEdit(attr)}
-                      className="rounded-lg p-1.5 text-blue-500 hover:bg-blue-50 transition-colors" title="Edit">
+                      className="rounded-xl p-1.5 text-primary hover:bg-primary/5 transition-colors" title="Edit">
                       <Edit2 className="h-3.5 w-3.5" />
                     </button>
                     <button onClick={() => setDeleteAttr(attr)}
-                      className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 transition-colors" title="Delete">
+                      className="rounded-xl p-1.5 text-red-500 hover:bg-red-50 transition-colors" title="Delete">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -315,19 +315,19 @@ export default function InventoryAttributesPage() {
                 <button
                   onClick={() => setPage(p => Math.max(0, p - 1))}
                   disabled={page === 0}
-                  className="rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="rounded-xl border border-outline-variant px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >Previous</button>
                 {Array.from({ length: totalPages }, (_, i) => (
                   <button key={i} onClick={() => setPage(i)}
-                    className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                      page === i ? 'border-brand-teal bg-brand-teal text-white' : 'border-outline-variant text-on-surface-variant hover:bg-surface'
+                    className={`rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors ${
+                      page === i ? 'border-primary bg-primary text-on-primary' : 'border-outline-variant text-on-surface-variant hover:bg-surface'
                     }`}
                   >{i + 1}</button>
                 ))}
                 <button
                   onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                   disabled={page === totalPages - 1}
-                  className="rounded-lg border border-outline-variant px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="rounded-xl border border-outline-variant px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >Next</button>
               </div>
             )}
@@ -354,7 +354,7 @@ export default function InventoryAttributesPage() {
           {categories.length === 0 && (
             <p className="text-xs text-outline">
               No categories yet.{' '}
-              <Link href="/inventory/categories" className="text-brand-teal underline">Create one first.</Link>
+              <Link href="/inventory/categories" className="text-primary underline">Create one first.</Link>
             </p>
           )}
           <div className="flex justify-end gap-2 pt-2">

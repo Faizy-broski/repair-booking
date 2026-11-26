@@ -12,6 +12,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store/auth.store'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/shared/page-header'
 import { useTour } from '@/hooks/use-tour'
 import { ANNUAL_DISCOUNT } from '@/lib/pricing'
 
@@ -94,13 +95,13 @@ function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; className: string }> = {
     active:    { label: 'Active',    className: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
     trialing:  { label: 'Trial',     className: 'bg-amber-500/15  text-amber-400  border-amber-500/30'  },
-    past_due:  { label: 'Past due',  className: 'bg-red-500/15    text-red-400    border-red-500/30'    },
-    canceled:  { label: 'Canceled',  className: 'bg-zinc-500/15   text-outline   border-zinc-500/30'   },
-    suspended: { label: 'Suspended', className: 'bg-red-500/15    text-red-400    border-red-500/30'    },
+    past_due:  { label: 'Past due',  className: 'bg-red-500/15    text-red-600    border-red-500/30'    },
+    canceled:  { label: 'Canceled',  className: 'bg-zinc-500/15   text-on-surface-variant   border-zinc-500/30'   },
+    suspended: { label: 'Suspended', className: 'bg-red-500/15    text-red-600    border-red-500/30'    },
     incomplete: { label: 'Awaiting payment', className: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
     paid:     { label: 'Completed', className: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
   }
-  const cfg = map[status] ?? { label: status, className: 'bg-zinc-500/15 text-outline border-zinc-500/30' }
+  const cfg = map[status] ?? { label: status, className: 'bg-zinc-500/15 text-on-surface-variant border-zinc-500/30' }
   return (
     <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold', cfg.className)}>
       {cfg.label}
@@ -299,8 +300,8 @@ function AccountPageInner() {
   ]
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <h1 className="text-2xl font-bold text-on-surface">Account settings</h1>
+    <div className="max-w-5xl space-y-6">
+      <PageHeader title="Account settings" />
 
       {/* Grace period — expired but still working for up to 24h */}
       {inGrace && (
@@ -353,12 +354,12 @@ function AccountPageInner() {
       {/* Fully expired / canceled banner */}
       {isExpired && !isPastDue && !isIncomplete && (
         <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
           <div>
             <p className="text-sm font-semibold text-red-300">
               {wasFreeTrial ? 'Your free trial has ended' : 'Your subscription has expired'}
             </p>
-            <p className="text-xs text-red-400/80 mt-0.5">
+            <p className="text-xs text-red-600/80 mt-0.5">
               {wasFreeTrial
                 ? 'All features are locked. Subscribe to a paid plan below to continue.'
                 : 'All features are locked. Resubscribe below to restore full access.'}
@@ -377,7 +378,7 @@ function AccountPageInner() {
             className={cn(
               'flex items-center gap-2 px-5 py-3 text-sm font-medium border-b-2 transition-colors -mb-px',
               tab === t.id
-                ? 'border-brand-teal text-brand-teal'
+                ? 'border-primary text-primary'
                 : 'border-transparent text-on-surface-variant hover:text-on-surface'
             )}
           >
@@ -390,7 +391,7 @@ function AccountPageInner() {
       {/* ── Account Tab ──────────────────────────────────────────────────── */}
       {tab === 'account' && (
         <div className="space-y-5">
-          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6 space-y-5">
+          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 space-y-5">
             <h2 className="text-base font-semibold text-on-surface">Profile information</h2>
             {loadingAccount ? (
               <div className="flex justify-center py-8">
@@ -485,7 +486,7 @@ function AccountPageInner() {
           </div>
 
           {/* ── Replay tour ─────────────────────────────────────────────── */}
-          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6 flex items-center justify-between gap-4">
+          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 flex items-center justify-between gap-4">
             <div>
               <h2 className="text-base font-semibold text-on-surface">Onboarding tour</h2>
               <p className="mt-0.5 text-sm text-on-surface-variant">
@@ -510,7 +511,7 @@ function AccountPageInner() {
           ) : (
             <>
               {/* Current plan card */}
-              <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6">
+              <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
                 <div className="flex items-start justify-between gap-4 mb-5">
                   <h2 className="text-base font-semibold text-on-surface">Current plan</h2>
                   {/* Substitute 'canceled' only when sub.status is stale and would otherwise
@@ -560,7 +561,7 @@ function AccountPageInner() {
 
                 {/* Trial warning */}
                 {isTrialing && trialDays <= 3 && (
-                  <div className="mt-4 flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2">
+                  <div className="mt-4 flex items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2">
                     <Clock className="h-4 w-4 text-amber-400 shrink-0" />
                     <p className="text-xs text-amber-400">
                       {trialDays === 0 ? 'Your trial expires today.' : `${trialDays} day${trialDays === 1 ? '' : 's'} left in your trial.`}
@@ -571,7 +572,7 @@ function AccountPageInner() {
 
               {/* Payment method update card — only for past_due */}
               {isPastDue && (
-                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-6">
+                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5">
                   <div className="flex items-center gap-2 mb-1">
                     <XCircle className="h-5 w-5 text-amber-400" />
                     <h3 className="text-base font-semibold text-on-surface">Update your payment method</h3>
@@ -582,7 +583,7 @@ function AccountPageInner() {
                   </p>
 
                   {errorMsg && (
-                    <p className="mb-4 text-sm text-red-400 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
+                    <p className="mb-4 text-sm text-red-600 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2">
                       {errorMsg}
                     </p>
                   )}
@@ -606,9 +607,9 @@ function AccountPageInner() {
 
               {/* Resubscribe to same plan — prominently shown when previous plan was paid */}
               {resubscribePlan && (
-                <div className="rounded-2xl border border-brand-teal bg-brand-teal/10 p-6">
+                <div className="rounded-2xl border border-primary bg-primary/5 p-5">
                   <div className="flex items-center gap-2 mb-1">
-                    <Zap className="h-5 w-5 text-brand-teal" />
+                    <Zap className="h-5 w-5 text-primary" />
                     <h3 className="text-base font-semibold text-on-surface">Resubscribe to continue</h3>
                   </div>
                   <p className="text-sm text-on-surface-variant mb-5">
@@ -616,26 +617,26 @@ function AccountPageInner() {
                   </p>
 
                   {errorMsg && (
-                    <p className="mb-4 text-sm text-red-400 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
+                    <p className="mb-4 text-sm text-red-600 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2">
                       {errorMsg}
                     </p>
                   )}
 
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-xl border border-brand-teal/40 bg-surface-container-lowest p-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-xl border border-primary/40 bg-surface-container-lowest p-5">
                     <div>
                       <div className="flex items-center gap-2 mb-0.5">
-                        <p className="text-sm font-bold text-on-surface uppercase tracking-wide">{resubscribePlan.name}</p>
-                        <span className="rounded-full bg-brand-teal/20 border border-brand-teal/40 px-2 py-0.5 text-[10px] font-semibold text-brand-teal">
+                        <p className="text-sm font-bold text-on-surface">{resubscribePlan.name}</p>
+                        <span className="rounded-full bg-primary/20 border border-primary/40 px-2 py-0.5 text-[10px] font-semibold text-primary">
                           Your previous plan
                         </span>
                       </div>
-                      <p className="text-2xl font-black text-on-surface">
+                      <p className="text-2xl font-semibold tabular-nums text-on-surface">
                         £{resubscribePlan.price_monthly}<span className="text-sm font-normal text-on-surface-variant">/mo</span>
                       </p>
                       <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
                         {parseFeatures(resubscribePlan.features).map((f) => (
                           <li key={f} className="flex items-center gap-1.5 text-xs text-on-surface-variant">
-                            <CheckCircle2 className="h-3 w-3 shrink-0 text-brand-teal" />
+                            <CheckCircle2 className="h-3 w-3 shrink-0 text-primary" />
                             <span className="capitalize">{f.replace(/_/g, ' ')}</span>
                           </li>
                         ))}
@@ -644,7 +645,7 @@ function AccountPageInner() {
                     <Button
                       onClick={() => handleResubscribe(resubscribePlan.id)}
                       disabled={upgrading === resubscribePlan.id}
-                      className="shrink-0 bg-brand-teal text-white hover:bg-brand-teal/90 font-semibold gap-2 px-6"
+                      className="shrink-0 bg-primary text-white hover:bg-primary/90 font-semibold gap-2 px-6"
                     >
                       {upgrading === resubscribePlan.id
                         ? <Loader2 className="h-4 w-4 animate-spin" />
@@ -660,7 +661,7 @@ function AccountPageInner() {
                 <div className="flex justify-center pt-2">
                   <Button
                     onClick={() => router.push('/account/plans')}
-                    className="gap-2 bg-brand-teal text-white hover:bg-brand-teal/90 font-semibold px-8"
+                    className="gap-2 bg-primary text-white hover:bg-primary/90 font-semibold px-8"
                   >
                     <Zap className="h-4 w-4" />
                     Explore More Plans
@@ -670,12 +671,12 @@ function AccountPageInner() {
 
               {/* Features list if active */}
               {isActive && plan?.features && parseFeatures(plan.features).length > 0 && (
-                <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-6">
-                  <h3 className="text-sm font-semibold text-on-surface mb-3">Included features</h3>
+                <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
+                  <h3 className="text-base font-semibold text-on-surface mb-3">Included features</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {parseFeatures(plan.features).map((f) => (
                       <div key={f} className="flex items-center gap-2 text-sm text-on-surface-variant">
-                        <CheckCircle2 className="h-4 w-4 shrink-0 text-brand-teal" />
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
                         <span className="capitalize">{f.replace(/_/g, ' ')}</span>
                       </div>
                     ))}
@@ -690,7 +691,7 @@ function AccountPageInner() {
       {/* ── Transactions Tab ─────────────────────────────────────────────── */}
       {tab === 'transactions' && (
         <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-outline-variant">
             <h2 className="text-base font-semibold text-on-surface">Transactions</h2>
             <button
               onClick={fetchInvoices}
@@ -718,12 +719,12 @@ function AccountPageInner() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-outline-variant text-xs text-on-surface-variant uppercase tracking-wider">
-                    <th className="px-6 py-3 text-left font-medium">Date</th>
-                    <th className="px-6 py-3 text-left font-medium">Description</th>
-                    <th className="px-6 py-3 text-left font-medium">Amount</th>
-                    <th className="px-6 py-3 text-left font-medium">Period</th>
-                    <th className="px-6 py-3 text-left font-medium">Status</th>
+                  <tr className="bg-primary text-[13px] text-white">
+                    <th className="whitespace-nowrap px-5 py-3.5 text-left font-medium">Date</th>
+                    <th className="whitespace-nowrap px-5 py-3.5 text-left font-medium">Description</th>
+                    <th className="whitespace-nowrap px-5 py-3.5 text-left font-medium">Amount</th>
+                    <th className="whitespace-nowrap px-5 py-3.5 text-left font-medium">Period</th>
+                    <th className="whitespace-nowrap px-5 py-3.5 text-left font-medium">Status</th>
                     <th className="px-6 py-3 text-right font-medium">Invoice</th>
                   </tr>
                 </thead>

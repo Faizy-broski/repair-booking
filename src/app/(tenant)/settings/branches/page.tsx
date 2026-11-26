@@ -128,15 +128,15 @@ export default function BranchesSettingsPage() {
   }
 
   return (
-    <div className="rounded-2xl border border-outline-variant bg-surface shadow-sm">
-      <div className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
+    <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest">
+      <div className="flex items-center justify-between gap-3 border-b border-outline-variant px-5 py-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-teal/10">
-            <Building2 className="h-4 w-4 text-brand-teal" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
+            <Building2 className="h-4 w-4 text-primary" />
           </div>
           <div>
-            <h3 className="font-semibold text-on-surface">Branches</h3>
-            <p className="text-xs text-outline">{branchList.length} location{branchList.length !== 1 ? 's' : ''}</p>
+            <h3 className="text-base font-semibold text-on-surface">Branches</h3>
+            <p className="text-xs text-on-surface-variant">{branchList.length} location{branchList.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
         <UIButton size="sm" onClick={() => { setShowNewBranchForm(true); setBranchCreateError(null); newBranchForm.reset() }}>
@@ -145,14 +145,14 @@ export default function BranchesSettingsPage() {
       </div>
       
       {showNewBranchForm && (
-        <div className="border-b border-outline-variant bg-blue-50/40 px-4 py-5">
+        <div className="border-b border-outline-variant bg-surface-container-low px-5 py-5">
           <p className="mb-3 text-sm font-semibold text-on-surface-variant">New Branch</p>
           {branchCreateError && (
-            <div className="mb-3 max-w-2xl rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="mb-3 max-w-2xl rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2 text-sm text-red-600">
               {branchCreateError}
             </div>
           )}
-          <form onSubmit={newBranchForm.handleSubmit(onCreateBranch)} className="max-w-2xl space-y-4">
+          <form onSubmit={newBranchForm.handleSubmit(onCreateBranch)} className="max-w-4xl space-y-4">
             <UIImageUpload label="Branch Logo" value={newBranchForm.watch('logo_url') || ''} onChange={(url) => newBranchForm.setValue('logo_url', url)} />
             <div className="grid grid-cols-2 gap-4">
               <UIInput label="Branch Name *" required {...newBranchForm.register('name')} />
@@ -161,9 +161,9 @@ export default function BranchesSettingsPage() {
               <UIInput label="Email" type="email" {...newBranchForm.register('email')} />
             </div>
 
-            <div className="rounded-xl border border-outline-variant bg-surface p-4">
-              <p className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-on-surface-variant">
-                <UserRound className="h-4 w-4 text-blue-600" /> Branch User
+            <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
+              <p className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-on-surface">
+                <UserRound className="h-4 w-4 text-primary" /> Branch User
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
@@ -193,7 +193,7 @@ export default function BranchesSettingsPage() {
                   <select
                     {...newBranchForm.register('manager_role')}
                     defaultValue=""
-                    className="h-9 w-full rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
+                    className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none"
                   >
                     <option value="" disabled>Select role</option>
                     <option value="cashier">Cashier</option>
@@ -215,11 +215,11 @@ export default function BranchesSettingsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
         {branchList.map((branch) => (
           <div
             key={branch.id}
-            className="group relative rounded-xl border border-outline-variant bg-surface-container-low/60 p-5 transition-all duration-200 hover:border-brand-teal/30 hover:bg-surface hover:shadow-md"
+            className="group relative rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 transition-colors duration-200 hover:border-primary/30"
           >
             {editBranchId === branch.id ? (
               <form onSubmit={branchForm.handleSubmit(onSaveBranch)} className="space-y-3">
@@ -234,25 +234,25 @@ export default function BranchesSettingsPage() {
                 {/* Associated users — editable */}
                 {branch.profiles && branch.profiles.length > 0 && (
                   <div className="rounded-xl border border-outline-variant bg-surface-container-low p-4">
-                    <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-on-surface-variant">
+                    <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-on-surface-variant">
                       <UserRound className="h-3.5 w-3.5" /> Associated Users
                     </p>
                     <div className="space-y-3">
                       {branch.profiles.map((user) => {
                         const edit = userEdits[user.id] ?? { full_name: user.full_name ?? '', role: user.role, saving: false }
                         return (
-                          <div key={user.id} className="rounded-xl border border-outline-variant bg-surface p-3 shadow-sm">
+                          <div key={user.id} className="rounded-xl border border-outline-variant bg-surface-container-lowest p-3">
                             <div className="mb-3 flex items-center gap-3">
-                              <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-teal/10">
+                              <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10">
                                 {user.avatar_url ? (
                                   <img src={user.avatar_url} alt={user.full_name ?? ''} className="h-full w-full object-cover" />
                                 ) : (
-                                  <span className="text-xs font-bold text-brand-teal">
+                                  <span className="text-xs font-bold text-primary">
                                     {(user.full_name ?? user.email ?? '?').charAt(0).toUpperCase()}
                                   </span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-1.5 text-xs text-outline">
+                              <div className="flex items-center gap-1.5 text-xs text-on-surface-variant">
                                 <Mail className="h-3 w-3 shrink-0" />
                                 <span className="truncate">{user.email ?? '—'}</span>
                               </div>
@@ -268,7 +268,7 @@ export default function BranchesSettingsPage() {
                                 <select
                                   value={edit.role}
                                   onChange={(e) => setUserEdits((prev) => ({ ...prev, [user.id]: { ...prev[user.id], role: e.target.value } }))}
-                                  className="h-9 w-full rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
+                                  className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none"
                                 >
                                   <option value="cashier">Cashier</option>
                                   <option value="staff">Staff</option>
@@ -281,7 +281,7 @@ export default function BranchesSettingsPage() {
                                 type="button"
                                 disabled={edit.saving}
                                 onClick={() => saveUser(user.id)}
-                                className="flex items-center gap-1.5 rounded-lg bg-brand-teal px-3 py-1.5 text-xs font-medium text-white transition hover:bg-brand-teal/80 disabled:opacity-60"
+                                className="flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-on-primary transition hover:bg-primary/90 disabled:opacity-60"
                               >
                                 {edit.saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
                                 Save User
@@ -303,17 +303,17 @@ export default function BranchesSettingsPage() {
               <>
                 {/* Avatar + Main badge */}
                 <div className="mb-4 flex items-start justify-between">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-brand-teal/20 to-brand-teal/5 shadow-sm">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br">
                     {branch.logo_url ? (
                       <img src={branch.logo_url} alt={branch.name} className="h-full w-full object-cover" />
                     ) : (
-                      <span className="text-lg font-bold text-brand-teal">
+                      <span className="text-lg font-bold text-primary">
                         {branch.name.charAt(0).toUpperCase()}
                       </span>
                     )}
                   </div>
                   {(branch as any).is_main && (
-                    <span className="rounded-full bg-brand-teal/10 px-2.5 py-1 text-xs font-semibold text-brand-teal">Main</span>
+                    <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">Main</span>
                   )}
                 </div>
 
@@ -324,13 +324,13 @@ export default function BranchesSettingsPage() {
                 <div className="space-y-1.5">
                   {branch.address && (
                     <div className="flex items-start gap-2 text-xs text-on-surface-variant">
-                      <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-outline" />
+                      <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-on-surface-variant" />
                       <span className="leading-snug">{branch.address}</span>
                     </div>
                   )}
                   {branch.phone && (
                     <div className="flex items-center gap-2 text-xs text-on-surface-variant">
-                      <Phone className="h-3.5 w-3.5 shrink-0 text-outline" />
+                      <Phone className="h-3.5 w-3.5 shrink-0 text-on-surface-variant" />
                       <span>{branch.phone}</span>
                     </div>
                   )}
@@ -339,7 +339,7 @@ export default function BranchesSettingsPage() {
                 {/* Edit button — always visible */}
                 <button
                   onClick={() => startEditBranch(branch as Branch)}
-                  className="absolute right-4 top-4 flex items-center gap-1.5 rounded-lg bg-brand-teal px-2.5 py-1.5 text-xs font-medium text-white shadow-sm transition-all duration-150 hover:bg-brand-teal/80"
+                  className="absolute right-4 top-4 flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-on-primary transition-colors duration-150 hover:bg-primary/90"
                 >
                   <Pencil className="h-3 w-3" /> Edit
                 </button>

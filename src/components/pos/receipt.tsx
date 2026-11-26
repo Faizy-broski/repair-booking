@@ -44,25 +44,25 @@ export function Receipt({
   timestamp,
 }: ReceiptProps) {
   return (
-    <div className="mx-auto w-72 bg-white p-4 font-mono text-xs text-gray-800">
+    <div className="mx-auto w-72 bg-white p-4 font-mono text-xs text-on-surface">
       {/* Header */}
       <div className="mb-3 text-center">
         <p className="text-sm font-bold">{businessName}</p>
-        {branchName && <p className="text-gray-500">{branchName}</p>}
-        {branchAddress && <p className="text-gray-500">{branchAddress}</p>}
+        {branchName && <p className="text-on-surface-variant">{branchName}</p>}
+        {branchAddress && <p className="text-on-surface-variant">{branchAddress}</p>}
       </div>
 
-      <hr className="my-2 border-dashed border-gray-300" />
+      <hr className="my-2 border-dashed border-outline-variant" />
 
       {/* Meta */}
-      <div className="mb-2 space-y-0.5 text-gray-500">
+      <div className="mb-2 space-y-0.5 text-on-surface-variant">
         {timestamp && <p>Date: {formatDateTime(timestamp)}</p>}
         {saleId && <p>Sale: #{saleId.slice(0, 8).toUpperCase()}</p>}
         {cashierName && <p>Cashier: {cashierName}</p>}
         {customerName && <p>Customer: {customerName}</p>}
       </div>
 
-      <hr className="my-2 border-dashed border-gray-300" />
+      <hr className="my-2 border-dashed border-outline-variant" />
 
       {/* Items */}
       <div className="mb-2 space-y-1">
@@ -76,37 +76,37 @@ export function Receipt({
         ))}
       </div>
 
-      <hr className="my-2 border-dashed border-gray-300" />
+      <hr className="my-2 border-dashed border-outline-variant" />
 
       {/* Totals */}
       <div className="space-y-0.5">
-        <div className="flex justify-between text-gray-500">
+        <div className="flex justify-between text-on-surface-variant">
           <span>Subtotal</span>
           <span>{formatCurrency(subtotal)}</span>
         </div>
         {discount > 0 && (
-          <div className="flex justify-between text-green-600">
+          <div className="flex justify-between text-emerald-700">
             <span>Discount</span>
             <span>-{formatCurrency(discount)}</span>
           </div>
         )}
         {tax > 0 && (
-          <div className="flex justify-between text-gray-500">
+          <div className="flex justify-between text-on-surface-variant">
             <span>Tax</span>
             <span>{formatCurrency(tax)}</span>
           </div>
         )}
-        <div className="flex justify-between border-t border-dashed border-gray-300 pt-1 font-bold">
+        <div className="flex justify-between border-t border-dashed border-outline-variant pt-1 font-bold">
           <span>TOTAL</span>
           <span>{formatCurrency(total)}</span>
         </div>
-        <div className="flex justify-between text-gray-500">
+        <div className="flex justify-between text-on-surface-variant">
           <span>Payment</span>
           <span className="capitalize">{paymentMethod.replace('_', ' ')}</span>
         </div>
       </div>
 
-      <hr className="my-1 border-dashed border-gray-300" />
+      <hr className="my-1 border-dashed border-outline-variant" />
 
       <p className="text-center font-bold text-black mt-2">Thank you for your business!</p>
     </div>

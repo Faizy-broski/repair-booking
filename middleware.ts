@@ -15,6 +15,23 @@ const PUBLIC_PATHS = ['/api/auth/', '/api/webhooks/', '/api/stripe/webhook', '/a
 // after 5 minutes — an acceptable delay for status changes on a VPS deployment.
 const businessCache = new Map<string, { id: string; is_active: boolean; is_suspended: boolean; cachedAt: number }>()
 const BUSINESS_CACHE_TTL_MS = 5 * 60 * 1000
+
+// Same idea for the two checks that run on EVERY authenticated request (each
+// page load and each of the API calls a page makes): the user's profile
+// (tenant isolation) and the business's latest subscription (access gate).
+// Both change rarely, so a short TTL removes most of the repeated queries
+// while a role/business move or a subscription change still applies within
+// a minute. Size-capped so the maps can't grow without bound.
+const AUTH_CACHE_TTL_MS = 60 * 1000
+const AUTH_CACHE_MAX = 5000
+type CachedProfile = { business_id: string | null; role: string | null; cachedAt: number }
+type CachedSub = { data: unknown; cachedAt: number }
+const profileCache = new Map<string, CachedProfile>()
+const subscriptionCache = new Map<string, CachedSub>()
+function cacheSet<V>(map: Map<string, V>, key: string, value: V) {
+  if (map.size >= AUTH_CACHE_MAX) map.clear()
+  map.set(key, value)
+}
 const SUPERADMIN_SUBDOMAIN = 'admin'
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'repairbooking.co.uk'
 
@@ -324,21 +341,39 @@ async function handleRequest(request: NextRequest) {
     // Profile (tenant isolation) and subscription status are independent of each
     // other — run them simultaneously to eliminate one sequential round-trip
     // (~80-120 ms) on every authenticated page load.
+    const now = Date.now()
+    const cachedProfile = profileCache.get(user.id)
+    const cachedSub = subscriptionCache.get(business.id)
+    const profileFresh = !!cachedProfile && now - cachedProfile.cachedAt < AUTH_CACHE_TTL_MS
+    const subFresh = !!cachedSub && now - cachedSub.cachedAt < AUTH_CACHE_TTL_MS
+
     const [{ data: userProfile }, subResult] = await Promise.all([
-      supabase
-        .from('profiles')
-        .select('business_id, role')
-        .eq('id', user.id)
-        .maybeSingle(),
+      profileFresh
+        ? Promise.resolve({ data: { business_id: cachedProfile!.business_id, role: cachedProfile!.role } })
+        : supabase
+            .from('profiles')
+            .select('business_id, role')
+            .eq('id', user.id)
+            .maybeSingle()
+            .then((r) => {
+              if (r.data) cacheSet(profileCache, user.id, { business_id: r.data.business_id, role: r.data.role, cachedAt: Date.now() })
+              return r
+            }),
       isExemptPath
         ? Promise.resolve({ data: null })
-        : tenantSupabase
-            .from('subscriptions')
-            .select('status, trial_ends_at, current_period_start, current_period_end, stripe_sub_id, plans(plan_type)')
-            .eq('business_id', business.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle(),
+        : subFresh
+          ? Promise.resolve({ data: cachedSub!.data })
+          : tenantSupabase
+              .from('subscriptions')
+              .select('status, trial_ends_at, current_period_start, current_period_end, stripe_sub_id, plans(plan_type)')
+              .eq('business_id', business.id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+              .then((r) => {
+                if (!r.error) cacheSet(subscriptionCache, business.id, { data: r.data, cachedAt: Date.now() })
+                return r
+              }),
     ])
 
     // ── Tenant isolation ───────────────────────────────────────────────────────

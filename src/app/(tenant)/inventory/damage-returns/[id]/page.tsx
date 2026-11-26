@@ -147,12 +147,12 @@ export default function DamageReturnDetailPage({ params }: { params: Promise<{ i
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.push('/inventory/damage-returns')} className="h-8 w-8 text-on-surface-variant hover:text-on-surface">
+        <Button variant="ghost" size="icon" onClick={() => router.push('/inventory/damage-returns')} className="h-10 w-10 rounded-full border border-outline-variant text-on-surface-variant hover:text-on-surface">
           <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-on-surface font-mono">{ret.return_number}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-on-surface font-mono">{ret.return_number}</h1>
             <Badge variant={STATUS_VARIANT[ret.status] ?? 'default'}>{ret.status}</Badge>
           </div>
           <p className="text-sm text-on-surface-variant">
@@ -160,7 +160,7 @@ export default function DamageReturnDetailPage({ params }: { params: Promise<{ i
             {ret.purchase_orders?.po_number && (
               <>
                 {' · '}
-                <a href={`/inventory/purchase-orders/${ret.po_id}`} className="text-brand-teal hover:underline">
+                <a href={`/inventory/purchase-orders/${ret.po_id}`} className="text-primary hover:underline">
                   {ret.purchase_orders.po_number}
                 </a>
               </>
@@ -207,7 +207,7 @@ export default function DamageReturnDetailPage({ params }: { params: Promise<{ i
             value: ret.shipped_at ? formatDate(ret.shipped_at) : '—',
           },
         ].map((card) => (
-          <div key={card.label} className="rounded-lg border border-outline-variant bg-surface p-3">
+          <div key={card.label} className="rounded-xl border border-outline-variant bg-surface p-3">
             <p className="text-xs text-outline">{card.label}</p>
             <p className="font-semibold text-on-surface">{card.value}</p>
           </div>
@@ -256,14 +256,14 @@ export default function DamageReturnDetailPage({ params }: { params: Promise<{ i
       </div>
 
       {ret.notes && (
-        <div className="rounded-lg border border-outline-variant bg-surface p-4">
+        <div className="rounded-xl border border-outline-variant bg-surface p-4">
           <p className="text-sm font-medium text-on-surface-variant mb-1">Notes</p>
           <p className="text-sm text-on-surface-variant">{ret.notes}</p>
         </div>
       )}
 
       {(ret.status === 'resolved' || ret.status === 'cancelled') && ret.resolution_note && (
-        <div className="rounded-lg border border-outline-variant bg-surface p-4">
+        <div className="rounded-xl border border-outline-variant bg-surface p-4">
           <p className="text-sm font-medium text-on-surface-variant mb-1">Resolution Note</p>
           <p className="text-sm text-on-surface-variant">{ret.resolution_note}</p>
         </div>
@@ -276,14 +276,14 @@ export default function DamageReturnDetailPage({ params }: { params: Promise<{ i
 
           {!showOtherTypes ? (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 rounded-lg border border-brand-teal bg-brand-teal-light/10 px-3 py-2 text-sm">
+              <div className="flex items-center gap-2 rounded-xl border border-primary bg-primary/10 px-3 py-2 text-sm">
                 <input type="radio" checked readOnly />
                 <span className="font-medium text-on-surface">Credit</span>
               </div>
               <button
                 type="button"
                 onClick={() => setShowOtherTypes(true)}
-                className="text-xs text-brand-teal hover:underline"
+                className="text-xs text-primary hover:underline"
               >
                 Supplier replaced or refunded instead?
               </button>
@@ -293,8 +293,8 @@ export default function DamageReturnDetailPage({ params }: { params: Promise<{ i
               {(['replacement', 'credit', 'refund'] as const).map((type) => (
                 <label
                   key={type}
-                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer transition-colors ${
-                    resolutionType === type ? 'border-brand-teal bg-brand-teal-light/10' : 'border-outline-variant'
+                  className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm cursor-pointer transition-colors ${
+                    resolutionType === type ? 'border-primary bg-primary/10' : 'border-outline-variant'
                   }`}
                 >
                   <input
@@ -318,7 +318,7 @@ export default function DamageReturnDetailPage({ params }: { params: Promise<{ i
                 type="number" min={0} step="0.01"
                 value={resolutionAmount}
                 onChange={(e) => setResolutionAmount(e.target.value)}
-                className="h-9 w-full rounded-lg border border-outline px-3 text-sm"
+                className="h-9 w-full rounded-xl border border-outline-variant px-3 text-sm"
                 placeholder="0.00"
               />
               {ret.po_id && (
@@ -335,7 +335,7 @@ export default function DamageReturnDetailPage({ params }: { params: Promise<{ i
               rows={2}
               value={resolutionNote}
               onChange={(e) => setResolutionNote(e.target.value)}
-              className="w-full rounded-lg border border-outline px-3 py-2 text-sm"
+              className="w-full rounded-xl border border-outline-variant px-3 py-2 text-sm"
             />
           </div>
 

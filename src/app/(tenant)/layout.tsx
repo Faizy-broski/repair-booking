@@ -210,7 +210,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
       setProfile(profile)
       setVerticalTemplateSlug(profile.verticalTemplateSlug ?? null)
       setCurrency(fetchedCurrency ?? 'GBP')
-      setBrandColor(fetchedBrandColor ?? '#008080')
+      setBrandColor(fetchedBrandColor ?? '#009C9C')
       setBusinessName(fetchedBusinessName ?? null)
       setSubscriptionStatus(subscriptionStatus)
 
@@ -281,7 +281,7 @@ export default function TenantLayout({ children }: { children: React.ReactNode }
 
   return (
     <Providers>
-      <div className="flex h-screen overflow-hidden bg-background print:hidden" style={getBrandStyle(brandColor, brandMode)}>
+      <div className="app-shell flex h-screen overflow-hidden bg-background print:hidden" style={getBrandStyle(brandColor, brandMode)}>
         <div className="hidden lg:flex">
           <Suspense fallback={null}>
             <Sidebar collapsed={collapsed} />

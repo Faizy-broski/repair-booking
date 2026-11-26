@@ -11,6 +11,7 @@ const PAGE_SIZE = 50
 import { Modal } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/shared/page-header'
 import { formatCurrency } from '@/lib/utils'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
@@ -76,7 +77,7 @@ function ColHeader({
     <div className="flex items-center justify-between px-4 py-2.5 bg-surface-container-low border-b border-outline-variant shrink-0">
       <div className="flex items-center gap-1.5">
         <Icon className={`h-3.5 w-3.5 ${iconColor}`} />
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-on-surface-variant">{label}</span>
+        <span className="text-xs font-medium text-on-surface-variant">{label}</span>
       </div>
       <div className="flex items-center gap-2">
         {loading && <Loader2 className="h-3 w-3 animate-spin text-outline" />}
@@ -137,13 +138,13 @@ function AddRow({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={onKeyDown ?? ((e) => e.key === 'Enter' && onAdd())}
-          className={`h-10 flex-1 min-w-0 rounded-md border border-outline-variant px-3 text-[15px] focus:outline-none focus:border-brand-teal`}
+          className={`h-10 flex-1 min-w-0 rounded-xl border border-outline-variant px-3 text-[15px] focus:outline-none focus:border-primary`}
         />
         {extra}
         <button
           onClick={onAdd}
           disabled={disabled || !value.trim()}
-          className={`h-10 px-4 rounded-md text-white text-[13px] font-medium disabled:opacity-40 flex items-center gap-1.5 shrink-0 transition-opacity ${accentClass ?? 'bg-brand-teal hover:bg-brand-teal/90'}`}
+          className={`h-10 px-4 rounded-md text-white text-[13px] font-medium disabled:opacity-40 flex items-center gap-1.5 shrink-0 transition-opacity ${accentClass ?? 'bg-primary hover:bg-primary/90'}`}
         >
           <Plus className="h-4 w-4" /> Add
         </button>
@@ -524,27 +525,22 @@ export default function ServiceCataloguePage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-bold text-on-surface">Service Catalogue</h1>
-        <p className="text-sm text-on-surface-variant mt-0.5">
-          {L.subtitle}
-        </p>
-      </div>
+      <PageHeader title="Service Catalogue" description={L.subtitle} />
 
       {/* Breadcrumb — hierarchy guide */}
-      <div className="hidden lg:flex items-center gap-1.5 text-xs text-on-surface-variant bg-surface-container-low rounded-lg px-4 py-2.5 border border-outline-variant">
+      <div className="hidden lg:flex items-center gap-1.5 rounded-xl bg-surface-container-low px-4 py-2.5 text-xs text-on-surface-variant">
         <Info className="h-3.5 w-3.5 text-outline shrink-0" />
         <span className="font-medium text-on-surface-variant">Hierarchy:</span>
         <span className="flex items-center gap-1">
-          <Tag className="h-3 w-3 text-purple-500" /> {L.type}
+          <Tag className="h-3 w-3 text-primary" /> {L.type}
         </span>
         <ChevronRight className="h-3 w-3 text-outline-variant" />
         <span className="flex items-center gap-1">
-          <Layers className="h-3 w-3 text-brand-teal" /> {L.brand}
+          <Layers className="h-3 w-3 text-primary" /> {L.brand}
         </span>
         <ChevronRight className="h-3 w-3 text-outline-variant" />
         <span className="flex items-center gap-1">
-          <Cpu className="h-3 w-3 text-blue-500" /> {L.device}
+          <Cpu className="h-3 w-3 text-primary" /> {L.device}
         </span>
         <ChevronRight className="h-3 w-3 text-outline-variant" />
         <span className="flex items-center gap-1">
@@ -552,13 +548,13 @@ export default function ServiceCataloguePage() {
         </span>
       </div>
 
-      <div className="rounded-xl border border-outline-variant bg-surface overflow-hidden">
+      <div className="overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest">
 
         {/* Mobile breadcrumb */}
         <div className="lg:hidden border-b border-outline-variant px-4 py-2 bg-surface-container-low flex items-center gap-1 flex-wrap text-xs">
           <button
             onClick={() => setMobileStep(0)}
-            className={`px-2.5 py-1 rounded-full font-medium transition-colors ${mobileStep === 0 ? 'bg-purple-600 text-white' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
+            className={`px-2.5 py-1 rounded-full font-medium transition-colors ${mobileStep === 0 ? 'bg-primary text-white' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
           >
             {L.types}
           </button>
@@ -566,7 +562,7 @@ export default function ServiceCataloguePage() {
             <ChevronRight className="h-3 w-3 text-outline-variant shrink-0" />
             <button
               onClick={() => setMobileStep(1)}
-              className={`px-2.5 py-1 rounded-full font-medium transition-colors ${mobileStep === 1 ? 'bg-brand-teal text-white' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
+              className={`px-2.5 py-1 rounded-full font-medium transition-colors ${mobileStep === 1 ? 'bg-primary text-white' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
             >
               {selectedType?.name ?? L.brands}
             </button>
@@ -575,7 +571,7 @@ export default function ServiceCataloguePage() {
             <ChevronRight className="h-3 w-3 text-outline-variant shrink-0" />
             <button
               onClick={() => setMobileStep(2)}
-              className={`px-2.5 py-1 rounded-full font-medium transition-colors ${mobileStep === 2 ? 'bg-blue-500 text-white' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
+              className={`px-2.5 py-1 rounded-full font-medium transition-colors ${mobileStep === 2 ? 'bg-primary text-white' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
             >
               {selectedBrand?.name ?? L.devices}
             </button>
@@ -584,7 +580,7 @@ export default function ServiceCataloguePage() {
             <ChevronRight className="h-3 w-3 text-outline-variant shrink-0" />
             <button
               onClick={() => setMobileStep(3)}
-              className={`px-2.5 py-1 rounded-full font-medium transition-colors ${mobileStep === 3 ? 'bg-orange-500 text-white' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
+              className={`px-2.5 py-1 rounded-full font-medium transition-colors ${mobileStep === 3 ? 'bg-primary text-white' : 'text-on-surface-variant hover:text-on-surface-variant'}`}
             >
               {selectedDevice?.name ?? L.services}
             </button>
@@ -596,7 +592,7 @@ export default function ServiceCataloguePage() {
 
           {/* ── Col 1: Device Types ── */}
           <div className={`flex flex-col border-b lg:border-b-0 border-outline-variant ${mobileStep !== 0 ? 'hidden lg:flex' : 'flex'}`}>
-            <ColHeader icon={Tag} iconColor="text-purple-500" label={L.types} count={deviceTypes.length} loading={loadingTypes} />
+            <ColHeader icon={Tag} iconColor="text-primary" label={L.types} count={deviceTypes.length} loading={loadingTypes} />
 
             {/* Quick add */}
             <div className="px-3 py-2 border-b border-outline-variant shrink-0">
@@ -610,19 +606,19 @@ export default function ServiceCataloguePage() {
                     setNewTypeSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-'))
                   }}
                   onKeyDown={(e) => e.key === 'Enter' && addTypeInline()}
-                  className="h-10 flex-1 min-w-0 rounded-md border border-outline-variant px-3 text-[15px] focus:outline-none focus:border-purple-400"
+                  className="h-10 flex-1 min-w-0 rounded-xl border border-outline-variant px-3 text-[15px] focus:outline-none focus:border-primary"
                 />
                 <button
                   onClick={addTypeInline}
                   disabled={saving || !newTypeName.trim()}
-                  className="h-10 px-4 rounded-md bg-purple-600 text-white text-[13px] font-medium hover:bg-purple-700 disabled:opacity-40 flex items-center gap-1.5 shrink-0"
+                  className="h-10 px-4 rounded-full bg-primary text-white text-[13px] font-medium hover:bg-primary/90 disabled:opacity-40 flex items-center gap-1.5 shrink-0"
                 >
                   <Plus className="h-4 w-4" /> Add
                 </button>
               </div>
               <button
                 onClick={() => openTypeModal()}
-                className="mt-2 h-8 w-full rounded-md border border-outline-variant text-on-surface-variant text-xs font-medium hover:bg-surface-container-low flex items-center justify-center gap-1"
+                className="mt-2 h-8 w-full rounded-xl border border-outline-variant text-on-surface-variant text-xs font-medium hover:bg-surface-container-low flex items-center justify-center gap-1"
               >
                 <Pencil className="h-3.5 w-3.5" /> Full details (slug, POS visibility)
               </button>
@@ -648,10 +644,10 @@ export default function ServiceCataloguePage() {
                       }
                     }}
                     className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer border-b border-outline-variant last:border-b-0 transition-colors
-                      ${isSelected ? 'bg-purple-50 border-l-[3px] border-l-purple-500' : 'hover:bg-surface-container-low border-l-[3px] border-l-transparent'}`}
+                      ${isSelected ? 'bg-primary/5 border-l-[3px] border-l-purple-500' : 'hover:bg-surface-container-low border-l-[3px] border-l-transparent'}`}
                   >
-                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border ${isSelected ? 'bg-purple-100 border-purple-200' : 'bg-surface-container-low border-outline-variant'}`}>
-                      <Tag className={`h-4 w-4 shrink-0 ${isSelected ? 'text-purple-600' : 'text-outline'}`} />
+                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border ${isSelected ? 'bg-primary/10 border-primary/20' : 'bg-surface-container-low border-outline-variant'}`}>
+                      <Tag className={`h-4 w-4 shrink-0 ${isSelected ? 'text-primary' : 'text-outline'}`} />
                     </div>
                     {isEditing ? (
                       <>
@@ -660,29 +656,29 @@ export default function ServiceCataloguePage() {
                           onChange={(e) => setEditTypeName(e.target.value)}
                           onKeyDown={(e) => { if (e.key === 'Enter') renameType(dt.id); if (e.key === 'Escape') setEditingTypeId(null) }}
                           onClick={(e) => e.stopPropagation()}
-                          className="flex-1 h-7 min-w-0 rounded border border-purple-400 px-2 text-sm focus:outline-none"
+                          className="flex-1 h-7 min-w-0 rounded border border-primary px-2 text-sm focus:outline-none"
                         />
                         <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                          <button onClick={() => renameType(dt.id)} className="p-1 rounded text-green-600 hover:bg-green-50"><Check className="h-3.5 w-3.5" /></button>
+                          <button onClick={() => renameType(dt.id)} className="p-1 rounded text-green-600 hover:bg-emerald-500/5"><Check className="h-3.5 w-3.5" /></button>
                           <button onClick={() => setEditingTypeId(null)} className="p-1 rounded text-outline hover:bg-surface-container"><X className="h-3.5 w-3.5" /></button>
                         </div>
                       </>
                     ) : (
                       <>
                         <div className="flex-1 min-w-0">
-                          <p className={`text-[15px] truncate font-medium ${isSelected ? 'text-purple-700' : 'text-on-surface'}`}>{dt.name}</p>
+                          <p className={`text-[15px] truncate font-medium ${isSelected ? 'text-primary' : 'text-on-surface'}`}>{dt.name}</p>
                           {!dt.show_on_pos && <p className="text-[11px] font-medium text-outline mt-0.5">Hidden on POS</p>}
                         </div>
                         <div className="flex gap-1 shrink-0 items-center" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => { setEditingTypeId(dt.id); setEditTypeName(dt.name) }}
-                            className="p-1.5 rounded text-outline hover:text-purple-600 hover:bg-purple-50"
+                            className="p-1.5 rounded text-outline hover:text-primary hover:bg-primary/5"
                           ><Pencil className="h-3.5 w-3.5" /></button>
                           <button
                             onClick={() => deleteType(dt.id)}
-                            className="p-1.5 rounded text-outline hover:text-red-500 hover:bg-red-50"
+                            className="p-1.5 rounded text-outline hover:text-red-500 hover:bg-red-500/5"
                           ><Trash2 className="h-3.5 w-3.5" /></button>
-                          {isSelected && <ChevronRight className="h-4 w-4 text-purple-400 ml-1" />}
+                          {isSelected && <ChevronRight className="h-4 w-4 text-primary ml-1" />}
                         </div>
                       </>
                     )}
@@ -694,7 +690,7 @@ export default function ServiceCataloguePage() {
 
           {/* ── Col 2: Brands (was Manufacturers) ── */}
           <div className={`flex flex-col border-b lg:border-b-0 border-outline-variant ${mobileStep !== 1 ? 'hidden lg:flex' : 'flex'}`}>
-            <ColHeader icon={Layers} iconColor="text-brand-teal" label={L.brands} count={selectedTypeId ? brandsTotal : null} loading={loadingBrands} />
+            <ColHeader icon={Layers} iconColor="text-primary" label={L.brands} count={selectedTypeId ? brandsTotal : null} loading={loadingBrands} />
 
             {!selectedTypeId ? (
               <EmptyPrompt icon={Layers} text={`Select a ${L.type.toLowerCase()} first`} />
@@ -720,10 +716,10 @@ export default function ServiceCataloguePage() {
                               key={brand.id}
                               onClick={() => { if (!isEditing) { setSelectedBrandId(brand.id); setSelectedDevId(null); setMobileStep(2) } }}
                               className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer border-b border-outline-variant last:border-b-0 transition-colors
-                                ${isSelected ? 'bg-teal-50 border-l-[3px] border-l-brand-teal' : 'hover:bg-surface-container-low border-l-[3px] border-l-transparent'}`}
+                                ${isSelected ? 'bg-primary/5 border-l-[3px] border-l-brand-teal' : 'hover:bg-surface-container-low border-l-[3px] border-l-transparent'}`}
                             >
-                              <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border ${isSelected ? 'bg-teal-100 border-teal-200' : 'bg-surface-container-low border-outline-variant'}`}>
-                                <Layers className={`h-4 w-4 shrink-0 ${isSelected ? 'text-brand-teal' : 'text-outline'}`} />
+                              <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border ${isSelected ? 'bg-primary/10 border-primary/20' : 'bg-surface-container-low border-outline-variant'}`}>
+                                <Layers className={`h-4 w-4 shrink-0 ${isSelected ? 'text-primary' : 'text-outline'}`} />
                               </div>
                               {isEditing ? (
                                 <>
@@ -732,20 +728,20 @@ export default function ServiceCataloguePage() {
                                     onChange={(e) => setEditBrandName(e.target.value)}
                                     onKeyDown={(e) => { if (e.key === 'Enter') renameBrand(brand.id); if (e.key === 'Escape') setEditingBrandId(null) }}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="flex-1 h-7 min-w-0 rounded border border-brand-teal px-2 text-sm focus:outline-none"
+                                    className="flex-1 h-7 min-w-0 rounded border border-primary px-2 text-sm focus:outline-none"
                                   />
                                   <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                    <button onClick={() => renameBrand(brand.id)} className="p-1 rounded text-green-600 hover:bg-green-50"><Check className="h-3.5 w-3.5" /></button>
+                                    <button onClick={() => renameBrand(brand.id)} className="p-1 rounded text-green-600 hover:bg-emerald-500/5"><Check className="h-3.5 w-3.5" /></button>
                                     <button onClick={() => setEditingBrandId(null)} className="p-1 rounded text-outline hover:bg-surface-container"><X className="h-3.5 w-3.5" /></button>
                                   </div>
                                 </>
                               ) : (
                                 <>
-                                  <span className={`flex-1 text-[15px] truncate font-medium ${isSelected ? 'text-teal-700' : 'text-on-surface'}`}>{brand.name}</span>
+                                  <span className={`flex-1 text-[15px] truncate font-medium ${isSelected ? 'text-primary' : 'text-on-surface'}`}>{brand.name}</span>
                                   <div className="flex gap-1 shrink-0 items-center" onClick={(e) => e.stopPropagation()}>
                                     <button onClick={() => { setEditingBrandId(brand.id); setEditBrandName(brand.name) }} className="p-1.5 rounded text-outline hover:text-on-surface-variant hover:bg-surface-container"><Pencil className="h-3.5 w-3.5" /></button>
-                                    <button onClick={() => deleteBrand(brand.id)} className="p-1.5 rounded text-outline hover:text-red-500 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
-                                    {isSelected && <ChevronRight className="h-4 w-4 text-teal-400 ml-1" />}
+                                    <button onClick={() => deleteBrand(brand.id)} className="p-1.5 rounded text-outline hover:text-red-500 hover:bg-red-500/5"><Trash2 className="h-3.5 w-3.5" /></button>
+                                    {isSelected && <ChevronRight className="h-4 w-4 text-primary ml-1" />}
                                   </div>
                                 </>
                               )}
@@ -766,7 +762,7 @@ export default function ServiceCataloguePage() {
 
           {/* ── Col 3: Devices ── */}
           <div className={`flex flex-col border-b lg:border-b-0 border-outline-variant ${mobileStep !== 2 ? 'hidden lg:flex' : 'flex'}`}>
-            <ColHeader icon={Cpu} iconColor="text-blue-500" label={L.devices} count={selectedBrandId ? devicesTotal : null} loading={loadingDevices} />
+            <ColHeader icon={Cpu} iconColor="text-primary" label={L.devices} count={selectedBrandId ? devicesTotal : null} loading={loadingDevices} />
 
             {!selectedBrandId ? (
               <EmptyPrompt icon={Cpu} text={`Select a ${L.brand.toLowerCase()} first`} />
@@ -792,10 +788,10 @@ export default function ServiceCataloguePage() {
                               key={dev.id}
                               onClick={() => { if (!isEditing) { setSelectedDevId(dev.id); setMobileStep(3) } }}
                               className={`flex items-center gap-3 px-4 py-3.5 cursor-pointer border-b border-outline-variant last:border-b-0 transition-colors
-                                ${isSelected ? 'bg-blue-50 border-l-[3px] border-l-blue-500' : 'hover:bg-surface-container-low border-l-[3px] border-l-transparent'}`}
+                                ${isSelected ? 'bg-surface-container-low border-l-[3px] border-l-primary' : 'hover:bg-surface-container-low border-l-[3px] border-l-transparent'}`}
                             >
-                              <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border ${isSelected ? 'bg-blue-100 border-blue-200' : 'bg-surface-container-low border-outline-variant'}`}>
-                                <Cpu className={`h-4 w-4 shrink-0 ${isSelected ? 'text-blue-600' : 'text-outline'}`} />
+                              <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border ${isSelected ? 'bg-blue-500/10 border-outline-variant' : 'bg-surface-container-low border-outline-variant'}`}>
+                                <Cpu className={`h-4 w-4 shrink-0 ${isSelected ? 'text-primary' : 'text-outline'}`} />
                               </div>
                               {isEditing ? (
                                 <>
@@ -804,19 +800,19 @@ export default function ServiceCataloguePage() {
                                     onChange={(e) => setEditDevName(e.target.value)}
                                     onKeyDown={(e) => { if (e.key === 'Enter') renameDevice(dev.id); if (e.key === 'Escape') setEditingDevId(null) }}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="flex-1 h-7 min-w-0 rounded border border-blue-400 px-2 text-sm focus:outline-none"
+                                    className="flex-1 h-7 min-w-0 rounded border border-primary px-2 text-sm focus:outline-none"
                                   />
                                   <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                    <button onClick={() => renameDevice(dev.id)} className="p-1 rounded text-green-600 hover:bg-green-50"><Check className="h-3.5 w-3.5" /></button>
+                                    <button onClick={() => renameDevice(dev.id)} className="p-1 rounded text-green-600 hover:bg-emerald-500/5"><Check className="h-3.5 w-3.5" /></button>
                                     <button onClick={() => setEditingDevId(null)} className="p-1 rounded text-outline hover:bg-surface-container"><X className="h-3.5 w-3.5" /></button>
                                   </div>
                                 </>
                               ) : (
                                 <>
-                                  <span className={`flex-1 text-[15px] truncate font-medium ${isSelected ? 'text-blue-700' : 'text-on-surface'}`}>{dev.name}</span>
+                                  <span className={`flex-1 text-[15px] truncate font-medium ${isSelected ? 'text-on-surface-variant' : 'text-on-surface'}`}>{dev.name}</span>
                                   <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                                     <button onClick={() => { setEditingDevId(dev.id); setEditDevName(dev.name) }} className="p-1.5 rounded text-outline hover:text-on-surface-variant hover:bg-surface-container"><Pencil className="h-3.5 w-3.5" /></button>
-                                    <button onClick={() => deleteDevice(dev.id)} className="p-1.5 rounded text-outline hover:text-red-500 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                                    <button onClick={() => deleteDevice(dev.id)} className="p-1.5 rounded text-outline hover:text-red-500 hover:bg-red-500/5"><Trash2 className="h-3.5 w-3.5" /></button>
                                   </div>
                                 </>
                               )}
@@ -862,24 +858,24 @@ export default function ServiceCataloguePage() {
                       type="text" placeholder={L.servicePh} value={newSvcName}
                       onChange={(e) => setNewSvcName(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && addServiceInline()}
-                      className="h-10 flex-1 min-w-0 rounded-md border border-outline-variant px-3 text-[15px] focus:border-orange-400 focus:outline-none"
+                      className="h-10 flex-1 min-w-0 rounded-xl border border-outline-variant px-3 text-[15px] focus:border-primary focus:outline-none"
                     />
                     <input
                       type="number" placeholder="£ Price" value={newSvcPrice}
                       onChange={(e) => setNewSvcPrice(e.target.value)}
-                      className="h-10 w-24 rounded-md border border-outline-variant px-3 text-[15px] focus:border-orange-400 focus:outline-none"
+                      className="h-10 w-24 rounded-xl border border-outline-variant px-3 text-[15px] focus:border-primary focus:outline-none"
                     />
                   </div>
                   <div className="flex gap-2">
                     <button
                       onClick={addServiceInline} disabled={saving || !newSvcName.trim()}
-                      className="h-10 px-4 rounded-md bg-orange-500 text-white text-[13px] font-medium hover:bg-orange-600 disabled:opacity-40 flex items-center gap-1.5"
+                      className="h-10 px-4 rounded-full bg-primary text-white text-[13px] font-medium hover:bg-primary/90 disabled:opacity-40 flex items-center gap-1.5"
                     >
                       <Plus className="h-4 w-4" /> Add
                     </button>
                     <button
                       onClick={() => openSvcModal()}
-                      className="h-10 px-4 rounded-md border border-outline-variant text-on-surface-variant text-[13px] font-medium hover:bg-surface-container-low flex items-center gap-1.5"
+                      className="h-10 px-4 rounded-xl border border-outline-variant text-on-surface-variant text-[13px] font-medium hover:bg-surface-container-low flex items-center gap-1.5"
                     >
                       <Pencil className="h-3.5 w-3.5" /> Full details
                     </button>
@@ -896,8 +892,8 @@ export default function ServiceCataloguePage() {
                     : services.length === 0
                       ? <p className="text-xs text-outline text-center py-10">No services yet</p>
                       : services.map((svc: Service) => (
-                          <div key={svc.id} className="flex items-center gap-3 px-4 py-3.5 border-b border-outline-variant last:border-b-0 hover:bg-orange-50/30 transition-colors group">
-                            <div className="h-8 w-8 rounded-lg bg-orange-50 flex items-center justify-center shrink-0 border border-orange-100">
+                          <div key={svc.id} className="flex items-center gap-3 px-4 py-3.5 border-b border-outline-variant last:border-b-0 hover:bg-orange-500/5 transition-colors group">
+                            <div className="h-8 w-8 rounded-lg bg-orange-500/5 flex items-center justify-center shrink-0 border border-outline-variant">
                               <Wrench className="h-4 w-4 text-orange-500 shrink-0" />
                             </div>
                             <div className="flex-1 min-w-0">
@@ -907,7 +903,7 @@ export default function ServiceCataloguePage() {
                                   <p className="text-[11px] font-medium text-outline">{svc.warranty_days}d warranty</p>
                                 )}
                                 {svc.category_id && (
-                                  <p className="text-[11px] font-medium text-purple-500">
+                                  <p className="text-[11px] font-medium text-primary">
                                     {deviceTypes.find(t => t.id === svc.category_id)?.name}
                                   </p>
                                 )}
@@ -916,7 +912,7 @@ export default function ServiceCataloguePage() {
                             <span className="text-[15px] font-semibold text-on-surface-variant shrink-0">{formatCurrency(svc.price)}</span>
                             <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
                               <button onClick={() => openSvcModal(svc)} className="p-1.5 rounded text-outline hover:text-on-surface-variant hover:bg-surface-container"><Pencil className="h-3.5 w-3.5" /></button>
-                              <button onClick={() => deleteService(svc.id)} className="p-1.5 rounded text-outline hover:text-red-500 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
+                              <button onClick={() => deleteService(svc.id)} className="p-1.5 rounded text-outline hover:text-red-500 hover:bg-red-500/5"><Trash2 className="h-3.5 w-3.5" /></button>
                             </div>
                           </div>
                         ))
@@ -934,9 +930,9 @@ export default function ServiceCataloguePage() {
                 {/* Breadcrumb context */}
                 <div className="px-4 py-2 border-t border-outline-variant bg-surface-container-low/60 shrink-0">
                   <p className="text-[11px] text-outline truncate flex items-center gap-1">
-                    {selectedType && <><span className="text-purple-500 font-medium">{selectedType.name}</span><ChevronRight className="h-3 w-3" /></>}
-                    {selectedBrand && <><span className="text-teal-600 font-medium">{selectedBrand.name}</span><ChevronRight className="h-3 w-3" /></>}
-                    {selectedDevice && <span className="text-blue-600 font-medium">{selectedDevice.name}</span>}
+                    {selectedType && <><span className="text-primary font-medium">{selectedType.name}</span><ChevronRight className="h-3 w-3" /></>}
+                    {selectedBrand && <><span className="text-primary font-medium">{selectedBrand.name}</span><ChevronRight className="h-3 w-3" /></>}
+                    {selectedDevice && <span className="text-primary font-medium">{selectedDevice.name}</span>}
                   </p>
                 </div>
               </>
@@ -965,7 +961,7 @@ export default function ServiceCataloguePage() {
               <label className="mb-1 block text-sm font-medium text-on-surface-variant">{L.type}</label>
               <select
                 {...svcForm.register('category_id')}
-                className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-purple-400 focus:outline-none"
+                className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-primary focus:outline-none"
               >
                 <option value="">None</option>
                 {deviceTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}

@@ -41,15 +41,15 @@ function RepairCard({ repair, isDragOverlay = false }: { repair: RepairRow; isDr
       style={style}
       {...listeners}
       {...attributes}
-      className={`rounded-lg border bg-surface p-3 shadow-sm cursor-grab active:cursor-grabbing select-none ${
+      className={`rounded-xl border border-outline-variant bg-surface-container-lowest p-3 cursor-grab active:cursor-grabbing select-none ${
         isDragging && !isDragOverlay ? 'opacity-40' : ''
       }`}
     >
       <div className="flex items-start justify-between gap-1 mb-1 relative">
         <div className="flex items-center gap-1.5">
-          <span className="font-mono text-xs font-semibold text-blue-600">{repair.job_number}</span>
+          <span className="font-mono text-xs font-semibold text-primary">{repair.job_number}</span>
           {(repair as any).is_rush && (
-            <span className="flex h-3.5 items-center rounded-sm bg-orange-100 px-1 text-[8px] font-bold text-orange-700 uppercase tracking-widest border border-orange-200">Rush</span>
+            <span className="inline-flex items-center rounded-full bg-orange-500/10 px-2 py-0.5 text-[10px] font-medium text-orange-600">Rush</span>
           )}
         </div>
         {repair.estimated_cost && (
@@ -70,8 +70,8 @@ function RepairCard({ repair, isDragOverlay = false }: { repair: RepairRow; isDr
         <p className="mt-1 text-xs text-outline line-clamp-2">{repair.issue}</p>
       )}
       {(repair.custom_fields as any)?.due_date && (
-        <div className="mt-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-orange-600/80">
-          <span className="h-1 w-1 rounded-full bg-orange-500" />
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-on-surface-variant">
+          <span className="h-1 w-1 rounded-full bg-primary" />
           Due: {formatDate((repair.custom_fields as any).due_date)}
         </div>
       )}
@@ -89,26 +89,21 @@ function KanbanColumn({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status.id })
 
-  // Build light tint from hex for header and body backgrounds
-  const headerStyle = { backgroundColor: `${status.hexColor}26`, borderColor: `${status.hexColor}66` }
-  const bodyStyle   = { backgroundColor: `${status.hexColor}14`, borderColor: `${status.hexColor}66` }
-
   return (
     <div className="flex w-60 shrink-0 flex-col">
-      <div
-        style={headerStyle}
-        className="mb-2 flex items-center justify-between rounded-t-lg border px-3 py-2"
-      >
-        <span className="text-xs font-semibold text-on-surface-variant">{status.label}</span>
-        <span className="rounded-full bg-surface/80 px-2 py-0.5 text-xs font-medium text-on-surface-variant">
+      <div className="mb-2 flex items-center justify-between rounded-xl bg-surface-container-low px-3 py-2.5">
+        <span className="flex items-center gap-2 text-sm font-medium text-on-surface">
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: status.hexColor }} />
+          {status.label}
+        </span>
+        <span className="rounded-full bg-surface-container-lowest px-2 py-0.5 text-xs font-medium text-on-surface-variant">
           {repairs.length}
         </span>
       </div>
       <div
         ref={setNodeRef}
-        style={bodyStyle}
-        className={`flex min-h-[200px] flex-1 flex-col gap-2 rounded-b-lg border border-t-0 p-2 transition-colors ${
-          isOver ? 'ring-2 ring-blue-400 ring-inset' : ''
+        className={`flex min-h-[200px] flex-1 flex-col gap-2 rounded-2xl bg-surface-container-low/50 p-2 transition-colors ${
+          isOver ? 'ring-2 ring-primary/30 ring-inset' : ''
         }`}
       >
         {repairs.map((r) => (

@@ -117,8 +117,8 @@ export function CustomerSearch({ value, onChange }: CustomerSearchProps) {
   // Customer already selected — show pill
   if (value) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">
+      <div className="flex items-center gap-2 rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
           {value.first_name.charAt(0).toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
@@ -137,7 +137,7 @@ export function CustomerSearch({ value, onChange }: CustomerSearchProps) {
   return (
     <div ref={containerRef} className="relative">
       {/* Search input */}
-      <div className="flex items-center gap-2 rounded-lg border border-outline bg-surface px-3 py-2 focus-within:border-blue-500">
+      <div className="flex items-center gap-2 rounded-lg border border-outline bg-surface px-3 py-2 focus-within:border-primary">
         <Search className="h-4 w-4 shrink-0 text-outline" />
         <input
           type="text"
@@ -148,7 +148,7 @@ export function CustomerSearch({ value, onChange }: CustomerSearchProps) {
           className="flex-1 bg-transparent text-sm outline-none placeholder:text-outline"
         />
         {isSearching && (
-          <div className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+          <div className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         )}
       </div>
 
@@ -193,7 +193,7 @@ export function CustomerSearch({ value, onChange }: CustomerSearchProps) {
             <button
               type="button"
               onClick={() => { setShowQuickAdd(true); setShowDropdown(false) }}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-blue-600 hover:bg-blue-50"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-primary hover:bg-surface-container-low"
             >
               <Plus className="h-4 w-4" />
               Add new customer

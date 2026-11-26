@@ -26,10 +26,10 @@ interface Estimate {
 }
 
 const STATUS_BADGE: Record<string, string> = {
-  pending:           'bg-yellow-100 text-yellow-700',
-  approved:          'bg-green-100 text-green-700',
-  declined:          'bg-red-100 text-red-700',
-  changes_requested: 'bg-orange-100 text-orange-700',
+  pending:           'bg-amber-500/10 text-amber-600',
+  approved:          'bg-emerald-500/10 text-emerald-600',
+  declined:          'bg-red-500/10 text-red-600',
+  changes_requested: 'bg-orange-500/10 text-orange-600',
 }
 
 interface EstimatesPanelProps {
@@ -164,14 +164,14 @@ export function EstimatesPanel({ repairId, customerId, branchId }: EstimatesPane
                   value={item.name}
                   onChange={(e) => updateLine(idx, { name: e.target.value })}
                   placeholder="Description"
-                  className="col-span-5 h-8 rounded border border-outline-variant px-2 text-sm focus:border-blue-400 focus:outline-none"
+                  className="col-span-5 h-8 rounded border border-outline-variant px-2 text-sm focus:border-primary focus:outline-none"
                 />
                 <input
                   type="number"
                   min="1"
                   value={item.quantity}
                   onChange={(e) => updateLine(idx, { quantity: parseInt(e.target.value) || 1 })}
-                  className="col-span-2 h-8 rounded border border-outline-variant px-2 text-center text-sm focus:border-blue-400 focus:outline-none"
+                  className="col-span-2 h-8 rounded border border-outline-variant px-2 text-center text-sm focus:border-primary focus:outline-none"
                 />
                 <input
                   type="number"
@@ -180,7 +180,7 @@ export function EstimatesPanel({ repairId, customerId, branchId }: EstimatesPane
                   value={item.unit_price || ''}
                   onChange={(e) => updateLine(idx, { unit_price: parseFloat(e.target.value) || 0 })}
                   placeholder="0.00"
-                  className="col-span-3 h-8 rounded border border-outline-variant px-2 text-right text-sm focus:border-blue-400 focus:outline-none"
+                  className="col-span-3 h-8 rounded border border-outline-variant px-2 text-right text-sm focus:border-primary focus:outline-none"
                 />
                 <span className="col-span-1 text-right text-xs text-on-surface-variant">
                   {item.total > 0 ? formatCurrency(item.total) : '—'}
@@ -194,7 +194,7 @@ export function EstimatesPanel({ repairId, customerId, branchId }: EstimatesPane
 
           <button
             onClick={addLine}
-            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+            className="flex items-center gap-1 text-xs text-primary hover:text-primary"
           >
             <Plus className="h-3.5 w-3.5" />
             Add line

@@ -4,6 +4,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth.store'
 import { ArrowLeft, FileDown, FileSpreadsheet, Printer, FileText } from 'lucide-react'
 import { DataTable } from '@/components/shared/data-table'
+import { PageHeader } from '@/components/shared/page-header'
+import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/utils'
 import type { ColumnDef } from '@tanstack/react-table'
 
@@ -139,7 +141,7 @@ export default function RepairCustomerDetailPage() {
   const columns: ColumnDef<RepairRow>[] = [
     {
       id: 'booking_id', header: 'Booking ID',
-      cell: ({ row }) => <span className="font-mono text-sm font-semibold text-blue-600">{row.original.job_number}</span>,
+      cell: ({ row }) => <span className="font-mono text-sm font-semibold text-primary">{row.original.job_number}</span>,
     },
     {
       accessorKey: 'status', header: 'Status',
@@ -169,7 +171,7 @@ export default function RepairCustomerDetailPage() {
       cell: ({ row }) => {
         const issue = row.original.issue
         return issue
-          ? <span className="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">{issue}</span>
+          ? <span className="inline-flex items-center rounded-full bg-surface-container px-2 py-0.5 text-xs font-medium text-on-surface-variant">{issue}</span>
           : <span className="text-outline">—</span>
       },
     },
@@ -213,28 +215,27 @@ export default function RepairCustomerDetailPage() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div>
-        <button onClick={() => router.push('/repairs/customers')} className="mb-2 flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-on-surface transition-colors">
+      <div className="space-y-2">
+        <button onClick={() => router.push('/repairs/customers')} className="flex items-center gap-1 text-sm text-on-surface-variant transition-colors hover:text-on-surface">
           <ArrowLeft className="h-4 w-4" /> Back to Repair Customers
         </button>
-        <h1 className="text-xl font-bold text-on-surface">Repair Job Sheet</h1>
-        <p className="mt-0.5 text-sm font-semibold text-on-surface-variant">{customerLabel}</p>
+        <PageHeader title="Repair Job Sheet" description={customerLabel} />
       </div>
 
       {/* Export Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
-        <button onClick={exportCSV} className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-700 hover:bg-emerald-100 transition-colors">
+        <Button variant="outline" size="sm" onClick={exportCSV}>
           <FileDown className="h-3.5 w-3.5" /> Export CSV
-        </button>
-        <button onClick={exportExcel} className="flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs text-green-700 hover:bg-green-100 transition-colors">
+        </Button>
+        <Button variant="outline" size="sm" onClick={exportExcel}>
           <FileSpreadsheet className="h-3.5 w-3.5" /> Export Excel
-        </button>
-        <button onClick={exportPDF} className="flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs text-sky-700 hover:bg-sky-100 transition-colors">
+        </Button>
+        <Button variant="outline" size="sm" onClick={exportPDF}>
           <Printer className="h-3.5 w-3.5" /> Print
-        </button>
-        <button onClick={exportPDF} className="flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs text-orange-700 hover:bg-orange-100 transition-colors">
+        </Button>
+        <Button variant="outline" size="sm" onClick={exportPDF}>
           <FileText className="h-3.5 w-3.5" /> Export PDF
-        </button>
+        </Button>
       </div>
 
       <DataTable

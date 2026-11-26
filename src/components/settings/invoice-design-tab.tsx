@@ -67,10 +67,10 @@ function Toggle({ label, desc, checked, onChange }: {
   label: string; desc?: string; checked: boolean; onChange: (v: boolean) => void
 }) {
   return (
-    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-gray-100 p-3 hover:bg-gray-50 transition-colors">
+    <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-outline-variant p-3 hover:bg-surface-container-low transition-colors">
       <div>
-        <p className="text-sm font-medium text-gray-800">{label}</p>
-        {desc && <p className="text-xs text-gray-400 mt-0.5">{desc}</p>}
+        <p className="text-sm font-medium text-on-surface">{label}</p>
+        {desc && <p className="text-xs text-on-surface-variant mt-0.5">{desc}</p>}
       </div>
       <button
         type="button"
@@ -79,11 +79,11 @@ function Toggle({ label, desc, checked, onChange }: {
         onClick={() => onChange(!checked)}
         className={cn(
           'relative shrink-0 h-5 w-9 rounded-full border-2 transition-colors focus:outline-none',
-          checked ? 'bg-teal-500 border-teal-500' : 'bg-gray-200 border-gray-200'
+          checked ? 'bg-primary border-primary' : 'bg-surface-container-high border-outline-variant'
         )}
       >
         <span className={cn(
-          'absolute top-0.5 left-0.5 h-3.5 w-3.5 rounded-full bg-white shadow transition-transform',
+          'absolute top-0.5 left-0.5 h-3.5 w-3.5 rounded-full bg-surface-container-lowest shadow transition-transform',
           checked ? 'translate-x-4' : 'translate-x-0'
         )} />
       </button>
@@ -108,10 +108,10 @@ function ScopeSelect({ value, onChange }: { value: FooterLineScope; onChange: (v
           type="button"
           onClick={() => onChange(o.value)}
           className={cn(
-            'rounded-md border px-2 py-1 text-xs transition-colors',
+            'rounded-full border px-2.5 py-1 text-xs transition-colors',
             value === o.value
-              ? 'border-teal-600 bg-teal-50 text-teal-700 font-medium'
-              : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+              ? 'border-primary bg-primary/10 text-primary font-medium'
+              : 'border-outline-variant text-on-surface-variant hover:bg-surface-container-low'
           )}
         >
           {o.label}
@@ -128,10 +128,10 @@ function Section({ icon, title, children }: {
 }) {
   const Icon = icon
   return (
-    <div className="rounded-xl border border-gray-200 bg-white">
-      <div className="flex items-center gap-2 border-b border-gray-100 px-5 py-3.5">
-        <Icon className="h-4 w-4 text-teal-600 shrink-0" />
-        <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
+    <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest">
+      <div className="flex items-center gap-2 border-b border-outline-variant px-5 py-3.5">
+        <Icon className="h-4 w-4 text-primary shrink-0" />
+        <h3 className="text-base font-semibold text-on-surface">{title}</h3>
       </div>
       <div className="p-5 space-y-3">
         {children}
@@ -173,7 +173,7 @@ function InvoicePreview({ s, businessName, branchName, previewContext }: {
 
   const fontMap: Record<string, string> = {
     'Helvetica': 'ui-sans-serif, system-ui, sans-serif',
-    'Times-Roman': 'Georgia, "Times New Roman", serif',
+    'Times-Roman': 'Georgia,"Times New Roman", serif',
     'Courier': '"Courier New", Courier, monospace',
   }
   const fontStyle = fontMap[s.font_family] ?? fontMap['Helvetica']
@@ -436,20 +436,20 @@ export function InvoiceDesignTab() {
   return (
     <div className="space-y-5">
       {/* ── Scope bar ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4">
         <div className="flex items-center gap-3">
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+          <div className="flex rounded-xl border border-outline-variant overflow-hidden text-sm">
             {isOwner() && (
               <button
                 onClick={() => setScope('business')}
-                className={cn('px-4 py-2 font-medium transition-colors', scope === 'business' ? 'bg-teal-500 text-white' : 'text-gray-600 hover:bg-gray-50')}
+                className={cn('px-4 py-2 font-medium transition-colors', scope === 'business' ? 'bg-primary text-white' : 'text-on-surface-variant hover:bg-surface-container-low')}
               >
                 Business Default
               </button>
             )}
             <button
               onClick={() => setScope('branch')}
-              className={cn('px-4 py-2 font-medium transition-colors', scope === 'branch' ? 'bg-teal-500 text-white' : 'text-gray-600 hover:bg-gray-50')}
+              className={cn('px-4 py-2 font-medium transition-colors', scope === 'branch' ? 'bg-primary text-white' : 'text-on-surface-variant hover:bg-surface-container-low')}
             >
               Branch Override
             </button>
@@ -458,7 +458,7 @@ export function InvoiceDesignTab() {
             <select
               value={selectedBranchId ?? ''}
               onChange={(e) => setSelectedBranchId(e.target.value || null)}
-              className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-sm text-on-surface focus:border-primary focus:outline-none"
             >
               {branches.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
@@ -466,7 +466,7 @@ export function InvoiceDesignTab() {
             </select>
           )}
           {scope === 'branch' && (
-            <p className="text-xs text-gray-400">Branch settings override the business default for this branch only.</p>
+            <p className="text-xs text-on-surface-variant">Branch settings override the business default for this branch only.</p>
           )}
         </div>
         <Button onClick={handleSave} loading={saving} size="sm">
@@ -475,7 +475,7 @@ export function InvoiceDesignTab() {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 flex items-center gap-2">
+        <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-600 flex items-center gap-2">
           <AlertCircle className="h-4 w-4 shrink-0" />
           <p>{error}</p>
         </div>
@@ -483,7 +483,7 @@ export function InvoiceDesignTab() {
 
       {loading ? (
         <div className="flex h-32 items-center justify-center">
-          <RefreshCw className="h-5 w-5 animate-spin text-gray-400" />
+          <RefreshCw className="h-5 w-5 animate-spin text-on-surface-variant" />
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -493,14 +493,14 @@ export function InvoiceDesignTab() {
             {/* Page Setup */}
             <Section icon={FileText} title="Page Setup">
               <div>
-                <label className="mb-2 block text-xs font-medium text-gray-600">Paper Size</label>
+                <label className="mb-2 block text-xs font-medium text-on-surface-variant">Paper Size</label>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {PAPER_OPTIONS.map((opt) => (
                     <label key={opt.value} className={cn(
-                      'flex cursor-pointer flex-col rounded-lg border p-3 transition-colors',
+                      'flex cursor-pointer flex-col rounded-xl border p-3 transition-colors',
                       settings.paper_size === opt.value
-                        ? 'border-teal-500 bg-teal-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-primary bg-primary/10'
+                        : 'border-outline-variant hover:border-primary/40'
                     )}>
                       <input
                         type="radio"
@@ -509,18 +509,18 @@ export function InvoiceDesignTab() {
                         onChange={() => patch({ paper_size: opt.value as any })}
                         className="sr-only"
                       />
-                      <span className={cn('text-sm font-semibold', settings.paper_size === opt.value ? 'text-teal-700' : 'text-gray-800')}>{opt.label}</span>
-                      <span className="text-[11px] text-gray-400 mt-0.5">{opt.desc}</span>
+                      <span className={cn('text-sm font-semibold', settings.paper_size === opt.value ? 'text-primary' : 'text-on-surface')}>{opt.label}</span>
+                      <span className="text-[11px] text-on-surface-variant mt-0.5">{opt.desc}</span>
                     </label>
                   ))}
                 </div>
               </div>
               {settings.paper_size === 'Custom' && (
                 <div>
-                  <label className="mb-2 block text-xs font-medium text-gray-600">Custom Dimensions (mm)</label>
+                  <label className="mb-2 block text-xs font-medium text-on-surface-variant">Custom Dimensions (mm)</label>
                   <div className="flex items-center gap-2">
                     <div className="flex-1">
-                      <label className="mb-1 block text-[11px] text-gray-400">Width</label>
+                      <label className="mb-1 block text-[11px] text-on-surface-variant">Width</label>
                       <Input
                         type="number"
                         min={10}
@@ -530,9 +530,9 @@ export function InvoiceDesignTab() {
                         onChange={(e) => patch({ custom_width: e.target.value ? Number(e.target.value) : null })}
                       />
                     </div>
-                    <span className="mt-5 text-gray-400">×</span>
+                    <span className="mt-5 text-on-surface-variant">×</span>
                     <div className="flex-1">
-                      <label className="mb-1 block text-[11px] text-gray-400">Height</label>
+                      <label className="mb-1 block text-[11px] text-on-surface-variant">Height</label>
                       <Input
                         type="number"
                         min={10}
@@ -547,12 +547,12 @@ export function InvoiceDesignTab() {
               )}
               {!settings.paper_size.startsWith('Receipt') && settings.paper_size !== 'Custom' && (
                 <div>
-                  <label className="mb-2 block text-xs font-medium text-gray-600">Orientation</label>
+                  <label className="mb-2 block text-xs font-medium text-on-surface-variant">Orientation</label>
                   <div className="flex gap-2">
                     {(['portrait', 'landscape'] as const).map((o) => (
                       <label key={o} className={cn(
-                        'flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors capitalize',
-                        settings.orientation === o ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                        'flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors capitalize',
+                        settings.orientation === o ? 'border-primary bg-primary/10 text-primary' : 'border-outline-variant text-on-surface-variant hover:border-primary/40'
                       )}>
                         <input type="radio" className="sr-only" checked={settings.orientation === o} onChange={() => patch({ orientation: o })} />
                         {o}
@@ -566,7 +566,7 @@ export function InvoiceDesignTab() {
             {/* Branding */}
             <Section icon={Palette} title="Branding & Colors">
               <div>
-                <label className="mb-2 block text-xs font-medium text-gray-600">Logo</label>
+                <label className="mb-2 block text-xs font-medium text-on-surface-variant">Logo</label>
                 <ImageUpload
                   value={settings.logo_url ?? ''}
                   onChange={(url) => patch({ logo_url: url || null })}
@@ -581,8 +581,8 @@ export function InvoiceDesignTab() {
                   { key: 'text_color',      label: 'Body text' },
                 ] as const).map(({ key, label }) => (
                   <div key={key}>
-                    <label className="mb-1.5 block text-xs font-medium text-gray-600">{label}</label>
-                    <div className="flex items-center gap-2 rounded-lg border border-gray-200 p-1.5">
+                    <label className="mb-1.5 block text-xs font-medium text-on-surface-variant">{label}</label>
+                    <div className="flex items-center gap-2 rounded-xl border border-outline-variant p-1.5">
                       <input
                         type="color"
                         value={settings[key]}
@@ -593,18 +593,18 @@ export function InvoiceDesignTab() {
                         type="text"
                         value={settings[key]}
                         onChange={(e) => /^#([0-9a-fA-F]{3}){1,2}$/.test(e.target.value) && patch({ [key]: e.target.value })}
-                        className="min-w-0 flex-1 font-mono text-xs text-gray-700 focus:outline-none"
+                        className="min-w-0 flex-1 font-mono text-xs text-on-surface focus:outline-none"
                       />
                     </div>
                   </div>
                 ))}
               </div>
               <div>
-                <label className="mb-2 block text-xs font-medium text-gray-600">Font</label>
+                <label className="mb-2 block text-xs font-medium text-on-surface-variant">Font</label>
                 <select
                   value={settings.font_family}
                   onChange={(e) => patch({ font_family: e.target.value })}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-sm focus:border-primary focus:outline-none"
                 >
                   {FONT_OPTIONS.map((f) => (
                     <option key={f.value} value={f.value}>{f.label}</option>
@@ -664,13 +664,13 @@ export function InvoiceDesignTab() {
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => patch({ footer_phone: e.target.value || null })}
               />
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-600">Footer Line 1</label>
+                <label className="mb-1.5 block text-xs font-medium text-on-surface-variant">Footer Line 1</label>
                 <textarea
                   rows={2}
                   placeholder="e.g. All repairs come with a 90-day warranty"
                   value={settings.footer_line_1 ?? ''}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => patch({ footer_line_1: e.target.value || null })}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-sm text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none resize-none"
                 />
                 <ScopeSelect
                   value={settings.footer_line_1_scope ?? 'both'}
@@ -678,13 +678,13 @@ export function InvoiceDesignTab() {
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-600">Footer Line 2</label>
+                <label className="mb-1.5 block text-xs font-medium text-on-surface-variant">Footer Line 2</label>
                 <textarea
                   rows={2}
                   placeholder="e.g. Free estimates · No fix, no fee"
                   value={settings.footer_line_2 ?? ''}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => patch({ footer_line_2: e.target.value || null })}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-sm text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none resize-none"
                 />
                 <ScopeSelect
                   value={settings.footer_line_2_scope ?? 'both'}
@@ -692,13 +692,13 @@ export function InvoiceDesignTab() {
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-600">Footer Line 3</label>
+                <label className="mb-1.5 block text-xs font-medium text-on-surface-variant">Footer Line 3</label>
                 <textarea
                   rows={2}
                   placeholder="e.g. Timing Mon to Sat 9:30am to 6pm&#10;Sunday 10:00am to 4pm"
                   value={settings.footer_line_3 ?? ''}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => patch({ footer_line_3: e.target.value || null })}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-sm text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none resize-none"
                 />
                 <ScopeSelect
                   value={settings.footer_line_3_scope ?? 'both'}
@@ -706,23 +706,23 @@ export function InvoiceDesignTab() {
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-600">POS Terms &amp; Conditions (printed small at bottom of sale receipts)</label>
+                <label className="mb-1.5 block text-xs font-medium text-on-surface-variant">POS Terms &amp; Conditions (printed small at bottom of sale receipts)</label>
                 <textarea
                   rows={3}
                   placeholder="e.g. All sales are final. Warranty void if tampered with. Registered in England & Wales..."
                   value={settings.policy_text_pos ?? ''}
                   onChange={(e) => patch({ policy_text_pos: e.target.value || null })}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-sm text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none resize-none"
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-gray-600">Repair Terms &amp; Conditions (printed small at bottom of repair invoices)</label>
+                <label className="mb-1.5 block text-xs font-medium text-on-surface-variant">Repair Terms &amp; Conditions (printed small at bottom of repair invoices)</label>
                 <textarea
                   rows={3}
                   placeholder="e.g. Devices left uncollected after 90 days may be recycled. Warranty void if tampered with..."
                   value={settings.policy_text_repair ?? ''}
                   onChange={(e) => patch({ policy_text_repair: e.target.value || null })}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                  className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-sm text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none resize-none"
                 />
               </div>
             </Section>
@@ -732,15 +732,15 @@ export function InvoiceDesignTab() {
               <div className="space-y-2.5">
                 {SOCIAL_FIELDS.map(({ key, label, icon: Icon, placeholder }) => (
                   <div key={key} className="flex items-center gap-2.5">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100">
-                      <Icon className="h-3.5 w-3.5 text-gray-500" />
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-container-low">
+                      <Icon className="h-3.5 w-3.5 text-on-surface-variant" />
                     </div>
                     <input
                       type="text"
                       placeholder={placeholder}
                       value={(settings.social_links?.[key] as string) ?? ''}
                       onChange={(e) => patchSocial(key, e.target.value)}
-                      className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      className="flex-1 rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-sm placeholder:text-on-surface-variant focus:border-primary focus:outline-none"
                     />
                   </div>
                 ))}
@@ -780,11 +780,11 @@ export function InvoiceDesignTab() {
 
           {/* ── Right: live preview ── */}
           <div className="lg:sticky lg:top-6 lg:self-start">
-            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <div className="rounded-xl border border-outline-variant bg-surface-container-low p-4">
               <div className="mb-3 flex items-center gap-2">
-                <Eye className="h-4 w-4 text-gray-400" />
-                <p className="text-sm font-medium text-gray-600">Live Preview</p>
-                <span className="ml-auto text-xs text-gray-400">Updates as you type</span>
+                <Eye className="h-4 w-4 text-on-surface-variant" />
+                <p className="text-sm font-medium text-on-surface-variant">Live Preview</p>
+                <span className="ml-auto text-xs text-on-surface-variant">Updates as you type</span>
               </div>
               <div className="mb-3 flex gap-1">
                 {(['repair', 'pos'] as const).map((ctx) => (
@@ -793,10 +793,10 @@ export function InvoiceDesignTab() {
                     type="button"
                     onClick={() => setPreviewContext(ctx)}
                     className={cn(
-                      'rounded-md border px-2.5 py-1 text-xs transition-colors',
+                      'rounded-full border px-2.5 py-1 text-xs transition-colors',
                       previewContext === ctx
-                        ? 'border-teal-600 bg-teal-50 text-teal-700 font-medium'
-                        : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                        ? 'border-primary bg-primary/10 text-primary font-medium'
+                        : 'border-outline-variant text-on-surface-variant hover:bg-surface-container-low'
                     )}
                   >
                     {ctx === 'repair' ? 'Preview as Repair receipt' : 'Preview as POS receipt'}

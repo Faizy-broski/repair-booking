@@ -181,7 +181,7 @@ export function CustomFieldBuilder({ module: initialModule, repairCategory: init
                 placeholder="e.g. Phone Repair, Computer Repair"
                 value={repairCategory}
                 onChange={e => setRepairCategory(e.target.value)}
-                className="h-9 w-56 rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none"
+                className="h-10 w-56 rounded-xl border border-outline-variant px-3.5 text-sm focus:border-brand-teal focus:outline-none"
               />
             </div>
           )}
@@ -197,7 +197,7 @@ export function CustomFieldBuilder({ module: initialModule, repairCategory: init
             placeholder="e.g. Phone Repair, Computer Repair, Watch Repair"
             value={repairCategory}
             onChange={e => setRepairCategory(e.target.value)}
-            className="h-9 w-72 rounded-lg border border-outline px-3 text-sm focus:border-brand-teal focus:outline-none"
+            className="h-10 w-72 rounded-xl border border-outline-variant px-3.5 text-sm focus:border-brand-teal focus:outline-none"
           />
         </div>
       )}
@@ -214,7 +214,7 @@ export function CustomFieldBuilder({ module: initialModule, repairCategory: init
               draggable
               onDragStart={() => onDragStart(index)}
               onDragOver={(e) => onDragOver(e, index)}
-              className="flex items-start gap-2 rounded-lg border border-outline-variant bg-surface p-3"
+              className="flex items-start gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest p-3"
             >
               <GripVertical className="mt-2.5 h-4 w-4 shrink-0 cursor-grab text-outline-variant" />
 
@@ -273,7 +273,7 @@ export function CustomFieldBuilder({ module: initialModule, repairCategory: init
       )}
 
       {saveError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{saveError}</div>
+        <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2 text-sm text-red-700">{saveError}</div>
       )}
       <div className="flex gap-2">
         <Button variant="outline" size="sm" onClick={addField}>

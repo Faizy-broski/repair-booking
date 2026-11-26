@@ -17,6 +17,7 @@ import { useModuleConfigStore } from '@/store/module-config.store'
 import { useRouter } from 'next/navigation'
 import { BranchSwitcher } from './branch-switcher'
 import { GraceSidebarNotice } from './grace-notice'
+import { SignOutButton } from './sign-out-button'
 import type { Role } from '@/backend/config/constants'
 import type { ModuleName } from '@/types/module-config'
 
@@ -238,8 +239,8 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
   return (
     <aside
       className={cn(
-        'flex h-screen flex-col bg-sidebar-bg text-white transition-all duration-200',
-        collapsed ? 'w-[68px]' : 'w-[248px]'
+        'sidebar-surface flex h-screen flex-col text-white transition-all duration-200',
+        collapsed ? 'w-[68px]' : 'w-64'
       )}
     >
       {/* Branch switcher / logo — at the very top */}
@@ -257,7 +258,7 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-2 px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <nav className="flex-1 overflow-y-auto py-3 px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {/* Skeletons while profile or module configs are still loading */}
         {!navReady && (
           <div className="space-y-1 px-1">
@@ -265,7 +266,7 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
               <div
                 key={i}
                 className={cn(
-                  'h-10 rounded-lg bg-white/5 animate-pulse',
+                  'h-10 rounded-full bg-white/5 animate-pulse',
                   collapsed ? 'w-10 mx-auto' : 'w-full'
                 )}
               />
@@ -289,7 +290,7 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
                 collapsed
                   ? groupIndex > 0 && <div className="mx-3 my-2 h-px bg-white/10" />
                   : (
-                    <p className={cn('px-3 pb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-white/35', groupIndex === 0 ? 'pt-1' : 'pt-4')}>
+                    <p className={cn('px-3 pb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-white/45', groupIndex === 0 ? 'pt-1' : 'pt-5')}>
                       {section}
                     </p>
                   )
@@ -300,7 +301,7 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
                 <div
                   title={collapsed ? parent.label : undefined}
                   className={cn(
-                    'relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium mb-0.5',
+                    'relative flex items-center gap-3 rounded-full px-3 py-2 text-sm font-medium mb-0.5',
                     'opacity-30 cursor-not-allowed select-none text-white/50',
                     collapsed && 'justify-center'
                   )}
@@ -311,12 +312,12 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
               ) : (
                 <div
                   className={cn(
-                    'group relative flex items-center rounded-lg mb-0.5 transition-all duration-150',
+                    'group relative flex items-center rounded-full mb-0.5 transition-all duration-150',
                     isParentActive
-                      ? 'bg-brand-teal shadow-sm'
+                      ? 'bg-brand-teal/15 ring-1 ring-inset ring-brand-teal/30'
                       : childIsActive
-                        ? 'bg-white/5'
-                        : 'hover:bg-white/8',
+                        ? 'bg-white/[0.04]'
+                        : 'hover:bg-white/[0.06]',
                     collapsed && 'justify-center'
                   )}
                 >
@@ -325,18 +326,18 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
                     href={parent.href}
                     title={collapsed ? parent.label : undefined}
                     className={cn(
-                      'flex flex-1 items-center gap-3 px-3 py-2 text-sm font-medium',
+                      'flex flex-1 items-center gap-3 px-3 py-2 text-[14px] font-medium',
                       collapsed && 'justify-center',
                       isParentActive
                         ? 'text-white font-semibold'
                         : childIsActive
                           ? 'text-white'
-                          : 'text-white/80 group-hover:text-white'
+                          : 'text-white/75 group-hover:text-white'
                     )}
                   >
                     <parent.icon className={cn(
                       'h-[18px] w-[18px] shrink-0 transition-colors',
-                      isParentActive ? 'text-white' : childIsActive ? 'text-white/90' : 'text-white/60 group-hover:text-white'
+                      isParentActive ? 'text-brand-teal' : childIsActive ? 'text-white/90' : 'text-white/55 group-hover:text-white'
                     )} />
                     {!collapsed && <span className="truncate flex-1">{parent.label}</span>}
                     {!collapsed && parent.badge && (
@@ -351,8 +352,8 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
                     <button
                       onClick={(e) => toggleSection(parent.href, e)}
                       className={cn(
-                        'flex h-7 w-7 shrink-0 items-center justify-center rounded-md mr-1 transition-colors',
-                        isParentActive ? 'text-white/80 hover:bg-white/15' : 'text-white/40 hover:text-white hover:bg-white/10'
+                        'flex h-7 w-7 shrink-0 items-center justify-center rounded-full mr-1 transition-colors',
+                        isParentActive ? 'text-white/80 hover:bg-white/10' : 'text-white/45 hover:text-white hover:bg-white/10'
                       )}
                       aria-label={isOpen ? 'Collapse' : 'Expand'}
                     >
@@ -367,7 +368,7 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
 
               {/* ── Children (collapsible, hidden when sidebar collapsed) ── */}
               {!collapsed && hasChildren && isOpen && (
-                <div className="ml-3 mb-1 border-l border-white/10 pl-1 space-y-0.5">
+                <div className="ml-[22px] mb-2 mt-1 border-l border-white/10 pl-2.5 space-y-0.5">
                   {children.map((child) => {
                     const isChildActive = isItemActive(child.href, pathname, searchString)
                     const isChildDisabled = !hasSubscriptionAccess && child.href !== '/account'
@@ -376,9 +377,8 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
                       return (
                         <div
                           key={child.href}
-                          className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium opacity-30 cursor-not-allowed select-none text-white/50"
+                          className="flex items-center rounded-full px-3 py-1.5 text-[13px] font-medium opacity-30 cursor-not-allowed select-none text-white/50"
                         >
-                          <child.icon className="h-4 w-4 shrink-0 text-white/40" />
                           <span className="truncate">{child.label}</span>
                         </div>
                       )
@@ -389,19 +389,12 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
                         key={child.href}
                         href={child.href}
                         className={cn(
-                          'group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-150',
+                          'group relative flex items-center rounded-full px-3 py-1.5 text-[13px] font-medium transition-all duration-150',
                           isChildActive
-                            ? 'bg-brand-teal/20 text-brand-teal'
-                            : 'text-white/65 hover:bg-white/8 hover:text-white'
+                            ? 'bg-brand-teal/15 text-white font-semibold ring-1 ring-inset ring-brand-teal/30'
+                            : 'text-white/60 hover:bg-white/[0.06] hover:text-white'
                         )}
                       >
-                        {isChildActive && (
-                          <span className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-0.5 rounded-full bg-brand-teal" />
-                        )}
-                        <child.icon className={cn(
-                          'h-4 w-4 shrink-0 transition-colors',
-                          isChildActive ? 'text-brand-teal' : 'text-white/50 group-hover:text-white'
-                        )} />
                         <span className="truncate flex-1">{child.label}</span>
                       </Link>
                     )
@@ -475,6 +468,17 @@ export function Sidebar({ collapsed = false, onClose }: { collapsed?: boolean; o
         </div>
       )}
 
+      {/* Log out — pinned to the foot of the panel */}
+      <div className="shrink-0 border-t border-white/10 px-3 py-3">
+        <SignOutButton
+          label={collapsed ? '' : 'Log out'}
+          className={cn(
+            'flex w-full items-center gap-3 rounded-full px-3 py-2 text-[14px] font-medium text-white/75 transition-colors hover:bg-white/[0.06] hover:text-white disabled:opacity-60',
+            collapsed && 'justify-center'
+          )}
+          iconClassName="h-[18px] w-[18px] shrink-0 text-white/55"
+        />
+      </div>
     </aside>
   )
 }

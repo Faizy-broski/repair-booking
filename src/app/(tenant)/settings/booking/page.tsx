@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useAuthStore } from '@/store/auth.store'
+import { PageHeader } from '@/components/shared/page-header'
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
@@ -160,21 +161,19 @@ export default function BookingSettingsPage() {
   // ── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-bold text-on-surface">Online Booking</h1>
-        <p className="text-sm text-on-surface-variant">
-          Configure business hours, appointment slots, and the public booking widget
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Online Booking"
+        description="Configure business hours, appointment slots, and the public booking widget"
+      />
 
       <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
-        <Tabs.List className="flex gap-1 rounded-lg bg-surface-container p-1">
+        <Tabs.List className="no-scrollbar flex gap-1 overflow-x-auto border-b border-outline-variant">
           {['hours', 'settings', 'blocked', 'widget'].map((tab) => (
             <Tabs.Trigger
               key={tab}
               value={tab}
-              className="rounded-md px-4 py-2 text-sm font-medium text-on-surface-variant transition-colors data-[state=active]:bg-surface data-[state=active]:text-on-surface data-[state=active]:shadow-sm"
+              className="-mb-px whitespace-nowrap rounded-t-lg border-b-2 border-transparent px-3.5 py-2.5 text-sm font-medium text-on-surface-variant transition-colors hover:text-on-surface data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:font-semibold data-[state=active]:text-primary"
             >
               {tab === 'hours' ? 'Business Hours' : tab === 'settings' ? 'Booking Config' : tab === 'blocked' ? 'Blocked Dates' : 'Widget & Embed'}
             </Tabs.Trigger>
@@ -183,9 +182,9 @@ export default function BookingSettingsPage() {
 
         {/* ── Business Hours Tab ─────────────────────────────────────────── */}
         <Tabs.Content value="hours" className="mt-4">
-          <div className="rounded-xl border border-outline-variant bg-surface p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-on-surface">Weekly Schedule</h3>
+          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <h3 className="text-base font-semibold text-on-surface">Weekly Schedule</h3>
               <Button onClick={saveHours} loading={saving && saved !== 'hours'} size="sm">
                 {saved === 'hours' ? <><Check className="h-4 w-4" /> Saved</> : <><Save className="h-4 w-4" /> Save Hours</>}
               </Button>
@@ -203,7 +202,7 @@ export default function BookingSettingsPage() {
                       type="checkbox"
                       checked={!h.is_closed}
                       onChange={(e) => updateHour(idx, 'is_closed', !e.target.checked)}
-                      className="rounded border-outline text-blue-600 focus:ring-blue-500"
+                      className="rounded border-outline-variant text-primary focus:ring-primary/20"
                     />
                     Open
                   </label>
@@ -214,14 +213,14 @@ export default function BookingSettingsPage() {
                         type="time"
                         value={h.open_time}
                         onChange={(e) => updateHour(idx, 'open_time', e.target.value)}
-                        className="rounded-lg border border-outline px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                        className="h-9 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-sm focus:border-primary focus:outline-none"
                       />
-                      <span className="text-outline">to</span>
+                      <span className="text-on-surface-variant">to</span>
                       <input
                         type="time"
                         value={h.close_time}
                         onChange={(e) => updateHour(idx, 'close_time', e.target.value)}
-                        className="rounded-lg border border-outline px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                        className="h-9 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 text-sm focus:border-primary focus:outline-none"
                       />
                     </>
                   )}
@@ -234,9 +233,9 @@ export default function BookingSettingsPage() {
 
         {/* ── Booking Config Tab ─────────────────────────────────────────── */}
         <Tabs.Content value="settings" className="mt-4">
-          <div className="rounded-xl border border-outline-variant bg-surface p-6 space-y-6">
+          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 space-y-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-on-surface">Booking Configuration</h3>
+              <h3 className="text-base font-semibold text-on-surface">Booking Configuration</h3>
               <Button onClick={saveSettings} loading={saving && saved !== 'settings'} size="sm">
                 {saved === 'settings' ? <><Check className="h-4 w-4" /> Saved</> : <><Save className="h-4 w-4" /> Save Settings</>}
               </Button>
@@ -247,11 +246,11 @@ export default function BookingSettingsPage() {
                 type="checkbox"
                 checked={settings.is_enabled}
                 onChange={(e) => setSettings((s) => ({ ...s, is_enabled: e.target.checked }))}
-                className="rounded border-outline text-blue-600 focus:ring-blue-500 h-5 w-5"
+                className="rounded border-outline-variant text-primary focus:ring-primary/20 h-5 w-5"
               />
               <div>
                 <p className="text-sm font-medium text-on-surface-variant">Enable Online Booking</p>
-                <p className="text-xs text-outline">Allow customers to book appointments through the public widget</p>
+                <p className="text-xs text-on-surface-variant">Allow customers to book appointments through the public widget</p>
               </div>
             </label>
 
@@ -305,11 +304,11 @@ export default function BookingSettingsPage() {
                     type="checkbox"
                     checked={settings.require_approval}
                     onChange={(e) => setSettings((s) => ({ ...s, require_approval: e.target.checked }))}
-                    className="rounded border-outline text-blue-600 focus:ring-blue-500"
+                    className="rounded border-outline-variant text-primary focus:ring-primary/20"
                   />
                   <div>
                     <p className="text-sm font-medium text-on-surface-variant">Require Manual Approval</p>
-                    <p className="text-xs text-outline">New bookings stay as &quot;Scheduled&quot; until you confirm them</p>
+                    <p className="text-xs text-on-surface-variant">New bookings stay as &quot;Scheduled&quot; until you confirm them</p>
                   </div>
                 </label>
               </div>
@@ -319,8 +318,8 @@ export default function BookingSettingsPage() {
 
         {/* ── Blocked Dates Tab ──────────────────────────────────────────── */}
         <Tabs.Content value="blocked" className="mt-4">
-          <div className="rounded-xl border border-outline-variant bg-surface p-6 space-y-4">
-            <h3 className="text-sm font-semibold text-on-surface">Blocked Dates (Holidays / Closures)</h3>
+          <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 space-y-4">
+            <h3 className="text-base font-semibold text-on-surface">Blocked Dates (Holidays / Closures)</h3>
 
             <div className="flex items-end gap-3">
               <Input
@@ -341,12 +340,12 @@ export default function BookingSettingsPage() {
             </div>
 
             {blockedDates.length === 0 ? (
-              <div className="flex items-center gap-2 text-sm text-outline py-4">
+              <div className="flex items-center gap-2 text-sm text-on-surface-variant py-4">
                 <AlertCircle className="h-4 w-4" />
                 No blocked dates configured
               </div>
             ) : (
-              <div className="divide-y divide-outline-variant border border-outline-variant rounded-lg">
+              <div className="divide-y divide-outline-variant overflow-hidden rounded-xl border border-outline-variant">
                 {blockedDates.map((bd) => (
                   <div key={bd.id} className="flex items-center justify-between px-4 py-3">
                     <div>
@@ -355,7 +354,7 @@ export default function BookingSettingsPage() {
                           weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
                         })}
                       </p>
-                      {bd.reason && <p className="text-xs text-outline">{bd.reason}</p>}
+                      {bd.reason && <p className="text-xs text-on-surface-variant">{bd.reason}</p>}
                     </div>
                     <Button variant="ghost" size="sm" onClick={() => removeBlockedDate(bd.id)}>
                       <Trash2 className="h-4 w-4 text-red-500" />
@@ -369,11 +368,11 @@ export default function BookingSettingsPage() {
 
         {/* ── Widget & Embed Tab ─────────────────────────────────────────── */}
         <Tabs.Content value="widget" className="mt-4">
-          <div className="space-y-4">
+          <div className="max-w-4xl space-y-4">
             {/* Branding */}
-            <div className="rounded-xl border border-outline-variant bg-surface p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-on-surface">Widget Branding</h3>
+            <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-base font-semibold text-on-surface">Widget Branding</h3>
                 <Button onClick={saveSettings} loading={saving} size="sm">
                   {saved === 'settings' ? <><Check className="h-4 w-4" /> Saved</> : <><Save className="h-4 w-4" /> Save</>}
                 </Button>
@@ -391,21 +390,21 @@ export default function BookingSettingsPage() {
                   type="color"
                   value={settings.widget_accent_color}
                   onChange={(e) => setSettings((s) => ({ ...s, widget_accent_color: e.target.value }))}
-                  className="h-8 w-12 rounded border border-outline cursor-pointer"
+                  className="h-9 w-12 cursor-pointer rounded-lg border border-outline-variant"
                 />
                 <span className="text-sm text-on-surface-variant">{settings.widget_accent_color}</span>
               </div>
             </div>
 
             {/* Embed Code */}
-            <div className="rounded-xl border border-outline-variant bg-surface p-6 space-y-4">
-              <h3 className="text-sm font-semibold text-on-surface">Embed Code</h3>
-              <p className="text-xs text-outline">
+            <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5 space-y-4">
+              <h3 className="text-base font-semibold text-on-surface">Embed Code</h3>
+              <p className="text-xs text-on-surface-variant">
                 Copy this code and paste it into your website to embed the booking widget.
               </p>
 
               <div className="relative">
-                <pre className="rounded-lg bg-surface-container-low p-4 text-xs text-on-surface-variant overflow-x-auto border border-outline-variant">
+                <pre className="rounded-xl bg-surface-container-low p-4 text-xs text-on-surface-variant overflow-x-auto border border-outline-variant">
 {`<iframe
   src="${typeof window !== 'undefined' ? window.location.origin : ''}/book/${branchId}"
   width="100%"
@@ -424,21 +423,21 @@ export default function BookingSettingsPage() {
                 </Button>
               </div>
 
-              <div className="flex items-center gap-2 text-xs text-outline">
+              <div className="flex items-center gap-2 text-xs text-on-surface-variant">
                 <AlertCircle className="h-3 w-3" />
                 Direct link: {typeof window !== 'undefined' ? window.location.origin : ''}/book/{branchId}
               </div>
             </div>
 
             {/* Widget Status */}
-            <div className="rounded-xl border border-outline-variant bg-surface p-6">
+            <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
               <div className="flex items-center gap-3">
-                <div className={`h-3 w-3 rounded-full ${settings.is_enabled ? 'bg-green-500' : 'bg-surface-container-highest'}`} />
+                <div className={`h-3 w-3 rounded-full ${settings.is_enabled ? 'bg-emerald-500' : 'bg-surface-container-highest'}`} />
                 <div>
                   <p className="text-sm font-medium text-on-surface-variant">
                     Widget is {settings.is_enabled ? 'Active' : 'Disabled'}
                   </p>
-                  <p className="text-xs text-outline">
+                  <p className="text-xs text-on-surface-variant">
                     {settings.is_enabled
                       ? 'Customers can book appointments through the public widget'
                       : 'Enable online booking in the Booking Config tab to activate the widget'}

@@ -65,9 +65,9 @@
   /* Primary – derived from a single overridable brand color.
      Per-tenant theming overrides only --brand-primary; everything else
      re-derives via color-mix() so the whole primary family stays in sync. */
-  --brand-primary:               #008080;
+  --brand-primary:               #009C9C;
   --primary:                     var(--brand-primary);
-  --primary-light: #18E3CD;
+  --primary-light: #1AD1D1;
   --primary-dim:                 color-mix(in srgb, var(--brand-primary) 80%, black);
   --primary-fixed:                color-mix(in srgb, var(--brand-primary) 25%, white);
   --primary-fixed-dim:            color-mix(in srgb, var(--brand-primary) 35%, white);
@@ -108,40 +108,46 @@
   --on-error-container:         #570008;
 
   /* Surface */
-  --surface:                    #f5f7f9;
-  --surface-dim:                #d0d5d8;
-  --surface-bright:             #f5f7f9;
+  /* Slate neutrals (Figma "irepairly dashboard"): white surfaces, slate tints */
+  --surface:                    #ffffff;
+  --surface-dim:                #cbd5e1;
+  --surface-bright:             #ffffff;
   --surface-tint:               var(--brand-primary);
-  --surface-variant:            #d9dde0;
+  --surface-variant:            #e2e8f0;
   --surface-container-lowest:   #ffffff;
-  --surface-container-low:      #eef1f3;
-  --surface-container:          #e5e9eb;
-  --surface-container-high:     #dfe3e6;
-  --surface-container-highest:  #d9dde0;
+  --surface-container-low:      #f8fafc;
+  --surface-container:          #f1f5f9;
+  --surface-container-high:     #e2e8f0;
+  --surface-container-highest:  #cbd5e1;
 
   /* On-surface */
-  --on-surface:                 #2c2f31;
-  --on-surface-variant:         #595c5e;
-  --on-background:              #2c2f31;
+  --on-surface:                 #131b29;
+  --on-surface-variant:         #64748b;
+  --on-background:              #131b29;
   --inverse-surface:            #0b0f10;
   --inverse-on-surface:         #9a9d9f;
 
   /* Outline */
-  --outline:                    #747779;
-  --outline-variant:            #abadaf;
+  --outline:                    #7c8799;
+  --outline-variant:            #cbd5e1;
 
   /* Hairlines — soft, warm borders tuned to the background. Used by the
      border-* utilities below so cards/inputs get sleek outlines, while the
      outline tokens above keep full contrast for muted TEXT. */
-  --hairline:                   oklch(91% .008 85);
-  --hairline-strong:            oklch(85.5% .01 85);
+  --hairline:                   #e2e8f0;
+  --hairline-strong:            #cbd5e1;
 
   /* Background */
-  --background:                 oklch(97.5% .006 85);
-  --foreground:                 #2c2f31;
+  --background:                 #ffffff;
+  --foreground:                 #131b29;
 
   /* ── Sidebar ──────────────────────────────────────────────── */
-  --sidebar-bg:         #001F2B;
+  /* Navy panel for every business; the brand colour only drives accents */
+  --sidebar-bg:         #091428;
+  --sidebar-gradient:   linear-gradient(180deg, #121f37 0%, #091428 55%, #030c1c 100%);
+
+  /* Deep navy used for the active segment pill and the first chart series */
+  --navy:               #0f1725;
 
   /* ── Legacy brand aliases (sidebar / existing components) ── */
   --brand-yellow:         #F8C301;
@@ -236,8 +242,10 @@
   --background:                 #101213;
   --foreground:                 #e2e3e4;
 
-  /* Sidebar stays a near-black brand-tinted panel in both schemes */
-  --sidebar-bg:         #00141b;
+  /* Sidebar stays a near-black navy panel in both schemes */
+  --sidebar-bg:         #050b16;
+  --sidebar-gradient:   linear-gradient(180deg, #0c1424 0%, #050b16 100%);
+  --navy:               #334155;
 
   /* Legacy brand aliases pick up the redefinitions above automatically */
 
@@ -321,6 +329,7 @@
 
   /* Sidebar */
   --color-sidebar-bg: var(--sidebar-bg);
+  --color-navy:       var(--navy);
 
   /* Brand aliases */
   --color-brand-yellow:       var(--brand-yellow);
@@ -363,6 +372,16 @@ body {
   .divide-outline-variant > :not(:last-child) { border-color: var(--hairline); }
   .border-gray-300        { border-color: var(--hairline-strong); }
   .border-gray-200        { border-color: var(--hairline); }
+}
+
+/* Tenant app uses Inter (Figma design); marketing pages keep Space Grotesk.
+   :has() also covers modals/toasts portalled to <body>. */
+body:has(.app-shell) {
+  font-family: var(--font-inter), "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+.sidebar-surface {
+  background: var(--sidebar-gradient);
 }
 
 .font-script {

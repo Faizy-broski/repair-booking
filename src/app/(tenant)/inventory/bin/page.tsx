@@ -1,9 +1,8 @@
 'use client'
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { RotateCcw, Archive, ArrowLeft } from 'lucide-react'
+import { RotateCcw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DataTable } from '@/components/shared/data-table'
@@ -11,6 +10,7 @@ import { useAuthStore } from '@/store/auth.store'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { confirmToast } from '@/lib/confirm-toast'
 import { InventoryNav } from '@/components/inventory/inventory-nav'
+import { PageHeader, FilterPills } from '@/components/shared/page-header'
 import type { ColumnDef } from '@tanstack/react-table'
 
 interface BinItemRow {
@@ -29,7 +29,6 @@ interface BinItemRow {
 
 export default function BinPage() {
   const { activeBranch } = useAuthStore()
-  const router = useRouter()
   const queryClient = useQueryClient()
   const [statusFilter, setStatusFilter] = useState<'binned' | 'restored'>('binned')
   const [restoringId, setRestoringId] = useState<string | null>(null)
@@ -111,49 +110,33 @@ export default function BinPage() {
   ]
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <PageHeader
+        back={{ href: '/inventory', label: 'Back to Inventory' }}
+        title="Bin"
+        description="Items written off as a 100% loss — removed from active inventory."
+        actions={statusFilter === 'binned' && items.length > 0 ? (
+          <div className="rounded-2xl border border-red-500/20 bg-red-500/5 px-4 py-2 text-right">
+            <p className="text-xs font-medium text-red-600">Total Loss in Bin</p>
+            <p className="text-lg font-semibold text-red-600">{formatCurrency(totalLoss)}</p>
+          </div>
+        ) : undefined}
+      />
+
       <InventoryNav />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8 shrink-0 text-on-surface-variant hover:text-on-surface">
-            <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
-          </Button>
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100">
-            <Archive className="h-6 w-6 text-amber-600" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-on-surface">Bin</h1>
-            <p className="text-sm text-on-surface-variant">Items written off as a 100% loss — removed from active inventory</p>
-          </div>
-        </div>
-        {statusFilter === 'binned' && items.length > 0 && (
-          <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-2">
-            <p className="text-xs font-medium text-red-500">Total Loss in Bin</p>
-            <p className="text-lg font-bold text-red-600">{formatCurrency(totalLoss)}</p>
-          </div>
-        )}
-      </div>
-
-      <div className="flex gap-2">
-        {(['binned', 'restored'] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => setStatusFilter(s)}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              statusFilter === s ? 'bg-brand-teal text-white' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-            }`}
-          >
-            {s === 'binned' ? 'In Bin' : 'Restored History'}
-          </button>
-        ))}
-      </div>
+      <FilterPills
+        options={[{ value: 'binned', label: 'In Bin' }, { value: 'restored', label: 'Restored History' }]}
+        value={statusFilter}
+        onChange={setStatusFilter}
+      />
 
       <DataTable
         data={items}
         columns={columns}
         isLoading={isLoading}
         emptyMessage={statusFilter === 'binned' ? 'The Bin is empty.' : 'No restored items yet.'}
+        emptyIcon={<Trash2 />}
       />
     </div>
   )

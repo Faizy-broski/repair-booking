@@ -2,9 +2,11 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Bell, Mail, Send, Eye as EyeIcon, RefreshCw,
+  Bell, Send, Eye as EyeIcon, RefreshCw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/shared/page-header'
+import { EmptyState } from '@/components/shared/ui-kit'
 import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { Badge } from '@/components/ui/badge'
@@ -156,35 +158,27 @@ export default function NotificationTemplatesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100">
-            <Mail className="h-5 w-5 text-indigo-600" />
-          </div>
-          <div>
-            <h1 className="text-lg sm:text-2xl font-bold text-on-surface">Notification Templates</h1>
-            <p className="text-sm text-on-surface-variant">Customize the messages sent to customers for each event</p>
-          </div>
-        </div>
-        {templates.length === 0 && (
-          <Button onClick={seedDefaults} loading={loading} className="self-start sm:self-auto">
+      <PageHeader
+        title="Notification Templates"
+        description="Customize the messages sent to customers for each event"
+        actions={templates.length === 0 ? (
+          <Button onClick={seedDefaults} loading={loading}>
             <RefreshCw className="h-4 w-4" /> Load Default Templates
           </Button>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       {/* Template list */}
       <div className="space-y-3">
         {templates.length === 0 && (
-          <div className="rounded-lg border border-dashed border-outline p-8 text-center">
-            <Bell className="mx-auto mb-3 h-10 w-10 text-outline-variant" />
-            <p className="text-on-surface-variant">No notification templates configured yet.</p>
-            <Button className="mt-3" onClick={seedDefaults} loading={loading}>Load Default Templates</Button>
-          </div>
+          <EmptyState
+            icon={Bell}
+            title="No notification templates configured yet."
+            action={<Button onClick={seedDefaults} loading={loading}>Load Default Templates</Button>}
+          />
         )}
         {templates.map((t) => (
-          <div key={t.id} className="flex flex-col gap-3 rounded-lg border border-outline-variant bg-surface p-4 shadow-sm hover:shadow-md transition-shadow sm:flex-row sm:items-center sm:justify-between">
+          <div key={t.id} className="flex flex-col gap-3 rounded-2xl border border-outline-variant bg-surface-container-lowest p-4 transition-colors hover:bg-surface-container-low sm:flex-row sm:items-center sm:justify-between">
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-on-surface">{TRIGGER_LABELS[t.trigger_event] ?? t.trigger_event}</span>
@@ -239,7 +233,7 @@ export default function NotificationTemplatesPage() {
               <input
                 type="checkbox"
                 checked={editForm.is_active}
-                className="h-4 w-4 rounded border-outline text-blue-600"
+                className="h-4 w-4 rounded accent-primary"
                 onChange={(e) => setEditForm((f) => ({ ...f, is_active: e.target.checked }))}
               />
               <span className="text-sm text-on-surface-variant">Active</span>
@@ -260,7 +254,7 @@ export default function NotificationTemplatesPage() {
                   rows={8}
                   value={editForm.email_body}
                   onChange={(e) => setEditForm((f) => ({ ...f, email_body: e.target.value }))}
-                  className="w-full rounded-lg border border-outline px-3 py-2 text-sm font-mono focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full rounded-2xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-sm font-mono focus:border-primary focus:outline-none"
                   placeholder="HTML email body with {{macros}}"
                 />
               </div>
@@ -274,7 +268,7 @@ export default function NotificationTemplatesPage() {
                 rows={3}
                 value={editForm.sms_body}
                 onChange={(e) => setEditForm((f) => ({ ...f, sms_body: e.target.value }))}
-                className="w-full rounded-lg border border-outline px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="w-full rounded-2xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-sm focus:border-primary focus:outline-none"
                 placeholder="SMS text with {{macros}} (160 char segments)"
               />
               <p className="mt-1 text-xs text-on-surface-variant">
@@ -319,23 +313,23 @@ export default function NotificationTemplatesPage() {
         <div className="space-y-4">
           {previewModal.subject && (
             <div>
-              <label className="text-xs font-medium text-on-surface-variant uppercase">Subject</label>
+              <label className="text-xs font-medium text-on-surface-variant">Subject</label>
               <p className="mt-1 text-sm font-medium text-on-surface">{previewModal.subject}</p>
             </div>
           )}
           {previewModal.emailBody && (
             <div>
-              <label className="text-xs font-medium text-on-surface-variant uppercase">Email Preview</label>
+              <label className="text-xs font-medium text-on-surface-variant">Email Preview</label>
               <div
-                className="mt-1 rounded-lg border border-outline-variant bg-surface-container-low p-4"
+                className="mt-1 rounded-xl border border-outline-variant bg-surface-container-low p-4"
                 dangerouslySetInnerHTML={{ __html: previewModal.emailBody }}
               />
             </div>
           )}
           {previewModal.smsBody && (
             <div>
-              <label className="text-xs font-medium text-on-surface-variant uppercase">SMS Preview</label>
-              <div className="mt-1 rounded-lg border border-outline-variant bg-green-50 p-3">
+              <label className="text-xs font-medium text-on-surface-variant">SMS Preview</label>
+              <div className="mt-1 rounded-xl border border-outline-variant bg-surface-container-low p-3">
                 <p className="text-sm text-on-surface whitespace-pre-wrap">{previewModal.smsBody}</p>
                 <p className="mt-1 text-xs text-on-surface-variant">{previewModal.smsBody.length} chars</p>
               </div>

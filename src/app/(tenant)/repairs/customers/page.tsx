@@ -11,6 +11,7 @@ import { DataTable } from '@/components/shared/data-table'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/shared/page-header'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@/lib/zod-resolver'
 import { z } from 'zod'
@@ -125,7 +126,7 @@ export default function RepairCustomersPage() {
     {
       id: 'sr', header: 'Sr No#', size: 70,
       cell: ({ row }) => (
-        <Link href={`/repairs/customers/${row.original.id}`} className="cursor-pointer font-medium text-blue-600 hover:underline hover:text-blue-800 transition-colors">
+        <Link href={`/repairs/customers/${row.original.id}`} className="cursor-pointer font-medium text-primary hover:underline hover:text-primary transition-colors">
           {page * 25 + row.index + 1}
         </Link>
       ),
@@ -133,7 +134,7 @@ export default function RepairCustomersPage() {
     {
       id: 'name', header: 'Name',
       cell: ({ row }) => (
-        <Link href={`/repairs/customers/${row.original.id}`} className="cursor-pointer font-medium text-on-surface hover:text-blue-600 hover:underline transition-colors">
+        <Link href={`/repairs/customers/${row.original.id}`} className="cursor-pointer font-medium text-on-surface hover:text-primary hover:underline transition-colors">
           {row.original.first_name} {row.original.last_name ?? ''}
         </Link>
       ),
@@ -166,13 +167,13 @@ export default function RepairCustomersPage() {
           <DropdownMenu.Portal>
             <DropdownMenu.Content align="end" sideOffset={4} className="z-50 min-w-[140px] rounded-lg border border-outline-variant bg-surface py-1 shadow-lg">
               <DropdownMenu.Item onSelect={() => router.push(`/repairs/customers/${row.original.id}`)} className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-on-surface-variant hover:bg-surface-container-low outline-none">
-                <Eye className="h-3.5 w-3.5 text-blue-500" /> Details
+                <Eye className="h-3.5 w-3.5 text-primary" /> Details
               </DropdownMenu.Item>
               <DropdownMenu.Item onSelect={() => openEdit(row.original)} className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-on-surface-variant hover:bg-surface-container-low outline-none">
                 <Pencil className="h-3.5 w-3.5 text-amber-500" /> Edit
               </DropdownMenu.Item>
               <DropdownMenu.Separator className="my-1 border-t border-outline-variant" />
-              <DropdownMenu.Item onSelect={() => onDelete(row.original)} className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 outline-none">
+              <DropdownMenu.Item onSelect={() => onDelete(row.original)} className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-red-600 hover:bg-red-500/5 outline-none">
                 <Trash2 className="h-3.5 w-3.5" /> Delete
               </DropdownMenu.Item>
             </DropdownMenu.Content>
@@ -189,26 +190,23 @@ export default function RepairCustomersPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-bold text-on-surface">Repairs Customers</h1>
-        <p className="text-sm font-semibold text-on-surface-variant mt-0.5">Manage Repairs Customers</p>
-      </div>
+      <PageHeader title="Repairs Customers" description="Manage Repairs Customers" />
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
-        <button onClick={() => exportCSV(customers)} className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-700 hover:bg-emerald-100 transition-colors">
+        <Button variant="outline" size="sm" onClick={() => exportCSV(customers)}>
           <FileDown className="h-3.5 w-3.5" /> Export CSV
-        </button>
-        <button onClick={() => exportExcel(customers)} className="flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs text-green-700 hover:bg-green-100 transition-colors">
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => exportExcel(customers)}>
           <FileSpreadsheet className="h-3.5 w-3.5" /> Export Excel
-        </button>
-        <button onClick={() => window.print()} className="flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs text-sky-700 hover:bg-sky-100 transition-colors">
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => window.print()}>
           <Printer className="h-3.5 w-3.5" /> Print
-        </button>
+        </Button>
         <div className="relative" ref={colMenuRef}>
-          <button onClick={() => setColMenuOpen((v) => !v)} className="flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs text-violet-700 hover:bg-violet-100 transition-colors">
+          <Button variant="outline" size="sm" onClick={() => setColMenuOpen((v) => !v)}>
             <Columns className="h-3.5 w-3.5" /> Column visibility
-          </button>
+          </Button>
           {colMenuOpen && (
             <div className="absolute left-0 top-full z-20 mt-1 w-44 rounded-lg border border-outline-variant bg-surface p-2 shadow-lg">
               {TOGGLEABLE.map((key) => (
@@ -220,14 +218,14 @@ export default function RepairCustomersPage() {
             </div>
           )}
         </div>
-        <button onClick={() => exportPDF(customers)} className="flex items-center gap-1.5 rounded-full border border-outline bg-surface px-3 py-1.5 text-xs text-on-surface-variant hover:bg-surface-container-low transition-colors">
+        <Button variant="outline" size="sm" onClick={() => exportPDF(customers)}>
           <FileText className="h-3.5 w-3.5" /> Export PDF
-        </button>
+        </Button>
 
-        <div className="ml-auto relative max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
+        <div className="relative ml-auto max-w-xs">
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
           <input type="search" placeholder="Search customers..." value={search} onChange={(e) => setSearch(e.target.value)}
-            className="h-9 w-full rounded-lg border border-outline bg-surface pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none" />
+            className="h-9 w-full rounded-full border border-outline-variant bg-surface-container-lowest pl-10 pr-4 text-sm focus:border-primary focus:outline-none" />
         </div>
       </div>
 
@@ -236,7 +234,7 @@ export default function RepairCustomersPage() {
       {/* Edit Sheet */}
       <InlineFormSheet open={editSheetOpen} onClose={() => { setEditSheetOpen(false); setEditError(null) }} title="Edit Customer">
         <form onSubmit={editForm.handleSubmit(onEdit)} className="space-y-4">
-          {editError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{editError}</div>}
+          {editError && <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-sm text-red-600">{editError}</div>}
           <div className="grid grid-cols-2 gap-3">
             <Input label="First Name" required error={editForm.formState.errors.first_name?.message} {...editForm.register('first_name')} />
             <Input label="Last Name" {...editForm.register('last_name')} />
@@ -248,7 +246,7 @@ export default function RepairCustomersPage() {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface-variant">Address</label>
-            <textarea rows={2} className="w-full rounded-lg border border-outline px-3 py-2 text-sm" {...editForm.register('address')} />
+            <textarea rows={2} className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-sm focus:border-primary focus:outline-none" {...editForm.register('address')} />
           </div>
           <Button type="submit" className="w-full" loading={editForm.formState.isSubmitting}>Save Changes</Button>
         </form>

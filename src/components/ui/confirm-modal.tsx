@@ -36,7 +36,7 @@ export function ConfirmModal({
           <AlertTriangle className="h-6 w-6" />
         </div>
 
-        <h3 className="mb-1 text-lg font-bold text-on-surface">{title}</h3>
+        <h3 className="mb-1 text-lg font-semibold text-on-surface">{title}</h3>
         {description && (
           <p className="mb-6 text-sm text-on-surface-variant">{description}</p>
         )}

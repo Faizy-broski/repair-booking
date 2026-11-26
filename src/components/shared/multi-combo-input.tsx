@@ -47,15 +47,15 @@ export function MultiComboInput({ values, onAdd, onRemove, options, placeholder 
             }
           }}
           placeholder={placeholder}
-          className="h-8 w-full rounded-md border border-outline-variant bg-surface px-2.5 text-sm text-on-surface placeholder:text-outline transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
+          className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm text-on-surface placeholder:text-outline transition focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/20"
         />
         {open && (value || filtered.length > 0) && (
-          <ul className="absolute z-50 mt-1 max-h-44 w-full overflow-y-auto rounded-lg border border-outline-variant bg-surface shadow-lg">
+          <ul className="absolute z-50 mt-1 max-h-44 w-full overflow-y-auto rounded-xl border border-outline-variant bg-surface-container-lowest shadow-lg">
             {filtered.map((o) => (
               <li key={o}>
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 transition-colors"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-container-low transition-colors"
                   onMouseDown={(e) => { e.preventDefault(); onAdd(o); setValue(''); setOpen(false) }}
                 >
                   <span className="text-on-surface-variant">{o}</span>
@@ -66,7 +66,7 @@ export function MultiComboInput({ values, onAdd, onRemove, options, placeholder 
               <li>
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 border-t border-outline-variant transition-colors"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-container-low border-t border-outline-variant transition-colors"
                   onMouseDown={(e) => { e.preventDefault(); onAdd(value.trim()); setValue(''); setOpen(false) }}
                 >
                   <span className="text-on-surface-variant italic">Add &quot;{value.trim()}&quot;...</span>

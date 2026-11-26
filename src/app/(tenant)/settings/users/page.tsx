@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { KeyRound, Pencil, X, Crown } from 'lucide-react'
+import { KeyRound, Pencil, X, Crown, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/store/auth.store'
@@ -200,10 +200,16 @@ export default function UsersSettingsPage() {
   if (!isOwner()) return <div className="p-8 text-center text-on-surface-variant">Only business owners can manage users.</div>
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-outline-variant bg-surface">
-        <div className="border-b border-outline-variant px-4 py-3">
-          <h3 className="font-semibold text-on-surface">Team Members</h3>
+    <div className="max-w-4xl space-y-6">
+      <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest">
+        <div className="flex items-start gap-3 p-5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Users className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold text-on-surface">Team Members</h3>
+            <p className="mt-0.5 text-sm text-on-surface-variant">Manage who can sign in to this business and what they can do.</p>
+          </div>
         </div>
         <div className="divide-y divide-outline-variant">
           {users.map((user) => {
@@ -211,19 +217,19 @@ export default function UsersSettingsPage() {
             return (
               <div
                 key={user.id}
-                className={`flex items-center justify-between px-4 py-3 ${isSelf ? 'bg-amber-50/60 border-l-2 border-amber-400' : ''}`}
+                className={`flex items-center justify-between gap-3 px-5 py-4 ${isSelf ? 'border-l-2 border-amber-400 bg-amber-500/5' : ''}`}
               >
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-on-surface">{user.full_name ?? user.email}</p>
                     {isSelf && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-700">
                         <Crown className="h-3 w-3" />
                         You
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-outline">{user.email} · {ROLE_LABELS[user.role] ?? user.role}</p>
+                  <p className="text-xs text-on-surface-variant">{user.email} · {ROLE_LABELS[user.role] ?? user.role}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {(user.role !== 'business_owner' || isSelf) && (
@@ -252,7 +258,7 @@ export default function UsersSettingsPage() {
                       <KeyRound className="h-4 w-4" />
                     </Button>
                   )}
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${user.is_active ? 'bg-green-100 text-green-700' : 'bg-surface-container text-on-surface-variant'}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${user.is_active ? 'bg-emerald-500/10 text-emerald-600' : 'bg-surface-container text-on-surface-variant'}`}>
                     {user.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </div>
@@ -262,19 +268,19 @@ export default function UsersSettingsPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-outline-variant bg-surface p-6">
-        <h3 className="mb-4 font-semibold text-on-surface">Create Team Member Account</h3>
+      <div className="rounded-2xl border border-outline-variant bg-surface-container-lowest p-5">
+        <h3 className="mb-4 text-base font-semibold text-on-surface">Create Team Member Account</h3>
         {userCreateError && (
-          <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{userCreateError}</div>
+          <div className="mb-3 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2 text-sm text-red-600">{userCreateError}</div>
         )}
-        <form onSubmit={userForm.handleSubmit(onCreateUser)} className="space-y-3 max-w-md">
+        <form onSubmit={userForm.handleSubmit(onCreateUser)} className="space-y-3 max-w-4xl">
           <Input label="Full Name" required {...userForm.register('full_name')} />
           <Input label="Email" type="email" required {...userForm.register('email')} />
           <Input label="Password" type="password" required {...userForm.register('password')} />
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-on-surface-variant">Role</label>
-              <select {...userForm.register('role')} className="h-9 w-full rounded-lg border border-outline px-3 text-sm">
+              <select {...userForm.register('role')} className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none">
                 <option value="cashier">Cashier</option>
                 <option value="staff">Staff</option>
                 <option value="branch_manager">Branch Manager</option>
@@ -282,7 +288,7 @@ export default function UsersSettingsPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-on-surface-variant">Branch</label>
-              <select {...userForm.register('branch_id')} className="h-9 w-full rounded-lg border border-outline px-3 text-sm">
+              <select {...userForm.register('branch_id')} className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none">
                 <option value="">Select branch</option>
                 {branches.map((b) => (
                   <option key={b.id} value={b.id}>{b.name}</option>
@@ -296,15 +302,15 @@ export default function UsersSettingsPage() {
 
       {resetTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-surface shadow-xl">
+          <div className="w-full max-w-sm rounded-xl bg-surface-container-lowest shadow-xl">
             <div className="flex items-center justify-between border-b border-outline-variant px-5 py-4">
               <div>
-                <h2 className="font-semibold text-on-surface">Set password</h2>
+                <h2 className="text-base font-semibold text-on-surface">Set password</h2>
                 <p className="mt-0.5 text-xs text-on-surface-variant">{resetTarget.full_name ?? resetTarget.email}</p>
               </div>
               <button
                 onClick={() => { setResetTarget(null); setResetError(null); setResetSuccess(false) }}
-                className="rounded-lg p-1 text-outline hover:bg-surface-container"
+                className="rounded-full p-1 text-on-surface-variant hover:bg-surface-container"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -312,7 +318,7 @@ export default function UsersSettingsPage() {
             <div className="p-5">
               {resetSuccess ? (
                 <div className="space-y-3">
-                  <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600">
                     <p className="font-semibold">Password updated</p>
                     <p className="mt-0.5 text-xs">They can now sign in with the new password.</p>
                   </div>
@@ -321,7 +327,7 @@ export default function UsersSettingsPage() {
               ) : (
                 <form onSubmit={resetPwForm.handleSubmit(onResetPassword)} className="space-y-4">
                   {resetError && (
-                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{resetError}</div>
+                    <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600">{resetError}</div>
                   )}
                   <Input
                     label="New password"
@@ -351,18 +357,18 @@ export default function UsersSettingsPage() {
 
       {editTarget && editTarget.role === 'business_owner' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-surface shadow-xl">
+          <div className="w-full max-w-sm rounded-xl bg-surface-container-lowest shadow-xl">
             <div className="flex items-center justify-between border-b border-outline-variant px-5 py-4">
               <div className="flex items-center gap-2">
                 <Crown className="h-4 w-4 text-amber-500" />
                 <div>
-                  <h2 className="font-semibold text-on-surface">Edit my details</h2>
+                  <h2 className="text-base font-semibold text-on-surface">Edit my details</h2>
                   <p className="mt-0.5 text-xs text-on-surface-variant">{editTarget.full_name ?? editTarget.email}</p>
                 </div>
               </div>
               <button
                 onClick={() => { setEditTarget(null); setEditError(null) }}
-                className="rounded-lg p-1 text-outline hover:bg-surface-container"
+                className="rounded-full p-1 text-on-surface-variant hover:bg-surface-container"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -370,7 +376,7 @@ export default function UsersSettingsPage() {
             <div className="p-5">
               <form onSubmit={ownProfileForm.handleSubmit(onEditOwnProfile)} className="space-y-4">
                 {editError && (
-                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{editError}</div>
+                  <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600">{editError}</div>
                 )}
                 <Input
                   label="Full Name"
@@ -393,15 +399,15 @@ export default function UsersSettingsPage() {
 
       {editTarget && editTarget.role !== 'business_owner' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-surface shadow-xl">
+          <div className="w-full max-w-sm rounded-xl bg-surface-container-lowest shadow-xl">
             <div className="flex items-center justify-between border-b border-outline-variant px-5 py-4">
               <div>
-                <h2 className="font-semibold text-on-surface">Edit team member</h2>
+                <h2 className="text-base font-semibold text-on-surface">Edit team member</h2>
                 <p className="mt-0.5 text-xs text-on-surface-variant">{editTarget.full_name ?? editTarget.email}</p>
               </div>
               <button
                 onClick={() => { setEditTarget(null); setEditError(null) }}
-                className="rounded-lg p-1 text-outline hover:bg-surface-container"
+                className="rounded-full p-1 text-on-surface-variant hover:bg-surface-container"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -409,7 +415,7 @@ export default function UsersSettingsPage() {
             <div className="p-5">
               <form onSubmit={editForm.handleSubmit(onEditUser)} className="space-y-4">
                 {editError && (
-                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{editError}</div>
+                  <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600">{editError}</div>
                 )}
                 <Input
                   label="Full Name"
@@ -424,7 +430,7 @@ export default function UsersSettingsPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="mb-1 block text-sm font-medium text-on-surface-variant">Role</label>
-                    <select {...editForm.register('role')} className="h-9 w-full rounded-lg border border-outline px-3 text-sm">
+                    <select {...editForm.register('role')} className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none">
                       <option value="cashier">Cashier</option>
                       <option value="staff">Staff</option>
                       <option value="branch_manager">Branch Manager</option>
@@ -432,7 +438,7 @@ export default function UsersSettingsPage() {
                   </div>
                   <div>
                     <label className="mb-1 block text-sm font-medium text-on-surface-variant">Branch</label>
-                    <select {...editForm.register('branch_id')} className="h-9 w-full rounded-lg border border-outline px-3 text-sm">
+                    <select {...editForm.register('branch_id')} className="h-10 w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 text-sm focus:border-primary focus:outline-none">
                       <option value="">Select branch</option>
                       {branches.map((b) => (
                         <option key={b.id} value={b.id}>{b.name}</option>
@@ -441,7 +447,7 @@ export default function UsersSettingsPage() {
                   </div>
                 </div>
                 <label className="flex items-center gap-2 text-sm text-on-surface-variant">
-                  <input type="checkbox" className="h-4 w-4 rounded border-outline" {...editForm.register('is_active')} />
+                  <input type="checkbox" className="h-4 w-4 rounded border-outline-variant" {...editForm.register('is_active')} />
                   Active
                 </label>
                 <Button type="submit" className="w-full" loading={editForm.formState.isSubmitting}>
@@ -455,18 +461,18 @@ export default function UsersSettingsPage() {
 
       {changePwTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-surface shadow-xl">
+          <div className="w-full max-w-sm rounded-xl bg-surface-container-lowest shadow-xl">
             <div className="flex items-center justify-between border-b border-outline-variant px-5 py-4">
               <div className="flex items-center gap-2">
                 <Crown className="h-4 w-4 text-amber-500" />
                 <div>
-                  <h2 className="font-semibold text-on-surface">Change my password</h2>
+                  <h2 className="text-base font-semibold text-on-surface">Change my password</h2>
                   <p className="mt-0.5 text-xs text-on-surface-variant">{changePwTarget.full_name ?? changePwTarget.email}</p>
                 </div>
               </div>
               <button
                 onClick={() => { setChangePwTarget(null); setChangePwError(null); setChangePwSuccess(false) }}
-                className="rounded-lg p-1 text-outline hover:bg-surface-container"
+                className="rounded-full p-1 text-on-surface-variant hover:bg-surface-container"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -474,7 +480,7 @@ export default function UsersSettingsPage() {
             <div className="p-5">
               {changePwSuccess ? (
                 <div className="space-y-3">
-                  <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-600">
                     <p className="font-semibold">Password updated</p>
                     <p className="mt-0.5 text-xs">Use your new password next time you sign in.</p>
                   </div>
@@ -483,7 +489,7 @@ export default function UsersSettingsPage() {
               ) : (
                 <form onSubmit={changePwForm.handleSubmit(onChangeOwnPassword)} className="space-y-4">
                   {changePwError && (
-                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{changePwError}</div>
+                    <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-sm text-red-600">{changePwError}</div>
                   )}
                   <Input
                     label="Current password"

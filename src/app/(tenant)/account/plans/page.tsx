@@ -78,7 +78,7 @@ export default function PlansPage() {
   const customPlanBaseline = deriveCustomPlanBaseline(plans)
   const effectiveCustomPlan = customPlan ?? makeDefaultCustomPlanState(customPlanBaseline)
 
-  // Arrived here via an "Upgrade Plan" CTA on a limit-reached error — if the
+  // Arrived here via an"Upgrade Plan" CTA on a limit-reached error — if the
   // hit limit maps to a Custom Plan dimension (branches/staff/inventory/repairs),
   // pre-bump that dimension one increment above baseline so the builder already
   // shows a plan that would fix it. Skipped if a trial custom-plan state has
@@ -210,7 +210,7 @@ export default function PlansPage() {
   const annualDiscountPct = Math.round(ANNUAL_DISCOUNT * 100)
 
   return (
-    <div className="min-h-screen bg-surface px-4 py-10">
+    <div className="min-h-screen bg-surface-container-lowest px-4 py-10">
       <div className="mx-auto max-w-5xl">
 
         {/* Back */}
@@ -223,7 +223,7 @@ export default function PlansPage() {
 
         {/* Header */}
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-black text-on-surface mb-2">Choose your plan</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-on-surface mb-2">Choose your plan</h1>
           <p className="text-on-surface-variant">
             {subscriptionStatus && !subscriptionStatus.hasAccess
               ? 'Your subscription has ended — resubscribe to restore full access.'
@@ -232,8 +232,8 @@ export default function PlansPage() {
         </div>
 
         {limitReason && (
-          <div className="mb-8 flex items-start gap-3 rounded-xl border border-brand-teal/30 bg-brand-teal/10 px-4 py-3 text-sm text-on-surface">
-            <Info className="h-4 w-4 shrink-0 mt-0.5 text-brand-teal" />
+          <div className="mb-8 flex items-start gap-3 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-on-surface">
+            <Info className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
             <p>
               You&apos;ve reached the {limitKey ? (LIMIT_FRIENDLY_LABEL[limitKey] ?? 'limit') : 'limit'} on your current plan.{' '}
               {limitDimension
@@ -251,7 +251,7 @@ export default function PlansPage() {
               className={cn(
                 'rounded-full px-6 py-2 text-sm font-semibold transition-all',
                 billingCycle === 'monthly'
-                  ? 'bg-brand-teal text-white shadow-sm'
+                  ? 'bg-primary text-on-primary'
                   : 'text-on-surface-variant hover:text-on-surface'
               )}
             >
@@ -262,14 +262,14 @@ export default function PlansPage() {
               className={cn(
                 'flex items-center gap-2 rounded-full px-6 py-2 text-sm font-semibold transition-all',
                 billingCycle === 'yearly'
-                  ? 'bg-brand-teal text-white shadow-sm'
+                  ? 'bg-primary text-on-primary'
                   : 'text-on-surface-variant hover:text-on-surface'
               )}
             >
               Annual
               <span className={cn(
-                'rounded-full px-2 py-0.5 text-[10px] font-bold',
-                billingCycle === 'yearly' ? 'bg-white/20 text-white' : 'bg-green-100 text-green-700'
+                'rounded-full px-2 py-0.5 text-[11px] font-medium',
+                billingCycle === 'yearly' ? 'bg-surface-container-lowest/20 text-white' : 'bg-emerald-500/10 text-emerald-600'
               )}>
                 Save {annualDiscountPct}%
               </span>
@@ -278,7 +278,7 @@ export default function PlansPage() {
         </div>
 
         {errorMsg && (
-          <p className="mb-6 text-center text-sm text-red-400 rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-3">
+          <p className="mb-6 text-center text-sm text-red-600 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3">
             {errorMsg}
           </p>
         )}
@@ -286,7 +286,7 @@ export default function PlansPage() {
         {/* Plan cards */}
         {loading ? (
           <div className="flex justify-center py-16">
-            <Loader2 className="h-8 w-8 animate-spin text-brand-teal" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -302,27 +302,27 @@ export default function PlansPage() {
                 <div
                   key={p.id}
                   className={cn(
-                    'relative flex flex-col rounded-2xl border p-6 transition-all',
+                    'relative flex flex-col rounded-2xl border p-6 transition-colors',
                     highlighted
-                      ? 'border-brand-teal bg-brand-teal/10 shadow-lg scale-[1.02]'
+                      ? 'border-primary bg-surface-container-lowest ring-1 ring-primary/20'
                       : 'border-outline-variant bg-surface-container-lowest'
                   )}
                 >
                   {highlighted && (
-                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand-teal px-3 py-0.5 text-[11px] font-bold text-white shadow">
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary/10 px-3 py-0.5 text-[11px] font-semibold text-primary">
                       Most popular
                     </span>
                   )}
 
-                  <p className="text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-2">{p.name}</p>
+                  <p className="text-sm font-semibold text-on-surface mb-2">{p.name}</p>
 
                   <div className="flex items-end gap-1 mb-1">
-                    <span className="text-4xl font-black text-on-surface">£{displayPrice}</span>
+                    <span className="text-4xl font-semibold tabular-nums tracking-tight text-on-surface">£{displayPrice}</span>
                     <span className="text-sm text-on-surface-variant mb-1">{priceSuffix}</span>
                   </div>
 
                   {showYearly ? (
-                    <p className="text-xs text-green-600 font-semibold mb-4">
+                    <p className="text-xs text-emerald-600 font-semibold mb-4">
                       saves £{savings}/yr vs monthly
                     </p>
                   ) : (
@@ -332,19 +332,19 @@ export default function PlansPage() {
                   <ul className="flex-1 space-y-2 mb-6">
                     {parseFeatures(p.features).map((f) => (
                       <li key={f} className="flex items-center gap-2 text-sm text-on-surface-variant">
-                        <CheckCircle2 className="h-4 w-4 shrink-0 text-brand-teal" />
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
                         <span className="capitalize">{f.replace(/_/g, ' ')}</span>
                       </li>
                     ))}
                     {p.max_branches != null && (
                       <li className="flex items-center gap-2 text-sm text-on-surface-variant">
-                        <CheckCircle2 className="h-4 w-4 shrink-0 text-brand-teal" />
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
                         {p.max_branches} branch{p.max_branches !== 1 ? 'es' : ''}
                       </li>
                     )}
                     {p.max_users != null && (
                       <li className="flex items-center gap-2 text-sm text-on-surface-variant">
-                        <CheckCircle2 className="h-4 w-4 shrink-0 text-brand-teal" />
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
                         Up to {p.max_users} staff members
                       </li>
                     )}
@@ -356,7 +356,7 @@ export default function PlansPage() {
                     className={cn(
                       'w-full font-semibold gap-2',
                       highlighted
-                        ? 'bg-brand-teal text-white hover:bg-brand-teal/90'
+                        ? 'bg-primary text-white hover:bg-primary/90'
                         : 'bg-surface-container-highest text-on-surface hover:bg-surface-container-high'
                     )}
                   >

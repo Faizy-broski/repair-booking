@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Search, Eye, Pencil, Trash2, FileDown, FileSpreadsheet, Printer, Columns, FileText, MoreHorizontal } from 'lucide-react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/shared/page-header'
 import { Input } from '@/components/ui/input'
 import { DataTable } from '@/components/shared/data-table'
 import { InlineFormSheet } from '@/components/shared/inline-form-sheet'
@@ -381,7 +382,7 @@ export default function CustomersPage() {
       cell: ({ row }) => (
         <button
           onClick={() => router.push(`/customers/${row.original.id}`)}
-          className="cursor-pointer font-medium text-blue-600 hover:underline hover:text-blue-800 transition-colors"
+          className="cursor-pointer font-medium text-primary hover:underline transition-colors"
         >
           {page * 20 + row.index + 1}
         </button>
@@ -393,7 +394,7 @@ export default function CustomersPage() {
       cell: ({ row }) => (
         <button
           onClick={() => router.push(`/customers/${row.original.id}`)}
-          className="cursor-pointer font-medium text-on-surface hover:text-blue-600 hover:underline transition-colors text-left"
+          className="cursor-pointer font-medium text-on-surface hover:text-primary hover:underline transition-colors text-left"
         >
           {row.original.first_name} {row.original.last_name ?? ''}
         </button>
@@ -445,7 +446,7 @@ export default function CustomersPage() {
       cell: ({ row }) => (
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
-            <button className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-on-surface hover:bg-surface-container hover:text-black transition-colors">
+            <button className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors">
               <MoreHorizontal className="h-5 w-5" />
             </button>
           </DropdownMenu.Trigger>
@@ -453,13 +454,13 @@ export default function CustomersPage() {
             <DropdownMenu.Content
               align="end"
               sideOffset={4}
-              className="z-50 min-w-[140px] rounded-lg border border-outline-variant bg-surface py-1 shadow-lg"
+              className="z-50 min-w-[140px] rounded-xl border border-outline-variant bg-surface-container-lowest py-1 shadow-lg"
             >
               <DropdownMenu.Item
                 onSelect={() => router.push(`/customers/${row.original.id}`)}
                 className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-on-surface-variant hover:bg-surface-container-low outline-none"
               >
-                <Eye className="h-3.5 w-3.5 text-blue-500" /> Details
+                <Eye className="h-3.5 w-3.5 text-primary" /> Details
               </DropdownMenu.Item>
               <DropdownMenu.Item
                 onSelect={() => openEdit(row.original)}
@@ -487,51 +488,39 @@ export default function CustomersPage() {
   })
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-on-surface">Manage Customers</h1>
-          <p className="text-sm text-on-surface-variant">{total} customers</p>
-        </div>
-        <Button onClick={() => setSheetOpen(true)}>
-          <Plus className="h-4 w-4" /> Add Customer
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Manage Customers"
+        description={`${total} customers`}
+        actions={
+          <Button onClick={() => setSheetOpen(true)}>
+            <Plus className="h-4 w-4" /> Add Customer
+          </Button>
+        }
+      />
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => exportCSV(customers)}
-          className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-700 hover:bg-emerald-100 transition-colors"
-        >
+        <Button variant="outline" size="sm" onClick={() => exportCSV(customers)}>
           <FileDown className="h-3.5 w-3.5" /> Export CSV
-        </button>
-        <button
-          onClick={() => exportExcel(customers)}
-          className="flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1.5 text-xs text-green-700 hover:bg-green-100 transition-colors"
-        >
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => exportExcel(customers)}>
           <FileSpreadsheet className="h-3.5 w-3.5" /> Export Excel
-        </button>
-        <button
-          onClick={() => exportPDF(customers)}
-          className="flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs text-sky-700 hover:bg-sky-100 transition-colors"
-        >
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => exportPDF(customers)}>
           <Printer className="h-3.5 w-3.5" /> Print
-        </button>
+        </Button>
         <div className="relative" ref={colMenuRef}>
-          <button
-            onClick={() => setColMenuOpen((v) => !v)}
-            className="flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs text-violet-700 hover:bg-violet-100 transition-colors"
-          >
+          <Button variant="outline" size="sm" onClick={() => setColMenuOpen((v) => !v)}>
             <Columns className="h-3.5 w-3.5" /> Column visibility
-          </button>
+          </Button>
           {colMenuOpen && (
-            <div className="absolute left-0 top-full z-20 mt-1 w-44 rounded-lg border border-outline-variant bg-surface p-2 shadow-lg">
+            <div className="absolute left-0 top-full z-20 mt-1 w-44 rounded-xl border border-outline-variant bg-surface-container-lowest p-2 shadow-lg">
               {TOGGLEABLE_COLS.map((key) => (
-                <label key={key} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs text-on-surface-variant hover:bg-surface-container-low">
+                <label key={key} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-on-surface-variant hover:bg-surface-container-low">
                   <input
                     type="checkbox"
-                    className="h-3.5 w-3.5 rounded"
+                    className="h-3.5 w-3.5 rounded accent-primary"
                     checked={colVisibility[key] !== false}
                     onChange={(e) => setColVisibility((v) => ({ ...v, [key]: e.target.checked }))}
                   />
@@ -541,21 +530,18 @@ export default function CustomersPage() {
             </div>
           )}
         </div>
-        <button
-          onClick={() => exportPDF(customers)}
-          className="flex items-center gap-1.5 rounded-full border border-outline bg-surface px-3 py-1.5 text-xs text-on-surface-variant hover:bg-surface-container-low transition-colors"
-        >
+        <Button variant="outline" size="sm" onClick={() => exportPDF(customers)}>
           <FileText className="h-3.5 w-3.5" /> Export PDF
-        </button>
+        </Button>
 
         <div className="ml-auto relative max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-outline" />
           <input
             type="search"
             placeholder="Search customers..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(0) }}
-            className="h-9 w-full rounded-lg border border-outline bg-surface pl-8 pr-3 text-sm focus:border-blue-500 focus:outline-none"
+            className="h-10 w-full rounded-full border border-outline-variant bg-surface-container-lowest pl-10 pr-4 text-sm focus:border-primary focus:outline-none"
           />
         </div>
       </div>
@@ -576,7 +562,7 @@ export default function CustomersPage() {
       <InlineFormSheet open={sheetOpen} onClose={() => { setSheetOpen(false); setCreateError(null); setNewVehicle(null) }} title="Add Customer">
         <form onSubmit={createForm.handleSubmit(onCreate)} className="space-y-4">
           {createError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{createError}</div>
+            <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2 text-sm text-red-600">{createError}</div>
           )}
           <div className="grid grid-cols-2 gap-3">
             <Input label="First Name" required error={createForm.formState.errors.first_name?.message} {...createForm.register('first_name')} />
@@ -594,17 +580,17 @@ export default function CustomersPage() {
           />
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface-variant">Address</label>
-            <textarea rows={2} className="w-full rounded-lg border border-outline px-3 py-2 text-sm" {...createForm.register('address')} />
+            <textarea rows={2} className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-sm focus:border-primary focus:outline-none" {...createForm.register('address')} />
           </div>
           {isTyreShop && (
             <div className="border-t border-outline-variant pt-3">
-              <p className="mb-2 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Vehicle (optional)</p>
+              <p className="mb-2 text-sm font-medium text-on-surface-variant">Vehicle (optional)</p>
               <VehiclePicker customerId={null} value={newVehicle} onChange={setNewVehicle} />
             </div>
           )}
           {customerFieldDefs.length > 0 && (
             <div className="border-t border-outline-variant pt-3 mt-2">
-              <p className="mb-2 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Additional Info</p>
+              <p className="mb-2 text-sm font-medium text-on-surface-variant">Additional Info</p>
               <CustomFieldRenderer
                 definitions={customerFieldDefs}
                 values={customFields}
@@ -622,7 +608,7 @@ export default function CustomersPage() {
       <InlineFormSheet open={editSheetOpen} onClose={() => { setEditSheetOpen(false); setEditError(null); setShowAddEditVehicle(false); setEditVehicleDraft(EMPTY_VEHICLE) }} title="Edit Customer">
         <form onSubmit={editForm.handleSubmit(onEdit)} className="space-y-4">
           {editError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{editError}</div>
+            <div className="rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2 text-sm text-red-600">{editError}</div>
           )}
           <div className="grid grid-cols-2 gap-3">
             <Input label="First Name" required error={editForm.formState.errors.first_name?.message} {...editForm.register('first_name')} />
@@ -640,15 +626,15 @@ export default function CustomersPage() {
           />
           <div>
             <label className="mb-1 block text-sm font-medium text-on-surface-variant">Address</label>
-            <textarea rows={2} className="w-full rounded-lg border border-outline px-3 py-2 text-sm" {...editForm.register('address')} />
+            <textarea rows={2} className="w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3.5 py-2 text-sm focus:border-primary focus:outline-none" {...editForm.register('address')} />
           </div>
           {isTyreShop && (
             <div className="border-t border-outline-variant pt-3">
-              <p className="mb-2 text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Vehicles</p>
+              <p className="mb-2 text-sm font-medium text-on-surface-variant">Vehicles</p>
               {editVehicles.length > 0 && (
                 <div className="mb-2 flex flex-wrap gap-2">
                   {editVehicles.map((v) => (
-                    <span key={v.id} className="rounded-md border border-outline bg-surface px-2.5 py-1.5 text-xs font-medium text-on-surface-variant">
+                    <span key={v.id} className="rounded-full border border-outline-variant bg-surface-container-low px-3 py-1 text-xs font-medium text-on-surface-variant">
                       {v.registration_number.toUpperCase()}
                       {(v.make || v.model) && <span className="ml-1 font-normal text-outline">{[v.make, v.model].filter(Boolean).join(' ')}</span>}
                     </span>
@@ -656,7 +642,7 @@ export default function CustomersPage() {
                 </div>
               )}
               {showAddEditVehicle ? (
-                <div className="rounded-lg border border-outline-variant bg-surface-container-low p-3 space-y-2">
+                <div className="rounded-xl border border-outline-variant bg-surface-container-low p-3 space-y-2">
                   <NewVehicleFields draft={editVehicleDraft} setDraft={setEditVehicleDraft} />
                   <div className="flex gap-2">
                     <Button type="button" size="sm" onClick={addEditVehicle} loading={savingEditVehicle} disabled={!editVehicleDraft.registration_number.trim()}>
@@ -671,7 +657,7 @@ export default function CustomersPage() {
                 <button
                   type="button"
                   onClick={() => setShowAddEditVehicle(true)}
-                  className="flex items-center gap-1 rounded-md border border-dashed border-outline px-2.5 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50"
+                  className="flex items-center gap-1 rounded-full border border-outline-variant px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10"
                 >
                   <Plus className="h-3 w-3" /> Add vehicle
                 </button>

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Wrench, ShoppingBag, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Wrench, ShoppingBag, ChevronLeft, ChevronRight, ArrowDownLeft, ArrowUpRight, Lock } from 'lucide-react'
 import { useAuthStore } from '@/store/auth.store'
 import { usePosStore } from '@/store/pos.store'
 import { formatCurrency } from '@/lib/utils'
@@ -115,9 +115,23 @@ export default function PosPage() {
 
   useEffect(() => {
     if (!pos.session) { setSessionStats(null); return }
-    fetchSessionStats(pos.session.id)
-    const interval = setInterval(() => fetchSessionStats(pos.session!.id), 30000)
-    return () => clearInterval(interval)
+    const sessionId = pos.session.id
+    fetchSessionStats(sessionId)
+    // Background refresh only while the till is actually on screen: a hidden
+    // POS tab used to poll this aggregate every 30s all day. Sales/refunds
+    // already trigger refreshSessionStats directly, so 60s is plenty, and
+    // coming back to the tab refreshes immediately.
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') fetchSessionStats(sessionId)
+    }, 60000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchSessionStats(sessionId)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [pos.session, fetchSessionStats])
 
   const refreshSessionStats = useCallback(() => {
@@ -501,39 +515,40 @@ export default function PosPage() {
   // ── Main layout ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="absolute inset-0 flex flex-col overflow-hidden bg-surface-container">
+    <div className="absolute inset-0 flex flex-col gap-3 overflow-hidden bg-surface p-3 sm:p-4">
 
       {/* Register open banner */}
       {pos.session && (
-        <div className="flex shrink-0 flex-col gap-1 border-b border-green-200 bg-green-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div className="flex items-center gap-2 text-sm font-medium text-green-700 whitespace-nowrap">
-            <div className="h-2.5 w-2.5 shrink-0 rounded-full bg-green-500 animate-pulse" />
-            Register Open · Float {formatCurrency(pos.session.opening_float)}
+        <div className="flex shrink-0 flex-col gap-2 rounded-2xl border border-primary/20 bg-primary/5 py-2 pl-5 pr-2 sm:flex-row sm:items-center sm:justify-between sm:rounded-full">
+          <div className="flex items-center gap-3 whitespace-nowrap text-sm">
+            <span className="flex items-center gap-2 font-medium text-on-surface">
+              <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-500" />
+              Register Open
+            </span>
+            <span className="h-4 w-px bg-outline-variant" />
+            <span className="text-on-surface-variant">
+              Float <span className="font-medium text-on-surface">{formatCurrency(pos.session.opening_float)}</span>
+            </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
               onClick={() => { setCashMovementType('cash_in'); setCashMovementOpen(true) }}
-              className="text-green-600 hover:text-green-700 font-bold"
+              className="font-semibold text-primary hover:bg-primary/10"
             >
-              Cash In
+              <ArrowDownLeft className="h-4 w-4" /> Cash In
             </Button>
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
               onClick={() => { setCashMovementType('cash_out'); setCashMovementOpen(true) }}
-              className="text-orange-600 hover:text-orange-700 font-bold"
+              className="font-semibold text-amber-600 hover:bg-amber-500/10"
             >
-              Cash Out
+              <ArrowUpRight className="h-4 w-4" /> Cash Out
             </Button>
-            <Button 
-              variant="secondary"
-              size="sm"
-              onClick={openCloseRegisterModal}
-              className="text-red-600 hover:text-red-700 font-bold"
-            >
-              Close Register
+            <Button size="sm" onClick={openCloseRegisterModal} className="h-9 px-4">
+              <Lock className="h-4 w-4" /> Close Register
             </Button>
           </div>
         </div>
@@ -574,14 +589,14 @@ export default function PosPage() {
           - (sessionStats.total_refunds - (sessionStats.card_refunds ?? 0))
           - (sessionStats.repair_cash_refunds ?? 0)
         return (
-          <div className="relative shrink-0 border-b border-outline-variant bg-surface-container-low px-3 py-2 sm:px-5">
+          <div className="relative shrink-0">
             <div
               ref={statsScrollRef}
               onScroll={updateStatsScrollState}
               className="flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               {([
-                ['Net Sales',      netSales,                                'text-brand-teal-dark', 'bg-brand-teal'],
+                ['Net Sales',      netSales,                                'text-primary', 'bg-primary'],
                 ['Product Sales',  productSales,                            'text-blue-700',   'bg-blue-500'],
                 // Product + Repair combined, tendered by cash/card — the one
                 // figure to check against the till count and the card
@@ -615,12 +630,12 @@ export default function PosPage() {
                 // is computed).
                 ['Cash Drawer Only', cashDrawerExpected,                    'text-lime-700',   'bg-lime-500'],
               ] as [string, number, string, string][]).map(([label, value, textCls, dotCls]) => (
-                <div key={label} className="flex shrink-0 flex-col gap-1 rounded-lg border border-outline-variant bg-surface px-3 py-2 shadow-sm">
-                  <span className="flex items-center gap-1.5 whitespace-nowrap text-xs font-bold uppercase tracking-wide text-on-surface-variant">
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${dotCls}`} />
+                <div key={label} className="flex min-w-[112px] shrink-0 flex-col gap-1.5 rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2.5">
+                  <span className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-wider text-on-surface-variant">
                     {label}
                   </span>
-                  <span className={`whitespace-nowrap text-base font-bold leading-none ${textCls}`}>{formatCurrency(value)}</span>
+                  <span className={`whitespace-nowrap text-lg font-semibold leading-none tabular-nums ${textCls}`}>{formatCurrency(value)}</span>
+                  <span className={`h-0.5 w-5 rounded-full ${dotCls}`} />
                 </div>
               ))}
             </div>
@@ -632,12 +647,12 @@ export default function PosPage() {
                 actually more to scroll to. */}
             {statsCanScrollLeft && (
               <>
-                <div className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-surface-container-low to-transparent sm:left-2" />
+                <div className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-surface to-transparent" />
                 <button
                   type="button"
                   aria-label="Scroll stats left"
                   onClick={() => scrollStatsBy(-220)}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-brand-teal text-white shadow-sm hover:bg-brand-teal-dark sm:left-1"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-on-primary hover:bg-primary/90 sm:left-1"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
@@ -645,12 +660,12 @@ export default function PosPage() {
             )}
             {statsCanScrollRight && (
               <>
-                <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-surface-container-low to-transparent sm:right-2" />
+                <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-surface to-transparent" />
                 <button
                   type="button"
                   aria-label="Scroll stats right"
                   onClick={() => scrollStatsBy(220)}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-brand-teal text-white shadow-sm hover:bg-brand-teal-dark sm:right-1"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-on-primary hover:bg-primary/90 sm:right-1"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>
@@ -660,25 +675,25 @@ export default function PosPage() {
         )
       })()}
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 gap-4 overflow-hidden">
 
         {/* ── LEFT: Cart Panel ── */}
         <CartPanel mobileView={mobileView} />
 
         {/* ── RIGHT: Tabbed browser ── */}
-        <div className={`flex-1 flex-col overflow-hidden ${mobileView === 'browse' ? 'flex' : 'hidden lg:flex'}`}>
+        <div className={`flex-1 flex-col overflow-hidden rounded-2xl border border-outline-variant bg-surface-container-lowest ${mobileView === 'browse' ? 'flex' : 'hidden lg:flex'}`}>
 
           {/* Tab bar */}
           {TABS.length > 1 && (
-            <div className="flex shrink-0 items-center bg-brand-teal">
+            <div className="flex shrink-0 items-center gap-2 border-b border-outline-variant px-4">
               {TABS.map(tab => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex flex-1 items-center justify-center gap-2 border-b-2 px-4 py-2.5 lg:py-4 text-sm lg:text-base font-semibold whitespace-nowrap transition-all ${
+                  className={`-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-2 py-3.5 text-sm font-semibold transition-colors lg:text-[15px] ${
                     activeTab === tab.key
-                      ? 'border-white text-white bg-white/10'
-                      : 'border-transparent text-white/60 hover:text-white hover:bg-white/5'
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-on-surface-variant hover:text-on-surface'
                   }`}
                 >
                   {tab.icon}{tab.label}
@@ -688,7 +703,7 @@ export default function PosPage() {
           )}
 
           {/* Tab content */}
-          <div className="flex flex-1 flex-col overflow-hidden bg-surface-container-low">
+          <div className="flex flex-1 flex-col overflow-hidden bg-surface-container-lowest">
             {activeTab === 'repairs' && <RepairsTab />}
             {activeTab === 'products' && <ProductsTab />}
           </div>
@@ -699,14 +714,14 @@ export default function PosPage() {
       <div className="flex shrink-0 lg:hidden border-t border-outline-variant bg-surface">
         <button
           onClick={() => setMobileView('browse')}
-          className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-semibold transition-colors ${mobileView === 'browse' ? 'text-brand-teal bg-brand-teal/5' : 'text-outline'}`}
+          className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-semibold transition-colors ${mobileView === 'browse' ? 'text-primary bg-primary/5' : 'text-outline'}`}
         >
           <Wrench className="h-5 w-5" />
           Browse
         </button>
         <button
           onClick={() => setMobileView('cart')}
-          className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-semibold transition-colors ${mobileView === 'cart' ? 'text-brand-teal bg-brand-teal/5' : 'text-outline'}`}
+          className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-semibold transition-colors ${mobileView === 'cart' ? 'text-primary bg-primary/5' : 'text-outline'}`}
         >
           <ShoppingBag className="h-5 w-5" />
           Cart
